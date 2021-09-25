@@ -1,0 +1,52 @@
+/*///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////// FETCH UNIT ////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////// Developed By: Willian Analdo Nunes /////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////// PUCRS, Porto Alegre, 2020      /////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
+
+module fetch  #(parameter start_address=32'h00000000)(//Generic start address
+    input logic clk,
+    input logic reset,
+    input logic ce,                                     // CE is used to bubble propagation (0 means hold state because a bubble is being issued)
+    input logic jump,                                   // Indicates when a branch must be taken
+    input logic [31:0] result,                          // The branch address from retire
+    input logic [31:0] instruction,                     // Instruction object code received from memory
+    output logic [31:0] i_address,                      // Instruction address in memory (PC)
+    output logic [31:0] IR,                             // Instruction Register
+    output logic [31:0] NPC,                            // PC value is propagated to be used as an operand in some instructions
+    output logic [3:0] tag_out);                        // Instruction Tag stream
+
+    logic [31:0] PC;
+    logic [3:0] next_tag, curr_tag;
+
+///////////////////////////////////////////////// PC Control ////////////////////////////////////////////////////////////////////////////////////////
+    always @(posedge clk or negedge reset)
+        if(!reset)                                      // Reset
+            PC <= start_address;
+        else if(jump)                                   // If a branch was taken then PC receives a new value from retire unit
+            PC <= result;
+        else if(ce==1)                                  // If there is no bubble being issued: PC <= PC+4
+            PC <= PC+4;                                 // Otherwise(when bubble==0) holds the current value
+
+///////////////////////////////////////////////// Sensitive Outputs /////////////////////////////////////////////////////////////////////////////////
+    always @(posedge clk)
+        if(ce==1) begin                                 // If there is no bubble then the internal signals are assigned to the outputs
+            IR <= instruction;                          // Needed because the instruction being hold in the registers must be executed
+            NPC <= PC;
+        end
+
+///////////////////////////////////////////////// TAG Calculator ////////////////////////////////////////////////////////////////////////////////////
+    always @(posedge clk or negedge reset)
+        if(!reset) begin                                // Reset
+            curr_tag <= 0;
+            next_tag <= 0;
+        end else if (jump)                              // If a Branch is taken then the instruction tag is increased
+            next_tag <= curr_tag + 1;
+        else if(ce==1)                                  // It is increased only when a bubbles is not being propagated
+            curr_tag <= next_tag;
+
+///////////////////////////////////////////////// Non-Sensitive Outputs /////////////////////////////////////////////////////////////////////////////
+    assign i_address = PC;
+    assign tag_out = curr_tag;
+
+endmodule

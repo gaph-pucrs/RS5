@@ -1,0 +1,80 @@
+/*///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////// RETIRE UNIT //////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////// Developed By: Willian Analdo Nunes /////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////// PUCRS, Porto Alegre, 2020      /////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
+
+//`include "pkg.sv"
+import my_pkg::*;
+
+module retire(
+    input logic clk,
+    input logic reset,
+    input logic [31:0] result [1:0],        // Results array
+    input logic jump,                       // Jump signal from branch unit 
+    input logic we,                         // Write enable from Execute(based on instruction type)
+    input logic [3:0] tag_in,               // Instruction tag to be compared with retire tag
+    input logic write_in,                   // Write in memory
+    input logic [1:0] size_in,              // Size of write in memory
+    output logic reg_we,                    // Write Enable to Register Bank
+    output logic [31:0] WrData,             // WriteBack data to Register Bank
+    output logic jump_out,                  // Jump signal to Fetch Unit
+    output logic [31:0] New_pc,             // Branch target to fetch Unit
+    output logic [31:0] write_address,      // Memory write address
+    output logic [31:0] DATA_out,           // Memory data to be written
+    output logic write,                     // Memory write enable
+    output logic [1:0] size);               // Memory write Size
+
+    logic [31:0] data;
+    logic [3:0] next_tag;
+    logic [3:0] curr_tag;
+    logic killed;
+
+///////////////////////////////////////////////// Assign to Register Bank Write Back ////////////////////////////////////////////////////////////////
+    assign WrData = result[0];
+
+///////////////////////////////////////////////// Killed signal generation //////////////////////////////////////////////////////////////////////////
+    always_comb
+        if (curr_tag != tag_in)     // If tags don't match then kill the instruction
+            killed <= 1;
+        else
+            killed <= 0;
+
+///////////////////////////////////////////////// TAG control based on signals Jump and Killed //////////////////////////////////////////////////////
+    always @(posedge clk or negedge reset)
+        if(!reset)
+            curr_tag <= 0;
+        else if (jump_out==1 && killed==0)      // If a jump was taken and the tag is correct then increases the internal tag
+            curr_tag <= curr_tag + 1;
+
+///////////////////////////////////////////////// Flow Control //////////////////////////////////////////////////////////////////////////////////////
+    always_comb
+        if(killed)          // If tags mismatch then do not write back
+          reg_we <= 0;
+        else                // Otherwise depends on instruction type
+          reg_we <= we;
+
+///////////////////////////////////////////////// PC Flow control signal generation /////////////////////////////////////////////////////////////////
+    always_comb
+        if (jump==1 && killed==0) begin     // If it is a branch instruction and tag is valid then effectuate the branch
+            New_pc <= result[1];
+            jump_out <= 1;
+        end else begin                      // Otherwise do nothing
+            New_pc <= 'Z;
+            jump_out <= 'Z;
+        end
+///////////////////////////////////////////////// Memory write control //////////////////////////////////////////////////////////////////////////////
+    always@(posedge clk)
+        if(write_in==1 && killed==0) begin  // If is a Store instruction and tag is valid then effectuate the Write
+            write <= write_in;
+            size <= size_in;
+            write_address <= result[1];
+            DATA_out <= result[0];
+        end else begin                      // Otherwise do nothing
+            write <= 'Z;
+            size <= 'Z;
+            write_address <= 'Z;
+            DATA_out <= 'Z;
+        end
+
+endmodule
