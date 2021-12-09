@@ -1,30 +1,42 @@
-/*///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////// DECODE UNIT ////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////// Developed By: Willian Analdo Nunes /////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////// PUCRS, Porto Alegre, 2020      /////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
+/*!\file decoder.sv
+ * PUCRS-RV VERSION - 1.0 - Public Release
+ *
+ * Distribution:  September 2021
+ *
+ * Willian Nunes   <willian.nunes@edu.pucrs.br>
+ * Marcos Sartori  <marcos.sartori@acad.pucrs.br>
+ * Ney calazans    <ney.calazans@pucrs.br>
+ *
+ * Research group: GAPH-PUCRS  <>
+ *
+ * \brief
+ * Decoder Unit is the second stage of PUCRS-RV processor.
+ *
+ * \detailed
+ * The decoder unit is the second stage of the PUCRS-RV processor and 
+ * is responsible for identify the instruction type and based on that 
+ * extracts the execute module of the instruction and the operation.
+ */
 
-//`include "pkg.sv"
 import my_pkg::*;
 
 module decoder(
-    input logic clk,
-    input logic reset,
-    input logic ce,                         // Used to bubble propagation (0 means hold state because a bubble is being issued)
-    input logic [31:0] NPC_in,              // Just bypass to NPC_out
-    input logic [31:0] instruction,         // Instruction Object code fetched by fetch unit
-    input logic [3:0] tag_in,               // Instruction tag (just bypass)
-    output logic [4:0] regA,                // Address of the first register(rs1)
-    output logic [4:0] regB,                // Address of the second register(rs2)
-    output logic [4:0] regD,                // Address of the destination register(rd)
+    input logic         clk,
+    input logic         reset,
+    input logic         ce,                 // Used to bubble propagation (0 means hold state because a bubble is being issued)
+    input logic [31:0]  NPC_in,             // Just bypass to NPC_out
+    input logic [31:0]  instruction,        // Instruction Object code fetched by fetch unit
+    input logic [3:0]   tag_in,             // Instruction tag (just bypass)
+    output logic [4:0]  regA,               // Address of the first register(rs1)
+    output logic [4:0]  regB,               // Address of the second register(rs2)
+    output logic [4:0]  regD,               // Address of the destination register(rd)
     output logic [31:0] NPC_out,            // Bypass of NPC_in signal
-    output fmts fmt_out,                    // Signal that indicates the instruction format
+    output fmts         fmt_out,            // Signal that indicates the instruction format
     output logic [31:0] instruction_out,    // Instruction object code to Operand Fetch (to catch immediate)
     output instruction_type i_out,          // Decoded Instruction operation (OP0, OP1...)
-    output xu xu_sel,                       // Decoded Instruction unity     (adder,shifter...)
-    output logic [3:0] tag_out);            // Instruction tag stream
+    output xu           xu_sel,             // Decoded Instruction unity     (adder,shifter...)
+    output logic [3:0]  tag_out);           // Instruction tag stream
 
-    // Type definition is at pkg.sv
     fmts fmt;
     i_type i;
     xu xu_int;
@@ -80,10 +92,10 @@ module decoder(
         else if (instruction[31:0]==32'h00000000) i<=NOP;
         else if (instruction[31:0]==32'h00000013) i<=NOP;
 
-        else i<=INVALID;    // if the opcodes are not recognized
+        else i<=INVALID;                        // if the opcodes are not recognized
     end
 
-    always_comb     // Execution unit is extracted based on instruction type
+    always_comb                                 // Execution unit is extracted based on instruction type
         case (i)
             ADD, SUB, SLTU, SLT:                        xu_int <= adder;
             XOR, OR, AND:                               xu_int <= logical;
@@ -93,7 +105,7 @@ module decoder(
             default:                                    xu_int <= bypass;
         endcase
 
-    always_comb     // Execution operation is extracted based on instruction type
+    always_comb                                 // Execution operation is extracted based on instruction type
         case (i)
             ADD, XOR, SLL, BEQ, LB:         op<=OP0;
             SUB, OR, SRL, BNE, LBU, LUI:    op<=OP1;

@@ -1,20 +1,36 @@
-/*///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////// FETCH UNIT ////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////// Developed By: Willian Analdo Nunes /////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////// PUCRS, Porto Alegre, 2020      /////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
+/*!\file fetch.sv
+ * PUCRS-RV VERSION - 1.0 - Public Release
+ *
+ * Distribution:  September 2021
+ *
+ * Willian Nunes   <willian.nunes@edu.pucrs.br>
+ * Marcos Sartori  <marcos.sartori@acad.pucrs.br>
+ * Ney calazans    <ney.calazans@pucrs.br>
+ *
+ * Research group: GAPH-PUCRS  <>
+ *
+ * \brief
+ * Fetch Unit is the first stage of the processor and fetch the instruction in memory.
+ *
+ * \detailed
+ * Fetch Unit is the first stage of the PUCRS-RV processor. It has an
+ * internal loop that contains the Program Counter(PC) that is increased by four 
+ * on a new clock cycle or is replaced by a new address in case of a branch. 
+ * It has a internal tag calculator that is increased in branchs and mantained
+ * in regular flows, the tag leaves the unit with the instruction fetched.
+ */
 
-module fetch  #(parameter start_address=32'h00000000)(//Generic start address
-    input logic clk,
-    input logic reset,
-    input logic ce,                                     // CE is used to bubble propagation (0 means hold state because a bubble is being issued)
-    input logic jump,                                   // Indicates when a branch must be taken
-    input logic [31:0] result,                          // The branch address from retire
-    input logic [31:0] instruction,                     // Instruction object code received from memory
+module fetch  #(parameter start_address=32'h00000000)(  //Generic start address
+    input logic         clk,
+    input logic         reset,
+    input logic         ce,                             // Chip Enable is used to bubble propagation (0 means hold state because a bubble is being issued)
+    input logic         jump,                           // Indicates when a branch must be taken
+    input logic [31:0]  result,                         // The branch address from retire
+    input logic [31:0]  instruction,                    // Instruction object code received from memory
     output logic [31:0] i_address,                      // Instruction address in memory (PC)
     output logic [31:0] IR,                             // Instruction Register
     output logic [31:0] NPC,                            // PC value is propagated to be used as an operand in some instructions
-    output logic [3:0] tag_out);                        // Instruction Tag stream
+    output logic [3:0]  tag_out);                       // Instruction Tag stream
 
     logic [31:0] PC;
     logic [3:0] next_tag, curr_tag;
