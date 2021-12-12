@@ -1,6 +1,6 @@
 TRIPLET = riscv32-unknown-elf
 CC = $(TRIPLET)-gcc
-CFLAGS = -IbareOS/include -O2 -fno-builtin -march=rv32i -nostdinc -mbranch-cost=7 -DITERATIONS=1 -DCORE_DEBUG=0
+CFLAGS = -IbareOS/include -O2 -fno-builtin -march=rv32i -nostdinc -mbranch-cost=7
 AS = $(TRIPLET)-as
 ASFLAGS = -march=rv32i
 CPP = $(TRIPLET)-g++
@@ -10,23 +10,16 @@ LDFLAGS = -nostdlib -march=rv32i -Triscv.ld
 OBJCOPY = $(TRIPLET)-objcopy
 OBJDUMP = $(TRIPLET)-objdump
 
-PROGNAME = coremark
-
-SRC_FILES = crt0.s \
-	arch.s \
-	softmul.c \
-	core_list_join.c \
-	core_matrix.c \
-	core_portme.c \
-	core_state.c \
-	core_util.c \
-	ee_printf.c \
-	core_main.c
+PROGNAME = helloworld dummy test_hanoi
 
 BIN_FILES = $(addsuffix .bin, $(PROGNAME))
 LST_FILES = $(addsuffix .lst, $(PROGNAME))
-ELF_FILES = $(addsuffix .elf, $(PROGNAME))
-OBJ_FILES = $(patsubst %.s, %.o, $(patsubst %.c, %.o, $(SRC_FILES)))
+
+BARE_OS = bareOS/crt0.o \
+	bareOS/arch.o \
+	bareOS/libos.o \
+	bareOS/malloc.o \
+	bareOS/softmul.o
 
 all : $(BIN_FILES) $(LST_FILES)
 
@@ -45,8 +38,8 @@ all : $(BIN_FILES) $(LST_FILES)
 %.o: %.s
 	$(AS) $(ASFLAGS) -o $@ $<
 
-$(ELF_FILES): $(OBJ_FILES)
+%.elf: $(BARE_OS) %.o
 	$(LD) -o $@ $+ $(LDFLAGS)
 
 clean :
-	rm -f $(BIN_FILES) $(LST_FILES) $(OBJ_FILES) $(ELF_FILES) $(wildcard *~)
+	rm -f $(BIN_FILES) $(LST_FILES) $(BARE_OS) $(wildcard *~) $(wildcard *.o) 

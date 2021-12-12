@@ -1,6 +1,6 @@
 ENTRY(_entry)
 
-/* specify HF-RISC memory areas */
+/* specify RISCV memory areas */
 
 
 /* define a global symbol _stack  */
@@ -39,7 +39,7 @@ SECTIONS {
 			*(.bss.*)
 			. = ALIGN(4);
 			_bss_end = . ;
-			. += 0x4000;
+			. += 0x2000;
 			_stack = .;
 	}
 
