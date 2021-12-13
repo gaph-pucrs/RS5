@@ -19,8 +19,29 @@ The processor is a 5 stage pipeline, synchronized to the rising edge of clock. T
 
 ## Requirements
 
-To perform code compilation the RISC-V toolchain is needed. The toolchain has a compiler that performs the compilation of the applications codes (located in [a link](https://github.com/Willian-Nunes/pucrs-rv/tree/master/app)) that are written in C language to a binary, this binary is the entry of the processor simulation.
+To perform code compilation the RISC-V toolchain is needed. The toolchain has a compiler that performs the compilation of the applications codes that are written in C language and generates a binary, this binary is the entry of the processor simulation. The applications are located in [app/](https://github.com/Willian-Nunes/pucrs-rv/tree/master/app).
 
-To install the Toolchain a guide and a script are provided inside the folder [a link](https://github.com/Willian-Nunes/pucrs-rv/tree/master/tools/riscv-toolchain).
+The installation of the toolchain is only needed if you want to compile new applications or change parameters in the given ones, the given applications are already compiled and it's binarys are located in the folder [bin/](https://github.com/Willian-Nunes/pucrs-rv/tree/master/bin).
+
+To install the Toolchain a guide and a script are provided inside the folder [tools/riscv-toolchain](https://github.com/Willian-Nunes/pucrs-rv/tree/master/tools/riscv-toolchain).
+
+To perform the simulation you must have a HDL simulator (e.g. ISE, MODELSIM). To perform the simulation of a specific application, you must edit the binary input file in the [testbench](https://github.com/Willian-Nunes/pucrs-rv/blob/master/sim/testbench.sv)(the line to be edited is the "initial" block located in the line 71). The tesbench is located in the [/sim](https://github.com/Willian-Nunes/pucrs-rv/blob/master/sim/) folder. Once the desired application is selected and the testbench is pointing to her, the you are able to perform the simulation using the HDL simulator. 
+
+## RTL and Processor Organization
+
+Brief explanation about the 3 loops, memory acess, etc.
 
 
+## Applications
+Brief explanation about the applications
+
+### Coremark
+Benchmark
+
+### RISCV Tests
+Berkeley Suite
+
+### Sample Codes
+Dummy
+Hello World
+Hanoi Tower
