@@ -17,11 +17,7 @@
  * processor and is responsible for performing operations such as 
  * SLL, SRL and SRA.
  */
-<<<<<<< Updated upstream
- 
-=======
 
->>>>>>> Stashed changes
 import my_pkg::*;
 
 module shiftUnit(

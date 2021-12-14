@@ -19,7 +19,7 @@
  * to the designed outputs, they are: 
  * 1) Register bank write data and write enable
  * 2) Branch address (New_PC)
- * 3) Memory write signals (Data, address, enable and size)
+ * 3) Memory write signals (Data, address and write enable)
  */
 
 import my_pkg::*;
@@ -31,16 +31,14 @@ module retire(
     input logic         jump,                       // Jump signal from branch unit 
     input logic         we,                         // Write enable from Execute(based on instruction type)
     input logic [3:0]   tag_in,                     // Instruction tag to be compared with retire tag
-    input logic         write_in,                   // Write in memory
-    input logic [1:0]   size_in,                    // Size of write in memory
+    input logic [3:0]   write_in,                   // Write enable memory
     output logic        reg_we,                     // Write Enable to Register Bank
     output logic [31:0] WrData,                     // WriteBack data to Register Bank
     output logic        jump_out,                   // Jump signal to Fetch Unit
     output logic [31:0] New_pc,                     // Branch target to fetch Unit
     output logic [31:0] write_address,              // Memory write address
     output logic [31:0] DATA_out,                   // Memory data to be written
-    output logic        write,                      // Memory write enable
-    output logic [1:0]  size);                      // Memory write Size
+    output logic [3:0]  write);                      // Memory write enable
 
     logic [31:0] data;
     logic [3:0] next_tag;
@@ -82,14 +80,12 @@ module retire(
         end
 ///////////////////////////////////////////////// Memory write control //////////////////////////////////////////////////////////////////////////////
     always@(posedge clk)
-        if(write_in==1 && killed==0) begin          // If is a Store instruction and tag is valid then effectuate the Write
+        if(write_in!=0 && killed==0) begin          // If is a Store instruction and tag is valid then effectuate the Write
             write <= write_in;
-            size <= size_in;
             write_address <= result[1];
             DATA_out <= result[0];
         end else begin                              // Otherwise do nothing
             write <= 'Z;
-            size <= 'Z;
             write_address <= 'Z;
             DATA_out <= 'Z;
         end

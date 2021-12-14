@@ -47,11 +47,10 @@ module PUCRS_RV(
     input logic [31:0]  DATA_in,                        // Data coming from Memory
     output logic [31:0] DATA_out,                       // Data to be written in Memory
     output logic [31:0] write_address,
-    output logic        write,                          // Memory Read or Write signal
-    output logic [1:0]  size);                          // Size of write in memory
+    output logic [3:0]  write);                          // Memory Write signal One Hot, each bit address 1 byte
 
-
-    logic jump_wb, jump_retire, bubble, write_retire, freeMem, we_retire;
+    logic jump_wb, jump_retire, bubble, freeMem, we_retire;
+    logic [3:0] write_retire;
     logic regD_we;
     logic [31:0] dataA, dataB, data_RLock;
     logic [4:0] regA_add, regB_add;
@@ -63,7 +62,6 @@ module PUCRS_RV(
     logic [31:0] write_address_retire;
     logic [3:0] decode_tag, OPF_tag, execute_tag, retire_tag;
     logic [4:0] regA_OPFetch, regB_OPFetch, regD_OPFetch;
-    logic [1:0] size_retire;
     fmts fmt_OPFetch;
     instruction_type i_OPFetch, i_execute, i_retire;
     xu xu_OPFetch, xu_execute;
@@ -94,15 +92,15 @@ module PUCRS_RV(
     execute execute1 (.clk(clk), .reset(reset), .NPC(NPC_execute), .opA(opA_execute), .opB(opB_execute), .opC(opC_execute),
                 .i(i_execute), .xu_sel(xu_execute), .tag_in(execute_tag),  .result_out(result_retire), .jump_out(jump_retire), 
                 .tag_out(retire_tag), .we_out(we_retire),
-                .DATA_in(DATA_in), .read_address(read_address), .read(read), .write(write_retire), .size(size_retire));
+                .DATA_in(DATA_in), .read_address(read_address), .read(read), .write(write_retire));
 
 /////////////////////////////////////////////////////////// RETIRE //////////////////////////////////////////////////////////////////////////////////
 
     retire retire1 (.clk(clk), .reset(reset), .result(result_retire), .jump(jump_retire), .we(we_retire),
                 .tag_in(retire_tag), .reg_we(regD_we), .WrData(data_wb),
                 .New_pc(New_pc), .jump_out(jump_wb),
-                .write_in(write_retire), .size_in(size_retire),
-                .write(write), .size(size), .write_address(write_address), .DATA_out(DATA_out));
+                .write_in(write_retire),
+                .write(write), .write_address(write_address), .DATA_out(DATA_out));
 
 /////////////////////////////////////////////////////////// REGISTER BANK ///////////////////////////////////////////////////////////////////////////
 

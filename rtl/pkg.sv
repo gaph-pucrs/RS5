@@ -36,4 +36,6 @@ package my_pkg;
 
     typedef enum  logic[2:0] {bypass, adder, logical, shifter, branch, memory} xu;
 
+    const int            MEMORY_SIZE = 65535;
+
 endpackage

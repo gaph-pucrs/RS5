@@ -42,8 +42,7 @@ module RAM_mem #(parameter startaddress = 32'h00000000)(
     input logic rst,
     input logic [31:0] i_address, 
     output logic [31:0] instruction,
-    input logic write_enable,
-    input logic [1:0] size,
+    input logic [3:0] write_enable,
     input logic [31:0] write_address,
     input logic [31:0] Wr_data,
     input logic read_enable,
@@ -51,6 +50,7 @@ module RAM_mem #(parameter startaddress = 32'h00000000)(
     output logic [31:0] data_read);
 
     bit [7:0] RAM [0:65535];
+    
     logic [31:0] W_tmp_address, R_tmp_address, INST_tmp_address;
     logic [15:0] W_low_address, R_low_address, INST_low_address;
     int W_low_address_int, R_low_address_int, INST_low_address_int;
@@ -69,10 +69,7 @@ module RAM_mem #(parameter startaddress = 32'h00000000)(
     assign INST_low_address_int = INST_low_address;   
 
     initial begin
-        //fd = $fopen ("../bin/BerkeleySuite.bin", "r");
-        //fd = $fopen ("../bin/test_hanoi.bin", "r");
-        fd = $fopen ("../bin/coremark.bin", "r");
-        //fd = $fopen ("../bin/coremarkDebug.bin", "r");
+        fd = $fopen ("../bin/test.bin", "r");
 
         r = $fread(RAM, fd);
         $display("read %d elements \n", r);
@@ -80,18 +77,15 @@ module RAM_mem #(parameter startaddress = 32'h00000000)(
 
 ////////////////////////////////////////////////////////////// Writes in memory ASYNCHRONOUSLY //////////////////////////////////////////////////////
     always @(write_enable or W_low_address) begin               // Sensitivity list 
-        if(write_enable==1 && W_low_address_int>=0 && W_low_address_int<=(MEMORY_SIZE-3)) begin // Check address range and write signals
-                if(size==2'b11) begin                           // Store Word(4 bytes)
+        if(write_enable!=0 && W_low_address_int>=0 && W_low_address_int<=(MEMORY_SIZE-3)) begin // Check address range and write signals
+                if(write_enable[3]==1)                                          // Store Word(4 bytes)
                     RAM[W_low_address_int+3] <= Wr_data[31:24];
+                if(write_enable[2]==1)                                          // Store Word(4 bytes)
                     RAM[W_low_address_int+2] <= Wr_data[23:16];
+                if(write_enable[1]==1)                                          // Store Half(2 bytes)
                     RAM[W_low_address_int+1] <= Wr_data[15:8];
-                    RAM[W_low_address_int] <= Wr_data[7:0];
-                end else if(size==2'b10) begin                  // Store Half(2 bytes)
-                    RAM[W_low_address_int+1] <= Wr_data[15:8];
-                    RAM[W_low_address_int] <= Wr_data[7:0];
-                end else begin                                  // Store Byte(1 byte)
-                    RAM[W_low_address_int] <= Wr_data[7:0];
-                end
+                if(write_enable[0]==1)                                          // Store Byte(1 byte)
+                    RAM[W_low_address_int]   <= Wr_data[7:0];
         end
     end
 
@@ -124,8 +118,8 @@ module PUCRS_RV_tb ();
 
 int    fd;                                                      // Variable for file descriptor handle
 logic [31:0]  Wr_address, Wr_data, instruction, read_address, i_address, write_address, data_read, data_rd, data_write;
-logic  clk, rstCPU, read, write;
-logic [1:0] size;
+logic  clk, rstCPU, read;
+logic [3:0] write;
 byte char;
 
 ////////////////////////////////////////////////////// Clock generator //////////////////////////////////////////////////////////////////////////////
@@ -135,15 +129,15 @@ byte char;
   end
 
 ////////////////////////////////////////////////////// MEM INSTANTIATION ///////////////////////////////////////////////////////////////////////
-	RAM_mem #(32'h00000000) RAM_MEM(.clock(clk), .write_enable(write), .read_enable(read), .rst(rstCPU), .size(size), .i_address(i_address), 
+	RAM_mem #(32'h00000000) RAM_MEM(.clock(clk), .write_enable(write), .read_enable(read), .rst(rstCPU), .i_address(i_address), 
             .read_address(read_address), .write_address(Wr_address), .Wr_data(Wr_data), .data_read(data_rd), .instruction(instruction));
 
 // data memory signals --------------------------------------------------------
   always_comb
-    if(write==1) begin
+    if(write!=0) begin
         Wr_address <= write_address;                            // Wr_address - write_address
         Wr_data <= data_write;                                  // Wr_data - data_write
-        $fdisplay(fd,"[%0d] Write: %h in address %d(%h) size: %0d  write %0d", $time, Wr_data, write_address, write_address, size, write);
+        $fdisplay(fd,"[%0d] Write: %h in address %d(%h)  write %04d", $time, Wr_data, write_address, write_address, write);
     end else begin 
         Wr_data <= 32'h00000000;
         Wr_address<=32'h00000000;
@@ -163,7 +157,7 @@ byte char;
 ////////////////////////////////////////////////////// Memory Mapped regs ///////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   always @(posedge clk) begin
-    if((write_address == 32'h80004000 | write_address == 32'h80001000) & write==1) begin
+    if((write_address == 32'h80004000 | write_address == 32'h80001000) & write!=0) begin
         char <= data_write[7:0];
         $write("%c",char);
     end
@@ -179,7 +173,7 @@ byte char;
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     PUCRS_RV dut (.clk(clk), .reset(rstCPU), .instruction(instruction), .i_address(i_address), .read(read), .read_address(read_address),
-             .DATA_in(data_read), .DATA_out(data_write), .write_address(write_address), .write(write), .size(size));
+             .DATA_in(data_read), .DATA_out(data_write), .write_address(write_address), .write(write));
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////// RESET CPU ////////////////////////////////////////////////////////////////////////////////////

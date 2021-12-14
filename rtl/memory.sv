@@ -32,59 +32,46 @@ module memoryUnit(
     input logic [31:0]  DATA_in,                        // Data received from memory
     output logic [31:0] write_address,                  // Adrress to Write in memory
     output logic [31:0] DATA_wb,                        // Data to be Written in Register Bank or in memory
-    output logic        write,                          // Signal that allows memory write
-    output logic [1:0]  size,                           // Signal that indicates the size of Write in memory(byte(1),half(2),word(4))
+    output logic [3:0]  write,                          // Signal that allows memory write
     output logic        we_out);                        // Write enable signal to register bank, in Stores=0 and in Loads=1
 
-    logic write_int, we_int;
+    logic we_int;
+    logic [3:0] write_int;
     logic [31:0] DATA_write, write_address_2;
-    logic [1:0] size_int;
 
 ///////////////////////////////////// generate all signals for read or write ////////////////////////////////////////////////////////////////////////
     always_comb begin
         if(i==OP0 | i==OP1) begin                        // Load Byte signed and unsigned (LB | LBU)
-            write_int <= 0;
+            write_int <= 4'b0000;
             read <= 1;
-            DATA_write <= '0;
-            size_int <= 2'b00;
 
         end else if(i==OP2 | i==OP3) begin               // Load Half(16b) signed and unsigned (LH | LHU)
-            write_int <= 0;
+            write_int <= 4'b0000;
             read <= 1;
-            DATA_write <= '0;
-            size_int <= 2'b00;
 
         end else if(i==OP4) begin                        // Load Word(32b) (LW)
-            write_int <= 0;
+            write_int <= 4'b0000;
             read <= 1;
-            DATA_write <= '0;
-            size_int <= 2'b00;
 
         end else if(i==OP7) begin                       // Store Byte (SB)
-            write_int <= 1;
+            write_int <= 4'b0001;
             read <= 0;
-            DATA_write[31:8] <= 24'h000000;
-            DATA_write[7:0] <= data[7:0];               // Only the less significant byte is fullfilled with data, the rest is fullfilled with zeros
-            size_int <= 2'b01;
 
         end else if(i==OP6) begin                       // Store Half(16b) (SH)
-            write_int <= 1;
+            write_int <= 4'b0011;
             read <= 0;
-            DATA_write[31:16] <= 16'h0000;    
-            DATA_write[15:0] <= data[15:0];             // Only the less significant half is fullfilled with data, the rest is fullfilled with zeros
-            size_int <= 2'b10;
 
         end else if(i==OP5) begin                       // Store Word (SW)
-            write_int <= 1;
+            write_int <= 4'b1111;
             read <= 0;
-            DATA_write[31:0] <= data[31:0];  
-            size_int <= 2'b11;
         end
         //////////////////////////////////////////////
         if(i==OP0 | i==OP1 | i==OP2 | i==OP3 | i==OP4)
             read_address = opA + opB;
         else 
             read_address = '0;
+        //////////////////////////////////////////////
+        DATA_write[31:0] <= data[31:0];
     end
 
 ///////////////////////////////////////////////// Data Write Back parsing ///////////////////////////////////////////////////////////////////////////
@@ -121,7 +108,6 @@ module memoryUnit(
     always@(posedge clk) begin
         write_address <= opA + opB;
         write <= write_int;
-        size <= size_int;
         we_out <= we_int;
     end
 
