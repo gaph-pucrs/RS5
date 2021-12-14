@@ -137,7 +137,7 @@ byte char;
     if(write!=0) begin
         Wr_address <= write_address;                            // Wr_address - write_address
         Wr_data <= data_write;                                  // Wr_data - data_write
-        $fdisplay(fd,"[%0d] Write: %h in address %d(%h)  write %04d", $time, Wr_data, write_address, write_address, write);
+        $fdisplay(fd,"[%0d] Write: %h in address %d(%h)  write %04b", $time, data_write, write_address, write_address, write);
     end else begin 
         Wr_data <= 32'h00000000;
         Wr_address<=32'h00000000;
@@ -149,7 +149,8 @@ byte char;
             data_read <= $time/1000;
         else 
             data_read <= data_rd; 
-        $fdisplay(fd,"[%0d]Read: %h from address %d(%h)) ", $time,  data_read, read_address, read_address);
+        if(read_address!=0 && data_read!=0)
+            $fdisplay(fd,"[%0d] Read: %h from address %d(%h)) ", $time,  data_read, read_address, read_address);
     end else
         data_read <= 'Z; 		                                // data_cpu
 
