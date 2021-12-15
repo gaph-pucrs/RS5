@@ -55,7 +55,6 @@ The Control of the processor flow is made by three main loops:
 3) The third loop comprehends the data hazard conflict mechanism that is implemented by the queue of register with pending writes.
 
 
-
 ## Requirements
 
 To perform code compilation the RISC-V toolchain is needed. The toolchain has a compiler that performs the compilation of the applications codes that are written in C language and generates a binary, this binary is the entry of the processor simulation. The applications are located in [app/](https://github.com/Willian-Nunes/pucrs-rv/tree/master/app).
