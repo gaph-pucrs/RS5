@@ -61,7 +61,6 @@ module PUCRS_RV(
     logic [31:0] opA_execute, opB_execute, opC_execute;
     logic [31:0] write_address_retire;
     logic [3:0] decode_tag, OPF_tag, execute_tag, retire_tag;
-    logic [4:0] regA_OPFetch, regB_OPFetch, regD_OPFetch;
     fmts fmt_OPFetch;
     instruction_type i_OPFetch, i_execute, i_retire;
     xu xu_OPFetch, xu_execute;
@@ -77,12 +76,12 @@ module PUCRS_RV(
 //////////////////////////////////////////////////////////// DECODER ////////////////////////////////////////////////////////////////////////////////
 
     decoder decoder1 (.clk(clk), .reset(reset), .ce(bubble), .NPC_in(NPC_decode), .instruction(IR), .tag_in(decode_tag), 
-                .regA(regA_OPFetch), .regB(regB_OPFetch), .regD(regD_OPFetch), .NPC_out(NPC_OPFetch), .fmt_out(fmt_OPFetch), 
+                .NPC_out(NPC_OPFetch), .fmt_out(fmt_OPFetch), 
                 .instruction_out(instruction_OPFetch), .i_out(i_OPFetch), .xu_sel(xu_OPFetch), .tag_out(OPF_tag));
 
 /////////////////////////////////////////////////////////// OP FETCH ////////////////////////////////////////////////////////////////////////////////
 
-    operandFetch OPfecth (.clk(clk), .reset(reset), .we(regD_we), .NPC(NPC_OPFetch), .regA(regA_OPFetch), .regB(regB_OPFetch), .regD(regD_OPFetch), 
+    operandFetch OPfecth (.clk(clk), .reset(reset), .we(regD_we), .NPC(NPC_OPFetch),
                 .fmt(fmt_OPFetch), .instruction(instruction_OPFetch), .i(i_OPFetch), .xu_sel_in(xu_OPFetch), .tag_in(OPF_tag), .dataA(dataA), 
                 .dataB(dataB), .regA_add(regA_add), .regB_add(regB_add), .opA_out(opA_execute), .opB_out(opB_execute), 
                 .opC_out(opC_execute), .NPC_out(NPC_execute), .i_out(i_execute), .xu_sel(xu_execute), .tag_out(execute_tag), .wrAddr(wrAddr), .bubble(bubble));

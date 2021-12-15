@@ -26,9 +26,6 @@ module operandFetch #(parameter DEPTH = 2)(
     input logic clk,
     input logic reset,
     input logic we,
-    input logic [4:0]   regA,                   // Address of the 1st register, from decode unit
-    input logic [4:0]   regB,                   // Address of the 2nd register, from decode unit
-    input logic [4:0]   regD,                   // Address of the destination register, from decode unit
     input fmts          fmt,                    // Instruction Format
     input logic [31:0]  instruction,            // Object code of the instruction to extract the immediate operand
     input logic [31:0]  NPC,                    // Bypassed to execute unit as an operand
@@ -99,8 +96,8 @@ module operandFetch #(parameter DEPTH = 2)(
             imed[31:0] <= 32'h00000000;
 
 ///////////////////////////////////////////////// Read Addresses to RegBank /////////////////////////////////////////////////////////////////////////
-    assign regA_add = regA;
-    assign regB_add = regB;
+    assign regA_add = instruction[19:15];
+    assign regB_add = instruction[24:20];
 
 ///////////////////////////////////////////////// Control of the exits based on format //////////////////////////////////////////////////////////////
     always_comb
@@ -132,7 +129,7 @@ module operandFetch #(parameter DEPTH = 2)(
 
 ////////////////////////////////////////////////// Conversion to one-hot codification ///////////////////////////////////////////////////////////////
     always_comb begin
-        regD_add <= 1 << regD;
+        regD_add <= 1 << instruction[11:7];
     ////////////////////////////////
         if(xu_sel_in==memory && (i==OP5 | i==OP6 | i==OP7)) // [0] Indicates a pending write in memory, used to avoid data hazards in memory
             regD_add[0] <= 1;

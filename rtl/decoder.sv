@@ -27,9 +27,6 @@ module decoder(
     input logic [31:0]  NPC_in,             // Just bypass to NPC_out
     input logic [31:0]  instruction,        // Instruction Object code fetched by fetch unit
     input logic [3:0]   tag_in,             // Instruction tag (just bypass)
-    output logic [4:0]  regA,               // Address of the first register(rs1)
-    output logic [4:0]  regB,               // Address of the second register(rs2)
-    output logic [4:0]  regD,               // Address of the destination register(rd)
     output logic [31:0] NPC_out,            // Bypass of NPC_in signal
     output fmts         fmt_out,            // Signal that indicates the instruction format
     output logic [31:0] instruction_out,    // Instruction object code to Operand Fetch (to catch immediate)
@@ -136,9 +133,6 @@ module decoder(
 ///////////////////////////////////////////////// Output registers //////////////////////////////////////////////////////////////////////////////////
     always @(posedge clk)
         if(ce==1) begin                         // Hold state when a bubble is being issued
-            regA <= instruction[19:15];
-            regB <= instruction[24:20];
-            regD <= instruction[11:7];
             NPC_out <= NPC_in;
             instruction_out <= instruction;
             fmt_out <= fmt;
