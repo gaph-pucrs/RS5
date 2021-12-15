@@ -25,11 +25,37 @@ The installation of the toolchain is only needed if you want to compile new appl
 
 To install the Toolchain a guide and a script are provided inside the folder [tools/riscv-toolchain](https://github.com/Willian-Nunes/pucrs-rv/tree/master/tools/riscv-toolchain).
 
-To perform the simulation you must have a HDL simulator (e.g. ISE, MODELSIM). To perform the simulation of a specific application, you must edit the binary input file in the [testbench](https://github.com/Willian-Nunes/pucrs-rv/blob/master/sim/testbench.sv) (the line to be edited is the "initial" block and is located in the line 72. The tesbench is located in the [/sim](https://github.com/Willian-Nunes/pucrs-rv/blob/master/sim/) folder. Once the desired application is selected and the testbench is pointing to her, the you are able to perform the simulation using the HDL simulator. 
+To perform the simulation you must have a HDL simulator (e.g. ISE, MODELSIM). To perform the simulation of a specific application, you must edit the binary input file in the [ram.sv](https://github.com/Willian-Nunes/pucrs-rv/blob/master/sim/ram.sv) (the line to be edited is inside the "initial" block and is located in the line 54. The tesbench and the ram implementation are located in the [/sim](https://github.com/Willian-Nunes/pucrs-rv/blob/master/sim/) folder. Once the desired application is selected and the testbench is pointing to it, then you are able to perform the simulation using the HDL simulator. 
 
 ## RTL and Processor Organization
 
+
+
+
+
+
+
+
+
+
+
+
+
 Brief explanation about the 3 loops, memory acess, etc.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 ## Applications
