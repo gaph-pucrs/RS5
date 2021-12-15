@@ -52,48 +52,42 @@ module operandFetch #(parameter DEPTH = 2)(
 
 ///////////////////////////////////////////////// Extract the immediate based on instruction type ///////////////////////////////////////////////////
     always_comb
-        if(fmt==I_type) begin
-            imed[10:0] <= instruction[30:20];
-            if(instruction[31]==0)
-                imed[31:11] <= 21'b000000000000000000000;
-            else
-                imed[31:11] <= 21'b111111111111111111111;    
+        case(fmt)
+            I_type: begin
+                        imed[31:11] = (instruction[31]==0) ? '0 : '1;
+                        imed[10:0] <= instruction[30:20];
+                    end
 
-        end else if(fmt==S_type) begin
-            imed[10:5] <= instruction[30:25];
-            imed[4:0]  <= instruction[11:7];
-            if(instruction[31]==0)
-                imed[31:11] <= 21'b000000000000000000000;
-            else
-                imed[31:11] <= 21'b111111111111111111111;    
+            S_type: begin
+                        imed[31:11] = (instruction[31]==0) ? '0 : '1;
+                        imed[10:5] <= instruction[30:25];
+                        imed[4:0]  <= instruction[11:7];
+                    end
 
-        end else if(fmt==B_type) begin
-            imed[11] <= instruction[7];
-            imed[10:5] <= instruction[30:25];
-            imed[4:1] <= instruction[11:8];
-            imed[0] <= 0;
-            if(instruction[31]==0)
-                imed[31:12] <= 20'b00000000000000000000;
-            else
-                imed[31:12]<=20'b11111111111111111111;
+            B_type: begin
+                        imed[31:12] = (instruction[31]==0) ? '0 : '1;
+                        imed[11] <= instruction[7];
+                        imed[10:5] <= instruction[30:25];
+                        imed[4:1] <= instruction[11:8];
+                        imed[0] <= 0;
+                    end
 
-        end else if(fmt==U_type) begin
-            imed[31:12] <= instruction[31:12];
-            imed[11:0] <= 12'b000000000000;
+            U_type: begin
+                        imed[31:12] <= instruction[31:12];
+                        imed[11:0] <= '0;
+                    end
 
-        end else if(fmt==J_type) begin
-            imed[19:12] <= instruction[19:12];
-            imed[11] <= instruction[20];
-            imed[10:5] <= instruction[30:25];
-            imed[4:1] <= instruction[24:21];
-            imed[0] <= 0;
-            if(instruction[31]==0)
-                imed[31:20] <= 12'b000000000000;
-            else
-                imed[31:20] <= 12'b111111111111;
+            J_type: begin
+                        imed[31:20] = (instruction[31]==0) ? '0 : '1;
+                        imed[19:12] <= instruction[19:12];
+                        imed[11] <= instruction[20];
+                        imed[10:5] <= instruction[30:25];
+                        imed[4:1] <= instruction[24:21];
+                        imed[0] <= 0;
+                    end
 
-        end else
-            imed[31:0] <= 32'h00000000;
+            default:      imed[31:0] <= '0;
+        endcase
 
 ///////////////////////////////////////////////// Read Addresses to RegBank /////////////////////////////////////////////////////////////////////////
     assign regA_add = instruction[19:15];
