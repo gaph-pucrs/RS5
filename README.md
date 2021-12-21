@@ -4,7 +4,7 @@
 
 PUCRS-RV is a processor that implements the RISC-V 32 bits integer Module (RV32I). It was written in a Hardware Description Language (HDL) called SystemVerilog.
 
-This project was designed at the Embedded Systems Group (GSE) of the polytechnic school, PUCRS, Brazil.
+This project was designed at the Hardware development support Group (GAPH) of the School of Technology, PUCRS, Brazil.
 
 The processor is a 5 stage pipeline, synchronized to the rising edge of clock. The stages are:
 
