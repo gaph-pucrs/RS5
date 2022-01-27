@@ -40,7 +40,7 @@ module decoder(
     instruction_type op;
 
 ///////////////////////////////////////////////// find out the type of the instruction //////////////////////////////////////////////////////////////
-    always_comb begin
+    always_comb
              if (instruction[6:0]==7'b0110111) i<=LUI;
         else if (instruction[6:0]==7'b0010111) i<=ADD;    //AUIPC
         else if (instruction[6:0]==7'b1101111) i<=JAL;
@@ -90,7 +90,6 @@ module decoder(
         else if (instruction[31:0]==32'h00000013) i<=NOP;
 
         else i<=INVALID;                        // if the opcodes are not recognized
-    end
 
     always_comb                                 // Execution unit is extracted based on instruction type
         case (i)
@@ -117,18 +116,14 @@ module decoder(
 
 /////////////////////////////////////////////////  Decodes the instruction format ///////////////////////////////////////////////////////////////////
     always_comb
-        if(instruction[6:0]==7'b0010011 | instruction[6:0]==7'b1100111 | instruction[6:0]==7'b0000011) // Register-Imediate(ADDI,ORI,ANDI,JALR,LOADS)
-            fmt <= I_type;                  
-        else if(instruction[6:0]==7'b0100011)   // Store_type(SW,SB,SH)
-            fmt <= S_type;
-        else if(instruction[6:0]==7'b1100011)   // Conditional branches(BEQ,BNE,BLT, BLTU, BGE, BGEU)
-            fmt <= B_type;
-        else if (instruction[6:0]==7'b0110111 | instruction[6:0]==7'b0010111) // U_type(LUI,AUIPC)
-            fmt <= U_type;
-        else if (instruction[6:0]==7'b1101111)  // J_type(JAL)
-            fmt <= J_type;
-        else                                    // Register-Register instructions (ADD,SUB,AND...)
-            fmt <= R_type;
+        case (instruction[6:0])
+            7'b0010011, 7'b1100111, 7'b0000011:     fmt <= I_type;
+            7'b0100011:                             fmt <= S_type;
+            7'b1100011:                             fmt <= B_type;
+            7'b0110111, 7'b0010111:                 fmt <= U_type;
+            7'b1101111:                             fmt <= J_type;
+            default:                                fmt <= R_type;
+        endcase
 
 ///////////////////////////////////////////////// Output registers //////////////////////////////////////////////////////////////////////////////////
     always @(posedge clk)
@@ -140,5 +135,4 @@ module decoder(
             xu_sel <= xu_int;
             tag_out <= tag_in;
         end
-
 endmodule

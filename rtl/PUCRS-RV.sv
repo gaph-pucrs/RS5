@@ -18,7 +18,6 @@
  * ans also defines the interface ports(inputs and outputs) os the processor.
  */
 
-/*
 `include "./pkg.sv"
 `include "./adder.sv"
 `include "./branch.sv"
@@ -32,8 +31,6 @@
 `include "./regbank.sv"
 `include "./execute.sv"
 `include "./retire.sv"
-*/
-
 
 import my_pkg::*;
 

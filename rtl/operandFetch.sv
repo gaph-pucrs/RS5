@@ -54,18 +54,18 @@ module operandFetch #(parameter DEPTH = 2)(
     always_comb
         case(fmt)
             I_type: begin
-                        imed[31:11] = (instruction[31]==0) ? '0 : '1;
+                        imed[31:11] <= (instruction[31]==0) ? '0 : '1;
                         imed[10:0] <= instruction[30:20];
                     end
 
             S_type: begin
-                        imed[31:11] = (instruction[31]==0) ? '0 : '1;
+                        imed[31:11] <= (instruction[31]==0) ? '0 : '1;
                         imed[10:5] <= instruction[30:25];
                         imed[4:0]  <= instruction[11:7];
                     end
 
             B_type: begin
-                        imed[31:12] = (instruction[31]==0) ? '0 : '1;
+                        imed[31:12] <= (instruction[31]==0) ? '0 : '1;
                         imed[11] <= instruction[7];
                         imed[10:5] <= instruction[30:25];
                         imed[4:1] <= instruction[11:8];
@@ -78,7 +78,7 @@ module operandFetch #(parameter DEPTH = 2)(
                     end
 
             J_type: begin
-                        imed[31:20] = (instruction[31]==0) ? '0 : '1;
+                        imed[31:20] <= (instruction[31]==0) ? '0 : '1;
                         imed[19:12] <= instruction[19:12];
                         imed[11] <= instruction[20];
                         imed[10:5] <= instruction[30:25];

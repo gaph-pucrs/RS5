@@ -75,8 +75,8 @@ module retire(
             New_pc <= result[1];
             jump_out <= 1;
         end else begin                              // Otherwise do nothing
-            New_pc <= 'Z;
-            jump_out <= 'Z;
+            New_pc <= '0;
+            jump_out <= '0;
         end
 ///////////////////////////////////////////////// Memory write control //////////////////////////////////////////////////////////////////////////////
     always@(posedge clk)
