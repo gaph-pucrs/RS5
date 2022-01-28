@@ -50,6 +50,10 @@ module operandFetch #(parameter DEPTH = 2)(
     wor [31:0] locked;
     logic [31:0] lock_queue[DEPTH];
 
+///////////////////////////////////////////////// Read Addresses to RegBank /////////////////////////////////////////////////////////////////////////
+    assign regA_add = instruction[19:15];
+    assign regB_add = instruction[24:20];
+
 ///////////////////////////////////////////////// Extract the immediate based on instruction type ///////////////////////////////////////////////////
     always_comb
         case(fmt)
@@ -89,43 +93,12 @@ module operandFetch #(parameter DEPTH = 2)(
             default:      imed[31:0] <= '0;
         endcase
 
-///////////////////////////////////////////////// Read Addresses to RegBank /////////////////////////////////////////////////////////////////////////
-    assign regA_add = instruction[19:15];
-    assign regB_add = instruction[24:20];
-
 ///////////////////////////////////////////////// Control of the exits based on format //////////////////////////////////////////////////////////////
-    always_comb
-        case(fmt)
-            I_type: begin
-                        opA <= dataA;
-                        opB <= imed;
-                        opC <= '0;
-                    end
-
-            U_type, J_type: begin
-                        opA <= NPC;
-                        opB <= imed;
-                        opC <= '0;
-                    end
-
-            S_type: begin
-                        opA <= dataA;
-                        opB <= imed;
-                        opC <= dataB;
-                    end
-
-            R_type, B_type: begin
-                        opA <= dataA;
-                        opB <= dataB;
-                        opC <= imed;
-                    end
-
-            default: begin
-                        opA <= imed;
-                        opB <= '0;
-                        opC <= '0;   
-                    end
-        endcase
+    always_comb begin
+        opA <= (fmt==U_type | fmt==J_type) ? NPC   : dataA;
+        opB <= (fmt==R_type | fmt==B_type) ? dataB : imed;
+        opC <= (fmt==S_type)               ? dataB : imed;
+    end
 
 ////////////////////////////////////////////////// Conversion to one-hot codification ///////////////////////////////////////////////////////////////
     always_comb begin
