@@ -95,36 +95,42 @@ module operandFetch #(parameter DEPTH = 2)(
 
 ///////////////////////////////////////////////// Control of the exits based on format //////////////////////////////////////////////////////////////
     always_comb
-        if(fmt==I_type) begin                               // addi, slti, andi, ori, xori, slli, slri, srai, LOADS, JALR
-            opA <= dataA;
-            opB <= imed;
-            opC <= 32'h00000000;
+        case(fmt)
+            I_type: begin
+                        opA <= dataA;
+                        opB <= imed;
+                        opC <= '0;
+                    end
 
-        end else if(fmt==U_type | fmt==J_type) begin        // auipc, lui, jal
-            opA <= NPC;
-            opB <= imed;
-            opC <= 32'h00000000;
+            U_type, J_type: begin
+                        opA <= NPC;
+                        opB <= imed;
+                        opC <= '0;
+                    end
 
-        end else if(fmt==S_type) begin                      // STORES
-            opA <= dataA;
-            opB <= imed;
-            opC <= dataB;
+            S_type: begin
+                        opA <= dataA;
+                        opB <= imed;
+                        opC <= dataB;
+                    end
 
-        end else if(fmt==R_type | fmt==B_type) begin        // Conditional branches and register-register instructions
-            opA <= dataA;
-            opB <= dataB;               
-            opC <= imed;
+            R_type, B_type: begin
+                        opA <= dataA;
+                        opB <= dataB;
+                        opC <= imed;
+                    end
 
-        end else begin                                      //nop, invalid
-            opA <= imed;
-            opB <= 32'h00000000;
-            opC <= 32'h00000000;   
-        end
+            default: begin
+                        opA <= imed;
+                        opB <= '0;
+                        opC <= '0;   
+                    end
+        endcase
 
 ////////////////////////////////////////////////// Conversion to one-hot codification ///////////////////////////////////////////////////////////////
     always_comb begin
         regD_add <= 1 << instruction[11:7];
-    ////////////////////////////////
+        ///////////////////////////////////
         if(xu_sel_in==memory && (i==OP5 | i==OP6 | i==OP7)) // [0] Indicates a pending write in memory, used to avoid data hazards in memory
             regD_add[0] <= 1;
         else
