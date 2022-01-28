@@ -51,7 +51,7 @@ module RAM_mem #(parameter startaddress = 32'h00000000)(
     assign INST_low_address_int = INST_tmp_address[15:0];               // convert to integer
 
     initial begin
-        fd = $fopen ("../bin/test.bin", "r");
+        fd = $fopen ("/home/williannunes/pucrs-rv/bin/test.bin", "r");
 
         r = $fread(RAM, fd);
         $display("read %d elements \n", r);
@@ -80,8 +80,10 @@ module RAM_mem #(parameter startaddress = 32'h00000000)(
         end
 
 ////////////////////////////////////////////////////////////// Read INSTRUCTION from memory /////////////////////////////////////////////////////////////////////
-    always @( rst or negedge clock)
-        if(rst==1 && INST_low_address_int>=0 && INST_low_address_int<=(MEMORY_SIZE-3)) begin
+    always @(rst or negedge clock)
+        if(rst==0)
+            instruction <= '0;
+        else if(rst==1 && INST_low_address_int>=0 && INST_low_address_int<=(MEMORY_SIZE-3)) begin
             instruction[31:24] <= RAM[INST_low_address_int+3];
             instruction[23:16] <= RAM[INST_low_address_int+2];
             instruction[15:8]  <= RAM[INST_low_address_int+1];

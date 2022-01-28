@@ -17,7 +17,7 @@
  * and is responsible for the instantiation of the lower level modules
  * ans also defines the interface ports(inputs and outputs) os the processor.
  */
-/*
+
 `include "./pkg.sv"
 `include "./adder.sv"
 `include "./branch.sv"
@@ -31,7 +31,7 @@
 `include "./regbank.sv"
 `include "./execute.sv"
 `include "./retire.sv"
-*/
+
 import my_pkg::*;
 
 module PUCRS_RV(

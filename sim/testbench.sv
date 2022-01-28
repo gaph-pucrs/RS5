@@ -17,6 +17,7 @@
  */
 
 `timescale 1ns/1ps
+
 `include "../rtl/pkg.sv"
 `include "../rtl/adder.sv"
 `include "../rtl/branch.sv"
@@ -40,11 +41,14 @@ import my_pkg::*;
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 module PUCRS_RV_tb ();
 
-int    fd;                                                      // Variable for file descriptor handle
-logic [31:0]  Wr_address, Wr_data, instruction, read_address, i_address, write_address, data_read, data_rd, data_write;
-logic  clk, rstCPU, read;
-logic [3:0] write;
-byte char;
+logic         clk, rstCPU;
+logic [31:0]  i_address, instruction;
+logic         read;
+logic [31:0]  read_address, data_read, write_address, data_write;
+logic [3:0]   write;
+byte          char;
+logic [31:0]  Rd_data, Wr_address, Wr_data;
+
 
 ////////////////////////////////////////////////////// Clock generator //////////////////////////////////////////////////////////////////////////////
   always begin
@@ -54,14 +58,13 @@ byte char;
 
 ////////////////////////////////////////////////////// RAM INSTANTIATION ///////////////////////////////////////////////////////////////////////
 	RAM_mem #(32'h00000000) RAM_MEM(.clock(clk), .rst(rstCPU), .write_enable(write), .read_enable(read), .i_address(i_address), 
-            .read_address(read_address), .write_address(Wr_address), .Wr_data(Wr_data), .data_read(data_rd), .instruction(instruction));
+            .read_address(read_address), .write_address(Wr_address), .Wr_data(Wr_data), .data_read(Rd_data), .instruction(instruction));
 
 // data memory signals --------------------------------------------------------
   always_comb
     if(write!=0) begin
         Wr_address <= write_address;                            // Wr_address - write_address
         Wr_data <= data_write;                                  // Wr_data - data_write
-        $fdisplay(fd,"[%0d] Write: %h in address %d(%h)  write %04b", $time, data_write, write_address, write_address, write);
     end else begin 
         Wr_data <= 32'h00000000;
         Wr_address<=32'h00000000;
@@ -72,9 +75,7 @@ byte char;
         if(read_address==32'h80006000)
             data_read <= $time/1000;
         else 
-            data_read <= data_rd; 
-        if(read_address!=0 && data_read!=0)
-            $fdisplay(fd,"[%0d] Read: %h from address %d(%h)) ", $time,  data_read, read_address, read_address);
+            data_read <= Rd_data; 
     end else
         data_read <= 'Z; 		                                // data_cpu
 
@@ -108,7 +109,6 @@ byte char;
 
     initial begin
         rstCPU = 0;                                         // RESET for CPU initialization
-        fd = $fopen ("memDebug.txt", "w");
-        #30 rstCPU = 1;                                     // Hold state for 30 ns
+        #100 rstCPU = 1;                                     // Hold state for 100 ns
     end
 endmodule
