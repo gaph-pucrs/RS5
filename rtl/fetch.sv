@@ -20,7 +20,7 @@
  * in regular flows, the tag leaves the unit with the instruction fetched.
  */
 
-module fetch  #(parameter start_address=32'h00000000)(  //Generic start address
+module fetch  #(parameter start_address='0)(  //Generic start address
     input logic         clk,
     input logic         reset,
     input logic         ce,                             // Chip Enable is used to bubble propagation (0 means hold state because a bubble is being issued)

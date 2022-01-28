@@ -32,15 +32,15 @@ module adder(
     always_comb
         if(i==OP3)                              // Set if opA is less than opB (SLT)
             if($signed(opA) < $signed(opB))
-                result <= 32'b1;
+                result <= 1;
             else
-                result <= 32'b0;
+                result <= 0;
 
         else if(i==OP2)                         // Set if opA is less than opB UNSIGNED (SLTU)
             if($unsigned(opA) < $unsigned(opB))
-                result <= 32'b1;
+                result <= 1;
             else
-                result <= 32'b0;
+                result <= 0;
 
         else if(i==OP1)                         // SUBTRACT (SUB)
             result <= opA - opB;

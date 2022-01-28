@@ -42,15 +42,15 @@ module memoryUnit(
 ///////////////////////////////////// generate all signals for read or write ////////////////////////////////////////////////////////////////////////
     always_comb begin
         if(i==OP0 | i==OP1) begin                        // Load Byte signed and unsigned (LB | LBU)
-            write_int <= 4'b0000;
+            write_int <= '0;
             read <= 1;
 
         end else if(i==OP2 | i==OP3) begin               // Load Half(16b) signed and unsigned (LH | LHU)
-            write_int <= 4'b0000;
+            write_int <= '0;
             read <= 1;
 
         end else if(i==OP4) begin                        // Load Word(32b) (LW)
-            write_int <= 4'b0000;
+            write_int <= '0;
             read <= 1;
 
         end else if(i==OP7) begin                       // Store Byte (SB)
@@ -78,16 +78,16 @@ module memoryUnit(
     always @(posedge clk) begin
         if(i==OP0 | i==OP1) begin                       // LB | LBU
             if(DATA_in[7]==1 & i==OP0)                  // Signal extension
-                DATA_wb[31:8] <= 24'hFFFFFF;
+                DATA_wb[31:8] <= '1;
             else                                        // 0's extension
-                DATA_wb[31:8] <= 24'h000000;
+                DATA_wb[31:8] <= '0;
             DATA_wb[7:0] <= DATA_in[7:0];
 
         end else if(i==OP2 | i==OP3) begin              // LH | LHU
             if(DATA_in[15]==1 & i==OP2)                 // Signal extension
-                DATA_wb[31:16] <= 16'hFFFF;
+                DATA_wb[31:16] <= '1;
             else                                        // 0's extension
-                DATA_wb[31:16] <= 16'h0000; 
+                DATA_wb[31:16] <= '0; 
             DATA_wb[15:0] <= DATA_in[15:0];
 
         end else if(i==OP4)                             // LW
