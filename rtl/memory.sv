@@ -37,7 +37,7 @@ module memoryUnit(
 
     logic we_int;
     logic [3:0] write_int;
-    logic [31:0] DATA_write, write_address_2;
+    logic [31:0] DATA_write;
 
 ///////////////////////////////////// generate all signals for read or write ////////////////////////////////////////////////////////////////////////
     always_comb begin
