@@ -19,12 +19,7 @@
 `timescale 1ns/1ps
 
 `include "../rtl/pkg.sv"
-`include "../rtl/adder.sv"
-`include "../rtl/branch.sv"
-`include "../rtl/bypass.sv"
-`include "../rtl/logic.sv"
-`include "../rtl/memory.sv"
-`include "../rtl/shift.sv"
+`include "../rtl/xus.sv"
 `include "../rtl/execute.sv"
 `include "../rtl/fetch.sv"
 `include "../rtl/decoder.sv"

@@ -23,6 +23,7 @@
 `include "./decoder.sv"
 `include "./operandFetch.sv"
 `include "./regbank.sv"
+`include "./xus.sv"
 `include "./execute.sv"
 `include "./retire.sv"
 */
