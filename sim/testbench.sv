@@ -20,10 +20,9 @@
 
 `include "../rtl/pkg.sv"
 `include "../rtl/xus.sv"
-`include "../rtl/execute.sv"
 `include "../rtl/fetch.sv"
 `include "../rtl/decoder.sv"
-`include "../rtl/operandFetch.sv"
+`include "../rtl/execute.sv"
 `include "../rtl/retire.sv"
 `include "../rtl/regbank.sv"
 `include "../rtl/PUCRS-RV.sv"

@@ -21,7 +21,6 @@
 `include "./pkg.sv"
 `include "./fetch.sv"
 `include "./decoder.sv"
-`include "./operandFetch.sv"
 `include "./regbank.sv"
 `include "./xus.sv"
 `include "./execute.sv"
@@ -48,37 +47,29 @@ module PUCRS_RV(
     logic [4:0] regA_add, regB_add;
     logic [31:0] regD_add, regD_add_int;
     logic [31:0] result_wb, data_wb, New_pc;
-    logic [31:0] IR, instruction_OPFetch; 
-    logic [31:0] NPC_decode, NPC_OPFetch, NPC_execute;
+    logic [31:0] IR; 
+    logic [31:0] NPC_decode, NPC_execute;
     logic [31:0] opA_execute, opB_execute, opC_execute;
     logic [31:0] write_address_retire;
-    logic [3:0] decode_tag, OPF_tag, execute_tag, retire_tag;
-    fmts fmt_OPFetch;
-    instruction_type i_OPFetch, i_execute, i_retire;
-    xu xu_OPFetch, xu_execute;
+    logic [3:0] decode_tag, execute_tag, retire_tag;
+    instruction_type i_execute, i_retire;
+    xu xu_execute;
     logic [31:0] result_retire [1:0];
     logic [31:1] wrAddr;
-    logic [1:0] MEMBlock;
 
 //////////////////////////////////////////////////////////// FETCH //////////////////////////////////////////////////////////////////////////////////
 
-    fetch #('0) fetch1 (.clk(clk), .reset(reset), .ce(bubble), .jump(jump_wb), .result(New_pc), .instruction(instruction), 
+    fetch fetch1 (.clk(clk), .reset(reset), .ce(bubble), .jump(jump_wb), .result(New_pc), .instruction(instruction), 
                 .i_address(i_address), .IR(IR), .NPC(NPC_decode), .tag_out(decode_tag));
 
-//////////////////////////////////////////////////////////// DECODER ////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////// DECODER /////////////////////////////////////////////////////////////////////////////////
 
-    decoder decoder1 (.clk(clk), .reset(reset), .ce(bubble), .NPC_in(NPC_decode), .instruction(IR), .tag_in(decode_tag), 
-                .NPC_out(NPC_OPFetch), .fmt_out(fmt_OPFetch), 
-                .instruction_out(instruction_OPFetch), .i_out(i_OPFetch), .xu_sel(xu_OPFetch), .tag_out(OPF_tag));
-
-/////////////////////////////////////////////////////////// OP FETCH ////////////////////////////////////////////////////////////////////////////////
-
-    operandFetch OPfecth (.clk(clk), .reset(reset), .we(regD_we), .NPC(NPC_OPFetch),
-                .fmt(fmt_OPFetch), .instruction(instruction_OPFetch), .i(i_OPFetch), .xu_sel_in(xu_OPFetch), .tag_in(OPF_tag), .dataA(dataA), 
-                .dataB(dataB), .regA_add(regA_add), .regB_add(regB_add), .opA_out(opA_execute), .opB_out(opB_execute), 
+    decoder decoder1 (.clk(clk), .reset(reset), .we(regD_we), 
+                .NPC(NPC_decode), .instruction(IR), .tag_in(decode_tag), 
+                .dataA(dataA), .dataB(dataB), .regA_add(regA_add), .regB_add(regB_add), .opA_out(opA_execute), .opB_out(opB_execute), 
                 .opC_out(opC_execute), .NPC_out(NPC_execute), .i_out(i_execute), .xu_sel(xu_execute), .tag_out(execute_tag), .wrAddr(wrAddr), .bubble(bubble));
 
-/////////////////////////////////////////////////////////// execute /////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////// EXECUTE /////////////////////////////////////////////////////////////////////////////////
 
     execute execute1 (.clk(clk), .reset(reset), .NPC(NPC_execute), .opA(opA_execute), .opB(opB_execute), .opC(opC_execute),
                 .i(i_execute), .xu_sel(xu_execute), .tag_in(execute_tag),  .result_out(result_retire), .jump_out(jump_retire), 
