@@ -40,12 +40,11 @@ module execute(
     output logic        we_out,             // Write enable to regbank
     output logic [31:0] read_address,       // Memory Read Address
     output logic        read,               // Allows memory read
-    input logic [31:0]  DATA_in,            // Data returned from memory
-    output logic        write,              // Signal that indicates the write memory operation to retire
-    output logic [1:0]  size);              // Signal that indicates the size of Write in memory(byte(1),half(2),word(4))
+    input  logic [31:0] DATA_in,            // Data returned from memory
+    output logic [3:0]  write);             // Signal that indicates the write memory operation to retire
 
-    logic jump_int, write_int;
-    logic [1:0] size_int;
+    logic jump_int;
+    logic [3:0] write_int;
     logic [31:0] adderA, adderB, logicA, logicB, shiftA, branchA, branchB, branchC, memoryA, memoryB, memoryC, bypassB, NPCbranch;
     logic [4:0] shiftB;
     logic [31:0] result [7:0];
@@ -59,7 +58,7 @@ module execute(
     branchUnit  branch1 (.clk(clk), .opA(branchA), .opB(branchB), .offset(branchC), .NPC(NPCbranch), .i(branch_i),
                 .result_out(result[4]), .result_jal(result[3]), .jump_out(jump_int), .we_out(we_branchUnit));
     memoryUnit  memory1 (.clk(clk), .opA(memoryA), .opB(memoryB), .data(memoryC), .i(memory_i), .read_address(read_address), .read(read),
-                .DATA_in(DATA_in), .write_address(result[7]), .DATA_wb(result[6]),  .write(write_int), .size(size_int), .we_out(we_memoryUnit));
+                .DATA_in(DATA_in), .write_address(result[7]), .DATA_wb(result[6]),  .write(write_int), .we_out(we_memoryUnit));
     bypassUnit  bypassUnit1 (.clk(clk), .opA(bypassB), .result_out(result[5]));
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
     always@(posedge clk) begin  // Generates a internal second stage to DEMUX operation
@@ -158,13 +157,10 @@ module execute(
         else
             jump_out <= '0;
    ////////////////////////////////////
-        if(xu_stage2==memory) begin       // SIZE & WRITE
-            size <= size_int;
+        if(xu_stage2==memory)             // WRITE
             write <= write_int;
-        end else begin
-            size <= '0;
+        else
             write <= '0;
-        end
    ////////////////////////////////////
         if(xu_stage2==branch)             // WE_OUT
             we_out <= we_branchUnit;

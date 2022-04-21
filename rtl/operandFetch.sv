@@ -26,9 +26,6 @@ module operandFetch #(parameter DEPTH = 2)(
     input logic clk,
     input logic reset,
     input logic we,
-    input logic [4:0]   regA,                   // Address of the 1st register, from decode unit
-    input logic [4:0]   regB,                   // Address of the 2nd register, from decode unit
-    input logic [4:0]   regD,                   // Address of the destination register, from decode unit
     input fmts          fmt,                    // Instruction Format
     input logic [31:0]  instruction,            // Object code of the instruction to extract the immediate operand
     input logic [31:0]  NPC,                    // Bypassed to execute unit as an operand
@@ -53,87 +50,60 @@ module operandFetch #(parameter DEPTH = 2)(
     wor [31:0] locked;
     logic [31:0] lock_queue[DEPTH];
 
+///////////////////////////////////////////////// Read Addresses to RegBank /////////////////////////////////////////////////////////////////////////
+    assign regA_add = instruction[19:15];
+    assign regB_add = instruction[24:20];
+
 ///////////////////////////////////////////////// Extract the immediate based on instruction type ///////////////////////////////////////////////////
     always_comb
-        if(fmt==I_type) begin
-            imed[10:0] <= instruction[30:20];
-            if(instruction[31]==0)
-                imed[31:11] <= 21'b000000000000000000000;
-            else
-                imed[31:11] <= 21'b111111111111111111111;    
+        case(fmt)
+            I_type: begin
+                        imed[31:11] <= (instruction[31]==0) ? '0 : '1;
+                        imed[10:0] <= instruction[30:20];
+                    end
 
-        end else if(fmt==S_type) begin
-            imed[10:5] <= instruction[30:25];
-            imed[4:0]  <= instruction[11:7];
-            if(instruction[31]==0)
-                imed[31:11] <= 21'b000000000000000000000;
-            else
-                imed[31:11] <= 21'b111111111111111111111;    
+            S_type: begin
+                        imed[31:11] <= (instruction[31]==0) ? '0 : '1;
+                        imed[10:5] <= instruction[30:25];
+                        imed[4:0]  <= instruction[11:7];
+                    end
 
-        end else if(fmt==B_type) begin
-            imed[11] <= instruction[7];
-            imed[10:5] <= instruction[30:25];
-            imed[4:1] <= instruction[11:8];
-            imed[0] <= 0;
-            if(instruction[31]==0)
-                imed[31:12] <= 20'b00000000000000000000;
-            else
-                imed[31:12]<=20'b11111111111111111111;
+            B_type: begin
+                        imed[31:12] <= (instruction[31]==0) ? '0 : '1;
+                        imed[11] <= instruction[7];
+                        imed[10:5] <= instruction[30:25];
+                        imed[4:1] <= instruction[11:8];
+                        imed[0] <= 0;
+                    end
 
-        end else if(fmt==U_type) begin
-            imed[31:12] <= instruction[31:12];
-            imed[11:0] <= 12'b000000000000;
+            U_type: begin
+                        imed[31:12] <= instruction[31:12];
+                        imed[11:0] <= '0;
+                    end
 
-        end else if(fmt==J_type) begin
-            imed[19:12] <= instruction[19:12];
-            imed[11] <= instruction[20];
-            imed[10:5] <= instruction[30:25];
-            imed[4:1] <= instruction[24:21];
-            imed[0] <= 0;
-            if(instruction[31]==0)
-                imed[31:20] <= 12'b000000000000;
-            else
-                imed[31:20] <= 12'b111111111111;
+            J_type: begin
+                        imed[31:20] <= (instruction[31]==0) ? '0 : '1;
+                        imed[19:12] <= instruction[19:12];
+                        imed[11] <= instruction[20];
+                        imed[10:5] <= instruction[30:25];
+                        imed[4:1] <= instruction[24:21];
+                        imed[0] <= 0;
+                    end
 
-        end else
-            imed[31:0] <= 32'h00000000;
-
-///////////////////////////////////////////////// Read Addresses to RegBank /////////////////////////////////////////////////////////////////////////
-    assign regA_add = regA;
-    assign regB_add = regB;
+            default:      imed[31:0] <= '0;
+        endcase
 
 ///////////////////////////////////////////////// Control of the exits based on format //////////////////////////////////////////////////////////////
-    always_comb
-        if(fmt==I_type) begin                               // addi, slti, andi, ori, xori, slli, slri, srai, LOADS, JALR
-            opA <= dataA;
-            opB <= imed;
-            opC <= 32'h00000000;
-
-        end else if(fmt==U_type | fmt==J_type) begin        // auipc, lui, jal
-            opA <= NPC;
-            opB <= imed;
-            opC <= 32'h00000000;
-
-        end else if(fmt==S_type) begin                      // STORES
-            opA <= dataA;
-            opB <= imed;
-            opC <= dataB;
-
-        end else if(fmt==R_type | fmt==B_type) begin        // Conditional branches and register-register instructions
-            opA <= dataA;
-            opB <= dataB;               
-            opC <= imed;
-
-        end else begin                                      //nop, invalid
-            opA <= imed;
-            opB <= 32'h00000000;
-            opC <= 32'h00000000;   
-        end
+    always_comb begin
+        opA <= (fmt==U_type | fmt==J_type) ? NPC   : dataA;
+        opB <= (fmt==R_type | fmt==B_type) ? dataB : imed;
+        opC <= (fmt==S_type)               ? dataB : imed;
+    end
 
 ////////////////////////////////////////////////// Conversion to one-hot codification ///////////////////////////////////////////////////////////////
     always_comb begin
-        regD_add <= 1 << regD;
-    ////////////////////////////////
+        regD_add <= 1 << instruction[11:7];
+        ///////////////////////////////////
         if(xu_sel_in==memory && (i==OP5 | i==OP6 | i==OP7)) // [0] Indicates a pending write in memory, used to avoid data hazards in memory
             regD_add[0] <= 1;
         else
