@@ -53,7 +53,7 @@ module execute(
     xu xu_stage2; 
 
 ///////////////////////////////////////////////////// Instantiation of execution units  ////////////////////
-    adder       adder1 (.clk(clk), .opA(adderA), .opB(adderB), .i(adder_i), .result_out(result[0]));
+    adderUnit   adder1 (.clk(clk), .opA(adderA), .opB(adderB), .i(adder_i), .result_out(result[0]));
     logicUnit   logical1 (.clk(clk), .opA(logicA), .opB(logicB), .i(logic_i), .result_out(result[1]));
     shiftUnit   shift1 (.clk(clk), .opA(shiftA), .opB(shiftB), .i(shift_i), .result_out(result[2]));
     branchUnit  branch1 (.clk(clk), .opA(branchA), .opB(branchB), .offset(branchC), .NPC(NPCbranch), .i(branch_i),

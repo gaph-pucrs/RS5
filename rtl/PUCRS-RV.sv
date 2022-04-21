@@ -20,12 +20,6 @@
 
 
 `include "./pkg.sv"
-`include "./adder.sv"
-`include "./branch.sv"
-`include "./bypass.sv"
-`include "./logic.sv"
-`include "./memory.sv"
-`include "./shift.sv"
 `include "./fetch.sv"
 `include "./decoder.sv"
 `include "./operandFetch.sv"
