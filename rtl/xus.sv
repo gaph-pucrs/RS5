@@ -23,13 +23,10 @@ import my_pkg::*;
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 module adderUnit (
-    input logic         clk,
     input logic [31:0]  opA,
     input logic [31:0]  opB,
     input instruction_type i,
-    output logic [31:0] result_out);
-
-    logic [31:0] result;
+    output logic [31:0] result);
 
     always_comb
         if(i==OP3)                              // Set if opA is less than opB (SLT)
@@ -49,10 +46,6 @@ module adderUnit (
 
         else                                    // ADD (ADD,ADDI and AUIPC)
             result <= opA + opB;
-
-    always @(posedge clk)
-        result_out <= result;
-
 endmodule
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -60,22 +53,21 @@ endmodule
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 module branchUnit (
-    input logic         clk,
     input logic [31:0]  opA,                        // In JALR is used to calculate the target and in conditional is used as condition
     input logic [31:0]  opB,                        // In JALR is used to calculate the target and in conditional is used as condition
     input logic [31:0]  offset,                     // Immediate OFFSET is added to PC value
     input logic [31:0]  NPC,                        // PC value
     input instruction_type i,                       // Instruction Type
-    output logic [31:0] result_out,                 // Branch target
+    output logic [31:0] result,                 // Branch target
     output logic [31:0] result_jal,                 // Return addres to a JAL instruction (NPC+4)
-    output logic        jump_out,                   // Signal that indicate a jump/branch
-    output logic        we_out);                    // Wrtie enable to register bank (used only in JAL)
+    output logic        jump,                   // Signal that indicate a jump/branch
+    output logic        we);                    // Wrtie enable to register bank (used only in JAL)
 
-    logic [31:0]        result, sum;
-    logic               jump, we_int;
+    logic [31:0]        sum;
 
 ///////////////////////////////////////////////// Result assign /////////////////////////////////////////////////////////////////////////////////////
     assign sum = opA + opB;                         // Generates the JALR target
+    assign result_jal = NPC + 4;
 
     always_comb
         if(i==OP6)                                  // JAL
@@ -110,32 +102,9 @@ module branchUnit (
 ///////////////////////////////////////////////// Write enable signal generator /////////////////////////////////////////////////////////////////////
     always_comb                                     // Register write enable is 1 in JAL and JALR instructions
         if(i==OP6 || i==OP7)
-            we_int <= '1;
+            we <= '1;
         else 
-            we_int <= '0;
-
-///////////////////////////////////////////////// Output registers //////////////////////////////////////////////////////////////////////////////////
-   always @(posedge clk) begin
-        result_out <= result;
-        result_jal <= NPC+4;
-        jump_out <= jump;
-        we_out <= we_int;
-     end
-
-endmodule
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-///                                    BYPASS                                                   ///
-///////////////////////////////////////////////////////////////////////////////////////////////////
-
-module bypassUnit (                    // LUI, NOP and INVALID
-    input logic         clk,
-    input logic [31:0]  opA,
-    output logic [31:0] result_out);
-
-    always @(posedge clk)
-        result_out <= opA;
-
+            we <= '0;
 endmodule
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -143,13 +112,10 @@ endmodule
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 module logicUnit (
-    input logic         clk,
     input logic [31:0]  opA,
     input logic [31:0]  opB,
     input instruction_type i,
-    output logic [31:0] result_out);
-
-    logic [31:0] result;
+    output logic [31:0] result);
 
     always_comb
         if(i==OP0)                      // XOR
@@ -158,10 +124,6 @@ module logicUnit (
             result <= opA | opB;
         else                            // AND
             result <= opA & opB;
-
-    always @(posedge clk)
-        result_out <= result;
-
 endmodule
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -169,19 +131,17 @@ endmodule
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 module memoryUnit (
-    input logic         clk,
     input logic [31:0]  opA,                            // Base Address
     input logic [31:0]  opB,                            // Offset
     input logic [31:0]  data,                           // Data to be Written in memory
     input instruction_type i,                           // Instruction type
     output logic [31:0] read_address,                   // Read Memory Address
     output logic        read,                           // Signal that allows memory read
-    input logic [31:0]  DATA_in,                        // Data received from memory
     output logic [31:0] write_address,                  // Adrress to Write in memory
     output logic [31:0] DATA_wb,                        // Data to be Written in Register Bank or in memory
     output logic        write,                          // Signal that allows memory write
     output logic [1:0]  size,                           // Signal that indicates the size of Write in memory(byte(1),half(2),word(4))
-    output logic        we_out);                        // Write enable signal to register bank, in Stores=0 and in Loads=1
+    output logic        we_rb);                         // Write enable signal to register bank, in Stores=0 and in Loads=1
 
     logic write_int, we_int;
     logic [31:0] DATA_write, write_address_2;
@@ -190,42 +150,42 @@ module memoryUnit (
 ///////////////////////////////////// generate all signals for read or write ////////////////////////////////////////////////////////////////////////
     always_comb begin
         if(i==OP0 | i==OP1) begin                        // Load Byte signed and unsigned (LB | LBU)
-            write_int <= 0;
+            write <= 0;
             read <= 1;
             DATA_write <= '0;
-            size_int <= 2'b00;
+            size <= 2'b00;
 
         end else if(i==OP2 | i==OP3) begin               // Load Half(16b) signed and unsigned (LH | LHU)
-            write_int <= 0;
+            write <= 0;
             read <= 1;
             DATA_write <= '0;
-            size_int <= 2'b00;
+            size <= 2'b00;
 
         end else if(i==OP4) begin                        // Load Word(32b) (LW)
-            write_int <= 0;
+            write <= 0;
             read <= 1;
             DATA_write <= '0;
-            size_int <= 2'b00;
+            size <= 2'b00;
 
         end else if(i==OP7) begin                       // Store Byte (SB)
-            write_int <= 1;
+            write <= 1;
             read <= 0;
             DATA_write[31:8] <= 24'h000000;
             DATA_write[7:0] <= data[7:0];               // Only the less significant byte is fullfilled with data, the rest is fullfilled with zeros
-            size_int <= 2'b01;
+            size <= 2'b01;
 
         end else if(i==OP6) begin                       // Store Half(16b) (SH)
-            write_int <= 1;
+            write <= 1;
             read <= 0;
             DATA_write[31:16] <= 16'h0000;    
             DATA_write[15:0] <= data[15:0];             // Only the less significant half is fullfilled with data, the rest is fullfilled with zeros
-            size_int <= 2'b10;
+            size <= 2'b10;
 
         end else if(i==OP5) begin                       // Store Word (SW)
-            write_int <= 1;
+            write <= 1;
             read <= 0;
             DATA_write[31:0] <= data[31:0];  
-            size_int <= 2'b11;
+            size <= 2'b11;
         end
         //////////////////////////////////////////////
         if(i==OP0 | i==OP1 | i==OP2 | i==OP3 | i==OP4)
@@ -234,44 +194,16 @@ module memoryUnit (
             read_address = '0;
     end
 
-///////////////////////////////////////////////// Data Write Back parsing ///////////////////////////////////////////////////////////////////////////
-    always @(posedge clk) begin
-        if(i==OP0 | i==OP1) begin                       // LB | LBU
-            if(DATA_in[7]==1 & i==OP0)                  // Signal extension
-                DATA_wb[31:8] <= 24'hFFFFFF;
-            else                                        // 0's extension
-                DATA_wb[31:8] <= 24'h000000;
-            DATA_wb[7:0] <= DATA_in[7:0];
-
-        end else if(i==OP2 | i==OP3) begin              // LH | LHU
-            if(DATA_in[15]==1 & i==OP2)                 // Signal extension
-                DATA_wb[31:16] <= 16'hFFFF;
-            else                                        // 0's extension
-                DATA_wb[31:16] <= 16'h0000; 
-            DATA_wb[15:0] <= DATA_in[15:0];
-
-        end else if(i==OP4)                             // LW
-            DATA_wb <= DATA_in;
-
-        else                                            // STORES
-            DATA_wb <= DATA_write;
-    end
-
 ///////////////////////////////////////////////// Write enable to register bank ///////////////////////////////////////////////////////////////////////////
     always_comb
         if(i==OP5 || i==OP6 || i==OP7)                  // Stores do not write in regbank
-            we_int<='0;
+            we_rb<='0;
         else
-            we_int<='1;
+            we_rb<='1;
 
 ///////////////////////////////////////////////// Output registers //////////////////////////////////////////////////////////////////////////////////
-    always@(posedge clk) begin
-        write_address <= opA + opB;
-        write <= write_int;
-        size <= size_int;
-        we_out <= we_int;
-    end
-
+    assign write_address = opA + opB;
+    assign DATA_wb = DATA_write;
 endmodule
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -279,13 +211,10 @@ endmodule
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 module shiftUnit (
-    input logic         clk,
     input logic [31:0]  opA,
     input logic [4:0]   opB,
     input instruction_type i,
-    output logic [31:0] result_out);
-
-    logic [31:0] result;
+    output logic [31:0] result);
 
     always_comb 
         if(i==OP0)                                  // Logical Left Shift (SLL)
@@ -294,8 +223,65 @@ module shiftUnit (
             result <= opA >> opB;
         else                                        // Arithmetic Right Shift  (SRA)
             result <= $signed(opA) >>> opB;
+endmodule
 
-    always @(posedge clk)
-        result_out <= result;
+///////////////////////////////////////////////////////////////////////////////////////////////////
+///                                    CSR                                                      ///
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+module csrUnit (
+    input logic [31:0]  opA, // DATA FROM RS1
+    input logic [31:0]  opB, // ADDRs
+    input instruction_type i,
+    output logic rd_en,
+    output logic wr_en,
+    output csr_ops csr_op,
+    output logic [11:0] csr_add,
+    output logic [31:0] data);
+
+    logic [4:0] rd, rs1;
+
+    assign rd  = opB[21:17];
+    assign rs1 = opB[16:12];
+
+    always_comb begin
+        if (i==OP0 || i==OP1) begin     // CSSRW or CSSRWI
+            wr_en = 1;
+            if(rd==0)
+                rd_en = 0;
+            else
+                rd_en = 1;
+
+        end else if (i==OP2 || i==OP3 || i==OP4 || i==OP5) begin     // CSRRS/C and CSRRS/CI
+            rd_en = 1;
+            if(rs1==0)
+                wr_en = 0;
+            else
+                wr_en = 1;
+        
+        end else begin
+            rd_en <= 0;
+            wr_en <= 0;
+        end
+    end
+
+    always_comb begin
+        csr_add <= opB[11:0];
+        
+        if(i==OP0 || i==OP2 || i==OP4)
+            data <= opA;
+        else
+            data <= '0 & rs1;
+    end
+
+    always_comb 
+        if(i==OP0 || i==OP1)               // WRITE
+            csr_op <= write;
+        else if(i==OP2 || i==OP3)          // SET
+            csr_op <= set;
+        else if(i==OP4 || i==OP5)          // CLEAR
+            csr_op <= clear;
+        else                               // NONE
+            csr_op <= none;
 
 endmodule

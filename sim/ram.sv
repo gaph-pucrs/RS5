@@ -40,6 +40,7 @@ module RAM_mem #(parameter startaddress = 32'h00000000)(
     logic [31:0] W_tmp_address, R_tmp_address, INST_tmp_address;
     int W_low_address_int, R_low_address_int, INST_low_address_int;
     int fd, r;
+    int fd_i, fd_d;
 
     assign W_tmp_address = write_address - startaddress;                //  Address offset
     assign W_low_address_int = W_tmp_address[15:0];                     // convert to integer
@@ -55,6 +56,9 @@ module RAM_mem #(parameter startaddress = 32'h00000000)(
 
         r = $fread(RAM, fd);
         $display("read %d elements \n", r);
+
+        fd_i = $fopen ("./debug/instructions.txt", "w");
+        fd_d = $fopen ("./debug/reads.txt", "w");
     end
 
 ////////////////////////////////////////////////////////////// Writes in memory  //////////////////////////////////////////////////////
@@ -71,12 +75,14 @@ module RAM_mem #(parameter startaddress = 32'h00000000)(
         end
 
 ////////////////////////////////////////////////////////////// Read DATA from memory /////////////////////////////////////////////////////////////////////
-    always @(negedge clock)
+    always @(posedge clock)
         if(read_enable==1 && R_low_address_int>=0 && R_low_address_int<=(MEMORY_SIZE-3)) begin
             data_read[31:24] <= RAM[R_low_address_int+3];
             data_read[23:16] <= RAM[R_low_address_int+2];
             data_read[15:8]  <= RAM[R_low_address_int+1];
             data_read[7:0]   <= RAM[R_low_address_int];
+
+            $fwrite(fd_d,"Read: %8h -> %8h\n", R_low_address_int, data_read);
         end
 
 ////////////////////////////////////////////////////////////// Read INSTRUCTION from memory /////////////////////////////////////////////////////////////////////
@@ -88,5 +94,7 @@ module RAM_mem #(parameter startaddress = 32'h00000000)(
             instruction[23:16] <= RAM[INST_low_address_int+2];
             instruction[15:8]  <= RAM[INST_low_address_int+1];
             instruction[7:0]   <= RAM[INST_low_address_int];
+
+            $fwrite(fd_i,"%8h -> %8h\n", INST_low_address_int, instruction);
         end
 endmodule

@@ -105,12 +105,12 @@ module decoder #(parameter DEPTH = 2)(
         else if (instruction[31:8]==24'h000000 & instruction[7:0]==8'b01110011) i<=NOP;    // ECALL
         else if (instruction[31:8]==24'h001000 & instruction[7:0]==8'b01110011) i<=NOP;    // EBREAK
 
-        else if (instruction[14:12]==3'b001 & instruction[6:0]==7'b1110011) i<=CSRRW 
-        else if (instruction[14:12]==3'b010 & instruction[6:0]==7'b1110011) i<=CSRRS
-        else if (instruction[14:12]==3'b011 & instruction[6:0]==7'b1110011) i<=CSRRC
-        else if (instruction[14:12]==3'b101 & instruction[6:0]==7'b1110011) i<=CSRRWI
-        else if (instruction[14:12]==3'b110 & instruction[6:0]==7'b1110011) i<=CSRRSI
-        else if (instruction[14:12]==3'b111 & instruction[6:0]==7'b1110011) i<=CSRRCI
+        else if (instruction[14:12]==3'b001 & instruction[6:0]==7'b1110011) i<=CSRRW;
+        else if (instruction[14:12]==3'b010 & instruction[6:0]==7'b1110011) i<=CSRRS;
+        else if (instruction[14:12]==3'b011 & instruction[6:0]==7'b1110011) i<=CSRRC;
+        else if (instruction[14:12]==3'b101 & instruction[6:0]==7'b1110011) i<=CSRRWI;
+        else if (instruction[14:12]==3'b110 & instruction[6:0]==7'b1110011) i<=CSRRSI;
+        else if (instruction[14:12]==3'b111 & instruction[6:0]==7'b1110011) i<=CSRRCI;
 
         else if (instruction[31:0]==32'h00000000) i<=NOP;
         else if (instruction[31:0]==32'h00000013) i<=NOP;
@@ -131,10 +131,10 @@ module decoder #(parameter DEPTH = 2)(
     always_comb                                 // Execution operation is extracted based on instruction type
         case (i)
             ADD, XOR, SLL, BEQ, LB, CSRRW:      op<=OP0;
-            SUB, OR, SRL, BNE, LBU, LUI, CSRRS: op<=OP1;
-            SLTU, AND, SRA, BLT, LH, CSRRC:     op<=OP2;
-            SLT, BLTU, LHU, CSRRWI:             op<=OP3;
-            BGE, LW, CSRRSI:                    op<=OP4;
+            SUB, OR, SRL, BNE, LBU, LUI, CSRRWI:op<=OP1;
+            SLTU, AND, SRA, BLT, LH, CSRRS:     op<=OP2;
+            SLT, BLTU, LHU, CSRRSI:             op<=OP3;
+            BGE, LW, CSRRC:                     op<=OP4;
             BGEU, SW, CSRRCI:                   op<=OP5;
             JAL, SH:                            op<=OP6;
             JALR, SB:                           op<=OP7;
@@ -145,12 +145,12 @@ module decoder #(parameter DEPTH = 2)(
 /////////////////////////////////////////////////  Decodes the instruction format ///////////////////////////////////////////////////////////////////
     always_comb
         case (instruction[6:0])
-            7'b0010011, 7'b1100111, 
-            7'b0000011, 7'b1110011:                 fmt <= I_type;
+            7'b0010011, 7'b1100111, 7'b0000011:     fmt <= I_type;
             7'b0100011:                             fmt <= S_type;
             7'b1100011:                             fmt <= B_type;
             7'b0110111, 7'b0010111:                 fmt <= U_type;
             7'b1101111:                             fmt <= J_type;
+            7'b1110011:                             fmt <= CSR_type;
             default:                                fmt <= R_type;
         endcase
 
@@ -193,6 +193,12 @@ module decoder #(parameter DEPTH = 2)(
                         imed[4:1] <= instruction[24:21];
                         imed[0] <= 0;
                     end
+            
+            CSR_type: begin
+                        imed[21:17] <= instruction[11:7];
+                        imed[16:12] <= instruction[19:15];
+                        imed[11:0]  <= instruction[31:20];
+            end
 
             default:      imed[31:0] <= '0;
         endcase

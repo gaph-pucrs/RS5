@@ -54,6 +54,7 @@ module PUCRS_RV(
     logic [3:0] decode_tag, execute_tag, retire_tag;
     instruction_type i_execute, i_retire;
     xu xu_execute;
+    logic mem_access;
     logic [31:0] result_retire [1:0];
     logic [31:1] wrAddr;
 
@@ -73,15 +74,16 @@ module PUCRS_RV(
 
     execute execute1 (.clk(clk), .reset(reset), .NPC(NPC_execute), .opA(opA_execute), .opB(opB_execute), .opC(opC_execute),
                 .i(i_execute), .xu_sel(xu_execute), .tag_in(execute_tag),  .result_out(result_retire), .jump_out(jump_retire), 
-                .tag_out(retire_tag), .we_out(we_retire),
-                .DATA_in(DATA_in), .read_address(read_address), .read(read), .write(write_retire));
+                .tag_out(retire_tag), .i_out(i_retire), .mem_access(mem_access), .we_out(we_retire),
+                .read_address(read_address), .read(read), .write(write_retire));
 
 /////////////////////////////////////////////////////////// RETIRE //////////////////////////////////////////////////////////////////////////////////
 
     retire retire1 (.clk(clk), .reset(reset), .result(result_retire), .jump(jump_retire), .we(we_retire),
                 .tag_in(retire_tag), .reg_we(regD_we), .WrData(data_wb),
                 .New_pc(New_pc), .jump_out(jump_wb),
-                .write_in(write_retire),
+                .write_in(write_retire), 
+                .DATA_in(DATA_in), .i(i_retire), .mem_access(mem_access),
                 .write(write), .write_address(write_address), .DATA_out(DATA_out));
 
 /////////////////////////////////////////////////////////// REGISTER BANK ///////////////////////////////////////////////////////////////////////////

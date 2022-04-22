@@ -32,6 +32,9 @@ module retire(
     input logic         we,                         // Write enable from Execute(based on instruction type)
     input logic [3:0]   tag_in,                     // Instruction tag to be compared with retire tag
     input logic [3:0]   write_in,                   // Write enable memory
+    input logic [31:0]  DATA_in,                    // Data from memory
+    input logic         mem_access,
+    input instruction_type i,
     output logic        reg_we,                     // Write Enable to Register Bank
     output logic [31:0] WrData,                     // WriteBack data to Register Bank
     output logic        jump_out,                   // Jump signal to Fetch Unit
@@ -40,13 +43,13 @@ module retire(
     output logic [31:0] DATA_out,                   // Memory data to be written
     output logic [3:0]  write);                      // Memory write enable
 
-    logic [31:0] data;
+    logic [31:0] mem_data;
     logic [3:0] next_tag;
     logic [3:0] curr_tag;
     logic killed;
 
 ///////////////////////////////////////////////// Assign to Register Bank Write Back ////////////////////////////////////////////////////////////////
-    assign WrData = result[0];
+    assign WrData = (mem_access) ? mem_data : result[0];
 
 ///////////////////////////////////////////////// Killed signal generation //////////////////////////////////////////////////////////////////////////
     always_comb
@@ -78,6 +81,29 @@ module retire(
             New_pc <= '0;
             jump_out <= '0;
         end
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+always_comb begin
+        if(i==OP0 | i==OP1) begin                       // LB | LBU
+            if(DATA_in[7]==1 & i==OP0)                  // Signal extension
+                mem_data[31:8] <= 24'hFFFFFF;
+            else                                        // 0's extension
+                mem_data[31:8] <= 24'h000000;
+            mem_data[7:0] <= DATA_in[7:0];
+
+        end else if(i==OP2 | i==OP3) begin              // LH | LHU
+            if(DATA_in[15]==1 & i==OP2)                 // Signal extension
+                mem_data[31:16] <= 16'hFFFF;
+            else                                        // 0's extension
+                mem_data[31:16] <= 16'h0000; 
+            mem_data[15:0] <= DATA_in[15:0];
+
+        end else if(i==OP4)                             // LW
+            mem_data <= DATA_in;
+
+        else                                            // STORES
+            mem_data <= '0;
+    end
+
 ///////////////////////////////////////////////// Memory write control //////////////////////////////////////////////////////////////////////////////
     always@(posedge clk)
         if(write_in!=0 && killed==0) begin          // If is a Store instruction and tag is valid then effectuate the Write
