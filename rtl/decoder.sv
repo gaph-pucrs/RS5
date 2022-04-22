@@ -58,8 +58,8 @@ module decoder #(parameter DEPTH = 2)(
     always_comb
              if (instruction[6:0]==7'b0110111) i<=LUI;
         else if (instruction[6:0]==7'b0010111) i<=ADD;    //AUIPC
+        
         else if (instruction[6:0]==7'b1101111) i<=JAL;
-
         else if (instruction[14:12]==3'b000 & instruction[6:0]==7'b1100111) i<=JALR;
 
         else if (instruction[14:12]==3'b000 & instruction[6:0]==7'b1100011) i<=BEQ;
@@ -101,6 +101,17 @@ module decoder #(parameter DEPTH = 2)(
         else if (instruction[31:25]==7'b0000000 & instruction[14:12]==3'b110 & instruction[6:0]==7'b0110011) i<=OR;
         else if (instruction[31:25]==7'b0000000 & instruction[14:12]==3'b111 & instruction[6:0]==7'b0110011) i<=AND;
 
+        else if (instruction[14:12]==3'b000 & instruction[6:0]==7'b0001111) i<=NOP;     // FENCE
+        else if (instruction[31:8]==24'h000000 & instruction[7:0]==8'b01110011) i<=NOP;    // ECALL
+        else if (instruction[31:8]==24'h001000 & instruction[7:0]==8'b01110011) i<=NOP;    // EBREAK
+
+        else if (instruction[14:12]==3'b001 & instruction[6:0]==7'b1110011) i<=CSRRW 
+        else if (instruction[14:12]==3'b010 & instruction[6:0]==7'b1110011) i<=CSRRS
+        else if (instruction[14:12]==3'b011 & instruction[6:0]==7'b1110011) i<=CSRRC
+        else if (instruction[14:12]==3'b101 & instruction[6:0]==7'b1110011) i<=CSRRWI
+        else if (instruction[14:12]==3'b110 & instruction[6:0]==7'b1110011) i<=CSRRSI
+        else if (instruction[14:12]==3'b111 & instruction[6:0]==7'b1110011) i<=CSRRCI
+
         else if (instruction[31:0]==32'h00000000) i<=NOP;
         else if (instruction[31:0]==32'h00000013) i<=NOP;
 
@@ -113,27 +124,29 @@ module decoder #(parameter DEPTH = 2)(
             SLL, SRL, SRA:                              xu_int <= shifter;
             BEQ, BNE, BLT, BLTU, BGE, BGEU, JAL, JALR:  xu_int <= branch;
             LB, LBU, LH, LHU, LW, SB, SH, SW:           xu_int <= memory;
+            CSRRW, CSRRS, CSRRC, CSRRWI, CSRRSI, CSRRCI:xu_int <= csri;
             default:                                    xu_int <= bypass;
         endcase
 
     always_comb                                 // Execution operation is extracted based on instruction type
         case (i)
-            ADD, XOR, SLL, BEQ, LB:         op<=OP0;
-            SUB, OR, SRL, BNE, LBU, LUI:    op<=OP1;
-            SLTU, AND, SRA, BLT, LH:        op<=OP2;
-            SLT, BLTU, LHU:                 op<=OP3;
-            BGE, LW:                        op<=OP4;
-            BGEU, SW:                       op<=OP5;
-            JAL, SH:                        op<=OP6;
-            JALR, SB:                       op<=OP7;
-            default:                        op<=OP0;
+            ADD, XOR, SLL, BEQ, LB, CSRRW:      op<=OP0;
+            SUB, OR, SRL, BNE, LBU, LUI, CSRRS: op<=OP1;
+            SLTU, AND, SRA, BLT, LH, CSRRC:     op<=OP2;
+            SLT, BLTU, LHU, CSRRWI:             op<=OP3;
+            BGE, LW, CSRRSI:                    op<=OP4;
+            BGEU, SW, CSRRCI:                   op<=OP5;
+            JAL, SH:                            op<=OP6;
+            JALR, SB:                           op<=OP7;
+            default:                            op<=OP0;
         endcase
 
 
 /////////////////////////////////////////////////  Decodes the instruction format ///////////////////////////////////////////////////////////////////
     always_comb
         case (instruction[6:0])
-            7'b0010011, 7'b1100111, 7'b0000011:     fmt <= I_type;
+            7'b0010011, 7'b1100111, 
+            7'b0000011, 7'b1110011:                 fmt <= I_type;
             7'b0100011:                             fmt <= S_type;
             7'b1100011:                             fmt <= B_type;
             7'b0110111, 7'b0010111:                 fmt <= U_type;
