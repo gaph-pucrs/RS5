@@ -64,7 +64,7 @@ module RAM_mem #(parameter startaddress = 32'h00000000)(
 
 ////////////////////////////////////////////////////////////// Writes in memory  //////////////////////////////////////////////////////
     always @(posedge clock)
-        if(write_enable!=0 && W_low_address_int>=0 && W_low_address_int<=(MEMORY_SIZE-3) && write_address!=32'h80001000) begin
+        if(write_enable!=0 && W_low_address_int>=0 && W_low_address_int<=(MEMORY_SIZE-3) && write_address[31]!=1) begin
                 if(write_enable[3]==1)                                  // Store Word(4 bytes)
                     RAM[W_low_address_int+3] <= Wr_data[31:24];
                 if(write_enable[2]==1)                                  // Store Word(4 bytes)
@@ -98,7 +98,7 @@ module RAM_mem #(parameter startaddress = 32'h00000000)(
 
 
 ////////////////////////////////////////////////////////////// Read INSTRUCTION from memory /////////////////////////////////////////////////////////////////////
-    always @(rst or negedge clock)
+    always @(negedge rst or negedge clock)
         if(rst==0)
             instruction <= '0;
         else if(rst==1 && INST_low_address_int>=0 && INST_low_address_int<=(MEMORY_SIZE-3)) begin
