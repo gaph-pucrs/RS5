@@ -42,10 +42,10 @@ module execute(
     output logic        we_out,             // Write enable to regbank
     output logic [31:0] read_address,       // Memory Read Address
     output logic        read,               // Allows memory read
-    output logic [3:0]  write);             // Signal that indicates the write memory operation to retire
+    output logic [3:0]  we_mem);             // Signal that indicates the write memory operation to retire
 
     logic jump_int;
-    logic [3:0] we_mem;
+    logic [3:0] we_mem_int;
     logic [31:0] result [7:0];
     instruction_type adder_i, logic_i, shift_i, branch_i, memory_i;
 
@@ -57,7 +57,7 @@ module execute(
                 .result(result[4]), .result_jal(result[3]), .jump(jump_int), .we(we_branchUnit));
     memoryUnit  memory1 (.opA(opA), .opB(opB), .data(opC), .i(memory_i), 
                 .read_address(read_address), .read(read),
-                .write_address(result[7]), .DATA_wb(result[6]),  .write(we_mem), .we_rb(we_memoryUnit));
+                .write_address(result[7]), .DATA_wb(result[6]),  .we_mem(we_mem_int), .we_rb(we_memoryUnit));
     assign result[5] = opB; // bypass
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -96,10 +96,10 @@ module execute(
    ////////////////////////////////////
         if(xu_sel==memory)  begin           // WRITE
             mem_access <= 1;            
-            write <= we_mem;
+            we_mem <= we_mem_int;
         end else begin
             mem_access <= 0;  
-            write <= '0;
+            we_mem <= '0;
         end
    ////////////////////////////////////
         if(xu_sel==branch)             // WE_OUT

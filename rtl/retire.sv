@@ -31,7 +31,7 @@ module retire(
     input logic         jump,                       // Jump signal from branch unit 
     input logic         we,                         // Write enable from Execute(based on instruction type)
     input logic [3:0]   tag_in,                     // Instruction tag to be compared with retire tag
-    input logic [3:0]   write_in,                   // Write enable memory
+    input logic [3:0]   we_mem_in,                   // Write enable memory
     input logic [31:0]  DATA_in,                    // Data from memory
     input logic         mem_access,
     input instruction_type i,
@@ -106,8 +106,8 @@ always_comb begin
 
 ///////////////////////////////////////////////// Memory write control //////////////////////////////////////////////////////////////////////////////
     always@(posedge clk)
-        if(write_in!=0 && killed==0) begin          // If is a Store instruction and tag is valid then effectuate the Write
-            write <= write_in;
+        if(we_mem_in!=0 && killed==0) begin          // If is a Store instruction and tag is valid then effectuate the Write
+            write <= we_mem_in;
             write_address <= result[1];
             DATA_out <= result[0];
         end else begin                              // Otherwise do nothing

@@ -283,5 +283,4 @@ module decoder #(parameter DEPTH = 2)(
             xu_sel <= xu_int;
             tag_out <= tag_in;
         end
-
 endmodule

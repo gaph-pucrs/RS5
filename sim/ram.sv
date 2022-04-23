@@ -40,7 +40,7 @@ module RAM_mem #(parameter startaddress = 32'h00000000)(
     logic [31:0] W_tmp_address, R_tmp_address, INST_tmp_address;
     int W_low_address_int, R_low_address_int, INST_low_address_int;
     int fd, r;
-    int fd_i, fd_d;
+    int fd_i, fd_r, fd_w;
 
     assign W_tmp_address = write_address - startaddress;                //  Address offset
     assign W_low_address_int = W_tmp_address[15:0];                     // convert to integer
@@ -58,12 +58,13 @@ module RAM_mem #(parameter startaddress = 32'h00000000)(
         $display("read %d elements \n", r);
 
         fd_i = $fopen ("./debug/instructions.txt", "w");
-        fd_d = $fopen ("./debug/reads.txt", "w");
+        fd_r = $fopen ("./debug/reads.txt", "w");
+        fd_w = $fopen ("./debug/writes.txt", "w");
     end
 
 ////////////////////////////////////////////////////////////// Writes in memory  //////////////////////////////////////////////////////
-    always @(negedge clock)
-        if(write_enable!=0 && W_low_address_int>=0 && W_low_address_int<=(MEMORY_SIZE-3)) begin
+    always @(posedge clock)
+        if(write_enable!=0 && W_low_address_int>=0 && W_low_address_int<=(MEMORY_SIZE-3) && write_address!=32'h80001000) begin
                 if(write_enable[3]==1)                                  // Store Word(4 bytes)
                     RAM[W_low_address_int+3] <= Wr_data[31:24];
                 if(write_enable[2]==1)                                  // Store Word(4 bytes)
@@ -72,6 +73,14 @@ module RAM_mem #(parameter startaddress = 32'h00000000)(
                     RAM[W_low_address_int+1] <= Wr_data[15:8];
                 if(write_enable[0]==1)                                  // Store Byte(1 byte)
                     RAM[W_low_address_int]   <= Wr_data[7:0];
+        
+                
+                $fwrite(fd_w,"[%0d] ", $time);
+                if(write_enable[3]==1) $fwrite(fd_w,"%h ", Wr_data[31:24]); else $fwrite(fd_w,"-- ");
+                if(write_enable[2]==1) $fwrite(fd_w,"%h ", Wr_data[23:16]); else $fwrite(fd_w,"-- ");
+                if(write_enable[1]==1) $fwrite(fd_w,"%h ", Wr_data[15:8]);  else $fwrite(fd_w,"-- ");
+                if(write_enable[0]==1) $fwrite(fd_w,"%h ", Wr_data[7:0]);   else $fwrite(fd_w,"-- ");
+                $fwrite(fd_w,"to address %8h\n", write_address);
         end
 
 ////////////////////////////////////////////////////////////// Read DATA from memory /////////////////////////////////////////////////////////////////////
@@ -82,8 +91,11 @@ module RAM_mem #(parameter startaddress = 32'h00000000)(
             data_read[15:8]  <= RAM[R_low_address_int+1];
             data_read[7:0]   <= RAM[R_low_address_int];
 
-            $fwrite(fd_d,"Read: %8h -> %8h\n", R_low_address_int, data_read);
+        if(R_low_address_int!=0)
+            $fwrite(fd_r,"[%0d] Read: %h %h %h %h from addr %8h\n", $time, RAM[R_low_address_int+3], RAM[R_low_address_int+2], RAM[R_low_address_int+1], RAM[R_low_address_int], R_low_address_int);
+
         end
+
 
 ////////////////////////////////////////////////////////////// Read INSTRUCTION from memory /////////////////////////////////////////////////////////////////////
     always @(rst or negedge clock)
@@ -95,6 +107,6 @@ module RAM_mem #(parameter startaddress = 32'h00000000)(
             instruction[15:8]  <= RAM[INST_low_address_int+1];
             instruction[7:0]   <= RAM[INST_low_address_int];
 
-            $fwrite(fd_i,"%8h -> %8h\n", INST_low_address_int, instruction);
+            $fwrite(fd_i,"[%0d] %h -> %h %h %h %h \n", $time, INST_low_address_int, RAM[INST_low_address_int+3], RAM[INST_low_address_int+2], RAM[INST_low_address_int+1], RAM[INST_low_address_int]);
         end
 endmodule

@@ -19,7 +19,7 @@
 
 package my_pkg;
 
-    typedef enum  logic[2:0] {R_type, I_type, S_type, B_type, U_type, J_type} fmts;
+    typedef enum  logic[2:0] {R_type, I_type, S_type, B_type, U_type, J_type, CSR_type} fmts;
 
     typedef enum  logic[2:0] {
                               OP0, OP1, OP2, OP3, OP4, OP5, OP6, OP7, NOTOKEN='Z
