@@ -55,7 +55,7 @@ module execute(
     shiftUnit   shift1 (.opA(opA), .opB(opB[4:0]), .i(shift_i), .result(result[2]));
     branchUnit  branch1 (.opA(opA), .opB(opB), .offset(opC), .NPC(NPC), .i(branch_i),
                 .result(result[4]), .result_jal(result[3]), .jump(jump_int), .we(we_branchUnit));
-    memoryUnit  memory1 (.opA(opA), .opB(opB), .data(opC), .i(memory_i), 
+    LSUnit      LSU1 (.opA(opA), .opB(opB), .data(opC), .i(memory_i), 
                 .read_address(read_address), .read(read),
                 .write_address(result[7]), .DATA_wb(result[6]),  .we_mem(we_mem_int), .we_rb(we_memoryUnit));
     assign result[5] = opB; // bypass

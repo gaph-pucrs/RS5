@@ -130,7 +130,7 @@ endmodule
 ///                                    MEMORY                                                   ///
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-module memoryUnit (
+module LSUnit (
     input logic [31:0]  opA,                            // Base Address
     input logic [31:0]  opB,                            // Offset
     input logic [31:0]  data,                           // Data to be Written in memory
