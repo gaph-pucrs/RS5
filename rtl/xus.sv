@@ -229,7 +229,8 @@ module csrUnit (
     output logic wr_en,
     output csr_ops csr_op,
     output logic [11:0] csr_add,
-    output logic [31:0] data);
+    output logic [31:0] data
+    );
 
     logic [4:0] rd, rs1;
 
