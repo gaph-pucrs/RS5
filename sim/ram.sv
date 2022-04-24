@@ -98,7 +98,7 @@ module RAM_mem #(parameter startaddress = 32'h00000000)(
 
 
 ////////////////////////////////////////////////////////////// Read INSTRUCTION from memory /////////////////////////////////////////////////////////////////////
-    always @(negedge rst or negedge clock)
+    always @(negedge rst or posedge clock)
         if(rst==0)
             instruction <= '0;
         else if(rst==1 && INST_low_address_int>=0 && INST_low_address_int<=(MEMORY_SIZE-3)) begin

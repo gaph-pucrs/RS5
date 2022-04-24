@@ -34,8 +34,8 @@ module execute(
     input instruction_type i,               // Operation selector
     input xu            xu_sel,             // Execute Unit selector
     input logic [3:0]   tag_in,             // Instruction tag
+    output logic        LS_operation,
     output logic        mem_access,
-    output logic        stall,
     output instruction_type i_out,
     output logic [31:0] result_out [1:0],   // Results array
     output logic        jump_out,           // Signal that indicates a branch taken
@@ -96,10 +96,10 @@ module execute(
             jump_out <= '0;
    ////////////////////////////////////
         if(xu_sel==memory)  begin           // WRITE
-            mem_access <= 1;            
+            LS_operation <= 1;            
             we_mem <= we_mem_int;
         end else begin
-            mem_access <= 0;  
+            LS_operation <= 0;  
             we_mem <= '0;
         end
    ////////////////////////////////////
@@ -114,8 +114,7 @@ module execute(
         i_out <= i;
     end
 
-///////////////////////////////////////////////// MEM ACCESS STALL ////////////////////////////////////////////////////
-    assign stall = (xu_sel==memory && read==1) ? 0 : 1;
+///////////////////////////////////////////////// MEM ACCESS mem_access ////////////////////////////////////////////////////
+    assign mem_access = (xu_sel==memory && read==1) ? 0 : 1;
 
-    
 endmodule

@@ -33,7 +33,7 @@ module retire(
     input logic [3:0]   tag_in,                     // Instruction tag to be compared with retire tag
     input logic [3:0]   we_mem_in,                   // Write enable memory
     input logic [31:0]  DATA_in,                    // Data from memory
-    input logic         mem_access,
+    input logic         LS_operation,
     input instruction_type i,
     output logic        reg_we,                     // Write Enable to Register Bank
     output logic [31:0] WrData,                     // WriteBack data to Register Bank
@@ -44,12 +44,11 @@ module retire(
     output logic [3:0]  write);                      // Memory write enable
 
     logic [31:0] mem_data;
-    logic [3:0] next_tag;
     logic [3:0] curr_tag;
     logic killed;
 
 ///////////////////////////////////////////////// Assign to Register Bank Write Back ////////////////////////////////////////////////////////////////
-    assign WrData = (mem_access) ? mem_data : result[0];
+    assign WrData = (LS_operation) ? mem_data : result[0];
 
 ///////////////////////////////////////////////// Killed signal generation //////////////////////////////////////////////////////////////////////////
     always_comb

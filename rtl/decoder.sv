@@ -28,7 +28,7 @@ module decoder #(parameter DEPTH = 2)(
     input logic clk,
     input logic reset,
     input logic we,
-    input logic [31:0]  instruction,            // Object code of the instruction to extract the immediate operand
+    input logic [31:0]  instruction_in,         // Object code of the instruction to extract the immediate operand
     input logic [31:0]  NPC,                    // Bypassed to execute unit as an operand
     input logic [3:0]   tag_in,                 // Instruction Tag
     input logic [31:0]  dataA,                  // Data read from register bank
@@ -43,19 +43,31 @@ module decoder #(parameter DEPTH = 2)(
     output instruction_type i_out,              // Instruction operation (OP0, OP1...)
     output xu           xu_sel,                 // Instruction unity     (adder,shifter...)
     output logic [3:0]  tag_out,                // Instruction Tag
-    output logic        bubble,                // Bubble issue indicator (0 active)
-    input logic stall
+    output logic        hazard,                 // Bubble issue indicator (0 active)
+    input logic pipe_clear
     );
 
-    logic [31:0] imed, opA, opB, opC, regD_add, target;
+    logic [31:0] imed, opA, opB, opC, regD_add, target, instruction, last_inst;
+    logic pipe_clear_r;
     wor [31:0] locked;
     logic [31:0] lock_queue[DEPTH];
-    fmts fmt;
 
+    fmts fmt;
     i_type i;
     xu xu_int;
     instruction_type op;
 
+///////////////////////////////////////////////// REDECODE INST TEST //////////////////////////////////////////////////////////////
+    always @(posedge clk ) begin
+        last_inst <= instruction;               // Holds the last cycle instruction
+        pipe_clear_r <= pipe_clear;             // Holds the last cycle state
+    end
+
+    always_comb
+        if (pipe_clear_r == 0)                   // If last cycle had a pipe stall
+            instruction = last_inst;             // Re-decode last cycle instruction
+        else
+            instruction = instruction_in; 
 ///////////////////////////////////////////////// find out the type of the instruction //////////////////////////////////////////////////////////////
     always_comb
              if (instruction[6:0]==7'b0110111) i<=LUI;
@@ -224,7 +236,7 @@ module decoder #(parameter DEPTH = 2)(
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     always @(*)
-        if(!bubble)                                         // If a bubble is being issued then regD=0 is inserted in queue (to avoid deadlock)
+        if(!hazard)                                         // If a bubble is being issued then regD=0 is inserted in queue (to avoid deadlock)
             target <= '0;
         else                                                // Otherwise the instruction regD is the target to be inserted in queue
             target <=regD_add; 
@@ -247,14 +259,14 @@ module decoder #(parameter DEPTH = 2)(
 
     assign wrAddr = lock_queue[DEPTH-1][31:1] & {32{&we}};  // Write Address is the last position with a bitwise AND with the write enable signal
 
-///////////////////////////////////////////////// BUBBLE SIGNAL GENERATION //////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////// HAZARD SIGNAL GENERATION //////////////////////////////////////////////////////////////////////////
     always_comb
         if(locked[0]==1 && xu_int==memory && (op==OP0 | op==OP1 | op==OP2 | op==OP3 | op==OP4)) //Can't read from memory if a write in memory is pending
-            bubble <= 0;
+            hazard <= 0;
         else if(locked[regA_add]==1 || locked[regB_add]==1) // Checks if rs1 and rs2 are not in the list of pending write registers
-            bubble <= 0;
+            hazard <= 0;
         else                                                // No Hazards identified
-            bubble <= 1;
+            hazard <= 1;
 
 ///////////////////////////////////////////////// Output registers //////////////////////////////////////////////////////////////////////////////////
     always @(posedge clk or negedge reset)
@@ -267,7 +279,7 @@ module decoder #(parameter DEPTH = 2)(
             xu_sel <= bypass;
             tag_out <= '0;
 
-         end else if(bubble==0 || stall==0) begin                       // Propagate bubble
+         end else if(pipe_clear==0) begin                       // Propagate bubble
             opA_out <= '0;
             opB_out <= '0;
             opC_out <= '0;
@@ -276,7 +288,7 @@ module decoder #(parameter DEPTH = 2)(
             xu_sel <= bypass;
             tag_out <= '0;
 
-        end else if(bubble==1 && stall==1) begin                        // Propagate instruction
+        end else if(pipe_clear==1) begin                        // Propagate instruction
             opA_out <= opA;
             opB_out <= opB;
             opC_out <= opC;
@@ -285,4 +297,5 @@ module decoder #(parameter DEPTH = 2)(
             xu_sel <= xu_int;
             tag_out <= tag_in;
         end
+    
 endmodule

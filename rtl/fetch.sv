@@ -26,13 +26,11 @@ module fetch  #(parameter start_address='0)(  //Generic start address
     input logic         ce,                             // Chip Enable is used to bubble propagation (0 means hold state because a bubble is being issued)
     input logic         jump,                           // Indicates when a branch must be taken
     input logic [31:0]  result,                         // The branch address from retire
-    input logic [31:0]  instruction,                    // Instruction object code received from memory
     output logic [31:0] i_address,                      // Instruction address in memory (PC)
-    output logic [31:0] IR,                             // Instruction Register
     output logic [31:0] NPC,                            // PC value is propagated to be used as an operand in some instructions
     output logic [3:0]  tag_out);                       // Instruction Tag stream
 
-    logic [31:0] PC;
+    logic [31:0] PC, PC_plus4;
     logic [3:0] next_tag, curr_tag;
 
 ///////////////////////////////////////////////// PC Control ////////////////////////////////////////////////////////////////////////////////////////
@@ -42,12 +40,13 @@ module fetch  #(parameter start_address='0)(  //Generic start address
         else if(jump)                                   // If a branch was taken then PC receives a new value from retire unit
             PC <= result;
         else if(ce==1)                                  // If there is no bubble being issued: PC <= PC+4
-            PC <= PC+4;                                 // Otherwise(when bubble==0) holds the current value
+            PC <= PC_plus4;                                     // Otherwise(when bubble==0) holds the current value
+
+    assign PC_plus4 = PC + 4;
 
 ///////////////////////////////////////////////// Sensitive Outputs /////////////////////////////////////////////////////////////////////////////////
     always @(posedge clk)
         if(ce==1) begin                                 // If there is no bubble then the internal signals are assigned to the outputs
-            IR <= instruction;                          // Needed because the instruction being hold in the registers must be executed
             NPC <= PC;
         end
 
