@@ -35,6 +35,7 @@ module execute(
     input xu            xu_sel,             // Execute Unit selector
     input logic [3:0]   tag_in,             // Instruction tag
     output logic        mem_access,
+    output logic        stall,
     output instruction_type i_out,
     output logic [31:0] result_out [1:0],   // Results array
     output logic        jump_out,           // Signal that indicates a branch taken
@@ -55,7 +56,7 @@ module execute(
     shiftUnit   shift1 (.opA(opA), .opB(opB[4:0]), .i(shift_i), .result(result[2]));
     branchUnit  branch1 (.opA(opA), .opB(opB), .offset(opC), .NPC(NPC), .i(branch_i),
                 .result(result[4]), .result_jal(result[3]), .jump(jump_int), .we(we_branchUnit));
-    LSUnit      LSU1 (.opA(opA), .opB(opB), .data(opC), .i(memory_i), 
+    LSUnit  memory1 (.opA(opA), .opB(opB), .data(opC), .i(memory_i), 
                 .read_address(read_address), .read(read),
                 .write_address(result[7]), .DATA_wb(result[6]),  .we_mem(we_mem_int), .we_rb(we_memoryUnit));
     assign result[5] = opB; // bypass
@@ -112,4 +113,9 @@ module execute(
         tag_out <= tag_in;
         i_out <= i;
     end
+
+///////////////////////////////////////////////// MEM ACCESS STALL ////////////////////////////////////////////////////
+    assign stall = (xu_sel==memory && read==1) ? 0 : 1;
+
+    
 endmodule

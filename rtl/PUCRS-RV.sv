@@ -40,7 +40,7 @@ module PUCRS_RV(
     output logic [31:0] write_address,
     output logic [3:0]  write);                          // Memory Write signal One Hot, each bit address 1 byte
 
-    logic jump_wb, jump_retire, bubble, freeMem, we_retire;
+    logic jump_wb, jump_retire, bubble, stall, we_retire;
     logic [3:0] we_mem_retire;
     logic regD_we;
     logic [31:0] dataA, dataB, data_RLock;
@@ -60,7 +60,7 @@ module PUCRS_RV(
 
 //////////////////////////////////////////////////////////// FETCH //////////////////////////////////////////////////////////////////////////////////
 
-    fetch fetch1 (.clk(clk), .reset(reset), .ce(bubble), .jump(jump_wb), .result(New_pc), .instruction(instruction), 
+    fetch fetch1 (.clk(clk), .reset(reset), .ce(bubble&stall), .jump(jump_wb), .result(New_pc), .instruction(instruction), 
                 .i_address(i_address), .IR(IR), .NPC(NPC_decode), .tag_out(decode_tag));
 
 /////////////////////////////////////////////////////////// DECODER /////////////////////////////////////////////////////////////////////////////////
@@ -68,14 +68,16 @@ module PUCRS_RV(
     decoder decoder1 (.clk(clk), .reset(reset), .we(regD_we), 
                 .NPC(NPC_decode), .instruction(IR), .tag_in(decode_tag), 
                 .dataA(dataA), .dataB(dataB), .regA_add(regA_add), .regB_add(regB_add), .opA_out(opA_execute), .opB_out(opB_execute), 
-                .opC_out(opC_execute), .NPC_out(NPC_execute), .i_out(i_execute), .xu_sel(xu_execute), .tag_out(execute_tag), .wrAddr(wrAddr), .bubble(bubble));
+                .opC_out(opC_execute), .NPC_out(NPC_execute), .i_out(i_execute), .xu_sel(xu_execute), .tag_out(execute_tag), .wrAddr(wrAddr), 
+                .bubble(bubble), .stall(stall)
+                );
 
 /////////////////////////////////////////////////////////// EXECUTE /////////////////////////////////////////////////////////////////////////////////
 
     execute execute1 (.clk(clk), .reset(reset), .NPC(NPC_execute), .opA(opA_execute), .opB(opB_execute), .opC(opC_execute),
                 .i(i_execute), .xu_sel(xu_execute), .tag_in(execute_tag),  .result_out(result_retire), .jump_out(jump_retire), 
                 .tag_out(retire_tag), .i_out(i_retire), .mem_access(mem_access), .we_out(we_retire),
-                .read_address(read_address), .read(read), .we_mem(we_mem_retire));
+                .read_address(read_address), .read(read), .we_mem(we_mem_retire), .stall(stall));
 
 /////////////////////////////////////////////////////////// RETIRE //////////////////////////////////////////////////////////////////////////////////
 

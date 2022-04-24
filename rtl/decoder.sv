@@ -43,7 +43,9 @@ module decoder #(parameter DEPTH = 2)(
     output instruction_type i_out,              // Instruction operation (OP0, OP1...)
     output xu           xu_sel,                 // Instruction unity     (adder,shifter...)
     output logic [3:0]  tag_out,                // Instruction Tag
-    output logic        bubble);                // Bubble issue indicator (0 active)
+    output logic        bubble,                // Bubble issue indicator (0 active)
+    input logic stall
+    );
 
     logic [31:0] imed, opA, opB, opC, regD_add, target;
     wor [31:0] locked;
@@ -265,7 +267,7 @@ module decoder #(parameter DEPTH = 2)(
             xu_sel <= bypass;
             tag_out <= '0;
 
-         end else if(bubble==0) begin                       // Propagate bubble
+         end else if(bubble==0 || stall==0) begin                       // Propagate bubble
             opA_out <= '0;
             opB_out <= '0;
             opC_out <= '0;
@@ -274,7 +276,7 @@ module decoder #(parameter DEPTH = 2)(
             xu_sel <= bypass;
             tag_out <= '0;
 
-        end else if(bubble==1) begin                        // Propagate instruction
+        end else if(bubble==1 && stall==1) begin                        // Propagate instruction
             opA_out <= opA;
             opB_out <= opB;
             opC_out <= opC;
