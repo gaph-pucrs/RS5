@@ -26,19 +26,17 @@ import my_pkg::*;
 module RAM_mem #(parameter startaddress = 32'h00000000)(
     input logic clock,
     input logic rst,
-    input logic [31:0] i_address, 
-    output logic [31:0] instruction,
     input logic [3:0] write_enable,
     input logic [31:0] write_address,
     input logic [31:0] Wr_data,
-    input logic read_enable,
     input logic [31:0] read_address,
-    output logic [31:0] data_read);
+    output logic [31:0] data_read
+    );
 
     bit [7:0] RAM [0:65535];
 
-    logic [31:0] W_tmp_address, R_tmp_address, INST_tmp_address;
-    int W_low_address_int, R_low_address_int, INST_low_address_int;
+    logic [31:0] W_tmp_address, R_tmp_address;
+    int W_low_address_int, R_low_address_int;
     int fd, r;
     int fd_i, fd_r, fd_w;
 
@@ -47,9 +45,6 @@ module RAM_mem #(parameter startaddress = 32'h00000000)(
 
     assign R_tmp_address = read_address - startaddress;                 //  Address offset
     assign R_low_address_int = R_tmp_address[15:0];                     // convert to integer
-
-    assign INST_tmp_address = i_address - startaddress;                 // Address offset
-    assign INST_low_address_int = INST_tmp_address[15:0];               // convert to integer
 
     initial begin
         fd = $fopen ("/home/williannunes/pucrs-rv/bin/test.bin", "r");
@@ -85,7 +80,7 @@ module RAM_mem #(parameter startaddress = 32'h00000000)(
 
 ////////////////////////////////////////////////////////////// Read DATA from memory /////////////////////////////////////////////////////////////////////
     always @(posedge clock)
-        if(read_enable==1 && R_low_address_int>=0 && R_low_address_int<=(MEMORY_SIZE-3)) begin
+        if(R_low_address_int>=0 && R_low_address_int<=(MEMORY_SIZE-3)) begin
             data_read[31:24] <= RAM[R_low_address_int+3];
             data_read[23:16] <= RAM[R_low_address_int+2];
             data_read[15:8]  <= RAM[R_low_address_int+1];
@@ -96,17 +91,4 @@ module RAM_mem #(parameter startaddress = 32'h00000000)(
 
         end
 
-
-////////////////////////////////////////////////////////////// Read INSTRUCTION from memory /////////////////////////////////////////////////////////////////////
-    always @(negedge rst or posedge clock)
-        if(rst==0)
-            instruction <= '0;
-        else if(rst==1 && INST_low_address_int>=0 && INST_low_address_int<=(MEMORY_SIZE-3)) begin
-            instruction[31:24] <= RAM[INST_low_address_int+3];
-            instruction[23:16] <= RAM[INST_low_address_int+2];
-            instruction[15:8]  <= RAM[INST_low_address_int+1];
-            instruction[7:0]   <= RAM[INST_low_address_int];
-
-            $fwrite(fd_i,"[%0d] %h -> %h %h %h %h \n", $time, INST_low_address_int, RAM[INST_low_address_int+3], RAM[INST_low_address_int+2], RAM[INST_low_address_int+1], RAM[INST_low_address_int]);
-        end
 endmodule

@@ -115,6 +115,7 @@ module execute(
     end
 
 ///////////////////////////////////////////////// MEM ACCESS mem_access ////////////////////////////////////////////////////
+    
     assign mem_access = (xu_sel==memory && read==1) ? 0 : 1;
 
 endmodule
