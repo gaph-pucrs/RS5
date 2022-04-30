@@ -36,13 +36,13 @@ import my_pkg::*;
 module PUCRS_RV_tb ();
 
 logic         clk=1, rstCPU;
-logic [31:0]  i_address;
+logic [31:0]  i_address, instruction;
 logic         read;
 logic [31:0]  read_address, data_read, write_address, data_write;
 logic [3:0]   write;
 byte          char;
 logic [31:0]  Rd_data, Wr_address, Wr_data;
-logic [31:0]  ram_address;
+
 
 ////////////////////////////////////////////////////// Clock generator //////////////////////////////////////////////////////////////////////////////
   always begin
@@ -51,8 +51,8 @@ logic [31:0]  ram_address;
   end
 
 ////////////////////////////////////////////////////// RAM INSTANTIATION ///////////////////////////////////////////////////////////////////////
-	RAM_mem #(32'h00000000) RAM_MEM(.clock(clk), .rst(rstCPU), .read_address(ram_address), .data_read(Rd_data),
-             .write_address(Wr_address), .Wr_data(Wr_data), .write_enable(write));
+	RAM_mem #(32'h00000000) RAM_MEM(.clock(clk), .rst(rstCPU), .write_enable(write), .read_enable(read), .i_address(i_address), 
+            .read_address(read_address), .write_address(Wr_address), .Wr_data(Wr_data), .data_read(Rd_data), .instruction(instruction));
 
 // data memory signals --------------------------------------------------------
   always_comb
@@ -65,16 +65,13 @@ logic [31:0]  ram_address;
     end
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   always_comb
-    if(read_address==32'h80006000)
-        data_read <= $time/1000;
-    else 
-        data_read <= Rd_data; 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    always_comb 
-        if(read==1) 
-            ram_address <= read_address;
-         else 
-            ram_address <= i_address;
+    if(read==1) begin
+        if(read_address==32'h80006000)
+            data_read <= $time/1000;
+        else 
+            data_read <= Rd_data; 
+    end else
+        data_read <= 'Z; 		                                // data_cpu
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////// Memory Mapped regs ///////////////////////////////////////////////////////////////////////////
@@ -95,7 +92,7 @@ logic [31:0]  ram_address;
 ////////////////////////////////////////////////////// CPU INSTANTIATION ////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    PUCRS_RV dut (.clk(clk), .reset(rstCPU), .instruction(Rd_data), .i_address(i_address), .read(read), .read_address(read_address),
+    PUCRS_RV dut (.clk(clk), .reset(rstCPU), .instruction(instruction), .i_address(i_address), .read(read), .read_address(read_address),
              .DATA_in(data_read), .DATA_out(data_write), .write_address(write_address), .write(write));
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

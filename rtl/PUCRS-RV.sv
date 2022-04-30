@@ -40,7 +40,7 @@ module PUCRS_RV(
     output logic [31:0] write_address,
     output logic [3:0]  write);                          // Memory Write signal One Hot, each bit address 1 byte
 
-    logic jump_wb, jump_retire, hazard, mem_access, we_retire, pipe_clear;
+    logic jump_wb, jump_retire, hazard, we_retire, pipe_clear;
     logic [3:0] we_mem_retire;
     logic regD_we;
     logic [31:0] dataA, dataB;
@@ -55,11 +55,11 @@ module PUCRS_RV(
     logic [31:0] result_retire [1:0];
     logic [31:1] wrAddr;
 
-    assign pipe_clear = hazard & mem_access;
+    assign pipe_clear = hazard;
 
 //////////////////////////////////////////////////////////// FETCH //////////////////////////////////////////////////////////////////////////////////
 
-    fetch fetch1 (.clk(clk), .reset(reset), .ce(pipe_clear), .jump(jump_wb), .result(New_pc),
+    fetch fetch1 (.clk(clk), .reset(reset), .pipe_clear(pipe_clear), .jump(jump_wb), .result(New_pc),
                 .i_address(i_address), .NPC(NPC_decode), .tag_out(decode_tag));
 
 /////////////////////////////////////////////////////////// DECODER /////////////////////////////////////////////////////////////////////////////////
@@ -76,7 +76,7 @@ module PUCRS_RV(
     execute execute1 (.clk(clk), .reset(reset), .NPC(NPC_execute), .opA(opA_execute), .opB(opB_execute), .opC(opC_execute),
                 .i(i_execute), .xu_sel(xu_execute), .tag_in(execute_tag),  .result_out(result_retire), .jump_out(jump_retire), 
                 .tag_out(retire_tag), .i_out(i_retire), .LS_operation(LS_operation), .we_out(we_retire),
-                .read_address(read_address), .read(read), .we_mem(we_mem_retire), .mem_access(mem_access));
+                .read_address(read_address), .read(read), .we_mem(we_mem_retire));
 
 /////////////////////////////////////////////////////////// RETIRE //////////////////////////////////////////////////////////////////////////////////
 

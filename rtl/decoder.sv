@@ -57,7 +57,7 @@ module decoder #(parameter DEPTH = 2)(
     xu xu_int;
     instruction_type op;
 
-///////////////////////////////////////////////// REDECODE INST TEST //////////////////////////////////////////////////////////////
+///////////////////////////////////////////////// RE-DECODE INST TEST //////////////////////////////////////////////////////////////
     always @(posedge clk ) begin
         last_inst <= instruction;               // Holds the last cycle instruction
         pipe_clear_r <= pipe_clear;             // Holds the last cycle state
@@ -279,7 +279,7 @@ module decoder #(parameter DEPTH = 2)(
             xu_sel <= bypass;
             tag_out <= '0;
 
-         end else if(pipe_clear==0) begin                       // Propagate bubble
+         end else if(!pipe_clear) begin                     // Propagate bubble
             opA_out <= '0;
             opB_out <= '0;
             opC_out <= '0;
@@ -288,7 +288,7 @@ module decoder #(parameter DEPTH = 2)(
             xu_sel <= bypass;
             tag_out <= '0;
 
-        end else if(pipe_clear==1) begin                        // Propagate instruction
+        end else if(pipe_clear) begin                       // Propagate instruction
             opA_out <= opA;
             opB_out <= opB;
             opC_out <= opC;
