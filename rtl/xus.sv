@@ -222,19 +222,23 @@ endmodule
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 module csrUnit (
-    input logic [31:0]  opA, // DATA FROM RS1
-    input logic [31:0]  opB, // ADDRs
+    input logic [31:0]  opA,            // DATA FROM REGBANK 
+    input logic [31:0]  instruction,
     input instruction_type i,
+    input Privilege privilege,
     output logic rd_en,
     output logic wr_en,
     output csr_ops csr_op,
     output logic [11:0] csr_add,
-    output logic [31:0] data);
+    output logic [31:0] data,
+    output logic exception_csr);
 
     logic [4:0] rd, rs1;
+    logic [11:0] add;
 
-    assign rd  = opB[21:17];
-    assign rs1 = opB[16:12];
+    assign rd  = opB[11:7];
+    assign rs1 = opB[19:15];
+    assign add = opb[31:20];
 
     always_comb begin
         if (i==OP0 || i==OP1) begin     // CSSRW or CSSRWI
@@ -258,7 +262,7 @@ module csrUnit (
     end
 
     always_comb begin
-        csr_add <= opB[11:0];
+        csr_add <= add;
         
         if(i==OP0 || i==OP2 || i==OP4)
             data <= opA;
@@ -276,4 +280,16 @@ module csrUnit (
         else                               // NONE
             csr_op <= none;
 
+    
+    always_comb begin
+        // Raise exeption if CSR is read only and write enable is true
+        if((csr_add[11:10] == 2'b11) && (wr_en == 1))
+            exception_csr <= 1;
+        // Check Level privileges
+        else if(csr_add[9:8] < privilege)
+            exception_csr <= 1;
+        // No exception is raised
+        else
+            exception_csr <= 0;
+    end
 endmodule

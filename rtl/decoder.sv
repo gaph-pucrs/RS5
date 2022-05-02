@@ -208,13 +208,10 @@ module decoder #(parameter DEPTH = 2)(
                         imed[0] <= 0;
                     end
             
-            CSR_type: begin
-                        imed[21:17] <= instruction[11:7];
-                        imed[16:12] <= instruction[19:15];
-                        imed[11:0]  <= instruction[31:20];
-            end
+            CSR_type:
+                        imed <= instruction;
 
-            default:      imed[31:0] <= '0;
+            default:      imed <= '0;
         endcase
 
 ///////////////////////////////////////////////// Control of the exits based on format //////////////////////////////////////////////////////////////
