@@ -11,43 +11,36 @@ module CSRBank (
     output logic [31:0] out,
 
     input logic RAISE_EXCEPTION,
-    input logic [30:0] EXCEPTION_CODE,
+    input logic [30:0] CODE,
     input Privilege privilege,
     input logic [31:0] PC,
     input logic [31:0] instruction
     );
 
-    CSRs CSR;
-    logic [31:0] mvendorid, marchid, mimpid, mhartid, mconfigptr, mstatus, misa, medeleg, mideleg, mie, mtvec, mcounteren, mstatush, mscratch, mepc, mcause, mtval, mip, mtinst, mtval2;
+    CSRs CSR = addr;
+    logic [31:0] mstatus, misa, mie, mtvec, mcounteren, mstatush, mscratch, mepc, mcause, mtval, mip, mtinst, mtval2;
     logic [31:0] wr_data, wmask, current_val;
+    //logic [31:0] medeleg, mideleg; // NOT IMPLEMENTED YET (REQUIRED ONLY WHEN SYSTEM HAVE S-MODE)
 
     always_comb begin
         wmask <= '1;
         case (csr_add)
-            // RO regs
-            12'hF11: CSR <= MVENDORID;
-            12'hF12: CSR <= MARCHID;
-            12'hF13: CSR <= MIMPID;
-            12'hF14: CSR <= MHARTID;
-            12'hF15: CSR <= MCONFIGPTR;
-
             // RW REGS
-            12'h300: begin CSR <= MSTATUS; current_val <= mstatus; wmask <= '1; end
-            12'h301: begin CSR <= MISA; current_val <= misa; wmask <= '1; end
-            12'h302: begin CSR <= MEDELEG; current_val <= medeleg; wmask <= '1; end
-            12'h303: begin CSR <= MIDELEG; current_val <= mideleg; wmask <= '1; end
-            12'h304: begin CSR <= MIE; current_val <= mie; wmask <= '1; end
-            12'h305: begin CSR <= MTVEC; current_val <= mtvec; wmask <= '1; end
-            12'h306: begin CSR <= MCOUNTEREN; current_val <= mcounteren; wmask <= '1; end
-            12'h310: begin CSR <= MSTATUSH; current_val <= mstatush; wmask <= '1; end
+            MSTATUS:    begin current_val <= mstatus;   wmask <= 32'h007E19AA; end
+            MISA:       begin current_val <= misa;      wmask <= 32'h3C000000; end
+            //MEDELEG:    begin current_val <= medeleg;   wmask <= '1; end
+            //MIDELEG:    begin current_val <= mideleg;   wmask <= '1; end
+            MIE:        begin current_val <= mie;       wmask <= 32'h00000888; end
+            MTVEC:      begin current_val <= mtvec;     wmask <= 32'hFFFFFFFC; end
+            //MCOUNTEREN: begin current_val <= mcounteren;wmask <= '1; end
+            //MSTATUSH:   begin current_val <= mstatush;  wmask <= '1; end
+            MSCRATCH:   begin current_val <= mscratch;  wmask <= 32'hFFFFFFFF; end
+            MEPC:       begin current_val <= mepc;      wmask <= 32'hFFFFFFFC; end
+            MCAUSE:     begin current_val <= mcause;    wmask <= 32'hFFFFFFFF; end
+            MTVAL:      begin current_val <= mtval;     wmask <= 32'hFFFFFFFF; end
+            MIP:        begin current_val <= mip;       wmask <= 32'h00000000; end
 
-            12'h340: begin CSR <= MSCRATCH; current_val <= mscratch; wmask <= '1; end
-            12'h341: begin CSR <= MEPC; current_val <= mepc; wmask <= '1; end
-            12'h342: begin CSR <= MCAUSE; current_val <= mcause; wmask <= '1; end
-            12'h343: begin CSR <= MTVAL; current_val <= mtval; wmask <= '1; end
-            12'h344: begin CSR <= MIP; current_val <= mip; wmask <= '1; end
-            12'h34A: begin CSR <= MTINST; current_val <= mtinst; wmask <= '1; end
-            12'h34B: begin CSR <= MTVAL2; current_val <= mtval2; wmask <= '1; end
+            default:    begin current_val <= '0;        wmask <= 32'h00000000; end
         endcase
     end
 
@@ -63,56 +56,74 @@ module CSRBank (
 
     always @(negedge reset or posedge clk) begin
         if(!reset) begin
-            mvendorid <= '0;
-            marchid <= '0;
-            mimpid <= '0;
-            mhartid <= '0;
-            mconfigptr <= '0;
-        
             mstatus <= '0;
-            misa <= '0;
-            medeleg <= '0;
-            mideleg <= '0;
+            mstatus[3] <= 0;        // MIE  = 0
+            mstatus[17] <= 0;       // MPRV = 0
+            misa <= 32'h40000100;   // 32 - I
+            //medeleg <= '0;
+            //mideleg <= '0;
             mie <= '0;
             mtvec <= '0;
-            mcounteren <= '0;
-            mstatush <= '0;
+            //mcounteren <= '0;
+            //mstatush <= '0;
             mscratch <= '0;
             mepc <= '0;
             mcause <= '0;
             mtval <= '0;
             mip <= '0;
-            mtinst <= '0;
-            mtval2 <= '0;
 
         end else if(RAISE_EXCEPTION) begin
 
-            mcause          <= 0 & EXCEPTION_CODE;
+            mcause          <= 0 & CODE;
             mstatus[12:11]  <= privilege;           // MPP previous privilege
             mstatus[7]      <= mstatus[3];          // MPIE = MIE
             mstatus[3]      <= 0;                   // MIE = 0
-            //mepc            <= PC+4;                // Return address
-            mtval           <= (EXCEPTION_CODE==ILLEGAL_INSTRUCTION) ? instruction : PC;
+            mepc            <= PC+4;                // Return address
+            mtval           <= (CODE==ILLEGAL_INSTRUCTION) ? instruction : PC;
         
         end else if(wr_en) begin
             case(CSR)
                 MSTATUS:    mstatus     <= wr_data;
-                MEDELEG:    medeleg     <= wr_data;
-                MIDELEG:    mideleg     <= wr_data;
+                MISA:       misa        <= wr_data;
+                //MEDELEG:    medeleg     <= wr_data;
+                //MIDELEG:    mideleg     <= wr_data;
                 MIE:        mie         <= wr_data;
                 MTVEC:      mtvec       <= wr_data;
-                MCOUNTEREN: mcounteren  <= wr_data;
-                MSTATUSH:   mstatush    <= wr_data;
+                //MCOUNTEREN: mcounteren  <= wr_data;
+                //MSTATUSH:   mstatush    <= wr_data;
                 MSCRATCH:   mscratch    <= wr_data;
                 MEPC:       mepc        <= wr_data;
                 MCAUSE:     mcause      <= wr_data;
                 MTVAL:      mtval       <= wr_data;
                 MIP:        mip         <= wr_data;
-                MTINST:     mtinst      <= wr_data;
-                MTVAL2:     mtval2      <= wr_data;
             endcase
         end
     end
 
+    always_comb
+        if(rd_en)
+            case(CSR)
+                MVENDORID:  out <= '0;
+                MARCHID:    out <= '0;
+                MIMPID:     out <= '0;
+                MHARTID:    out <= '0;
+                MCONFIGPTR: out <= '0;
+
+                MSTATUS:    out <= mstatus;
+                MISA:       out <= misa;
+                //MEDELEG:    out <= medeleg;
+                //MIDELEG:    out <= mideleg;
+                MIE:        out <= mie;
+                MTVEC:      out <= mtvec;
+                //MCOUNTEREN: out <= mcounteren;
+                //MSTATUSH:   out <= mstatush;
+                MSCRATCH:   out <= mscratch;
+                MEPC:       out <= mepc;
+                MCAUSE:     out <= mcause;
+                MTVAL:      out <= mtval;
+                MIP:        out <= mip;
+            endcase
+        else
+            out <= '0;
 
 endmodule;
