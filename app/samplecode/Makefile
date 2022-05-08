@@ -10,7 +10,7 @@ LDFLAGS = -nostdlib -march=rv32i -Triscv.ld
 OBJCOPY = $(TRIPLET)-objcopy
 OBJDUMP = $(TRIPLET)-objdump
 
-PROGNAME = helloworld dummy test_hanoi
+PROGNAME = asm #helloworld dummy test_hanoi 
 
 BIN_FILES = $(addsuffix .bin, $(PROGNAME))
 LST_FILES = $(addsuffix .lst, $(PROGNAME))
