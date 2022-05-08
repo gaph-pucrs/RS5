@@ -41,6 +41,9 @@ package my_pkg;
 
     typedef enum  logic[1:0] {none, write, set, clear} csr_ops;
 
+    typedef enum  int {MVENDORID, MARCHID, MIMPID, MHARTID, MCONFIGPTR, MSTATUS, MISA, MEDELEG, MIDELEG, MIE, MTVEC, MCOUNTEREN, MSTATUSH, MSCRATCH, MEPC, MCAUSE, MTVAL, MIP, MTINST, MTVAL2} CSRs;
+
+
     const int            MEMORY_SIZE = 65535;
 
 endpackage
