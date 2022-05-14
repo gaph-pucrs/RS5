@@ -27,6 +27,8 @@ import my_pkg::*;
 module execute(
     input logic         clk,
     input logic         reset,
+    input logic         exception_in,
+    input logic [31:0]  instruction_in,
     input logic [31:0]  NPC,                // Operand from Operand Fetch stage
     input logic [31:0]  opA,                //              ||
     input logic [31:0]  opB,                //              ||
@@ -35,6 +37,8 @@ module execute(
     input xu            xu_sel,             // Execute Unit selector
     input logic [3:0]   tag_in,             // Instruction tag
     output logic        LS_operation,
+    output logic [31:0] instruction_out,
+    output logic [31:0] NPC_out,
     output instruction_type i_out,
     output logic [31:0] result_out [1:0],   // Results array
     output logic        jump_out,           // Signal that indicates a branch taken
@@ -42,12 +46,21 @@ module execute(
     output logic        we_out,             // Write enable to regbank
     output logic [31:0] read_address,       // Memory Read Address
     output logic        read,               // Allows memory read
-    output logic [3:0]  we_mem);             // Signal that indicates the write memory operation to retire
-
+    output logic [3:0]  we_mem,             // Signal that indicates the write memory operation to retire
+    output logic        exception_out,
+    //////////////////////////////////
+    output logic csr_rd_en,
+    output logic csr_wr_en,
+    output csr_ops csr_op,
+    output logic [11:0] csr_addr,
+    output logic [31:0] csr_data
+    );
+    
     logic jump_int;
+    logic csr_exception;
     logic [3:0] we_mem_int;
     logic [31:0] result [7:0];
-    instruction_type adder_i, logic_i, shift_i, branch_i, memory_i;
+    instruction_type adder_i, logic_i, shift_i, branch_i, memory_i, csrU_i;
 
 ///////////////////////////////////////////////////// Instantiation of execution units  ////////////////////
     adderUnit   adder1 (.opA(opA), .opB(opB), .i(adder_i), .result(result[0]));
@@ -58,14 +71,18 @@ module execute(
     LSUnit      memory1 (.opA(opA), .opB(opB), .data(opC), .i(memory_i), 
                 .read_address(read_address), .read(read),
                 .write_address(result[7]), .DATA_wb(result[6]),  .we_mem(we_mem_int), .we_rb(we_memoryUnit));
+    csrUnit     CSRaccess (.opA(opA), .instruction(instruction_in), .i(csrU_i), .privilege(2'b11), .csr_exception(csr_exception),
+                .csr_rd_en(csr_rd_en), .csr_wr_en(csr_wr_en), .csr_op(csr_op), .csr_addr(csr_addr), .csr_data(csr_data) );
+
     assign result[5] = opB; // bypass
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    assign adder_i =  (xu_sel==adder)  ? i : NOTOKEN;
-    assign logic_i = (xu_sel==logical) ? i : NOTOKEN;
-    assign shift_i = (xu_sel==shifter) ? i : NOTOKEN;
-    assign branch_i = (xu_sel==branch) ? i : NOTOKEN;
-    assign memory_i = (xu_sel==memory) ? i : NOTOKEN;
+    assign adder_i  = (xu_sel==adder)   ? i : NOTOKEN;
+    assign logic_i  = (xu_sel==logical) ? i : NOTOKEN;
+    assign shift_i  = (xu_sel==shifter) ? i : NOTOKEN;
+    assign branch_i = (xu_sel==branch)  ? i : NOTOKEN;
+    assign memory_i = (xu_sel==memory)  ? i : NOTOKEN;
+    assign csr_i    = (xu_sel==csri)    ? i : NOTOKEN;
 
 ///////////////////////////////////////////////// DEMUX ////////////////////////////////////////////////////
     always@(posedge clk) begin                    // RESULT[0]
@@ -111,6 +128,9 @@ module execute(
    ////////////////////////////////////
         tag_out <= tag_in;
         i_out <= i;
+        instruction_out <= instruction_in;
+        NPC_out <= NPC;
+        exception_out <= exception_in | csr_exception;
     end
 
 endmodule

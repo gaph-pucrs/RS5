@@ -21,7 +21,7 @@ package my_pkg;
 
     const int            MEMORY_SIZE = 65535;
 
-    typedef enum  logic[2:0] {R_type, I_type, S_type, B_type, U_type, J_type, CSR_type} fmts;
+    typedef enum  logic[2:0] {R_type, I_type, S_type, B_type, U_type, J_type} fmts;
 
     typedef enum  logic[2:0] {
                               OP0, OP1, OP2, OP3, OP4, OP5, OP6, OP7, NOTOKEN='Z
@@ -49,7 +49,7 @@ package my_pkg;
 
     typedef enum  logic[30:0] { INSTRUCTION_ADDRESS_MISALIGNED, INSTRUCTION_ACCESS_FAULT, ILLEGAL_INSTRUCTION, BREAKPOINT, LOAD_ADDRESS_MISALIGNED,
 		                        LOAD_ACCESS_FAULT, STORE_AMO_ADDRESS_MISALIGNED, STORE_AMO_ACCESS_FAULT, ECALL_FROM_UMODE,ECALL_FROM_SMODE,
-                                ECALL_FROM_MMODE = 11, INSTRUCTION_PAGE_FAULT, LOAD_PAGE_FAULT, STORE_AMO_PAGE_FAULT = 15,	NOP} EXCEPTION_CODE;
+                                ECALL_FROM_MMODE = 11, INSTRUCTION_PAGE_FAULT, LOAD_PAGE_FAULT, STORE_AMO_PAGE_FAULT = 15,	NE} EXCEPTION_CODE;
 
     typedef enum  logic[30:0] { SUP_SW_INT = 1, MAC_SW_INT = 3, SUP_TIM_INT = 5, MAC_TIM_INT = 7, SUP_EXT_INT = 9, MAC_EXT_INT = 11} INTERRUPT_CODE;
 

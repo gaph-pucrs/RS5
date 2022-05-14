@@ -17,14 +17,16 @@ module CSRBank (
     input logic [31:0] instruction
     );
 
-    CSRs CSR = addr;
+    CSRs CSR;
     logic [31:0] mstatus, misa, mie, mtvec, mcounteren, mstatush, mscratch, mepc, mcause, mtval, mip, mtinst, mtval2;
     logic [31:0] wr_data, wmask, current_val;
     //logic [31:0] medeleg, mideleg; // NOT IMPLEMENTED YET (REQUIRED ONLY WHEN SYSTEM HAVE S-MODE)
 
+    assign CSR = CSRs'(addr);
+
     always_comb begin
         wmask <= '1;
-        case (csr_add)
+        case (CSR)
             // RW REGS
             MSTATUS:    begin current_val <= mstatus;   wmask <= 32'h007E19AA; end
             MISA:       begin current_val <= misa;      wmask <= 32'h3C000000; end
@@ -126,4 +128,4 @@ module CSRBank (
         else
             out <= '0;
 
-endmodule;
+endmodule

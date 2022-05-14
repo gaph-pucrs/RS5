@@ -25,6 +25,7 @@
 `include "../rtl/execute.sv"
 `include "../rtl/retire.sv"
 `include "../rtl/regbank.sv"
+`include "../rtl/CSRBank.sv"
 `include "../rtl/PUCRS-RV.sv"
 `include "./ram.sv"
 

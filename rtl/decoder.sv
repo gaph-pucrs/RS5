@@ -40,10 +40,12 @@ module decoder #(parameter DEPTH = 2)(
     output logic [31:0] opB_out,                // Second operand output register
     output logic [31:0] opC_out,                // Third operand output register
     output logic [31:0] NPC_out,                // PC operand output register
+    output logic [31:0] instruction_out,        // Instruction Used in exceptions and CSR operations
     output instruction_type i_out,              // Instruction operation (OP0, OP1...)
     output xu           xu_sel,                 // Instruction unity     (adder,shifter...)
     output logic [3:0]  tag_out,                // Instruction Tag
     output logic        hazard,                 // Bubble issue indicator (0 active)
+    output logic        exception,
     input logic pipe_clear
     );
 
@@ -58,6 +60,7 @@ module decoder #(parameter DEPTH = 2)(
     instruction_type op;
 
 ///////////////////////////////////////////////// RE-DECODE INST TEST //////////////////////////////////////////////////////////////
+
     always @(posedge clk ) begin
         last_inst <= instruction;               // Holds the last cycle instruction
         pipe_clear_r <= pipe_clear;             // Holds the last cycle state
@@ -164,7 +167,6 @@ module decoder #(parameter DEPTH = 2)(
             7'b1100011:                             fmt <= B_type;
             7'b0110111, 7'b0010111:                 fmt <= U_type;
             7'b1101111:                             fmt <= J_type;
-            7'b1110011:                             fmt <= CSR_type;
             default:                                fmt <= R_type;
         endcase
 
@@ -207,9 +209,6 @@ module decoder #(parameter DEPTH = 2)(
                         imed[4:1] <= instruction[24:21];
                         imed[0] <= 0;
                     end
-            
-            CSR_type:
-                        imed <= instruction;
 
             default:      imed <= '0;
         endcase
@@ -272,27 +271,33 @@ module decoder #(parameter DEPTH = 2)(
             opB_out <= '0;
             opC_out <= '0;
             NPC_out <= '0;
+            instruction_out <= '0;
             i_out <= OP0;
             xu_sel <= bypass;
             tag_out <= '0;
+            exception <= 0;
 
          end else if(!pipe_clear) begin                     // Propagate bubble
             opA_out <= '0;
             opB_out <= '0;
             opC_out <= '0;
             NPC_out <= '0;
+            instruction_out <= '0;
             i_out <= OP0;
             xu_sel <= bypass;
             tag_out <= '0;
+            exception <= 0;
 
         end else if(pipe_clear) begin                       // Propagate instruction
             opA_out <= opA;
             opB_out <= opB;
             opC_out <= opC;
             NPC_out <= NPC;
+            instruction_out <= instruction;
             i_out <= op;
             xu_sel <= xu_int;
             tag_out <= tag_in;
+            exception <= (i==INVALID) ? 1 : 0;
         end
     
 endmodule

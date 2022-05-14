@@ -27,6 +27,9 @@ import my_pkg::*;
 module retire(
     input logic         clk,
     input logic         reset,
+    input logic         exception,
+    input logic [31:0]  instruction,
+    input logic [31:0]  NPC,
     input logic [31:0]  result [1:0],               // Results array
     input logic         jump,                       // Jump signal from branch unit 
     input logic         we,                         // Write enable from Execute(based on instruction type)
@@ -41,8 +44,10 @@ module retire(
     output logic [31:0] New_pc,                     // Branch target to fetch Unit
     output logic [31:0] write_address,              // Memory write address
     output logic [31:0] DATA_out,                   // Memory data to be written
-    output logic [3:0]  write);                      // Memory write enable
-
+    output logic [3:0]  write,                      // Memory write enable
+    output logic        RAISE_EXCEPTION
+    );
+    
     logic [31:0] mem_data;
     logic [3:0] curr_tag;
     logic killed;
@@ -113,6 +118,12 @@ always_comb begin
             write <= 'Z;
             write_address <= 'Z;
             DATA_out <= 'Z;
+        end
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    always_comb
+        if(exception==1 && killed==0) begin
+            RAISE_EXCEPTION <= 1;
+            $write("EXCEPTION: %8h %8h", NPC, instruction);
         end
 
 endmodule

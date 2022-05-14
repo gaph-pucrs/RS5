@@ -59,7 +59,7 @@ module branchUnit (
     input logic [31:0]  NPC,                        // PC value
     input instruction_type i,                       // Instruction Type
     output logic [31:0] result,                 // Branch target
-    output logic [31:0] result_jal,                 // Return addres to a JAL instruction (NPC+4)
+    output logic [31:0] result_jal,                 // Return csr_addres to a JAL instruction (NPC+4)
     output logic        jump,                   // Signal that indicate a jump/branch
     output logic        we);                    // Wrtie enable to register bank (used only in JAL)
 
@@ -131,11 +131,11 @@ endmodule
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 module LSUnit (
-    input logic [31:0]  opA,                            // Base Address
+    input logic [31:0]  opA,                            // Base csr_address
     input logic [31:0]  opB,                            // Offset
     input logic [31:0]  data,                           // Data to be Written in memory
     input instruction_type i,                           // Instruction type
-    output logic [31:0] read_address,                   // Read Memory Address
+    output logic [31:0] read_address,                   // Read Memory csr_address
     output logic        read,                           // Signal that allows memory read
     output logic [31:0] write_address,                  // Adrress to Write in memory
     output logic [31:0] DATA_wb,                        // Data to be Written in Register Bank or in memory
@@ -226,51 +226,52 @@ module csrUnit (
     input logic [31:0]  instruction,
     input instruction_type i,
     input Privilege privilege,
-    output logic rd_en,
-    output logic wr_en,
+    output logic csr_rd_en,
+    output logic csr_wr_en,
     output csr_ops csr_op,
-    output logic [11:0] addr,
-    output logic [31:0] data,
-    output logic exception_csr);
+    output logic [11:0] csr_addr,
+    output logic [31:0] csr_data,
+    output logic csr_exception);
 
-    logic rd_en_int, wr_en_int;
+    logic csr_rd_en_int, csr_wr_en_int;
     logic [4:0] rd, rs1;
-    logic [11:0] addr_int;
+    logic [11:0] csr_addr_int;
 
-    assign rd  = opB[11:7];
-    assign rs1 = opB[19:15];
-    assign addr_int = opb[31:20];
+    assign rd  = instruction[11:7];
+    assign rs1 = instruction[19:15];
+    assign csr_addr_int = instruction[31:20];
 
-    assign rd_en = rd_en_int & !exception_csr
+    assign csr_rd_en = csr_rd_en_int & !csr_exception;
+    assign csr_wr_en = csr_wr_en_int & !csr_exception;
 
     always_comb begin
         if (i==OP0 || i==OP1) begin     // CSSRW or CSSRWI
-            wr_en_int = 1;
+            csr_wr_en_int = 1;
             if(rd==0)
-                rd_en_int = 0;
+                csr_rd_en_int = 0;
             else
-                rd_en_int = 1;
+                csr_rd_en_int = 1;
 
         end else if (i==OP2 || i==OP3 || i==OP4 || i==OP5) begin     // CSRRS/C and CSRRS/CI
-            rd_en_int = 1;
+            csr_rd_en_int = 1;
             if(rs1==0)
-                wr_en_int = 0;
+                csr_wr_en_int = 0;
             else
-                wr_en_int = 1;
+                csr_wr_en_int = 1;
         
         end else begin
-            rd_en_int <= 0;
-            wr_en_int <= 0;
+            csr_rd_en_int <= 0;
+            csr_wr_en_int <= 0;
         end
     end
 
     always_comb begin
-        addr <= addr_int;
+        csr_addr <= csr_addr_int;
         
         if(i==OP0 || i==OP2 || i==OP4)
-            data <= opA;
+            csr_data <= opA;
         else
-            data <= '0 & rs1;
+            csr_data <= '0 & rs1;
     end
 
     always_comb 
@@ -286,13 +287,13 @@ module csrUnit (
     
     always_comb begin
         // Raise exeption if CSR is read only and write enable is true
-        if((addr[11:10] == 2'b11) && (wr_en_int == 1))
-            exception_csr <= 1;
+        if((csr_addr[11:10] == 2'b11) && (csr_wr_en_int == 1))
+            csr_exception <= 1;
         // Check Level privileges
-        else if(addr[9:8] < privilege)
-            exception_csr <= 1;
+        else if(csr_addr[9:8] < privilege)
+            csr_exception <= 1;
         // No exception is raised
         else
-            exception_csr <= 0;
+            csr_exception <= 0;
     end
 endmodule
