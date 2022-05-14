@@ -233,6 +233,7 @@ module csrUnit (
     output logic [31:0] data,
     output logic exception_csr);
 
+    logic rd_en_int, wr_en_int;
     logic [4:0] rd, rs1;
     logic [11:0] addr_int;
 
@@ -240,24 +241,26 @@ module csrUnit (
     assign rs1 = opB[19:15];
     assign addr_int = opb[31:20];
 
+    assign rd_en = rd_en_int & !exception_csr
+
     always_comb begin
         if (i==OP0 || i==OP1) begin     // CSSRW or CSSRWI
-            wr_en = 1;
+            wr_en_int = 1;
             if(rd==0)
-                rd_en = 0;
+                rd_en_int = 0;
             else
-                rd_en = 1;
+                rd_en_int = 1;
 
         end else if (i==OP2 || i==OP3 || i==OP4 || i==OP5) begin     // CSRRS/C and CSRRS/CI
-            rd_en = 1;
+            rd_en_int = 1;
             if(rs1==0)
-                wr_en = 0;
+                wr_en_int = 0;
             else
-                wr_en = 1;
+                wr_en_int = 1;
         
         end else begin
-            rd_en <= 0;
-            wr_en <= 0;
+            rd_en_int <= 0;
+            wr_en_int <= 0;
         end
     end
 
@@ -283,7 +286,7 @@ module csrUnit (
     
     always_comb begin
         // Raise exeption if CSR is read only and write enable is true
-        if((addr[11:10] == 2'b11) && (wr_en == 1))
+        if((addr[11:10] == 2'b11) && (wr_en_int == 1))
             exception_csr <= 1;
         // Check Level privileges
         else if(addr[9:8] < privilege)
