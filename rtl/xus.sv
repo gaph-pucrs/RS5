@@ -290,7 +290,7 @@ module csrUnit (
         if((csr_addr[11:10] == 2'b11) && (csr_wr_en_int == 1))
             csr_exception <= 1;
         // Check Level privileges
-        else if(csr_addr[9:8] < privilege)
+        else if((csr_addr[9:8] < privilege) && ((csr_rd_en_int == 1) || (csr_wr_en_int == 1)))
             csr_exception <= 1;
         // No exception is raised
         else

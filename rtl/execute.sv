@@ -53,7 +53,8 @@ module execute(
     output logic csr_wr_en,
     output csr_ops csr_op,
     output logic [11:0] csr_addr,
-    output logic [31:0] csr_data
+    output logic [31:0] csr_data,
+    input  logic [31:0] csr_data_rd
     );
     
     logic jump_int;
@@ -71,7 +72,7 @@ module execute(
     LSUnit      memory1 (.opA(opA), .opB(opB), .data(opC), .i(memory_i), 
                 .read_address(read_address), .read(read),
                 .write_address(result[7]), .DATA_wb(result[6]),  .we_mem(we_mem_int), .we_rb(we_memoryUnit));
-    csrUnit     CSRaccess (.opA(opA), .instruction(instruction_in), .i(csrU_i), .privilege(2'b11), .csr_exception(csr_exception),
+    csrUnit     CSRaccess (.opA(opA), .instruction(instruction_in), .i(csrU_i), .privilege(Privilege'(2'b11)), .csr_exception(csr_exception),
                 .csr_rd_en(csr_rd_en), .csr_wr_en(csr_wr_en), .csr_op(csr_op), .csr_addr(csr_addr), .csr_data(csr_data) );
 
     assign result[5] = opB; // bypass
@@ -82,7 +83,7 @@ module execute(
     assign shift_i  = (xu_sel==shifter) ? i : NOTOKEN;
     assign branch_i = (xu_sel==branch)  ? i : NOTOKEN;
     assign memory_i = (xu_sel==memory)  ? i : NOTOKEN;
-    assign csr_i    = (xu_sel==csri)    ? i : NOTOKEN;
+    assign csrU_i    = (xu_sel==csri)    ? i : NOTOKEN;
 
 ///////////////////////////////////////////////// DEMUX ////////////////////////////////////////////////////
     always@(posedge clk) begin                    // RESULT[0]
@@ -96,6 +97,8 @@ module execute(
             result_out[0] <= result[3];
         else if(xu_sel==memory)
             result_out[0] <= result[6];
+        else if(xu_sel==csri)
+            result_out[0] <= csr_data_rd;
         else
             result_out[0] <= result[5];
    ////////////////////////////////////

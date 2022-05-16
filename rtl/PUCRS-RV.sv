@@ -57,7 +57,11 @@ module PUCRS_RV(
 
     logic [31:0] instruction_execute, instruction_retire;
     logic [31:0] NPC_retire;
-    logic [31:0] exception_execute, exception_retire;
+    logic exception_execute, exception_retire;
+    logic csr_rd_en, csr_wr_en;
+    csr_ops csr_op;
+    logic [11:0] csr_addr;
+    logic [31:0] csr_data, csr_data_rd;
 
 
     assign pipe_clear = hazard;
@@ -87,7 +91,7 @@ module PUCRS_RV(
         .result_out(result_retire), .jump_out(jump_retire), .tag_out(retire_tag), .i_out(i_retire), .LS_operation(LS_operation), .we_out(we_retire),
         .read_address(read_address), .read(read), .we_mem(we_mem_retire),
         .instruction_out(instruction_retire), .NPC_out(NPC_retire), .exception_out(exception_retire),
-        .csr_rd_en(csr_rd_en), .csr_wr_en(csr_wr_en), .csr_op(csr_op), .csr_addr(csr_addr), .csr_data(csr_data)
+        .csr_rd_en(csr_rd_en), .csr_wr_en(csr_wr_en), .csr_op(csr_op), .csr_addr(csr_addr), .csr_data(csr_data), .csr_data_rd(csr_data_rd)
         );
 
 /////////////////////////////////////////////////////////// RETIRE //////////////////////////////////////////////////////////////////////////////////
@@ -111,8 +115,8 @@ module PUCRS_RV(
 
 /////////////////////////////////////////////////////////// CSRs BANK ///////////////////////////////////////////////////////////////////////////////
     CSRBank CSRBank1 (
-        .clk(clk), .reset(reset), .rd_en(csr_rd_en), .wr_en(csr_wr_en), .csr_op(csr_op), .addr(csr_addr), .data(csr_data), 
-        .RAISE_EXCEPTION(RAISE_EXCEPTION), .privilege(2'b11), .PC(NPC_retire), .instruction(instruction_retire)
+        .clk(clk), .reset(reset), .rd_en(csr_rd_en), .wr_en(csr_wr_en), .csr_op(csr_op), .addr(csr_addr), .data(csr_data), .out(csr_data_rd),
+        .RAISE_EXCEPTION(RAISE_EXCEPTION), .privilege(Privilege'(2'b11)), .PC(NPC_retire), .instruction(instruction_retire)
     );
     
 endmodule
