@@ -53,6 +53,7 @@ module RAM_mem #(parameter startaddress = 32'h00000000)(
 
     initial begin
         fd = $fopen ("/home/williannunes/pucrs-rv/bin/test.bin", "r");
+        //fd = $fopen ("/home/williannunes/pucrs-rv/app/assembly/asm.bin", "r");
 
         r = $fread(RAM, fd);
         $display("read %d elements \n", r);

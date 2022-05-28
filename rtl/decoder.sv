@@ -41,8 +41,7 @@ module decoder #(parameter DEPTH = 2)(
     output logic [31:0] opC_out,                // Third operand output register
     output logic [31:0] NPC_out,                // PC operand output register
     output logic [31:0] instruction_out,        // Instruction Used in exceptions and CSR operations
-    output instruction_type i_out,              // Instruction operation (OP0, OP1...)
-    output xu           xu_sel,                 // Instruction unity     (adder,shifter...)
+    output i_type i_out,              // Instruction operation (OP0, OP1...)
     output logic [3:0]  tag_out,                // Instruction Tag
     output logic        hazard,                 // Bubble issue indicator (0 active)
     output logic        exception,
@@ -56,8 +55,6 @@ module decoder #(parameter DEPTH = 2)(
 
     fmts fmt;
     i_type i;
-    xu xu_int;
-    instruction_type op;
 
 ///////////////////////////////////////////////// RE-DECODE INST TEST //////////////////////////////////////////////////////////////
 
@@ -118,9 +115,7 @@ module decoder #(parameter DEPTH = 2)(
         else if (instruction[31:25]==7'b0000000 & instruction[14:12]==3'b110 & instruction[6:0]==7'b0110011) i<=OR;
         else if (instruction[31:25]==7'b0000000 & instruction[14:12]==3'b111 & instruction[6:0]==7'b0110011) i<=AND;
 
-        else if (instruction[14:12]==3'b000 & instruction[6:0]==7'b0001111) i<=NOP;     // FENCE
-        else if (instruction[31:8]==24'h000000 & instruction[7:0]==8'b01110011) i<=NOP;    // ECALL
-        else if (instruction[31:8]==24'h001000 & instruction[7:0]==8'b01110011) i<=NOP;    // EBREAK
+        else if (instruction[14:12]==3'b000 & instruction[6:0]==7'b0001111) i<=NOP;          // FENCE
 
         else if (instruction[14:12]==3'b001 & instruction[6:0]==7'b1110011) i<=CSRRW;
         else if (instruction[14:12]==3'b010 & instruction[6:0]==7'b1110011) i<=CSRRS;
@@ -129,35 +124,18 @@ module decoder #(parameter DEPTH = 2)(
         else if (instruction[14:12]==3'b110 & instruction[6:0]==7'b1110011) i<=CSRRSI;
         else if (instruction[14:12]==3'b111 & instruction[6:0]==7'b1110011) i<=CSRRCI;
 
+        else if (instruction[31:0]==32'h00000073) i<=ECALL;
+        else if (instruction[31:0]==32'h00100073) i<=EBREAK;
+
+        else if (instruction[31:0]==32'h10200073) i<=SRET;
+        else if (instruction[31:0]==32'h30200073) i<=MRET;
+
+        else if (instruction[31:0]==32'h10500073) i<=WFI;
+
         else if (instruction[31:0]==32'h00000000) i<=NOP;
         else if (instruction[31:0]==32'h00000013) i<=NOP;
 
         else i<=INVALID;                        // if the opcodes are not recognized
-
-    always_comb                                 // Execution unit is extracted based on instruction type
-        case (i)
-            ADD, SUB, SLTU, SLT:                        xu_int <= adder;
-            XOR, OR, AND:                               xu_int <= logical;
-            SLL, SRL, SRA:                              xu_int <= shifter;
-            BEQ, BNE, BLT, BLTU, BGE, BGEU, JAL, JALR:  xu_int <= branch;
-            LB, LBU, LH, LHU, LW, SB, SH, SW:           xu_int <= memory;
-            CSRRW, CSRRS, CSRRC, CSRRWI, CSRRSI, CSRRCI:xu_int <= csri;
-            default:                                    xu_int <= bypass;
-        endcase
-
-    always_comb                                 // Execution operation is extracted based on instruction type
-        case (i)
-            ADD, XOR, SLL, BEQ, LB, CSRRW:      op<=OP0;
-            SUB, OR, SRL, BNE, LBU, LUI, CSRRWI:op<=OP1;
-            SLTU, AND, SRA, BLT, LH, CSRRS:     op<=OP2;
-            SLT, BLTU, LHU, CSRRSI:             op<=OP3;
-            BGE, LW, CSRRC:                     op<=OP4;
-            BGEU, SW, CSRRCI:                   op<=OP5;
-            JAL, SH:                            op<=OP6;
-            JALR, SB:                           op<=OP7;
-            default:                            op<=OP0;
-        endcase
-
 
 /////////////////////////////////////////////////  Decodes the instruction format ///////////////////////////////////////////////////////////////////
     always_comb
@@ -224,7 +202,7 @@ module decoder #(parameter DEPTH = 2)(
     always_comb begin
         regD_add <= 1 << instruction[11:7];
         ///////////////////////////////////
-        if(xu_int==memory && (op==OP5 | op==OP6 | op==OP7)) // [0] Indicates a pending write in memory, used to avoid data hazards in memory
+        if(i==SB || i==SH || i==SW) // [0] Indicates a pending write in memory, used to avoid data hazards in memory
             regD_add[0] <= 1;
         else
             regD_add[0] <= 0;
@@ -257,7 +235,7 @@ module decoder #(parameter DEPTH = 2)(
 
 ///////////////////////////////////////////////// HAZARD SIGNAL GENERATION //////////////////////////////////////////////////////////////////////////
     always_comb
-        if(locked[0]==1 && xu_int==memory && (op==OP0 | op==OP1 | op==OP2 | op==OP3 | op==OP4)) //Can't read from memory if a write in memory is pending
+        if(locked[0]==1 && (i==LB | i==LBU | i==LH | i==LH | i==LW)) //Can't read from memory if a write in memory is pending
             hazard <= 0;
         else if(locked[regA_add]==1 || locked[regB_add]==1) // Checks if rs1 and rs2 are not in the list of pending write registers
             hazard <= 0;
@@ -272,8 +250,7 @@ module decoder #(parameter DEPTH = 2)(
             opC_out <= '0;
             NPC_out <= '0;
             instruction_out <= '0;
-            i_out <= OP0;
-            xu_sel <= bypass;
+            i_out <= NOP;
             tag_out <= '0;
             exception <= 0;
 
@@ -283,8 +260,7 @@ module decoder #(parameter DEPTH = 2)(
             opC_out <= '0;
             NPC_out <= '0;
             instruction_out <= '0;
-            i_out <= OP0;
-            xu_sel <= bypass;
+            i_out <= NOP;
             tag_out <= '0;
             exception <= 0;
 
@@ -294,8 +270,7 @@ module decoder #(parameter DEPTH = 2)(
             opC_out <= opC;
             NPC_out <= NPC;
             instruction_out <= instruction;
-            i_out <= op;
-            xu_sel <= xu_int;
+            i_out <= i;
             tag_out <= tag_in;
             exception <= (i==INVALID) ? 1 : 0;
         end

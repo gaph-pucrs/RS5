@@ -49,7 +49,7 @@ module PUCRS_RV(
     logic [31:0] NPC_decode, NPC_execute;
     logic [31:0] opA_execute, opB_execute, opC_execute;
     logic [3:0] decode_tag, execute_tag, retire_tag;
-    instruction_type i_execute, i_retire;
+    i_type i_execute, i_retire;
     xu xu_execute;
     logic LS_operation;
     logic [31:0] result_retire [1:0];
@@ -79,7 +79,7 @@ module PUCRS_RV(
         .clk(clk), .reset(reset), .we(regD_we), 
         .NPC(NPC_decode), .instruction_in(instruction), .tag_in(decode_tag), 
         .dataA(dataA), .dataB(dataB), .regA_add(regA_add), .regB_add(regB_add), .opA_out(opA_execute), .opB_out(opB_execute), 
-        .opC_out(opC_execute), .NPC_out(NPC_execute), .i_out(i_execute), .xu_sel(xu_execute), .tag_out(execute_tag), .wrAddr(wrAddr), 
+        .opC_out(opC_execute), .NPC_out(NPC_execute), .i_out(i_execute), .tag_out(execute_tag), .wrAddr(wrAddr), 
         .hazard(hazard), .pipe_clear(pipe_clear), .instruction_out(instruction_execute), .exception(exception_execute)
         );
 
@@ -87,8 +87,8 @@ module PUCRS_RV(
 
     execute execute1 (
         .clk(clk), .reset(reset), .NPC(NPC_execute), .opA(opA_execute), .opB(opB_execute), .opC(opC_execute),
-        .i(i_execute), .xu_sel(xu_execute), .tag_in(execute_tag), .instruction_in(instruction_execute), .exception_in(exception_execute),
-        .result_out(result_retire), .jump_out(jump_retire), .tag_out(retire_tag), .i_out(i_retire), .LS_operation(LS_operation), .we_out(we_retire),
+        .i(i_execute), .tag_in(execute_tag), .instruction_in(instruction_execute), .exception_in(exception_execute),
+        .result_out(result_retire), .jump_out(jump_retire), .tag_out(retire_tag), .i_out(i_retire), .we_out(we_retire),
         .read_address(read_address), .read(read), .we_mem(we_mem_retire),
         .instruction_out(instruction_retire), .NPC_out(NPC_retire), .exception_out(exception_retire),
         .csr_rd_en(csr_rd_en), .csr_wr_en(csr_wr_en), .csr_op(csr_op), .csr_addr(csr_addr), .csr_data(csr_data), .csr_data_rd(csr_data_rd)
@@ -101,7 +101,7 @@ module PUCRS_RV(
         .tag_in(retire_tag), .reg_we(regD_we), .WrData(data_wb),
         .New_pc(New_pc), .jump_out(jump_wb),
         .we_mem_in(we_mem_retire), 
-        .DATA_in(DATA_in), .i(i_retire), .LS_operation(LS_operation),
+        .DATA_in(DATA_in), .i(i_retire),
         .write(write), .write_address(write_address), .DATA_out(DATA_out),
         .instruction(instruction_retire), .NPC(NPC_retire),
         .exception('0), .RAISE_EXCEPTION(RAISE_EXCEPTION)

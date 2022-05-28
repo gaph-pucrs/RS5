@@ -25,7 +25,7 @@ import my_pkg::*;
 module adderUnit (
     input logic [31:0]  opA,
     input logic [31:0]  opB,
-    input instruction_type i,
+    input op_type i,
     output logic [31:0] result);
 
     always_comb
@@ -57,7 +57,7 @@ module branchUnit (
     input logic [31:0]  opB,                        // In JALR is used to calculate the target and in conditional is used as condition
     input logic [31:0]  offset,                     // Immediate OFFSET is added to PC value
     input logic [31:0]  NPC,                        // PC value
-    input instruction_type i,                       // Instruction Type
+    input op_type i,                       // Instruction Type
     output logic [31:0] result,                 // Branch target
     output logic [31:0] result_jal,                 // Return csr_addres to a JAL instruction (NPC+4)
     output logic        jump,                   // Signal that indicate a jump/branch
@@ -114,7 +114,7 @@ endmodule
 module logicUnit (
     input logic [31:0]  opA,
     input logic [31:0]  opB,
-    input instruction_type i,
+    input op_type i,
     output logic [31:0] result);
 
     always_comb
@@ -134,7 +134,7 @@ module LSUnit (
     input logic [31:0]  opA,                            // Base csr_address
     input logic [31:0]  opB,                            // Offset
     input logic [31:0]  data,                           // Data to be Written in memory
-    input instruction_type i,                           // Instruction type
+    input op_type i,                           // Instruction type
     output logic [31:0] read_address,                   // Read Memory csr_address
     output logic        read,                           // Signal that allows memory read
     output logic [31:0] write_address,                  // Adrress to Write in memory
@@ -205,7 +205,7 @@ endmodule
 module shiftUnit (
     input logic [31:0]  opA,
     input logic [4:0]   opB,
-    input instruction_type i,
+    input op_type i,
     output logic [31:0] result);
 
     always_comb 
@@ -224,7 +224,7 @@ endmodule
 module csrUnit (
     input logic [31:0]  opA,            // DATA FROM REGBANK 
     input logic [31:0]  instruction,
-    input instruction_type i,
+    input op_type i,
     input Privilege privilege,
     output logic csr_rd_en,
     output logic csr_wr_en,

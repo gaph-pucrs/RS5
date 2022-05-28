@@ -33,13 +33,11 @@ module execute(
     input logic [31:0]  opA,                //              ||
     input logic [31:0]  opB,                //              ||
     input logic [31:0]  opC,                //              ||
-    input instruction_type i,               // Operation selector
-    input xu            xu_sel,             // Execute Unit selector
+    input i_type        i,                  // Operation selector
     input logic [3:0]   tag_in,             // Instruction tag
-    output logic        LS_operation,
     output logic [31:0] instruction_out,
     output logic [31:0] NPC_out,
-    output instruction_type i_out,
+    output i_type i_out,
     output logic [31:0] result_out [1:0],   // Results array
     output logic        jump_out,           // Signal that indicates a branch taken
     output logic [3:0]  tag_out,            // Instruction tag
@@ -61,29 +59,31 @@ module execute(
     logic csr_exception;
     logic [3:0] we_mem_int;
     logic [31:0] result [7:0];
-    instruction_type adder_i, logic_i, shift_i, branch_i, memory_i, csrU_i;
+    op_type adder_op, logic_op, shift_op, branch_op, memory_op, csrU_op;
+    xu xu_sel;
 
+    assign xu_sel = xu'(i[5:3]);
 ///////////////////////////////////////////////////// Instantiation of execution units  ////////////////////
-    adderUnit   adder1 (.opA(opA), .opB(opB), .i(adder_i), .result(result[0]));
-    logicUnit   logical1 (.opA(opA), .opB(opB), .i(logic_i), .result(result[1]));
-    shiftUnit   shift1 (.opA(opA), .opB(opB[4:0]), .i(shift_i), .result(result[2]));
-    branchUnit  branch1 (.opA(opA), .opB(opB), .offset(opC), .NPC(NPC), .i(branch_i),
+    adderUnit   adder1 (.opA(opA), .opB(opB), .i(adder_op), .result(result[0]));
+    logicUnit   logical1 (.opA(opA), .opB(opB), .i(logic_op), .result(result[1]));
+    shiftUnit   shift1 (.opA(opA), .opB(opB[4:0]), .i(shift_op), .result(result[2]));
+    branchUnit  branch1 (.opA(opA), .opB(opB), .offset(opC), .NPC(NPC), .i(branch_op),
                 .result(result[4]), .result_jal(result[3]), .jump(jump_int), .we(we_branchUnit));
-    LSUnit      memory1 (.opA(opA), .opB(opB), .data(opC), .i(memory_i), 
+    LSUnit      memory1 (.opA(opA), .opB(opB), .data(opC), .i(memory_op), 
                 .read_address(read_address), .read(read),
                 .write_address(result[7]), .DATA_wb(result[6]),  .we_mem(we_mem_int), .we_rb(we_memoryUnit));
-    csrUnit     CSRaccess (.opA(opA), .instruction(instruction_in), .i(csrU_i), .privilege(Privilege'(2'b11)), .csr_exception(csr_exception),
+    csrUnit     CSRaccess (.opA(opA), .instruction(instruction_in), .i(csrU_op), .privilege(Privilege'(2'b11)), .csr_exception(csr_exception),
                 .csr_rd_en(csr_rd_en), .csr_wr_en(csr_wr_en), .csr_op(csr_op), .csr_addr(csr_addr), .csr_data(csr_data) );
 
     assign result[5] = opB; // bypass
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    assign adder_i  = (xu_sel==adder)   ? i : NOTOKEN;
-    assign logic_i  = (xu_sel==logical) ? i : NOTOKEN;
-    assign shift_i  = (xu_sel==shifter) ? i : NOTOKEN;
-    assign branch_i = (xu_sel==branch)  ? i : NOTOKEN;
-    assign memory_i = (xu_sel==memory)  ? i : NOTOKEN;
-    assign csrU_i    = (xu_sel==csri)    ? i : NOTOKEN;
+    assign adder_op  = (xu_sel==adder)   ? op_type'(i[2:0]) : NOTOKEN;
+    assign logic_op  = (xu_sel==logical) ? op_type'(i[2:0]) : NOTOKEN;
+    assign shift_op  = (xu_sel==shifter) ? op_type'(i[2:0]) : NOTOKEN;
+    assign branch_op = (xu_sel==branch)  ? op_type'(i[2:0]) : NOTOKEN;
+    assign memory_op = (xu_sel==memory)  ? op_type'(i[2:0]) : NOTOKEN;
+    assign csrU_op   = (xu_sel==csri)    ? op_type'(i[2:0]) : NOTOKEN;
 
 ///////////////////////////////////////////////// DEMUX ////////////////////////////////////////////////////
     always@(posedge clk) begin                    // RESULT[0]
@@ -114,13 +114,11 @@ module execute(
         else
             jump_out <= '0;
    ////////////////////////////////////
-        if(xu_sel==memory)  begin           // WRITE
-            LS_operation <= 1;            
+        if(xu_sel==memory)             // WRITE
             we_mem <= we_mem_int;
-        end else begin
-            LS_operation <= 0;  
+         else 
             we_mem <= '0;
-        end
+        
    ////////////////////////////////////
         if(xu_sel==branch)             // WE_OUT
             we_out <= we_branchUnit;

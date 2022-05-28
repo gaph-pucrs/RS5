@@ -36,8 +36,7 @@ module retire(
     input logic [3:0]   tag_in,                     // Instruction tag to be compared with retire tag
     input logic [3:0]   we_mem_in,                   // Write enable memory
     input logic [31:0]  DATA_in,                    // Data from memory
-    input logic         LS_operation,
-    input instruction_type i,
+    input i_type        i,
     output logic        reg_we,                     // Write Enable to Register Bank
     output logic [31:0] WrData,                     // WriteBack data to Register Bank
     output logic        jump_out,                   // Jump signal to Fetch Unit
@@ -51,9 +50,12 @@ module retire(
     logic [31:0] mem_data;
     logic [3:0] curr_tag;
     logic killed;
+    xu xu_sel;
+
+    assign xu_sel = xu'(i[5:3]);
 
 ///////////////////////////////////////////////// Assign to Register Bank Write Back ////////////////////////////////////////////////////////////////
-    assign WrData = (LS_operation) ? mem_data : result[0];
+    assign WrData = (xu_sel==memory) ? mem_data : result[0];
 
 ///////////////////////////////////////////////// Killed signal generation //////////////////////////////////////////////////////////////////////////
     always_comb
@@ -87,21 +89,21 @@ module retire(
         end
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 always_comb begin
-        if(i==OP0 | i==OP1) begin                       // LB | LBU
-            if(DATA_in[7]==1 & i==OP0)                  // Signal extension
+        if(i==LB | i==LBU) begin                       // LB | LBU
+            if(DATA_in[7]==1 & i==LB)                  // Signal extension
                 mem_data[31:8] <= 24'hFFFFFF;
             else                                        // 0's extension
                 mem_data[31:8] <= 24'h000000;
             mem_data[7:0] <= DATA_in[7:0];
 
-        end else if(i==OP2 | i==OP3) begin              // LH | LHU
-            if(DATA_in[15]==1 & i==OP2)                 // Signal extension
+        end else if(i==LH | i==LHU) begin              // LH | LHU
+            if(DATA_in[15]==1 & i==LH)                 // Signal extension
                 mem_data[31:16] <= 16'hFFFF;
             else                                        // 0's extension
                 mem_data[31:16] <= 16'h0000; 
             mem_data[15:0] <= DATA_in[15:0];
 
-        end else if(i==OP4)                             // LW
+        end else if(i==LW)                             // LW
             mem_data <= DATA_in;
 
         else                                            // STORES

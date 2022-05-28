@@ -25,16 +25,16 @@ package my_pkg;
 
     typedef enum  logic[2:0] {
                               OP0, OP1, OP2, OP3, OP4, OP5, OP6, OP7, NOTOKEN='Z
-                              } instruction_type;
+                            } op_type;
 
     typedef enum  logic[5:0] {
-                              NOP,LUI,INVALID,
-                              ADD,SUB,SLTU,SLT,
-                              XOR,OR,AND,
-                              SLL,SRL,SRA,
-                              BEQ,BNE,BLT,BLTU,BGE,BGEU,JAL,JALR,
-                              LB,LBU,LH,LHU,LW,SB,SH,SW,
-                              CSRRW,CSRRS,CSRRC,CSRRWI,CSRRSI,CSRRCI
+                              NOP = 6'o00,LUI,SRET,MRET,WFI,ECALL,EBREAK,INVALID,
+                              ADD = 6'o10,SUB,SLTU,SLT,
+                              XOR = 6'o20,OR,AND,
+                              SLL = 6'o30,SRL,SRA,
+                              BEQ = 6'o40,BNE,BLT,BLTU,BGE,BGEU,JAL,JALR,
+                              LB  = 6'o50,LBU,LH,LHU,LW,SB,SH,SW,
+                              CSRRW=6'o60,CSRRS,CSRRC,CSRRWI,CSRRSI,CSRRCI
                               } i_type;
 
     typedef enum  logic[2:0] {bypass, adder, logical, shifter, branch, memory, csri} xu;
