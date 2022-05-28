@@ -203,9 +203,9 @@ module decoder #(parameter DEPTH = 2)(
         regD_add <= 1 << instruction[11:7];
         ///////////////////////////////////
         if(i==SB || i==SH || i==SW) // [0] Indicates a pending write in memory, used to avoid data hazards in memory
-            regD_add[0] <= 1;
+            regD_add[0] = 1;
         else
-            regD_add[0] <= 0;
+            regD_add[0] = 0;
     end
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -235,7 +235,7 @@ module decoder #(parameter DEPTH = 2)(
 
 ///////////////////////////////////////////////// HAZARD SIGNAL GENERATION //////////////////////////////////////////////////////////////////////////
     always_comb
-        if(locked[0]==1 && (i==LB | i==LBU | i==LH | i==LH | i==LW)) //Can't read from memory if a write in memory is pending
+        if(locked[0]==1 && (i==LB || i==LBU || i==LH || i==LH || i==LW)) //Can't read from memory if a write in memory is pending
             hazard <= 0;
         else if(locked[regA_add]==1 || locked[regB_add]==1) // Checks if rs1 and rs2 are not in the list of pending write registers
             hazard <= 0;

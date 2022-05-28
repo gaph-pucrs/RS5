@@ -161,7 +161,7 @@ module LSUnit (
             DATA_write <= '0;
             we_mem <= 4'b0000;
 
-        end else if(i==OP7) begin                       // Store Byte (SB)
+        end else if(i==OP5) begin                       // Store Byte (SB)
             read <= 0;
             DATA_write[31:8] <= 24'h000000;
             DATA_write[7:0] <= data[7:0];               // Only the less significant byte is fullfilled with data, the rest is fullfilled with zeros
@@ -173,7 +173,7 @@ module LSUnit (
             DATA_write[15:0] <= data[15:0];             // Only the less significant half is fullfilled with data, the rest is fullfilled with zeros
             we_mem <= 4'b0011;
 
-        end else if(i==OP5) begin                       // Store Word (SW)
+        end else if(i==OP7) begin                       // Store Word (SW)
             read <= 0;
             DATA_write[31:0] <= data[31:0];  
             we_mem <= 4'b1111;
