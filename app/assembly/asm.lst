@@ -5,15 +5,17 @@ asm.elf:     file format elf32-littleriscv
 Disassembly of section .init:
 
 00000000 <_etext>:
-   0:	30001073          	csrw	mstatus,zero
-   4:	34401073          	csrw	mip,zero
-   8:	000012b7          	lui	t0,0x1
-   c:	80028293          	addi	t0,t0,-2048 # 800 <_bss_end+0x7c0>
-  10:	30429073          	csrw	mie,t0
-  14:	30301073          	csrw	mideleg,zero
-  18:	30201073          	csrw	medeleg,zero
-  1c:	03400293          	li	t0,52
-  20:	30529073          	csrw	mtvec,t0
-  24:	fddff0ef          	jal	ra,0 <_etext>
-  28:	34011073          	csrw	mscratch,sp
-  2c:	0080006f          	j	34 <except_handler>
+   0:	123452b7          	lui	t0,0x12345
+   4:	67828293          	addi	t0,t0,1656 # 12345678 <_end+0x12343628>
+   8:	301013f3          	csrrw	t2,misa,zero
+   c:	305293f3          	csrrw	t2,mtvec,t0
+  10:	cc498337          	lui	t1,0xcc498
+  14:	18130313          	addi	t1,t1,385 # cc498181 <_end+0xcc496131>
+  18:	305323f3          	csrrs	t2,mtvec,t1
+  1c:	305333f3          	csrrc	t2,mtvec,t1
+  20:	04400293          	li	t0,68
+  24:	30529073          	csrw	mtvec,t0
+  28:	fd9ff0ef          	jal	ra,0 <_etext>
+  2c:	34011073          	csrw	mscratch,sp
+  30:	0140006f          	j	44 <except_handler>
+	...

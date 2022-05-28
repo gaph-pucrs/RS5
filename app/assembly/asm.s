@@ -2,33 +2,25 @@
 .align 4
 
 .globl main
+
 main:
 
-	# Configure system status MPP=0, MPIE=0, MIE=0
-	csrw	mstatus, zero
+    li      t0, 0x12345678
 
-	# Clear pending interrupts
-	csrw	mip, zero
+	csrrw	t2, misa, zero  # read misa
 
-	# Enable MEI when unmasked (if MIE=1)
-	li		t0, 0x800
-	csrw	mie, t0
+	csrrw	t2, mtvec, t0   # Write 12345678 to mtvec
 
-	# Disable S-Mode int/exc handling
-	# Handle them in M-Mode
-	csrw	mideleg, zero
-	csrw	medeleg, zero
+	li		t1, 0xCC498180
+	csrrs	t2, mtvec, t1   # Set some bits
+	csrrc	t2, mtvec, t1   # Unset the bits previously set
+	
 
-	# Configure Syscall
 	la		t0, except_handler		# Load the vector_entry address to t0
 	csrw	mtvec,t0			# Write vector_entry address to mtvec
-								# Last bit is 0, means DIRECT mode
 
 	jal		main
 
-	csrw	mscratch, sp	# Save sp to mscratch
-
-	j		except_handler
 
 
 .section .rodata		# Constants
