@@ -28,7 +28,14 @@ module fetch  #(parameter start_address='0)(  //Generic start address
     input logic [31:0]  result,                         // The branch address from retire
     output logic [31:0] i_address,                      // Instruction address in memory (PC)
     output logic [31:0] NPC,                            // PC value is propagated to be used as an operand in some instructions
-    output logic [3:0]  tag_out);                       // Instruction Tag stream
+    output logic [3:0]  tag_out,                        // Instruction Tag stream
+    ///////////////////////////////
+    input logic [31:0]  mtvec,
+    input logic [31:0]  mepc,
+    input logic         EXCEPTION_RAISED,
+    input logic         MACHINE_RETURN
+    );
+
 
     logic [31:0] PC, PC_plus4;
     logic [3:0] next_tag, curr_tag;
@@ -37,6 +44,11 @@ module fetch  #(parameter start_address='0)(  //Generic start address
     always @(posedge clk or negedge reset)
         if(!reset)                                      // Reset
             PC <= start_address;
+        else if(MACHINE_RETURN)                                   
+            PC <= mepc;
+        else if(EXCEPTION_RAISED)                                   
+            PC <= mtvec;
+            
         else if(jump)                                   // If a branch was taken then PC receives a new value from retire unit
             PC <= result;
         else if(pipe_clear==1)                                  // If there is no bubble being issued: PC <= PC+4

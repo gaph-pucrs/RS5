@@ -62,7 +62,9 @@ module PUCRS_RV(
     csr_ops csr_op;
     logic [11:0] csr_addr;
     logic [31:0] csr_data, csr_data_rd;
-
+    logic [31:0] mepc, mtvec;
+    logic RAISE_EXCEPTION, MACHINE_RETURN;
+    EXCEPT_CODE   Exception_Code;
 
     assign pipe_clear = hazard;
 
@@ -70,7 +72,8 @@ module PUCRS_RV(
 
     fetch fetch1 (
         .clk(clk), .reset(reset), .pipe_clear(pipe_clear), .jump(jump_wb), .result(New_pc),
-        .i_address(i_address), .NPC(NPC_decode), .tag_out(decode_tag)
+        .i_address(i_address), .NPC(NPC_decode), .tag_out(decode_tag),
+        .EXCEPTION_RAISED(RAISE_EXCEPTION), .MACHINE_RETURN(MACHINE_RETURN), .mepc(mepc), .mtvec(mtvec)
         );
 
 /////////////////////////////////////////////////////////// DECODER /////////////////////////////////////////////////////////////////////////////////
@@ -104,7 +107,9 @@ module PUCRS_RV(
         .DATA_in(DATA_in), .i(i_retire),
         .write(write), .write_address(write_address), .DATA_out(DATA_out),
         .instruction(instruction_retire), .NPC(NPC_retire),
-        .exception('0), .RAISE_EXCEPTION(RAISE_EXCEPTION)
+        .exception('0), 
+        .RAISE_EXCEPTION(RAISE_EXCEPTION), .Exception_Code(Exception_Code),
+        .MACHINE_RETURN(MACHINE_RETURN)
         );
 
 /////////////////////////////////////////////////////////// REGISTER BANK ///////////////////////////////////////////////////////////////////////////
@@ -116,7 +121,10 @@ module PUCRS_RV(
 /////////////////////////////////////////////////////////// CSRs BANK ///////////////////////////////////////////////////////////////////////////////
     CSRBank CSRBank1 (
         .clk(clk), .reset(reset), .rd_en(csr_rd_en), .wr_en(csr_wr_en), .csr_op(csr_op), .addr(csr_addr), .data(csr_data), .out(csr_data_rd),
-        .RAISE_EXCEPTION(RAISE_EXCEPTION), .privilege(Privilege'(2'b11)), .PC(NPC_retire), .instruction(instruction_retire)
+        .RAISE_EXCEPTION(RAISE_EXCEPTION), .Exception_Code(Exception_Code),
+        .MACHINE_RETURN(MACHINE_RETURN),
+        .privilege(Privilege'(2'b11)), .PC(NPC_retire), .instruction(instruction_retire),
+        .mepc(mepc), .mtvec(mtvec)
     );
     
 endmodule

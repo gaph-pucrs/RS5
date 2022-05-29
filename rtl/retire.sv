@@ -44,7 +44,9 @@ module retire(
     output logic [31:0] write_address,              // Memory write address
     output logic [31:0] DATA_out,                   // Memory data to be written
     output logic [3:0]  write,                      // Memory write enable
-    output logic        RAISE_EXCEPTION
+    output EXCEPT_CODE  Exception_Code,
+    output logic        RAISE_EXCEPTION,
+    output logic        MACHINE_RETURN
     );
     
     logic [31:0] mem_data;
@@ -123,9 +125,36 @@ always_comb begin
         end
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     always_comb
-        if(exception==1 && killed==0) begin
-            RAISE_EXCEPTION <= 1;
-            $write("EXCEPTION: %8h %8h", NPC, instruction);
+        if(killed==0) begin
+            if(exception==1) begin
+                RAISE_EXCEPTION <= 1;
+                Exception_Code <= ILLEGAL_INSTRUCTION;
+                MACHINE_RETURN <= 0;
+                $write("EXCEPTION - ILLEGAL INSTRUCTION: %8h %8h", NPC, instruction);
+
+            end else if(i==ECALL) begin
+                RAISE_EXCEPTION <= 1;
+                Exception_Code <= ECALL_FROM_MMODE;
+                MACHINE_RETURN <= 0;
+                $write("EXCEPTION - ECALL_FROM_MMODE: %8h %8h", NPC, instruction);
+
+            end else if(i==EBREAK) begin
+                RAISE_EXCEPTION <= 1;
+                Exception_Code <= BREAKPOINT;
+                MACHINE_RETURN <= 0;
+                $write("EXCEPTION - EBREAK: %8h %8h", NPC, instruction);
+
+            end else if(i==MRET) begin
+                RAISE_EXCEPTION <= 0;
+                Exception_Code <= NE;
+                MACHINE_RETURN <= 1;
+                $write("MRET: %8h %8h", NPC, instruction);
+
+            end else begin
+                RAISE_EXCEPTION <= 0;
+                Exception_Code <= NE;
+                MACHINE_RETURN <= 0;
+            end
         end
 
 endmodule
