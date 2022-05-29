@@ -48,7 +48,7 @@ module fetch  #(parameter start_address='0)(  //Generic start address
             PC <= mepc;
         else if(EXCEPTION_RAISED)                                   
             PC <= mtvec;
-            
+
         else if(jump)                                   // If a branch was taken then PC receives a new value from retire unit
             PC <= result;
         else if(pipe_clear==1)                                  // If there is no bubble being issued: PC <= PC+4
@@ -66,7 +66,7 @@ module fetch  #(parameter start_address='0)(  //Generic start address
         if(!reset) begin                                // Reset
             curr_tag <= 0;
             next_tag <= 0;
-        end else if (jump)                              // If a Branch is taken then the instruction tag is increased
+        end else if (jump | EXCEPTION_RAISED | MACHINE_RETURN)  // If a Branch is taken then the instruction tag is increased
             next_tag <= curr_tag + 1;
         else if(pipe_clear==1)                                  // It is increased only when a bubbles is not being propagated
             curr_tag <= next_tag;

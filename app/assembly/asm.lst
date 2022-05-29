@@ -5,17 +5,46 @@ asm.elf:     file format elf32-littleriscv
 Disassembly of section .init:
 
 00000000 <_etext>:
-   0:	123452b7          	lui	t0,0x12345
-   4:	67828293          	addi	t0,t0,1656 # 12345678 <_end+0x12343628>
-   8:	301013f3          	csrrw	t2,misa,zero
-   c:	305293f3          	csrrw	t2,mtvec,t0
-  10:	cc498337          	lui	t1,0xcc498
-  14:	18130313          	addi	t1,t1,385 # cc498181 <_end+0xcc496131>
-  18:	305323f3          	csrrs	t2,mtvec,t1
-  1c:	305333f3          	csrrc	t2,mtvec,t1
-  20:	04400293          	li	t0,68
-  24:	30529073          	csrw	mtvec,t0
-  28:	fd9ff0ef          	jal	ra,0 <_etext>
-  2c:	34011073          	csrw	mscratch,sp
-  30:	0140006f          	j	44 <except_handler>
+   0:	00000297          	auipc	t0,0x0
+   4:	07c28293          	addi	t0,t0,124 # 7c <trap_handler>
+   8:	30529073          	csrw	mtvec,t0
+   c:	08000313          	li	t1,128
+  10:	30032073          	csrs	mstatus,t1
+  14:	000013b7          	lui	t2,0x1
+  18:	80038393          	addi	t2,t2,-2048 # 800 <_bss_end+0x750>
+  1c:	3043a073          	csrs	mie,t2
+  20:	0a400313          	li	t1,164
+  24:	34031073          	csrw	mscratch,t1
+  28:	30002373          	csrr	t1,mstatus
+  2c:	ffffe3b7          	lui	t2,0xffffe
+  30:	7ff38393          	addi	t2,t2,2047 # ffffe7ff <_end+0xffffc74f>
+  34:	00737333          	and	t1,t1,t2
+  38:	30031073          	csrw	mstatus,t1
+  3c:	00000297          	auipc	t0,0x0
+  40:	01028293          	addi	t0,t0,16 # 4c <main>
+  44:	34129073          	csrw	mepc,t0
+  48:	30200073          	mret
+
+0000004c <main>:
+  4c:	123452b7          	lui	t0,0x12345
+  50:	67828293          	addi	t0,t0,1656 # 12345678 <_end+0x123435c8>
+  54:	edcbb337          	lui	t1,0xedcbb
+  58:	98730313          	addi	t1,t1,-1657 # edcba987 <_end+0xedcb88d7>
+  5c:	98765537          	lui	a0,0x98765
+  60:	43250513          	addi	a0,a0,1074 # 98765432 <_end+0x98763382>
+  64:	301013f3          	csrrw	t2,misa,zero
+  68:	340293f3          	csrrw	t2,mscratch,t0
+  6c:	340323f3          	csrrs	t2,mscratch,t1
+  70:	340333f3          	csrrc	t2,mscratch,t1
+  74:	00000073          	ecall
+  78:	fd5ff0ef          	jal	ra,4c <main>
+
+0000007c <trap_handler>:
+  7c:	34051573          	csrrw	a0,mscratch,a0
+  80:	342025f3          	csrr	a1,mcause
+  84:	341025f3          	csrr	a1,mepc
+  88:	00458593          	addi	a1,a1,4
+  8c:	34159073          	csrw	mepc,a1
+  90:	34051573          	csrrw	a0,mscratch,a0
+  94:	30200073          	mret
 	...

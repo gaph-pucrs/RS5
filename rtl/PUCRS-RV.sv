@@ -42,13 +42,13 @@ module PUCRS_RV(
 
     logic jump_wb, jump_retire, hazard, we_retire, pipe_clear;
     logic [3:0] we_mem_retire;
-    logic regD_we;
+    logic regD_we, Killed;
     logic [31:0] dataA, dataB;
     logic [4:0] regA_add, regB_add;
     logic [31:0] data_wb, New_pc;
     logic [31:0] NPC_decode, NPC_execute;
     logic [31:0] opA_execute, opB_execute, opC_execute;
-    logic [3:0] decode_tag, execute_tag, retire_tag;
+    logic [3:0] decode_tag, execute_tag, retire_tag, curr_retire_tag;
     i_type i_execute, i_retire;
     xu xu_execute;
     logic LS_operation;
@@ -103,7 +103,7 @@ module PUCRS_RV(
         .clk(clk), .reset(reset), .result(result_retire), .jump(jump_retire), .we(we_retire),
         .tag_in(retire_tag), .reg_we(regD_we), .WrData(data_wb),
         .New_pc(New_pc), .jump_out(jump_wb),
-        .we_mem_in(we_mem_retire), 
+        .we_mem_in(we_mem_retire), .curr_retire_tag(curr_retire_tag),
         .DATA_in(DATA_in), .i(i_retire),
         .write(write), .write_address(write_address), .DATA_out(DATA_out),
         .instruction(instruction_retire), .NPC(NPC_retire),
@@ -121,7 +121,7 @@ module PUCRS_RV(
 /////////////////////////////////////////////////////////// CSRs BANK ///////////////////////////////////////////////////////////////////////////////
     CSRBank CSRBank1 (
         .clk(clk), .reset(reset), .rd_en(csr_rd_en), .wr_en(csr_wr_en), .csr_op(csr_op), .addr(csr_addr), .data(csr_data), .out(csr_data_rd),
-        .RAISE_EXCEPTION(RAISE_EXCEPTION), .Exception_Code(Exception_Code),
+        .RAISE_EXCEPTION(RAISE_EXCEPTION), .Exception_Code(Exception_Code), .killed(execute_tag!=curr_retire_tag),
         .MACHINE_RETURN(MACHINE_RETURN),
         .privilege(Privilege'(2'b11)), .PC(NPC_retire), .instruction(instruction_retire),
         .mepc(mepc), .mtvec(mtvec)

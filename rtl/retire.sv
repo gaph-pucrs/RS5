@@ -34,7 +34,7 @@ module retire(
     input logic         jump,                       // Jump signal from branch unit 
     input logic         we,                         // Write enable from Execute(based on instruction type)
     input logic [3:0]   tag_in,                     // Instruction tag to be compared with retire tag
-    input logic [3:0]   we_mem_in,                   // Write enable memory
+    input logic [3:0]   we_mem_in,                  // Write enable memory
     input logic [31:0]  DATA_in,                    // Data from memory
     input i_type        i,
     output logic        reg_we,                     // Write Enable to Register Bank
@@ -44,6 +44,7 @@ module retire(
     output logic [31:0] write_address,              // Memory write address
     output logic [31:0] DATA_out,                   // Memory data to be written
     output logic [3:0]  write,                      // Memory write enable
+    output logic [3:0]  curr_retire_tag,
     output EXCEPT_CODE  Exception_Code,
     output logic        RAISE_EXCEPTION,
     output logic        MACHINE_RETURN
@@ -53,6 +54,8 @@ module retire(
     logic [3:0] curr_tag;
     logic killed;
     xu xu_sel;
+
+    assign curr_retire_tag = curr_tag;
 
     assign xu_sel = xu'(i[5:3]);
 
@@ -70,7 +73,7 @@ module retire(
     always @(posedge clk or negedge reset)
         if(!reset)
             curr_tag <= 0;
-        else if (jump_out==1 && killed==0)          // If a jump was taken and the tag is correct then increases the internal tag
+        else if ((jump_out==1|| RAISE_EXCEPTION==1 || MACHINE_RETURN==1 )&& killed==0)          // If a jump was taken and the tag is correct then increases the internal tag
             curr_tag <= curr_tag + 1;
 
 ///////////////////////////////////////////////// Flow Control //////////////////////////////////////////////////////////////////////////////////////
@@ -130,25 +133,25 @@ always_comb begin
                 RAISE_EXCEPTION <= 1;
                 Exception_Code <= ILLEGAL_INSTRUCTION;
                 MACHINE_RETURN <= 0;
-                $write("EXCEPTION - ILLEGAL INSTRUCTION: %8h %8h", NPC, instruction);
+                $write("[%0d] EXCEPTION - ILLEGAL INSTRUCTION: %8h %8h\n", $time, NPC, instruction);
 
             end else if(i==ECALL) begin
                 RAISE_EXCEPTION <= 1;
                 Exception_Code <= ECALL_FROM_MMODE;
                 MACHINE_RETURN <= 0;
-                $write("EXCEPTION - ECALL_FROM_MMODE: %8h %8h", NPC, instruction);
+                $write("[%0d] EXCEPTION - ECALL_FROM_MMODE: %8h %8h\n", $time, NPC, instruction);
 
             end else if(i==EBREAK) begin
                 RAISE_EXCEPTION <= 1;
                 Exception_Code <= BREAKPOINT;
                 MACHINE_RETURN <= 0;
-                $write("EXCEPTION - EBREAK: %8h %8h", NPC, instruction);
+                $write("[%0d] EXCEPTION - EBREAK: %8h %8h\n", $time, NPC, instruction);
 
             end else if(i==MRET) begin
                 RAISE_EXCEPTION <= 0;
                 Exception_Code <= NE;
                 MACHINE_RETURN <= 1;
-                $write("MRET: %8h %8h", NPC, instruction);
+                $write("[%0d] MRET: %8h %8h\n", $time, NPC, instruction);
 
             end else begin
                 RAISE_EXCEPTION <= 0;

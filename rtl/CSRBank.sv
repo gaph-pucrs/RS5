@@ -5,6 +5,7 @@ module CSRBank (
     input logic         reset,
     input logic         rd_en,
     input logic         wr_en,
+    input logic         killed,
     input csr_ops       csr_op,
     input logic [11:0]  addr,
     input logic [31:0]  data,
@@ -39,11 +40,11 @@ module CSRBank (
             //MEDELEG:    begin current_val <= medeleg;   wmask <= '1; end
             //MIDELEG:    begin current_val <= mideleg;   wmask <= '1; end
             MIE:        begin current_val <= mie;       wmask <= 32'h00000888; end
-            MTVEC:      begin current_val <= mtvec_r;     wmask <= 32'hFFFFFFFC; end
+            MTVEC:      begin current_val <= mtvec_r;   wmask <= 32'hFFFFFFFC; end
             //MCOUNTEREN: begin current_val <= mcounteren;wmask <= '1; end
             //MSTATUSH:   begin current_val <= mstatush;  wmask <= '1; end
             MSCRATCH:   begin current_val <= mscratch;  wmask <= 32'hFFFFFFFF; end
-            MEPC:       begin current_val <= mepc_r;      wmask <= 32'hFFFFFFFC; end
+            MEPC:       begin current_val <= mepc_r;    wmask <= 32'hFFFFFFFC; end
             MCAUSE:     begin current_val <= mcause;    wmask <= 32'hFFFFFFFF; end
             MTVAL:      begin current_val <= mtval;     wmask <= 32'hFFFFFFFF; end
             MIP:        begin current_val <= mip;       wmask <= 32'h00000000; end
@@ -58,7 +59,7 @@ module CSRBank (
         else if(csr_op==set)
             wr_data <= (current_val | data) & wmask;
         else if(csr_op==clear)
-            wr_data <= (current_val & !data) & wmask;
+            wr_data <= (current_val & (~data)) & wmask;
         else
             wr_data <= 'Z;
 
@@ -82,18 +83,19 @@ module CSRBank (
 
         end else if(MACHINE_RETURN) begin
             mstatus[3]      <= mstatus[7];          // MIE = MPIE
-
+            // privilege = mstatus[12:11]           // priv = MPP
 
         end else if(RAISE_EXCEPTION) begin
 
-            mcause          <= '0 & Exception_Code;
+            mcause          <= Exception_Code;
             mstatus[12:11]  <= privilege;           // MPP previous privilege
+            // privilege    <= MACHINE
             mstatus[7]      <= mstatus[3];          // MPIE = MIE
             mstatus[3]      <= 0;                   // MIE = 0
-            mepc_r            <= (Exception_Code==ECALL_FROM_MMODE) ? PC : PC+4;                // Return address
+            mepc_r          <= (Exception_Code==ECALL_FROM_MMODE) ? PC : PC+4;                // Return address
             mtval           <= (Exception_Code==ILLEGAL_INSTRUCTION) ? instruction : PC;
         
-        end else if(wr_en) begin
+        end else if(wr_en==1 && killed==0) begin
             case(CSR)
                 MSTATUS:    mstatus     <= wr_data;
                 MISA:       misa        <= wr_data;
@@ -113,7 +115,7 @@ module CSRBank (
     end
 
     always_comb
-        if(rd_en)
+        if(rd_en==1 && killed==0)
             case(CSR)
                 MVENDORID:  out <= '0;
                 MARCHID:    out <= '0;

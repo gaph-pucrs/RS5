@@ -132,7 +132,6 @@ module decoder #(parameter DEPTH = 2)(
 
         else if (instruction[31:0]==32'h10500073) i<=WFI;
 
-        else if (instruction[31:0]==32'h00000000) i<=NOP;
         else if (instruction[31:0]==32'h00000013) i<=NOP;
 
         else i<=INVALID;                        // if the opcodes are not recognized

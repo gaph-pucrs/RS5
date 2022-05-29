@@ -245,14 +245,14 @@ module csrUnit (
     assign csr_wr_en = csr_wr_en_int & !csr_exception;
 
     always_comb begin
-        if (i==OP0 || i==OP1) begin     // CSSRW or CSSRWI
+        if (i==OP0 || i==OP3) begin     // CSSRW or CSSRWI
             csr_wr_en_int = 1;
             if(rd==0)
                 csr_rd_en_int = 0;
             else
                 csr_rd_en_int = 1;
 
-        end else if (i==OP2 || i==OP3 || i==OP4 || i==OP5) begin     // CSRRS/C and CSRRS/CI
+        end else if (i==OP1 || i==OP2 || i==OP4 || i==OP5) begin     // CSRRS/C and CSRRS/CI
             csr_rd_en_int = 1;
             if(rs1==0)
                 csr_wr_en_int = 0;
@@ -268,18 +268,18 @@ module csrUnit (
     always_comb begin
         csr_addr <= csr_addr_int;
         
-        if(i==OP0 || i==OP2 || i==OP4)
+        if(i==OP0 || i==OP1 || i==OP2)
             csr_data <= opA;
         else
             csr_data <= '0 & rs1;
     end
 
     always_comb 
-        if(i==OP0 || i==OP1)               // WRITE
+        if(i==OP0 || i==OP3)               // WRITE
             csr_op <= write;
-        else if(i==OP2 || i==OP3)          // SET
+        else if(i==OP1 || i==OP4)          // SET
             csr_op <= set;
-        else if(i==OP4 || i==OP5)          // CLEAR
+        else if(i==OP2 || i==OP5)          // CLEAR
             csr_op <= clear;
         else                               // NONE
             csr_op <= none;
