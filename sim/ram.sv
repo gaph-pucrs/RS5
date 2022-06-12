@@ -52,8 +52,8 @@ module RAM_mem #(parameter startaddress = 32'h00000000)(
     assign INST_low_address_int = INST_tmp_address[15:0];               // convert to integer
 
     initial begin
-        fd = $fopen ("/home/williannunes/pucrs-rv/bin/test.bin", "r");
-        //fd = $fopen ("/home/williannunes/pucrs-rv/app/assembly/asm.bin", "r");
+        //fd = $fopen ("/home/williannunes/pucrs-rv/bin/test.bin", "r");
+        fd = $fopen ("/home/williannunes/pucrs-rv/app/assembly/asm.bin", "r");
 
         r = $fread(RAM, fd);
         $display("read %d elements \n", r);

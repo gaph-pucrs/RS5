@@ -18,6 +18,10 @@ module CSRBank (
     input logic [31:0]  PC,
     input logic [31:0]  instruction,
 
+    input logic [31:0]  IRQ,
+    input logic Interupt_ACK,
+    output logic Interupt_pending,
+
     output logic [31:0] mtvec,
     output logic [31:0] mepc
     );
@@ -26,6 +30,7 @@ module CSRBank (
     logic [31:0] mstatus, misa, mie, mtvec_r, mcounteren, mstatush, mscratch, mepc_r, mcause, mtval, mip, mtinst, mtval2;
     logic [31:0] wr_data, wmask, current_val;
     //logic [31:0] medeleg, mideleg; // NOT IMPLEMENTED YET (REQUIRED ONLY WHEN SYSTEM HAVE S-MODE)
+    INTERRUPT_CODE Interuption_Code;
 
     assign mtvec = mtvec_r;
     assign mepc = mepc_r;
@@ -47,7 +52,7 @@ module CSRBank (
             MEPC:       begin current_val <= mepc_r;    wmask <= 32'hFFFFFFFC; end
             MCAUSE:     begin current_val <= mcause;    wmask <= 32'hFFFFFFFF; end
             MTVAL:      begin current_val <= mtval;     wmask <= 32'hFFFFFFFF; end
-            MIP:        begin current_val <= mip;       wmask <= 32'h00000000; end
+            //MIP:        begin current_val <= mip;       wmask <= 32'h00000000; end
 
             default:    begin current_val <= '0;        wmask <= 32'h00000000; end
         endcase
@@ -79,21 +84,30 @@ module CSRBank (
             mepc_r <= '0;
             mcause <= '0;
             mtval <= '0;
-            mip <= '0;
+            //mip <= '0;
 
         end else if(MACHINE_RETURN) begin
             mstatus[3]      <= mstatus[7];          // MIE = MPIE
             // privilege = mstatus[12:11]           // priv = MPP
 
         end else if(RAISE_EXCEPTION) begin
-
-            mcause          <= Exception_Code;
+            mcause[31]       <= '0;
+            mcause[30:0]    <= Exception_Code;
             mstatus[12:11]  <= privilege;           // MPP previous privilege
             // privilege    <= MACHINE
             mstatus[7]      <= mstatus[3];          // MPIE = MIE
             mstatus[3]      <= 0;                   // MIE = 0
             mepc_r          <= (Exception_Code==ECALL_FROM_MMODE) ? PC : PC+4;                // Return address
             mtval           <= (Exception_Code==ILLEGAL_INSTRUCTION) ? instruction : PC;
+
+        end else if(Interupt_ACK) begin
+            mcause[31]      <= '1;
+            mcause[30:0]    <= Interuption_Code;
+            mstatus[12:11]  <= privilege;           // MPP = previous privilege
+            // privilege    <= MACHINE
+            mstatus[7]      <= mstatus[3];          // MPIE = MIE
+            mstatus[3]      <= 0;                   // MIE = 0
+            mepc_r          <= PC;                  // Return address
         
         end else if(wr_en==1 && killed==0) begin
             case(CSR)
@@ -109,7 +123,7 @@ module CSRBank (
                 MEPC:       mepc_r        <= wr_data;
                 MCAUSE:     mcause      <= wr_data;
                 MTVAL:      mtval       <= wr_data;
-                MIP:        mip         <= wr_data;
+                //MIP:        mip         <= wr_data;
             endcase
         end
     end
@@ -139,5 +153,26 @@ module CSRBank (
             endcase
         else
             out <= '0;
+
+    always @(negedge reset or posedge clk)
+        if(!reset)
+            mip <= '0;
+        else
+            mip <= IRQ;
+    
+
+    always @(posedge clk)
+        if(mstatus[3]==1 && (mie & mip) && Interupt_ACK==0) begin
+            Interupt_pending <= 1;
+            if(mip[11] & mie[11])                   // Machine External
+                Interuption_Code <= M_EXT_INT;
+            else if(mip[3] & mie[3])                // Machine Software
+                Interuption_Code <= M_SW_INT;
+            else if(mip[7] & mie[7])                // Machine Timer
+                Interuption_Code <= M_TIM_INT;
+
+        end else
+            Interupt_pending <= 0;
+    
 
 endmodule

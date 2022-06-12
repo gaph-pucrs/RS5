@@ -43,6 +43,10 @@ logic [31:0]  read_address, data_read, write_address, data_write;
 logic [3:0]   write;
 byte          char;
 logic [31:0]  Rd_data, Wr_address, Wr_data;
+logic [31:0]  IRQ;
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 
 
 ////////////////////////////////////////////////////// Clock generator //////////////////////////////////////////////////////////////////////////////
@@ -94,7 +98,9 @@ logic [31:0]  Rd_data, Wr_address, Wr_data;
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     PUCRS_RV dut (.clk(clk), .reset(rstCPU), .instruction(instruction), .i_address(i_address), .read(read), .read_address(read_address),
-             .DATA_in(data_read), .DATA_out(data_write), .write_address(write_address), .write(write));
+             .DATA_in(data_read), .DATA_out(data_write), .write_address(write_address), .write(write),
+             .IRQ(IRQ)
+             );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////// RESET CPU ////////////////////////////////////////////////////////////////////////////////////
@@ -104,6 +110,22 @@ logic [31:0]  Rd_data, Wr_address, Wr_data;
 
     initial begin
         rstCPU = 0;                                         // RESET for CPU initialization
+        IRQ <= '0;
+        
         #100 rstCPU = 1;                                     // Hold state for 100 ns
+
+        #300
+        IRQ[11] <= 1;
+        #70
+        IRQ[11] <= 0;
+        #30
+        IRQ[3] <= 1;
+        #70
+        IRQ[3] <= 0;
+        #30
+        IRQ[7] <= 1;
+        #70
+        IRQ[7] <= 0;
+
     end
 endmodule

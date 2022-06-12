@@ -38,7 +38,10 @@ module PUCRS_RV(
     input logic [31:0]  DATA_in,                        // Data coming from Memory
     output logic [31:0] DATA_out,                       // Data to be written in Memory
     output logic [31:0] write_address,
-    output logic [3:0]  write);                          // Memory Write signal One Hot, each bit address 1 byte
+    output logic [3:0]  write,                          // Memory Write signal One Hot, each bit address 1 byte
+
+    input logic [31:0] IRQ
+    );
 
     logic jump_wb, jump_retire, hazard, we_retire, pipe_clear;
     logic [3:0] we_mem_retire;
@@ -65,6 +68,7 @@ module PUCRS_RV(
     logic [31:0] mepc, mtvec;
     logic RAISE_EXCEPTION, MACHINE_RETURN;
     EXCEPT_CODE   Exception_Code;
+    logic Interupt_pending, Interupt_ACK;
 
     assign pipe_clear = hazard;
 
@@ -73,7 +77,8 @@ module PUCRS_RV(
     fetch fetch1 (
         .clk(clk), .reset(reset), .pipe_clear(pipe_clear), .jump(jump_wb), .result(New_pc),
         .i_address(i_address), .NPC(NPC_decode), .tag_out(decode_tag),
-        .EXCEPTION_RAISED(RAISE_EXCEPTION), .MACHINE_RETURN(MACHINE_RETURN), .mepc(mepc), .mtvec(mtvec)
+        .EXCEPTION_RAISED(RAISE_EXCEPTION), .MACHINE_RETURN(MACHINE_RETURN), .Interupt_ACK(Interupt_ACK),
+        .mepc(mepc), .mtvec(mtvec)
         );
 
 /////////////////////////////////////////////////////////// DECODER /////////////////////////////////////////////////////////////////////////////////
@@ -109,7 +114,8 @@ module PUCRS_RV(
         .instruction(instruction_retire), .NPC(NPC_retire),
         .exception('0), 
         .RAISE_EXCEPTION(RAISE_EXCEPTION), .Exception_Code(Exception_Code),
-        .MACHINE_RETURN(MACHINE_RETURN)
+        .MACHINE_RETURN(MACHINE_RETURN),
+        .Interupt_pending(Interupt_pending), .Interupt_ACK(Interupt_ACK)
         );
 
 /////////////////////////////////////////////////////////// REGISTER BANK ///////////////////////////////////////////////////////////////////////////
@@ -124,7 +130,8 @@ module PUCRS_RV(
         .RAISE_EXCEPTION(RAISE_EXCEPTION), .Exception_Code(Exception_Code), .killed(execute_tag!=curr_retire_tag),
         .MACHINE_RETURN(MACHINE_RETURN),
         .privilege(Privilege'(2'b11)), .PC(NPC_retire), .instruction(instruction_retire),
-        .mepc(mepc), .mtvec(mtvec)
+        .mepc(mepc), .mtvec(mtvec),
+        .IRQ(IRQ), .Interupt_pending(Interupt_pending), .Interupt_ACK(Interupt_ACK)
     );
     
 endmodule

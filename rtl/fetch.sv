@@ -33,7 +33,8 @@ module fetch  #(parameter start_address='0)(  //Generic start address
     input logic [31:0]  mtvec,
     input logic [31:0]  mepc,
     input logic         EXCEPTION_RAISED,
-    input logic         MACHINE_RETURN
+    input logic         MACHINE_RETURN,
+    input logic         Interupt_ACK
     );
 
 
@@ -46,7 +47,7 @@ module fetch  #(parameter start_address='0)(  //Generic start address
             PC <= start_address;
         else if(MACHINE_RETURN)                                   
             PC <= mepc;
-        else if(EXCEPTION_RAISED)                                   
+        else if(EXCEPTION_RAISED || Interupt_ACK)                                   
             PC <= mtvec;
 
         else if(jump)                                   // If a branch was taken then PC receives a new value from retire unit
@@ -66,7 +67,7 @@ module fetch  #(parameter start_address='0)(  //Generic start address
         if(!reset) begin                                // Reset
             curr_tag <= 0;
             next_tag <= 0;
-        end else if (jump | EXCEPTION_RAISED | MACHINE_RETURN)  // If a Branch is taken then the instruction tag is increased
+        end else if (jump | EXCEPTION_RAISED | MACHINE_RETURN | Interupt_ACK)  // If a Branch is taken then the instruction tag is increased
             next_tag <= curr_tag + 1;
         else if(pipe_clear==1)                                  // It is increased only when a bubbles is not being propagated
             curr_tag <= next_tag;

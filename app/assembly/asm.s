@@ -4,7 +4,7 @@
 .globl boot
 
     # Configura o tratador de interrupções
-    la t0, trap_handler         # Grava o endereço do rótulo int_handler
+    la t0, trap_handler         # Grava o endereço do rótulo trap_handler
     csrw mtvec, t0              # no registrador mtvec
 
     # Habilita Interrupções Global
@@ -12,7 +12,7 @@
     csrs mstatus, t1            # do registrador mstatus
 
     # Habilita Interrupções Externas
-    li t2, 0x800                # Seta o bit 11 (MEIE)
+    li t2, 0x888                # Seta os bits 11, 7 e 3 (MEIE, MTIE e MSIE)
     csrs mie, t2                # do registrador mie
 
     # Ajusta o mscratch
@@ -43,12 +43,51 @@ main:
 
     ecall
 
-	jal		main
+
+wfi:
+    wfi
+    wfi
+    wfi
+    wfi
+	j   wfi
 
 
 trap_handler:
     csrrw a0, mscratch, a0
     csrr  a1, mcause
+
+    bgez a1, exc_handler    # desvia se for uma exceção
+    andi a1, a1, 0x3f       # isola a causa de interrupção
+    li a2, 11               # a2 = interrupção externa
+    beq a1, a2, MEI_handler # se for MEI salta pro handler
+    li a2, 3                # a2 = software interrupt
+    beq a1, a2, MSI_handler # se for MSI salta pro handler
+    li a2, 7                # a2 = timer interrupt
+    beq a1, a2, MTI_handler # se for MTI salta pro handler
+
+    j return                # se nao retorna
+
+
+MEI_handler:
+    li a1, 0xBBBBBBBB
+    csrw mtval, a1
+
+    j return
+
+MSI_handler:
+    li a1, 0x33333333
+    csrw mtval, a1
+
+    j return
+
+MTI_handler:
+    li a1, 0x77777777
+    csrw mtval, a1
+
+    j return
+
+exc_handler:
+    #TRATA A EXCECAO
     
     # Ajustando MEPC para retornar de uma chamada de sistema
     csrr a1, mepc # carrega endereço de retorno
@@ -59,7 +98,10 @@ trap_handler:
     # (para retornar após a ecall)
     csrw mepc, a1 # armazena endereço de retorno de volta no mepc
 
-    csrrw a0, mscratch, a0        
+    j return
+
+return:
+    csrrw a0, mscratch, a0
     mret
 
 
