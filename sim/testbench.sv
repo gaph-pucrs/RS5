@@ -19,6 +19,7 @@
 `timescale 1ns/1ps
 
 `include "../rtl/pkg.sv"
+`include "../rtl/CSRs.sv"
 `include "../rtl/xus.sv"
 `include "../rtl/fetch.sv"
 `include "../rtl/decoder.sv"

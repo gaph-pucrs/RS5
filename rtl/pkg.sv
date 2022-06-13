@@ -41,7 +41,9 @@ package my_pkg;
 
     typedef enum  logic[1:0] {USER, SUPERVISOR, HYPERVISOR, MACHINE = 3} Privilege;
 
-    typedef enum  logic[1:0] {none, write, set, clear} csr_ops;
+    typedef enum  logic[1:0] {NONE, WRITE, SET, CLEAR} csr_ops;
+
+    typedef enum  logic[1:0] {DIRECT, VECTORED} TRAP_MODE;
 
     typedef enum  logic[11:0] { MVENDORID = 12'hF11, MARCHID, MIMPID, MHARTID, MCONFIGPTR, 
                                 MSTATUS = 12'h300, MISA, MEDELEG, MIDELEG, MIE, MTVEC, MCOUNTEREN, MSTATUSH = 12'h310, 

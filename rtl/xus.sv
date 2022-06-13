@@ -276,13 +276,13 @@ module csrUnit (
 
     always_comb 
         if(i==OP0 || i==OP3)               // WRITE
-            csr_op <= write;
+            csr_op <= WRITE;
         else if(i==OP1 || i==OP4)          // SET
-            csr_op <= set;
+            csr_op <= SET;
         else if(i==OP2 || i==OP5)          // CLEAR
-            csr_op <= clear;
+            csr_op <= CLEAR;
         else                               // NONE
-            csr_op <= none;
+            csr_op <= NONE;
 
     
     always_comb begin
