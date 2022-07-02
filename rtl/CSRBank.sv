@@ -28,6 +28,8 @@ module CSRBank (
 
     CSRs CSR;
     logic [31:0] mstatus, misa, mie, mtvec_r, mcounteren, mstatush, mscratch, mepc_r, mcause, mtval, mip, mtinst, mtval2;
+    logic [63:0] cycle, instret;
+    
     logic [31:0] wr_data, wmask, current_val;
     //logic [31:0] medeleg, mideleg; // NOT IMPLEMENTED YET (REQUIRED ONLY WHEN SYSTEM HAVE S-MODE)
     INTERRUPT_CODE Interuption_Code;
@@ -131,12 +133,14 @@ module CSRBank (
     always_comb
         if(rd_en==1 && killed==0)
             case(CSR)
+                //RO
                 MVENDORID:  out <= '0;
                 MARCHID:    out <= '0;
                 MIMPID:     out <= '0;
                 MHARTID:    out <= '0;
                 MCONFIGPTR: out <= '0;
 
+                //RW
                 MSTATUS:    out <= mstatus;
                 MISA:       out <= misa;
                 //MEDELEG:    out <= medeleg;
@@ -150,6 +154,12 @@ module CSRBank (
                 MCAUSE:     out <= mcause;
                 MTVAL:      out <= mtval;
                 MIP:        out <= mip;
+
+                //RO
+                CYCLE:      out <= cycle[31:0];
+                CYCLEH:     out <= cycle[63:32];
+                INSTRET:    out <= instret[31:0];
+                INSTRETH:   out <= instret[63:32];
             endcase
         else
             out <= '0;
@@ -160,7 +170,6 @@ module CSRBank (
         else
             mip <= IRQ;
     
-
     always @(posedge clk)
         if(mstatus[3]==1 && (mie & mip) && Interupt_ACK==0) begin
             Interupt_pending <= 1;
@@ -173,6 +182,16 @@ module CSRBank (
 
         end else
             Interupt_pending <= 0;
-    
+
+//##################################################################################
+    // PERFORMANCE MONITORS
+    always @(negedge reset or posedge clk)
+        if(!reset) begin
+            cycle <= '0;
+            instret <= '0;
+        end else begin
+            cycle <= cycle + 1;
+            instret <= (killed == 1) ? instret : instret + 1;
+        end
 
 endmodule

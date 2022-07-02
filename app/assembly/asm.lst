@@ -11,13 +11,13 @@ Disassembly of section .init:
    c:	08000313          	li	t1,128
   10:	30032073          	csrs	mstatus,t1
   14:	000013b7          	lui	t2,0x1
-  18:	88838393          	addi	t2,t2,-1912 # 888 <_bss_end+0x778>
+  18:	88838393          	addi	t2,t2,-1912 # 888 <_bss_end+0x768>
   1c:	3043a073          	csrs	mie,t2
-  20:	10400313          	li	t1,260
+  20:	11400313          	li	t1,276
   24:	34031073          	csrw	mscratch,t1
   28:	30002373          	csrr	t1,mstatus
   2c:	ffffe3b7          	lui	t2,0xffffe
-  30:	7ff38393          	addi	t2,t2,2047 # ffffe7ff <_end+0xffffc6ef>
+  30:	7ff38393          	addi	t2,t2,2047 # ffffe7ff <_end+0xffffc6df>
   34:	00737333          	and	t1,t1,t2
   38:	30031073          	csrw	mstatus,t1
   3c:	00000297          	auipc	t0,0x0
@@ -27,11 +27,11 @@ Disassembly of section .init:
 
 0000004c <main>:
   4c:	123452b7          	lui	t0,0x12345
-  50:	67828293          	addi	t0,t0,1656 # 12345678 <_end+0x12343568>
+  50:	67828293          	addi	t0,t0,1656 # 12345678 <_end+0x12343558>
   54:	edcbb337          	lui	t1,0xedcbb
-  58:	98730313          	addi	t1,t1,-1657 # edcba987 <_end+0xedcb8877>
+  58:	98730313          	addi	t1,t1,-1657 # edcba987 <_end+0xedcb8867>
   5c:	98765537          	lui	a0,0x98765
-  60:	43250513          	addi	a0,a0,1074 # 98765432 <_end+0x98763322>
+  60:	43250513          	addi	a0,a0,1074 # 98765432 <_end+0x98763312>
   64:	301013f3          	csrrw	t2,misa,zero
   68:	340293f3          	csrrw	t2,mscratch,t0
   6c:	340323f3          	csrrs	t2,mscratch,t1
@@ -48,7 +48,7 @@ Disassembly of section .init:
 0000008c <trap_handler>:
   8c:	34051573          	csrrw	a0,mscratch,a0
   90:	342025f3          	csrr	a1,mcause
-  94:	0405da63          	bgez	a1,e8 <exc_handler>
+  94:	0605d063          	bgez	a1,f4 <exc_handler>
   98:	03f5f593          	andi	a1,a1,63
   9c:	00b00613          	li	a2,11
   a0:	00c58c63          	beq	a1,a2,b8 <MEI_handler>
@@ -56,32 +56,37 @@ Disassembly of section .init:
   a8:	02c58063          	beq	a1,a2,c8 <MSI_handler>
   ac:	00700613          	li	a2,7
   b0:	02c58463          	beq	a1,a2,d8 <MTI_handler>
-  b4:	0440006f          	j	f8 <return>
+  b4:	0500006f          	j	104 <return>
 
 000000b8 <MEI_handler>:
   b8:	bbbbc5b7          	lui	a1,0xbbbbc
-  bc:	bbb58593          	addi	a1,a1,-1093 # bbbbbbbb <_end+0xbbbb9aab>
+  bc:	bbb58593          	addi	a1,a1,-1093 # bbbbbbbb <_end+0xbbbb9a9b>
   c0:	34359073          	csrw	mtval,a1
-  c4:	0340006f          	j	f8 <return>
+  c4:	0400006f          	j	104 <return>
 
 000000c8 <MSI_handler>:
   c8:	333335b7          	lui	a1,0x33333
-  cc:	33358593          	addi	a1,a1,819 # 33333333 <_end+0x33331223>
+  cc:	33358593          	addi	a1,a1,819 # 33333333 <_end+0x33331213>
   d0:	34359073          	csrw	mtval,a1
-  d4:	0240006f          	j	f8 <return>
+  d4:	0300006f          	j	104 <return>
 
 000000d8 <MTI_handler>:
   d8:	777775b7          	lui	a1,0x77777
-  dc:	77758593          	addi	a1,a1,1911 # 77777777 <_end+0x77775667>
+  dc:	77758593          	addi	a1,a1,1911 # 77777777 <_end+0x77775657>
   e0:	34359073          	csrw	mtval,a1
-  e4:	0140006f          	j	f8 <return>
+  e4:	800005b7          	lui	a1,0x80000
+  e8:	00758593          	addi	a1,a1,7 # 80000007 <_end+0x7fffdee7>
+  ec:	00b5a023          	sw	a1,0(a1)
+  f0:	0140006f          	j	104 <return>
 
-000000e8 <exc_handler>:
-  e8:	341025f3          	csrr	a1,mepc
-  ec:	00458593          	addi	a1,a1,4
-  f0:	34159073          	csrw	mepc,a1
-  f4:	0040006f          	j	f8 <return>
+000000f4 <exc_handler>:
+  f4:	341025f3          	csrr	a1,mepc
+  f8:	00458593          	addi	a1,a1,4
+  fc:	34159073          	csrw	mepc,a1
+ 100:	0040006f          	j	104 <return>
 
-000000f8 <return>:
-  f8:	34051573          	csrrw	a0,mscratch,a0
-  fc:	30200073          	mret
+00000104 <return>:
+ 104:	34051573          	csrrw	a0,mscratch,a0
+ 108:	30200073          	mret
+ 10c:	0000                	unimp
+	...

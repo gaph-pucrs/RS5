@@ -45,69 +45,76 @@ byte          char;
 logic [31:0]  Rd_data, Wr_address, Wr_data;
 logic [31:0]  IRQ;
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-
 ////////////////////////////////////////////////////// Clock generator //////////////////////////////////////////////////////////////////////////////
-  always begin
-    #1.0 clk = 0;
-    #1.0 clk = 1;
-  end
-
-////////////////////////////////////////////////////// RAM INSTANTIATION ///////////////////////////////////////////////////////////////////////
-	RAM_mem #(32'h00000000) RAM_MEM(.clock(clk), .rst(rstCPU), .write_enable(write), .read_enable(read), .i_address(i_address), 
-            .read_address(read_address), .write_address(Wr_address), .Wr_data(Wr_data), .data_read(Rd_data), .instruction(instruction));
-
-// data memory signals --------------------------------------------------------
-  always_comb
-    if(write!=0) begin
-        Wr_address <= write_address;                            // Wr_address - write_address
-        Wr_data <= data_write;                                  // Wr_data - data_write
-    end else begin 
-        Wr_data <= 32'h00000000;
-        Wr_address<=32'h00000000;
+    always begin
+        #1.0 clk = 0;
+        #1.0 clk = 1;
     end
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-  always_comb
-    if(read==1) begin
-        if(read_address==32'h80006000)
-            data_read <= $time/1000;
-        else 
-            data_read <= Rd_data; 
-    end else
-        data_read <= 'Z; 		                                // data_cpu
 
+////////////////////////////////////////////////////// TIMER generator //////////////////////////////////////////////////////////////////////////////
+integer TIMER;
+    always @(negedge rstCPU or posedge clk) begin
+        if(!rstCPU)
+            TIMER <= 0;
+        else begin
+            TIMER <= TIMER + 1;
+            if(TIMER % 500 == 0)
+                IRQ[7] <= 1;
+        end
+    end
+////////////////////////////////////////////////////// data memory signals //////////////////////////////////////////////////////////////////////////
+    always_comb begin
+        if(write != 0) begin
+            Wr_address <= write_address;
+            Wr_data <= data_write;
+        end else begin 
+            Wr_data <= 32'h00000000;
+            Wr_address<=32'h00000000;
+        end
+
+        if(read == 1)
+            if(read_address == 32'h80006000)
+                data_read <= $time/1000;
+            else 
+                data_read <= Rd_data;
+        else
+            data_read <= 'Z;
+    end
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////// Memory Mapped regs ///////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-  always @(posedge clk) begin
-    if((write_address == 32'h80004000 | write_address == 32'h80001000) & write!=0) begin
-        char <= data_write[7:0];
-        $write("%c",char);
+    always @(posedge clk) begin
+        if((write_address == 32'h80004000 || write_address == 32'h80001000) && write!=0) begin
+            char <= data_write[7:0];
+            $write("%c",char);
+
+        end else if(write_address == 32'h80000007)
+            IRQ[7] <= 'Z;
+
+        else if(write_address==32'h80000000) begin
+            $display("# %t END OF SIMULATION",$time);
+            $finish;
+        end
     end
 
-    if(write_address==32'h80000000) begin
-        $display("# %t END OF SIMULATION",$time);
-        $finish;
-    end
-  end
+////////////////////////////////////////////////////// RAM INSTANTIATION ///////////////////////////////////////////////////////////////////////
+    RAM_mem RAM_MEM(
+            .clock(clk), .rst(rstCPU), .write_enable(write), .read_enable(read), .i_address(i_address), 
+            .read_address(read_address), .write_address(Wr_address), .Wr_data(Wr_data), .data_read(Rd_data), .instruction(instruction)
+        );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////// CPU INSTANTIATION ////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-    PUCRS_RV dut (.clk(clk), .reset(rstCPU), .instruction(instruction), .i_address(i_address), .read(read), .read_address(read_address),
-             .DATA_in(data_read), .DATA_out(data_write), .write_address(write_address), .write(write),
-             .IRQ(IRQ)
-             );
+    PUCRS_RV dut (
+            .clk(clk), .reset(rstCPU), .instruction(instruction), .i_address(i_address), .read(read), .read_address(read_address),
+            .DATA_in(data_read), .DATA_out(data_write), .write_address(write_address), .write(write),
+            .IRQ(IRQ)
+        );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////// RESET CPU ////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    //always #1000000000
-    //    $display("%d elapsed", $time);
-
     initial begin
         rstCPU = 0;                                         // RESET for CPU initialization
         IRQ <= '0;
@@ -126,6 +133,8 @@ logic [31:0]  IRQ;
         IRQ[7] <= 1;
         #70
         IRQ[7] <= 0;
-
+        #70
+        IRQ[7] <= 'Z;
     end
+
 endmodule

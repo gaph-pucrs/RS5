@@ -76,7 +76,7 @@ module retire(
     always @(posedge clk or negedge reset)
         if(!reset)
             curr_tag <= 0;
-        else if ((jump_out==1|| RAISE_EXCEPTION==1 || MACHINE_RETURN==1 || Interupt_ACK )&& killed==0)          // If a jump was taken and the tag is correct then increases the internal tag
+        else if ((jump_out==1|| RAISE_EXCEPTION==1 || MACHINE_RETURN==1 || Interupt_ACK==1) && killed==0)          // If a jump was taken and the tag is correct then increases the internal tag
             curr_tag <= curr_tag + 1;
 
 ///////////////////////////////////////////////// Flow Control //////////////////////////////////////////////////////////////////////////////////////
@@ -161,7 +161,7 @@ always_comb begin
 
                 $write("[%0d] MRET: %8h %8h\n", $time, NPC, instruction);
 
-            end else if(Interupt_pending && jump==0) begin
+            end else if(Interupt_pending==1 && jump==0) begin
                 RAISE_EXCEPTION <= 0;
                 Exception_Code <= NE;
                 MACHINE_RETURN <= 0;
@@ -174,6 +174,11 @@ always_comb begin
                 MACHINE_RETURN <= 0;
                 Interupt_ACK <= 0;
             end
+        end else begin
+            RAISE_EXCEPTION <= 0;
+            Exception_Code <= NE;
+            MACHINE_RETURN <= 0;
+            Interupt_ACK <= 0;
         end
 
 

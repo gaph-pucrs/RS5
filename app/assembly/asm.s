@@ -83,6 +83,8 @@ MSI_handler:
 MTI_handler:
     li a1, 0x77777777
     csrw mtval, a1
+    li a1, 0x80000007
+    sw a1, 0(a1)
 
     j return
 

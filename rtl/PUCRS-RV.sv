@@ -46,7 +46,7 @@ module PUCRS_RV(
 
     logic jump_wb, jump_retire, hazard, we_retire, pipe_clear;
     logic [3:0] we_mem_retire;
-    logic regD_we, Killed;
+    logic regD_we;
     logic [31:0] dataA, dataB;
     logic [4:0] regA_add, regB_add;
     logic [31:0] data_wb, New_pc;
@@ -55,7 +55,6 @@ module PUCRS_RV(
     logic [3:0] decode_tag, execute_tag, retire_tag, curr_retire_tag;
     i_type i_execute, i_retire;
     xu xu_execute;
-    logic LS_operation;
     logic [31:0] result_retire [1:0];
     logic [31:1] wrAddr;
 
