@@ -1,5 +1,4 @@
 import my_pkg::*;
-import CSRs_pkg::*;
 
 module CSRBank (
     input logic         clk,
@@ -28,24 +27,13 @@ module CSRBank (
     );
 
     CSRs CSR;
-    logic [31:0] mstatus, /*misa, mie, mtvec_r,*/ mcounteren, mstatush, /*mscratch, mepc_r, mcause, mtval, mip,*/ mtinst, mtval2;
+    logic [31:0] mstatus, misa, mie, mtvec_r, mcounteren, mstatush, mscratch, mepc_r, mcause, mtval, mip, mtinst, mtval2;
     logic [31:0] wr_data, wmask, current_val;
-    IMISA misa = new;
-    IMIE mie = new;
-    IMTVEC mtvec_r = new;
-    IMSCRATCH mscratch = new;
-    IMEPC mepc_r = new;
-    IMTVAL mtval = new;
-    IMCAUSE mcause = new;
-    IMIP mip = new;
     //logic [31:0] medeleg, mideleg; // NOT IMPLEMENTED YET (REQUIRED ONLY WHEN SYSTEM HAVE S-MODE)
     INTERRUPT_CODE Interuption_Code;
 
-    always @(posedge clk) begin
-        mtvec <= mtvec_r.value;
-        mepc <= mepc_r.value;
-    end
-
+    assign mtvec = mtvec_r;
+    assign mepc = mepc_r;
 
     assign CSR = CSRs'(addr);
 
@@ -53,17 +41,18 @@ module CSRBank (
         wmask <= '1;
         case (CSR)
             MSTATUS:    begin current_val <= mstatus;   wmask <= 32'h007E19AA; end
-            //MISA:       begin current_val <= misa;      wmask <= 32'h3C000000; end
+            MISA:       begin current_val <= misa;      wmask <= 32'h3C000000; end
             //MEDELEG:    begin current_val <= medeleg;   wmask <= '1; end
             //MIDELEG:    begin current_val <= mideleg;   wmask <= '1; end
-            //MIE:        begin current_val <= mie.value;       wmask <= 32'h00000888; end
-            //MTVEC:      begin current_val <= mtvec_r;   wmask <= 32'hFFFFFFFC; end
+            MIE:        begin current_val <= mie;       wmask <= 32'h00000888; end
+            MTVEC:      begin current_val <= mtvec_r;   wmask <= 32'hFFFFFFFC; end
             //MCOUNTEREN: begin current_val <= mcounteren;wmask <= '1; end
             //MSTATUSH:   begin current_val <= mstatush;  wmask <= '1; end
-            //MSCRATCH:   begin current_val <= mscratch;  wmask <= 32'hFFFFFFFF; end
-            //MEPC:       begin current_val <= mepc_r;    wmask <= 32'hFFFFFFFC; end
-            //MCAUSE:     begin current_val <= mcause;    wmask <= 32'hFFFFFFFF; end
-            //MTVAL:      begin current_val <= mtval;     wmask <= 32'hFFFFFFFF; end
+            MSCRATCH:   begin current_val <= mscratch;  wmask <= 32'hFFFFFFFF; end
+            MEPC:       begin current_val <= mepc_r;    wmask <= 32'hFFFFFFFC; end
+            MCAUSE:     begin current_val <= mcause;    wmask <= 32'hFFFFFFFF; end
+            MTVAL:      begin current_val <= mtval;     wmask <= 32'hFFFFFFFF; end
+            //MIP:        begin current_val <= mip;       wmask <= 32'h00000000; end
 
             default:    begin current_val <= '0;        wmask <= 32'h00000000; end
         endcase
@@ -84,55 +73,57 @@ module CSRBank (
             mstatus <= '0;
             mstatus[3] <= 0;        // MIE  = 0
             mstatus[17] <= 0;       // MPRV = 0
-            misa.reset();
+            misa <= 32'h40000100;   // 32 - I
             //medeleg <= '0;
             //mideleg <= '0;
-            mie.reset();
-            mtvec_r.reset();
+            mie <= '0;
+            mtvec_r <= '0;
             //mcounteren <= '0;
             //mstatush <= '0;
-            mscratch.reset();
-            mepc_r.reset();
-            mcause.reset();
-            mtval.reset();
+            mscratch <= '0;
+            mepc_r <= '0;
+            mcause <= '0;
+            mtval <= '0;
+            //mip <= '0;
 
         end else if(MACHINE_RETURN) begin
             mstatus[3]      <= mstatus[7];          // MIE = MPIE
             // privilege = mstatus[12:11]           // priv = MPP
 
         end else if(RAISE_EXCEPTION) begin
-            mcause.SET_EXCEPTION();
-            mcause.SET_CODE(Exception_Code);
+            mcause[31]       <= '0;
+            mcause[30:0]    <= Exception_Code;
             mstatus[12:11]  <= privilege;           // MPP previous privilege
             // privilege    <= MACHINE
             mstatus[7]      <= mstatus[3];          // MPIE = MIE
             mstatus[3]      <= 0;                   // MIE = 0
-            mepc_r.write((Exception_Code==ECALL_FROM_MMODE) ? PC : PC+4, csr_ops'(WRITE));   // Return address
-            mtval.write((Exception_Code==ILLEGAL_INSTRUCTION) ? instruction : PC, csr_ops'(WRITE));
+            mepc_r          <= (Exception_Code==ECALL_FROM_MMODE) ? PC : PC+4;                // Return address
+            mtval           <= (Exception_Code==ILLEGAL_INSTRUCTION) ? instruction : PC;
 
         end else if(Interupt_ACK) begin
-            mcause.SET_INTERRUPT();
-            mcause.SET_CODE(Interuption_Code);
+            mcause[31]      <= '1;
+            mcause[30:0]    <= Interuption_Code;
             mstatus[12:11]  <= privilege;           // MPP = previous privilege
             // privilege    <= MACHINE
             mstatus[7]      <= mstatus[3];          // MPIE = MIE
             mstatus[3]      <= 0;                   // MIE = 0
-            mepc_r.write( PC, csr_ops'(WRITE));     // Return address
+            mepc_r          <= PC;                  // Return address
         
         end else if(wr_en==1 && killed==0) begin
             case(CSR)
                 MSTATUS:    mstatus     <= wr_data;
-                MISA:       misa.write(data, csr_op);
+                MISA:       misa        <= wr_data;
                 //MEDELEG:    medeleg     <= wr_data;
                 //MIDELEG:    mideleg     <= wr_data;
-                MIE:        mie.write(data, csr_op);
-                MTVEC:      mtvec_r.write(data, csr_op);
+                MIE:        mie         <= wr_data;
+                MTVEC:      mtvec_r       <= wr_data;
                 //MCOUNTEREN: mcounteren  <= wr_data;
                 //MSTATUSH:   mstatush    <= wr_data;
-                MSCRATCH:   mscratch.write(data, csr_op);
-                MEPC:       mepc_r.write(data, csr_op);
-                MCAUSE:     mcause.write(data, csr_op);
-                MTVAL:      mtval.write(data, csr_op);
+                MSCRATCH:   mscratch    <= wr_data;
+                MEPC:       mepc_r        <= wr_data;
+                MCAUSE:     mcause      <= wr_data;
+                MTVAL:      mtval       <= wr_data;
+                //MIP:        mip         <= wr_data;
             endcase
         end
     end
@@ -147,37 +138,37 @@ module CSRBank (
                 MCONFIGPTR: out <= '0;
 
                 MSTATUS:    out <= mstatus;
-                MISA:       out <= misa.read();
+                MISA:       out <= misa;
                 //MEDELEG:    out <= medeleg;
                 //MIDELEG:    out <= mideleg;
-                MIE:        out <= mie.read();
-                MTVEC:      out <= mtvec_r.read();
+                MIE:        out <= mie;
+                MTVEC:      out <= mtvec_r;
                 //MCOUNTEREN: out <= mcounteren;
                 //MSTATUSH:   out <= mstatush;
-                MSCRATCH:   out <= mscratch.read();
-                MEPC:       out <= mepc_r.read();
-                MCAUSE:     out <= mcause.read();
-                MTVAL:      out <= mtval.read();
-                MIP:        out <= mip.read();
+                MSCRATCH:   out <= mscratch;
+                MEPC:       out <= mepc_r;
+                MCAUSE:     out <= mcause;
+                MTVAL:      out <= mtval;
+                MIP:        out <= mip;
             endcase
         else
             out <= '0;
 
     always @(negedge reset or posedge clk)
         if(!reset)
-            mip.reset();
+            mip <= '0;
         else
-            mip.write(IRQ, csr_ops'(WRITE));
+            mip <= IRQ;
     
 
     always @(posedge clk)
-        if(mstatus[3]==1 && (mie.read() & mip.read()) && Interupt_ACK==0) begin
+        if(mstatus[3]==1 && (mie & mip) && Interupt_ACK==0) begin
             Interupt_pending <= 1;
-            if(mip.MEIP & mie.MEIE)                   // Machine External
+            if(mip[11] & mie[11])                   // Machine External
                 Interuption_Code <= M_EXT_INT;
-            else if(mip.MSIP & mie.MSIE)                // Machine Software
+            else if(mip[3] & mie[3])                // Machine Software
                 Interuption_Code <= M_SW_INT;
-            else if(mip.MTIP & mie.MTIE)                // Machine Timer
+            else if(mip[7] & mie[7])                // Machine Timer
                 Interuption_Code <= M_TIM_INT;
 
         end else

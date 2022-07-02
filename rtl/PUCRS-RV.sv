@@ -18,13 +18,14 @@
  * ans also defines the interface ports(inputs and outputs) os the processor.
  */
 /*
-`include "./pkg.sv"
-`include "./fetch.sv"
-`include "./decoder.sv"
-`include "./regbank.sv"
-`include "./xus.sv"
-`include "./execute.sv"
-`include "./retire.sv"
+`include "../rtl/pkg.sv"
+`include "../rtl/xus.sv"
+`include "../rtl/fetch.sv"
+`include "../rtl/decoder.sv"
+`include "../rtl/execute.sv"
+`include "../rtl/retire.sv"
+`include "../rtl/regbank.sv"
+`include "../rtl/CSRBank.sv"
 */
 import my_pkg::*;
 
