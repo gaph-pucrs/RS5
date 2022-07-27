@@ -30,18 +30,17 @@
 import my_pkg::*;
 
 module PUCRS_RV(
-    input logic         clk,
-    input logic         reset,
-    input logic [31:0]  instruction,                    // Object Code coming from Memory
+    input  logic        clk,
+    input  logic        reset,
     output logic [31:0] i_address,                      // Instruction Address in Memory
+    input  logic [31:0] instruction,                    // Object Code coming from Memory
     output logic        read,                           // Memory chip enable
     output logic [31:0] read_address,                   // Data address in Memory
-    input logic [31:0]  DATA_in,                        // Data coming from Memory
+    input  logic [31:0] DATA_in,                        // Data coming from Memory
     output logic [31:0] DATA_out,                       // Data to be written in Memory
     output logic [31:0] write_address,
     output logic [3:0]  write,                          // Memory Write signal One Hot, each bit address 1 byte
-
-    input logic [31:0] IRQ
+    input  logic [31:0] IRQ
     );
 
     logic jump_wb, jump_retire, hazard, we_retire, pipe_clear;
