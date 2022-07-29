@@ -56,4 +56,20 @@ module regbank(
             else if (addrw[i])
                 regfile[i] <= in;
 
+
+////////////////// DEBUG ///////////////////////////////////
+    int fd;
+    initial 
+        fd = $fopen ("./debug/regBank.txt", "w");
+
+    always @(posedge clk ) begin
+        automatic int i;
+        $fwrite(fd,"[%0d] %02d - %8h \t %02d - %8h\n", $time, addra, outa, addrb, outb);
+        if(addrw != '0) begin
+            for (i = 0; i <= 32; i++) 
+                if(addrw[i]==1)
+                    break;
+            $fwrite(fd,"[%0d] --------------------------------- %02d - %8h\n", $time, i, in);
+        end
+    end
 endmodule

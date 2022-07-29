@@ -71,7 +71,7 @@ module execute(
                 .result(result[4]), .result_jal(result[3]), .jump(jump_int), .we(we_branchUnit));
     LSUnit      memory1 (.opA(opA), .opB(opB), .data(opC), .i(memory_op), 
                 .read_address(read_address), .read(read),
-                .write_address(result[7]), .DATA_wb(result[6]),  .we_mem(we_mem_int), .we_rb(we_memoryUnit));
+                .write_address(result[7]), .write_data(result[6]),  .we_mem(we_mem_int), .we_rb(we_memoryUnit));
     csrUnit     CSRaccess (.opA(opA), .instruction(instruction_in), .i(csrU_op), .privilege(Privilege'(2'b11)), .csr_exception(csr_exception),
                 .csr_rd_en(csr_rd_en), .csr_wr_en(csr_wr_en), .csr_op(csr_op), .csr_addr(csr_addr), .csr_data(csr_data) );
 

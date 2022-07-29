@@ -138,64 +138,69 @@ module LSUnit (
     output logic [31:0] read_address,                   // Read Memory csr_address
     output logic        read,                           // Signal that allows memory read
     output logic [31:0] write_address,                  // Adrress to Write in memory
-    output logic [31:0] DATA_wb,                        // Data to be Written in Register Bank or in memory
+    output logic [31:0] write_data,                        // Data to be Written in Register Bank or in memory
     output logic [3:0]  we_mem,                           // Signal that indicates the size of Write in memory(byte(1),half(2),word(4))
     output logic        we_rb);                         // Write enable signal to register bank, in Stores=0 and in Loads=1
 
-    logic [31:0] DATA_write;
+    logic [31:0] sum;
+    assign sum = opA + opB;
 
 ///////////////////////////////////// generate all signals for read or write ////////////////////////////////////////////////////////////////////////
     always_comb begin
         if(i==OP0 | i==OP1) begin                        // Load Byte signed and unsigned (LB | LBU)
             read <= 1;
-            DATA_write <= '0;
+            write_data <= '0;
             we_mem <= 4'b0000;
 
         end else if(i==OP2 | i==OP3) begin               // Load Half(16b) signed and unsigned (LH | LHU)
             read <= 1;
-            DATA_write <= '0;
+            write_data <= '0;
             we_mem <= 4'b0000;
 
         end else if(i==OP4) begin                        // Load Word(32b) (LW)
             read <= 1;
-            DATA_write <= '0;
+            write_data <= '0;
             we_mem <= 4'b0000;
 
         end else if(i==OP5) begin                       // Store Byte (SB)
             read <= 0;
-            DATA_write[31:8] <= 24'h000000;
-            DATA_write[7:0] <= data[7:0];               // Only the less significant byte is fullfilled with data, the rest is fullfilled with zeros
-            we_mem <= 4'b0001;
-
+            write_data[31:24] <= data[7:0];
+            write_data[23:16] <= data[7:0];
+            write_data[15:8] <= data[7:0];
+            write_data[7:0] <= data[7:0];
+            case(sum[1:0])
+                2'b11:   we_mem <= 4'b1000;
+                2'b10:   we_mem <= 4'b0100;
+                2'b01:   we_mem <= 4'b0010;
+                default: we_mem <= 4'b0001;
+            endcase
+            
         end else if(i==OP6) begin                       // Store Half(16b) (SH)
             read <= 0;
-            DATA_write[31:16] <= 16'h0000;    
-            DATA_write[15:0] <= data[15:0];             // Only the less significant half is fullfilled with data, the rest is fullfilled with zeros
-            we_mem <= 4'b0011;
+            write_data[31:16] <= data[15:0];    
+            write_data[15:0] <= data[15:0];
+            we_mem <= (write_address[1]==1) ? 4'b1100 : 4'b0011;
 
         end else if(i==OP7) begin                       // Store Word (SW)
             read <= 0;
-            DATA_write[31:0] <= data[31:0];  
+            write_data[31:0] <= data[31:0];  
             we_mem <= 4'b1111;
-
         end
+
         //////////////////////////////////////////////
-        if(i==OP0 | i==OP1 | i==OP2 | i==OP3 | i==OP4)
-            read_address = opA + opB;
-        else 
-            read_address = '0;
+        read_address = sum;
     end
 
 ///////////////////////////////////////////////// Write enable to register bank ///////////////////////////////////////////////////////////////////////////
     always_comb
         if(i==OP5 || i==OP6 || i==OP7)                  // Stores do not write in regbank
-            we_rb<='0;
+            we_rb <= '0;
         else
-            we_rb<='1;
+            we_rb <= '1;
 
 ///////////////////////////////////////////////// Output registers //////////////////////////////////////////////////////////////////////////////////
-    assign write_address = opA + opB;
-    assign DATA_wb = DATA_write;
+    assign write_address = sum;
+
 endmodule
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

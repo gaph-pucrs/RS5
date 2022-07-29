@@ -41,18 +41,21 @@ module RAM_mem #(parameter startaddress = 32'h00000000)(
     int fd, r;
     int fd_i, fd_r, fd_w;
 
-    assign W_tmp_address = write_address - startaddress;                //  Address offset
+    assign W_tmp_address[31:2] = write_address[31:2] - startaddress[31:2];//  Address offset
+    assign W_tmp_address[1:0] = '0;
     assign W_low_address_int = W_tmp_address[15:0];                     // convert to integer
 
-    assign R_tmp_address = read_address - startaddress;                 //  Address offset
-    assign R_low_address_int = R_tmp_address[15:0];                     // convert to integer
+    assign R_tmp_address[31:2] = read_address[31:2] - startaddress[31:2];//  Address offset
+    assign R_tmp_address[1:0] = '0;
+    assign R_low_address_int = R_tmp_address;                           // convert to integer
+    //assign R_low_address_int[15:2] = R_tmp_address[15:2];               // convert to integer
 
     assign INST_tmp_address = i_address - startaddress;                 // Address offset
     assign INST_low_address_int = INST_tmp_address[15:0];               // convert to integer
 
     initial begin
-        //fd = $fopen ("/home/williannunes/pucrs-rv/bin/test.bin", "r");
-        fd = $fopen ("/home/williannunes/pucrs-rv/app/assembly/asm.bin", "r");
+        fd = $fopen ("/home/williannunes/pucrs-rv/bin/test.bin", "r");
+        //fd = $fopen ("/home/williannunes/pucrs-rv/app/assembly/asm.bin", "r");
 
         r = $fread(RAM, fd);
         $display("read %d elements \n", r);
@@ -80,7 +83,7 @@ module RAM_mem #(parameter startaddress = 32'h00000000)(
             if(write_enable[0]==1) $fwrite(fd_w,"%h ", Wr_data[7:0]);   else $fwrite(fd_w,"-- ");
             
             $fwrite(fd_w,"[%0d] ", $time);
-            $fwrite(fd_w,"to address %8h\n", write_address);
+            $fwrite(fd_w,"to address %8h\n", W_low_address_int);
         end
 
 ////////////////////////////////////////////////////////////// Read DATA from memory /////////////////////////////////////////////////////////////////////
@@ -90,10 +93,12 @@ module RAM_mem #(parameter startaddress = 32'h00000000)(
             data_read[23:16] <= RAM[R_low_address_int+2];
             data_read[15:8]  <= RAM[R_low_address_int+1];
             data_read[7:0]   <= RAM[R_low_address_int];
-
-        if(R_low_address_int!=0)
-            $fwrite(fd_r,"[%0d] Read: %h %h %h %h from addr %8h\n", $time, RAM[R_low_address_int+3], RAM[R_low_address_int+2], RAM[R_low_address_int+1], RAM[R_low_address_int], R_low_address_int);
-        end
+        
+            if(R_low_address_int!=0)
+                $fwrite(fd_r,"[%0d] Read: %h %h %h %h from addr %8h\n", $time, RAM[R_low_address_int+3], RAM[R_low_address_int+2], RAM[R_low_address_int+1], RAM[R_low_address_int], R_low_address_int);
+        
+        end else
+            data_read <= 'Z;
 
 ////////////////////////////////////////////////////////////// Read INSTRUCTION from memory /////////////////////////////////////////////////////////////////////
     always @(posedge clock)

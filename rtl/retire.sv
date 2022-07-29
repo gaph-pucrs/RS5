@@ -88,7 +88,7 @@ module retire(
 
 ///////////////////////////////////////////////// PC Flow control signal generation /////////////////////////////////////////////////////////////////
     always_comb
-        if (jump==1 && killed==0) begin             // If it is a branch instruction and tag is valid then effectuate the branch
+        if(jump==1 && killed==0) begin             // If it is a branch instruction and tag is valid then effectuate the branch
             New_pc <= result[1];
             jump_out <= 1;
         end else begin                              // Otherwise do nothing
@@ -96,27 +96,23 @@ module retire(
             jump_out <= '0;
         end
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-always_comb begin
-        if(i==LB | i==LBU) begin                       // LB | LBU
-            if(DATA_in[7]==1 & i==LB)                  // Signal extension
-                mem_data[31:8] <= 24'hFFFFFF;
-            else                                        // 0's extension
-                mem_data[31:8] <= 24'h000000;
-            mem_data[7:0] <= DATA_in[7:0];
+    always_comb
+        if(i==LB || i==LBU) begin                       // LB | LBU
+            case(result[1][1:0])
+                2'b11:   begin mem_data[7:0] <= DATA_in[31:24]; mem_data[31:8] <= (DATA_in[31]==1 & i==LB) ? '1 : '0; end
+                2'b10:   begin mem_data[7:0] <= DATA_in[23:16]; mem_data[31:8] <= (DATA_in[23]==1 & i==LB) ? '1 : '0; end
+                2'b01:   begin mem_data[7:0] <= DATA_in[15:8];  mem_data[31:8] <= (DATA_in[15]==1 & i==LB) ? '1 : '0; end
+                default: begin mem_data[7:0] <= DATA_in[7:0];   mem_data[31:8] <= (DATA_in[7]==1 & i==LB)  ? '1 : '0; end
+            endcase
 
-        end else if(i==LH | i==LHU) begin              // LH | LHU
-            if(DATA_in[15]==1 & i==LH)                 // Signal extension
-                mem_data[31:16] <= 16'hFFFF;
-            else                                        // 0's extension
-                mem_data[31:16] <= 16'h0000; 
-            mem_data[15:0] <= DATA_in[15:0];
+        end else if(i==LH || i==LHU) begin              // LH | LHU
+            case(result[1][1])
+                1'b1:    begin mem_data[15:0] <= DATA_in[31:16]; mem_data[31:16] <= (DATA_in[31]==1 & i==LH) ? '1 : '0; end
+                default: begin mem_data[15:0] <= DATA_in[15:0];  mem_data[31:16] <= (DATA_in[15]==1 & i==LH) ? '1 : '0; end
+            endcase
 
-        end else if(i==LW)                             // LW
+        end else                                        // LW
             mem_data <= DATA_in;
-
-        else                                            // STORES
-            mem_data <= '0;
-    end
 
 ///////////////////////////////////////////////// Memory write control //////////////////////////////////////////////////////////////////////////////
     always@(posedge clk)
