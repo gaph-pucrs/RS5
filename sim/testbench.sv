@@ -40,7 +40,7 @@ logic         clk=1, rstCPU;
 logic [31:0]  i_address, instruction;
 logic         read;
 logic [31:0]  read_address, data_read, write_address, data_write;
-logic [3:0]   write;
+logic [3:0]   write, w_en;
 byte          char;
 logic [31:0]  Rd_data, Wr_address, Wr_data;
 logic [31:0]  IRQ;
@@ -63,15 +63,19 @@ integer TIMER;
         end
     end
 ////////////////////////////////////////////////////// data memory signals //////////////////////////////////////////////////////////////////////////
-    always_comb begin
-        if(write != 0) begin
-            Wr_address <= write_address;
-            Wr_data <= data_write;
-        end else begin 
-            Wr_data <= 32'h00000000;
-            Wr_address<=32'h00000000;
-        end
+  always_comb
+    if(write!=0) begin
+        if(write_address <= 32'h0000FFFF)
+          w_en <= write;
+        Wr_address <= write_address;                            // Wr_address - write_address
+        Wr_data <= data_write;                                  // Wr_data - data_write
+    end else begin 
+        w_en <= 4'h0;
+        Wr_data <= 32'h00000000;
+        Wr_address<=32'h00000000;
+    end
 
+    always_comb
         if(read == 1)
             if(read_address == 32'h80006000)
                 data_read <= $time/1000;
@@ -79,7 +83,7 @@ integer TIMER;
                 data_read <= Rd_data;
         else
             data_read <= 'Z;
-    end
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////// Memory Mapped regs ///////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -98,10 +102,9 @@ integer TIMER;
     end
 
 ////////////////////////////////////////////////////// RAM INSTANTIATION ///////////////////////////////////////////////////////////////////////
-    RAM_mem RAM_MEM(
-            .clock(clk), .rst(rstCPU), .write_enable(write), .read_enable(read), .i_address(i_address), 
-            .read_address(read_address), .write_address(Wr_address), .Wr_data(Wr_data), .data_read(Rd_data), .instruction(instruction)
-        );
+    RAM_mem RAM_MEM(.clk(clk), .rst(rstCPU), .w_en(w_en), .r_en(read), .i_addr(i_address[15:0]), 
+                    .r_addr(read_address[15:0]), .w_addr(Wr_address[15:0]), .w_data(Wr_data), .r_data(Rd_data), .i_data(instruction)
+                    );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////// CPU INSTANTIATION ////////////////////////////////////////////////////////////////////////////

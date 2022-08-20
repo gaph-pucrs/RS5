@@ -69,6 +69,13 @@ module PUCRS_RV(
     EXCEPT_CODE   Exception_Code;
     logic Interupt_pending, Interupt_ACK;
 
+    logic [31:0] read_address_int;
+    logic [31:0] write_address_int;
+    assign read_address[31:2] = read_address_int[31:2];
+    assign read_address[1:0] = '0;
+    assign write_address[31:2] = write_address_int[31:2];
+    assign write_address[1:0] = '0;
+
     assign pipe_clear = hazard;
 
 //////////////////////////////////////////////////////////// FETCH //////////////////////////////////////////////////////////////////////////////////
@@ -96,7 +103,7 @@ module PUCRS_RV(
         .clk(clk), .reset(reset), .NPC(NPC_execute), .opA(opA_execute), .opB(opB_execute), .opC(opC_execute),
         .i(i_execute), .tag_in(execute_tag), .instruction_in(instruction_execute), .exception_in(exception_execute),
         .result_out(result_retire), .jump_out(jump_retire), .tag_out(retire_tag), .i_out(i_retire), .we_out(we_retire),
-        .read_address(read_address), .read(read), .we_mem(we_mem_retire),
+        .read_address(read_address_int), .read(read), .we_mem(we_mem_retire),
         .instruction_out(instruction_retire), .NPC_out(NPC_retire), .exception_out(exception_retire),
         .csr_rd_en(csr_rd_en), .csr_wr_en(csr_wr_en), .csr_op(csr_op), .csr_addr(csr_addr), .csr_data(csr_data), .csr_data_rd(csr_data_rd)
         );
@@ -109,7 +116,7 @@ module PUCRS_RV(
         .New_pc(New_pc), .jump_out(jump_wb),
         .we_mem_in(we_mem_retire), .curr_retire_tag(curr_retire_tag),
         .DATA_in(DATA_in), .i(i_retire),
-        .write(write), .write_address(write_address), .DATA_out(DATA_out),
+        .write(write), .write_address(write_address_int), .DATA_out(DATA_out),
         .instruction(instruction_retire), .NPC(NPC_retire),
         .exception('0), 
         .RAISE_EXCEPTION(RAISE_EXCEPTION), .Exception_Code(Exception_Code),

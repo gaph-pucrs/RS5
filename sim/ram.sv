@@ -22,40 +22,27 @@ import my_pkg::*;
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////// SYNC RAM MEMORY IMPLEMENTATION ////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-module RAM_mem #(parameter startaddress = 32'h00000000)(
-    input logic clock,
+
+module RAM_mem (
+    input logic clk,
     input logic rst,
-    input logic [31:0] i_address, 
-    output logic [31:0] instruction,
-    input logic [3:0] write_enable,
-    input logic [31:0] write_address,
-    input logic [31:0] Wr_data,
-    input logic read_enable,
-    input logic [31:0] read_address,
-    output logic [31:0] data_read);
+    input logic [15:0] i_addr, 
+    output logic [31:0] i_data,
+    input logic [3:0] w_en,
+    input logic [15:0] w_addr,
+    input logic [31:0] w_data,
+    input logic r_en,
+    input logic [15:0] r_addr,
+    output logic [31:0] r_data
+);
 
-    bit [7:0] RAM [0:65535];
+    reg [7:0] RAM [0:65535];
 
-    logic [31:0] W_tmp_address, R_tmp_address, INST_tmp_address;
-    int W_low_address_int, R_low_address_int, INST_low_address_int;
     int fd, r;
     int fd_i, fd_r, fd_w;
 
-    assign W_tmp_address[31:2] = write_address[31:2] - startaddress[31:2];//  Address offset
-    assign W_tmp_address[1:0] = '0;
-    assign W_low_address_int = W_tmp_address[15:0];                     // convert to integer
-
-    assign R_tmp_address[31:2] = read_address[31:2] - startaddress[31:2];//  Address offset
-    assign R_tmp_address[1:0] = '0;
-    assign R_low_address_int = R_tmp_address;                           // convert to integer
-    //assign R_low_address_int[15:2] = R_tmp_address[15:2];               // convert to integer
-
-    assign INST_tmp_address = i_address - startaddress;                 // Address offset
-    assign INST_low_address_int = INST_tmp_address[15:0];               // convert to integer
-
     initial begin
         fd = $fopen ("/home/williannunes/pucrs-rv/bin/test.bin", "r");
-        //fd = $fopen ("/home/williannunes/pucrs-rv/app/assembly/asm.bin", "r");
 
         r = $fread(RAM, fd);
         $display("read %d elements \n", r);
@@ -65,49 +52,47 @@ module RAM_mem #(parameter startaddress = 32'h00000000)(
         fd_w = $fopen ("./debug/writes.txt", "w");
     end
 
-////////////////////////////////////////////////////////////// Writes in memory  //////////////////////////////////////////////////////
-    always @(posedge clock)
-        if(write_enable!=0 && W_low_address_int>=0 && W_low_address_int<=(MEMORY_SIZE-3) && write_address[31]!=1) begin
-            if(write_enable[3]==1)                                  // Store Word(4 bytes)
-                RAM[W_low_address_int+3] <= Wr_data[31:24];
-            if(write_enable[2]==1)                                  // Store Word(4 bytes)
-                RAM[W_low_address_int+2] <= Wr_data[23:16];
-            if(write_enable[1]==1)                                  // Store Half(2 bytes)
-                RAM[W_low_address_int+1] <= Wr_data[15:8];
-            if(write_enable[0]==1)                                  // Store Byte(1 byte)
-                RAM[W_low_address_int]   <= Wr_data[7:0];
+////////////////////////////////////////////////////////////// Writes data in memory  //////////////////////////////////////////////////////
+    always @(posedge clk)
+        if(w_en!=0) begin
+            if(w_en[3]==1)                                  // Store Word(4 bytes)
+                RAM[w_addr+3] <= w_data[31:24];
+            if(w_en[2]==1)                                  // Store Word(4 bytes)
+                RAM[w_addr+2] <= w_data[23:16];
+            if(w_en[1]==1)                                  // Store Half(2 bytes)
+                RAM[w_addr+1] <= w_data[15:8];
+            if(w_en[0]==1)                                  // Store Byte(1 byte)
+                RAM[w_addr]   <= w_data[7:0];
 
-            if(write_enable[3]==1) $fwrite(fd_w,"%h ", Wr_data[31:24]); else $fwrite(fd_w,"-- ");
-            if(write_enable[2]==1) $fwrite(fd_w,"%h ", Wr_data[23:16]); else $fwrite(fd_w,"-- ");
-            if(write_enable[1]==1) $fwrite(fd_w,"%h ", Wr_data[15:8]);  else $fwrite(fd_w,"-- ");
-            if(write_enable[0]==1) $fwrite(fd_w,"%h ", Wr_data[7:0]);   else $fwrite(fd_w,"-- ");
-            
             $fwrite(fd_w,"[%0d] ", $time);
-            $fwrite(fd_w,"to address %8h\n", W_low_address_int);
+            if(w_en[3]==1) $fwrite(fd_w,"%h ", w_data[31:24]); else $fwrite(fd_w,"-- ");
+            if(w_en[2]==1) $fwrite(fd_w,"%h ", w_data[23:16]); else $fwrite(fd_w,"-- ");
+            if(w_en[1]==1) $fwrite(fd_w,"%h ", w_data[15:8]);  else $fwrite(fd_w,"-- ");
+            if(w_en[0]==1) $fwrite(fd_w,"%h ", w_data[7:0]);   else $fwrite(fd_w,"-- ");
+            $fwrite(fd_w," --> 0x%4h\n", w_addr);
         end
 
 ////////////////////////////////////////////////////////////// Read DATA from memory /////////////////////////////////////////////////////////////////////
-    always @(posedge clock)
-        if(read_enable==1 && R_low_address_int>=0 && R_low_address_int<=(MEMORY_SIZE-3)) begin
-            data_read[31:24] <= RAM[R_low_address_int+3];
-            data_read[23:16] <= RAM[R_low_address_int+2];
-            data_read[15:8]  <= RAM[R_low_address_int+1];
-            data_read[7:0]   <= RAM[R_low_address_int];
+    always @(posedge clk)
+        if(r_en==1) begin
+            r_data[31:24] <= RAM[r_addr+3];
+            r_data[23:16] <= RAM[r_addr+2];
+            r_data[15:8]  <= RAM[r_addr+1];
+            r_data[7:0]   <= RAM[r_addr];
         
-            if(R_low_address_int!=0)
-                $fwrite(fd_r,"[%0d] Read: %h %h %h %h from addr %8h\n", $time, RAM[R_low_address_int+3], RAM[R_low_address_int+2], RAM[R_low_address_int+1], RAM[R_low_address_int], R_low_address_int);
+            if(r_addr!=0)
+                $fwrite(fd_r,"[%0d] %h %h %h %h <-- 0x%4h\n", $time, RAM[r_addr+3], RAM[r_addr+2], RAM[r_addr+1], RAM[r_addr], r_addr);
         
         end else
-            data_read <= 'Z;
+            r_data <= 'Z;
 
-////////////////////////////////////////////////////////////// Read INSTRUCTION from memory /////////////////////////////////////////////////////////////////////
-    always @(posedge clock)
-        if(INST_low_address_int>=0 && INST_low_address_int<=(MEMORY_SIZE-3)) begin
-            instruction[31:24] <= RAM[INST_low_address_int+3];
-            instruction[23:16] <= RAM[INST_low_address_int+2];
-            instruction[15:8]  <= RAM[INST_low_address_int+1];
-            instruction[7:0]   <= RAM[INST_low_address_int];
+////////////////////////////////////////////////////////////// Read instructions from memory /////////////////////////////////////////////////////////////////////
+    always @(posedge clk) begin
+        i_data[31:24] <= RAM[i_addr+3];
+        i_data[23:16] <= RAM[i_addr+2];
+        i_data[15:8]  <= RAM[i_addr+1];
+        i_data[7:0]   <= RAM[i_addr];
 
-            $fwrite(fd_i,"[%0d] %h -> %h %h %h %h \n", $time, INST_low_address_int, RAM[INST_low_address_int+3], RAM[INST_low_address_int+2], RAM[INST_low_address_int+1], RAM[INST_low_address_int]);
-        end
+        $fwrite(fd_i,"[%0d] %h -> %h %h %h %h \n", $time, i_addr, RAM[i_addr+3], RAM[i_addr+2], RAM[i_addr+1], RAM[i_addr]);
+    end
 endmodule
