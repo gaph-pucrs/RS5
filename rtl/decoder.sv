@@ -41,15 +41,14 @@ module decoder #(parameter DEPTH = 2)(
     output logic [31:0] opC_out,                // Third operand output register
     output logic [31:0] NPC_out,                // PC operand output register
     output logic [31:0] instruction_out,        // Instruction Used in exceptions and CSR operations
-    output i_type i_out,              // Instruction operation (OP0, OP1...)
+    output i_type i_out,                        // Instruction operation (OP0, OP1...)
     output logic [3:0]  tag_out,                // Instruction Tag
     output logic        hazard,                 // Bubble issue indicator (0 active)
-    output logic        exception,
-    input logic pipe_clear
+    output logic        exception
     );
 
     logic [31:0] imed, opA, opB, opC, regD_add, target, instruction, last_inst;
-    logic pipe_clear_r;
+    logic hazard_r;
     wor [31:0] locked;
     logic [31:0] lock_queue[DEPTH];
 
@@ -60,12 +59,12 @@ module decoder #(parameter DEPTH = 2)(
 
     always @(posedge clk ) begin
         last_inst <= instruction;               // Holds the last cycle instruction
-        pipe_clear_r <= pipe_clear;             // Holds the last cycle state
+        hazard_r <= hazard;                     // Holds the last cycle state
     end
 
     always_comb
-        if (pipe_clear_r == 0)                   // If last cycle had a pipe stall
-            instruction = last_inst;             // Re-decode last cycle instruction
+        if (hazard_r == 1)                      // If last cycle had a pipe stall
+            instruction = last_inst;            // Re-decode last cycle instruction
         else
             instruction = instruction_in; 
 ///////////////////////////////////////////////// find out the type of the instruction //////////////////////////////////////////////////////////////
@@ -209,7 +208,7 @@ module decoder #(parameter DEPTH = 2)(
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     always @(*)
-        if(!hazard)                                         // If a bubble is being issued then regD=0 is inserted in queue (to avoid deadlock)
+        if(hazard)                                         // If a bubble is being issued then regD=0 is inserted in queue (to avoid deadlock)
             target <= '0;
         else                                                // Otherwise the instruction regD is the target to be inserted in queue
             target <=regD_add; 
@@ -235,11 +234,11 @@ module decoder #(parameter DEPTH = 2)(
 ///////////////////////////////////////////////// HAZARD SIGNAL GENERATION //////////////////////////////////////////////////////////////////////////
     always_comb
         if(locked[0]==1 && (i==LB || i==LBU || i==LH || i==LH || i==LW)) //Can't read from memory if a write in memory is pending
-            hazard <= 0;
-        else if(locked[regA_add]==1 || locked[regB_add]==1) // Checks if rs1 and rs2 are not in the list of pending write registers
-            hazard <= 0;
-        else                                                // No Hazards identified
             hazard <= 1;
+        else if(locked[regA_add]==1 || locked[regB_add]==1) // Checks if rs1 and rs2 are not in the list of pending write registers
+            hazard <= 1;
+        else                                                // No Hazards identified
+            hazard <= 0;
 
 ///////////////////////////////////////////////// Output registers //////////////////////////////////////////////////////////////////////////////////
     always @(posedge clk or negedge reset)
@@ -253,7 +252,7 @@ module decoder #(parameter DEPTH = 2)(
             tag_out <= '0;
             exception <= 0;
 
-         end else if(!pipe_clear) begin                     // Propagate bubble
+         end else if(hazard) begin                     // Propagate bubble
             opA_out <= '0;
             opB_out <= '0;
             opC_out <= '0;
@@ -263,7 +262,7 @@ module decoder #(parameter DEPTH = 2)(
             tag_out <= '0;
             exception <= 0;
 
-        end else if(pipe_clear) begin                       // Propagate instruction
+        end else if(!hazard) begin                       // Propagate instruction
             opA_out <= opA;
             opB_out <= opB;
             opC_out <= opC;

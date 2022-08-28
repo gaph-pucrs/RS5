@@ -71,73 +71,149 @@ module PUCRS_RV(
 
     logic [31:0] read_address_int;
     logic [31:0] write_address_int;
+
+
+//////////////////////////////////////////////////////////// FETCH //////////////////////////////////////////////////////////////////////////////////
+    fetch fetch1 (
+                .clk(clk), 
+                .reset(reset), 
+                .hazard(hazard), 
+                .jump(jump_wb), 
+                .result(New_pc),
+                .i_address(i_address), 
+                .NPC(NPC_decode), 
+                .tag_out(decode_tag),
+                .EXCEPTION_RAISED(RAISE_EXCEPTION), 
+                .MACHINE_RETURN(MACHINE_RETURN), 
+                .Interupt_ACK(Interupt_ACK),
+                .mepc(mepc), 
+                .mtvec(mtvec)
+                );
+
+/////////////////////////////////////////////////////////// DECODER /////////////////////////////////////////////////////////////////////////////////
+    decoder decoder1 (
+                .clk(clk), 
+                .reset(reset), 
+                .we(regD_we), 
+                .NPC(NPC_decode), 
+                .instruction_in(instruction), 
+                .tag_in(decode_tag), 
+                .dataA(dataA), 
+                .dataB(dataB), 
+                .regA_add(regA_add), 
+                .regB_add(regB_add), 
+                .opA_out(opA_execute), 
+                .opB_out(opB_execute), 
+                .opC_out(opC_execute), 
+                .NPC_out(NPC_execute), 
+                .i_out(i_execute), 
+                .tag_out(execute_tag), 
+                .wrAddr(wrAddr), 
+                .hazard(hazard), 
+                .instruction_out(instruction_execute), 
+                .exception(exception_execute)
+                );
+
+/////////////////////////////////////////////////////////// REGISTER BANK ///////////////////////////////////////////////////////////////////////////
+    regbank regbank1 (
+                .clk(clk), 
+                .reset(reset), 
+                .addra(regA_add), 
+                .addrb(regB_add), 
+                .addrw(wrAddr), 
+                .in(data_wb), 
+                .outa(dataA), 
+                .outb(dataB)
+                );
+
+/////////////////////////////////////////////////////////// EXECUTE /////////////////////////////////////////////////////////////////////////////////
+    execute execute1 (
+                .clk(clk), 
+                .reset(reset), 
+                .NPC(NPC_execute), 
+                .opA(opA_execute), 
+                .opB(opB_execute), 
+                .opC(opC_execute),
+                .i(i_execute), 
+                .tag_in(execute_tag), 
+                .instruction_in(instruction_execute), 
+                .exception_in(exception_execute),
+                .result_out(result_retire), 
+                .jump_out(jump_retire), 
+                .tag_out(retire_tag), 
+                .i_out(i_retire), 
+                .we_out(we_retire),
+                .read_address(read_address_int), 
+                .read(read), .we_mem(we_mem_retire),
+                .instruction_out(instruction_retire), 
+                .NPC_out(NPC_retire), 
+                .exception_out(exception_retire),
+                .csr_rd_en(csr_rd_en), 
+                .csr_wr_en(csr_wr_en), 
+                .csr_op(csr_op), 
+                .csr_addr(csr_addr), 
+                .csr_data(csr_data), 
+                .csr_data_rd(csr_data_rd)
+                );
+
+/////////////////////////////////////////////////////////// RETIRE //////////////////////////////////////////////////////////////////////////////////
+    retire retire1 (
+                .clk(clk), 
+                .reset(reset), 
+                .result(result_retire), 
+                .jump(jump_retire), 
+                .we(we_retire),
+                .tag_in(retire_tag), 
+                .reg_we(regD_we), 
+                .WrData(data_wb),
+                .New_pc(New_pc), 
+                .jump_out(jump_wb),
+                .we_mem_in(we_mem_retire), 
+                .curr_retire_tag(curr_retire_tag),
+                .DATA_in(DATA_in), 
+                .i(i_retire),
+                .write(write), 
+                .write_address(write_address_int), 
+                .DATA_out(DATA_out),
+                .instruction(instruction_retire), 
+                .NPC(NPC_retire),
+                .exception('0), 
+                .RAISE_EXCEPTION(RAISE_EXCEPTION), 
+                .Exception_Code(Exception_Code),
+                .MACHINE_RETURN(MACHINE_RETURN),
+                .Interupt_pending(Interupt_pending), 
+                .Interupt_ACK(Interupt_ACK)
+                );
+
+/////////////////////////////////////////////////////////// CSRs BANK ///////////////////////////////////////////////////////////////////////////////
+    CSRBank CSRBank1 (
+                .clk(clk), 
+                .reset(reset), 
+                .rd_en(csr_rd_en), 
+                .wr_en(csr_wr_en), 
+                .csr_op(csr_op), 
+                .addr(csr_addr), 
+                .data(csr_data), 
+                .out(csr_data_rd),
+                .RAISE_EXCEPTION(RAISE_EXCEPTION), 
+                .Exception_Code(Exception_Code), 
+                .killed(execute_tag!=curr_retire_tag),
+                .MACHINE_RETURN(MACHINE_RETURN),
+                .privilege(Privilege'(2'b11)), 
+                .PC(NPC_retire), 
+                .instruction(instruction_retire),
+                .mepc(mepc), 
+                .mtvec(mtvec),
+                .IRQ(IRQ), 
+                .Interupt_pending(Interupt_pending), 
+                .Interupt_ACK(Interupt_ACK)
+            );
+
+/////////////////////////////////////////////////////////// MEMORY SIGNALS //////////////////////////////////////////////////////////////////////////
+
     assign read_address[31:2] = read_address_int[31:2];
     assign read_address[1:0] = '0;
     assign write_address[31:2] = write_address_int[31:2];
     assign write_address[1:0] = '0;
-
-    assign pipe_clear = hazard;
-
-//////////////////////////////////////////////////////////// FETCH //////////////////////////////////////////////////////////////////////////////////
-
-    fetch fetch1 (
-        .clk(clk), .reset(reset), .pipe_clear(pipe_clear), .jump(jump_wb), .result(New_pc),
-        .i_address(i_address), .NPC(NPC_decode), .tag_out(decode_tag),
-        .EXCEPTION_RAISED(RAISE_EXCEPTION), .MACHINE_RETURN(MACHINE_RETURN), .Interupt_ACK(Interupt_ACK),
-        .mepc(mepc), .mtvec(mtvec)
-        );
-
-/////////////////////////////////////////////////////////// DECODER /////////////////////////////////////////////////////////////////////////////////
-
-    decoder decoder1 (
-        .clk(clk), .reset(reset), .we(regD_we), 
-        .NPC(NPC_decode), .instruction_in(instruction), .tag_in(decode_tag), 
-        .dataA(dataA), .dataB(dataB), .regA_add(regA_add), .regB_add(regB_add), .opA_out(opA_execute), .opB_out(opB_execute), 
-        .opC_out(opC_execute), .NPC_out(NPC_execute), .i_out(i_execute), .tag_out(execute_tag), .wrAddr(wrAddr), 
-        .hazard(hazard), .pipe_clear(pipe_clear), .instruction_out(instruction_execute), .exception(exception_execute)
-        );
-
-/////////////////////////////////////////////////////////// EXECUTE /////////////////////////////////////////////////////////////////////////////////
-
-    execute execute1 (
-        .clk(clk), .reset(reset), .NPC(NPC_execute), .opA(opA_execute), .opB(opB_execute), .opC(opC_execute),
-        .i(i_execute), .tag_in(execute_tag), .instruction_in(instruction_execute), .exception_in(exception_execute),
-        .result_out(result_retire), .jump_out(jump_retire), .tag_out(retire_tag), .i_out(i_retire), .we_out(we_retire),
-        .read_address(read_address_int), .read(read), .we_mem(we_mem_retire),
-        .instruction_out(instruction_retire), .NPC_out(NPC_retire), .exception_out(exception_retire),
-        .csr_rd_en(csr_rd_en), .csr_wr_en(csr_wr_en), .csr_op(csr_op), .csr_addr(csr_addr), .csr_data(csr_data), .csr_data_rd(csr_data_rd)
-        );
-
-/////////////////////////////////////////////////////////// RETIRE //////////////////////////////////////////////////////////////////////////////////
-
-    retire retire1 (
-        .clk(clk), .reset(reset), .result(result_retire), .jump(jump_retire), .we(we_retire),
-        .tag_in(retire_tag), .reg_we(regD_we), .WrData(data_wb),
-        .New_pc(New_pc), .jump_out(jump_wb),
-        .we_mem_in(we_mem_retire), .curr_retire_tag(curr_retire_tag),
-        .DATA_in(DATA_in), .i(i_retire),
-        .write(write), .write_address(write_address_int), .DATA_out(DATA_out),
-        .instruction(instruction_retire), .NPC(NPC_retire),
-        .exception('0), 
-        .RAISE_EXCEPTION(RAISE_EXCEPTION), .Exception_Code(Exception_Code),
-        .MACHINE_RETURN(MACHINE_RETURN),
-        .Interupt_pending(Interupt_pending), .Interupt_ACK(Interupt_ACK)
-        );
-
-/////////////////////////////////////////////////////////// REGISTER BANK ///////////////////////////////////////////////////////////////////////////
-
-    regbank regbank1 (
-        .clk(clk), .reset(reset), .addra(regA_add), .addrb(regB_add), .addrw(wrAddr), .in(data_wb), .outa(dataA), .outb(dataB)
-        );
-
-/////////////////////////////////////////////////////////// CSRs BANK ///////////////////////////////////////////////////////////////////////////////
-    CSRBank CSRBank1 (
-        .clk(clk), .reset(reset), .rd_en(csr_rd_en), .wr_en(csr_wr_en), .csr_op(csr_op), .addr(csr_addr), .data(csr_data), .out(csr_data_rd),
-        .RAISE_EXCEPTION(RAISE_EXCEPTION), .Exception_Code(Exception_Code), .killed(execute_tag!=curr_retire_tag),
-        .MACHINE_RETURN(MACHINE_RETURN),
-        .privilege(Privilege'(2'b11)), .PC(NPC_retire), .instruction(instruction_retire),
-        .mepc(mepc), .mtvec(mtvec),
-        .IRQ(IRQ), .Interupt_pending(Interupt_pending), .Interupt_ACK(Interupt_ACK)
-    );
     
 endmodule

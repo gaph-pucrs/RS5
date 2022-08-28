@@ -27,7 +27,8 @@ module regbank(
     input logic [31:1]  addrw,
     input logic [31:0]  in,
     output logic [31:0] outa,
-    output logic [31:0] outb);
+    output logic [31:0] outb
+    );
 
     logic [31:0] regfile [31:1];
     wire [31:0] outa_int, outb_int;
@@ -66,7 +67,7 @@ module regbank(
         automatic int i;
         $fwrite(fd,"[%0d] %02d - %8h \t %02d - %8h\n", $time, addra, outa, addrb, outb);
         if(addrw != '0) begin
-            for (i = 0; i <= 32; i++) 
+            for (i = 1; i < 32; i++) 
                 if(addrw[i]==1)
                     break;
             $fwrite(fd,"[%0d] --------------------------------- %02d - %8h\n", $time, i, in);

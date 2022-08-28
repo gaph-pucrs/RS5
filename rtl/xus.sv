@@ -26,7 +26,8 @@ module adderUnit (
     input logic [31:0]  opA,
     input logic [31:0]  opB,
     input op_type i,
-    output logic [31:0] result);
+    output logic [31:0] result
+    );
 
     always_comb
         if(i==OP3)                              // Set if opA is less than opB (SLT)
@@ -57,11 +58,12 @@ module branchUnit (
     input logic [31:0]  opB,                        // In JALR is used to calculate the target and in conditional is used as condition
     input logic [31:0]  offset,                     // Immediate OFFSET is added to PC value
     input logic [31:0]  NPC,                        // PC value
-    input op_type i,                       // Instruction Type
-    output logic [31:0] result,                 // Branch target
+    input op_type i,                                // Instruction Type
+    output logic [31:0] result,                     // Branch target
     output logic [31:0] result_jal,                 // Return csr_addres to a JAL instruction (NPC+4)
-    output logic        jump,                   // Signal that indicate a jump/branch
-    output logic        we);                    // Wrtie enable to register bank (used only in JAL)
+    output logic        jump,                       // Signal that indicate a jump/branch
+    output logic        we                          // Wrtie enable to register bank (used only in JAL)
+    );
 
     logic [31:0]        sum;
 
@@ -115,7 +117,8 @@ module logicUnit (
     input logic [31:0]  opA,
     input logic [31:0]  opB,
     input op_type i,
-    output logic [31:0] result);
+    output logic [31:0] result
+    );
 
     always_comb
         if(i==OP0)                      // XOR
@@ -134,13 +137,14 @@ module LSUnit (
     input logic [31:0]  opA,                            // Base csr_address
     input logic [31:0]  opB,                            // Offset
     input logic [31:0]  data,                           // Data to be Written in memory
-    input op_type i,                           // Instruction type
+    input op_type i,                                    // Instruction type
     output logic [31:0] read_address,                   // Read Memory csr_address
     output logic        read,                           // Signal that allows memory read
     output logic [31:0] write_address,                  // Adrress to Write in memory
-    output logic [31:0] write_data,                        // Data to be Written in Register Bank or in memory
-    output logic [3:0]  we_mem,                           // Signal that indicates the size of Write in memory(byte(1),half(2),word(4))
-    output logic        we_rb);                         // Write enable signal to register bank, in Stores=0 and in Loads=1
+    output logic [31:0] write_data,                     // Data to be Written in Register Bank or in memory
+    output logic [3:0]  we_mem,                         // Signal that indicates the size of Write in memory(byte(1),half(2),word(4))
+    output logic        we_rb                           // Write enable signal to register bank, in Stores=0 and in Loads=1
+    );
 
     logic [31:0] sum;
     assign sum = opA + opB;
@@ -211,7 +215,8 @@ module shiftUnit (
     input logic [31:0]  opA,
     input logic [4:0]   opB,
     input op_type i,
-    output logic [31:0] result);
+    output logic [31:0] result
+    );
 
     always_comb 
         if(i==OP0)                                  // Logical Left Shift (SLL)
@@ -236,7 +241,8 @@ module csrUnit (
     output csr_ops csr_op,
     output logic [11:0] csr_addr,
     output logic [31:0] csr_data,
-    output logic csr_exception);
+    output logic csr_exception
+    );
 
     logic csr_rd_en_int, csr_wr_en_int;
     logic [4:0] rd, rs1;
