@@ -29,7 +29,7 @@
 */
 import my_pkg::*;
 
-//`define PROTO 1
+`define PROTO 1
 
 module PUCRS_RV (
     input  logic        clk,
