@@ -53,7 +53,7 @@ module execute(
     output logic [11:0] csr_addr,
     output logic [31:0] csr_data,
     input  logic [31:0] csr_data_rd
-    );
+);
     
     logic jump_int;
     logic csr_exception;

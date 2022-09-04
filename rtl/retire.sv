@@ -51,7 +51,7 @@ module retire(
 
     input logic Interupt_pending,
     output logic Interupt_ACK
-    );
+);
     
     logic [31:0] mem_data;
     logic [3:0] curr_tag;
@@ -74,21 +74,21 @@ module retire(
 
 ///////////////////////////////////////////////// TAG control based on signals Jump and Killed //////////////////////////////////////////////////////
     always @(posedge clk or negedge reset)
-        if(!reset)
+        if (!reset)
             curr_tag <= 0;
         else if ((jump_out==1|| RAISE_EXCEPTION==1 || MACHINE_RETURN==1 || Interupt_ACK==1) && killed==0)          // If a jump was taken and the tag is correct then increases the internal tag
             curr_tag <= curr_tag + 1;
 
 ///////////////////////////////////////////////// Flow Control //////////////////////////////////////////////////////////////////////////////////////
     always_comb
-        if(killed)                                  // If tags mismatch then do not write back
+        if (killed)                                  // If tags mismatch then do not write back
           reg_we <= 0;
         else                                        // Otherwise depends on instruction type
           reg_we <= we;
 
 ///////////////////////////////////////////////// PC Flow control signal generation /////////////////////////////////////////////////////////////////
     always_comb
-        if(jump==1 && killed==0) begin             // If it is a branch instruction and tag is valid then effectuate the branch
+        if (jump==1 && killed==0) begin             // If it is a branch instruction and tag is valid then effectuate the branch
             New_pc <= result[1];
             jump_out <= 1;
         end else begin                              // Otherwise do nothing
@@ -97,16 +97,16 @@ module retire(
         end
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     always_comb
-        if(i==LB || i==LBU) begin                       // LB | LBU
-            case(result[1][1:0])
+        if (i==LB || i==LBU) begin                      // LB | LBU
+            case (result[1][1:0])
                 2'b11:   begin mem_data[7:0] <= DATA_in[31:24]; mem_data[31:8] <= (DATA_in[31]==1 & i==LB) ? '1 : '0; end
                 2'b10:   begin mem_data[7:0] <= DATA_in[23:16]; mem_data[31:8] <= (DATA_in[23]==1 & i==LB) ? '1 : '0; end
                 2'b01:   begin mem_data[7:0] <= DATA_in[15:8];  mem_data[31:8] <= (DATA_in[15]==1 & i==LB) ? '1 : '0; end
                 default: begin mem_data[7:0] <= DATA_in[7:0];   mem_data[31:8] <= (DATA_in[7]==1 & i==LB)  ? '1 : '0; end
             endcase
 
-        end else if(i==LH || i==LHU) begin              // LH | LHU
-            case(result[1][1])
+        end else if (i==LH || i==LHU) begin             // LH | LHU
+            case (result[1][1])
                 1'b1:    begin mem_data[15:0] <= DATA_in[31:16]; mem_data[31:16] <= (DATA_in[31]==1 & i==LH) ? '1 : '0; end
                 default: begin mem_data[15:0] <= DATA_in[15:0];  mem_data[31:16] <= (DATA_in[15]==1 & i==LH) ? '1 : '0; end
             endcase
@@ -115,41 +115,41 @@ module retire(
             mem_data <= DATA_in;
 
 ///////////////////////////////////////////////// Memory write control //////////////////////////////////////////////////////////////////////////////
-    always@(posedge clk)
-        if(we_mem_in!=0 && killed==0) begin          // If is a Store instruction and tag is valid then effectuate the Write
+    always @(posedge clk)
+        if (we_mem_in!=0 && killed==0) begin            // If is a Store instruction and tag is valid then effectuate the Write
             write <= we_mem_in;
             write_address <= result[1];
             DATA_out <= result[0];
-        end else begin                              // Otherwise do nothing
+        end else begin                                  // Otherwise do nothing
             write <= 'Z;
             write_address <= 'Z;
             DATA_out <= 'Z;
         end
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     always_comb
-        if(killed==0) begin
-            if(exception==1) begin
+        if (killed==0) begin
+            if (exception==1) begin
                 RAISE_EXCEPTION <= 1;
                 Exception_Code <= ILLEGAL_INSTRUCTION;
                 MACHINE_RETURN <= 0;
                 Interupt_ACK <= 0;
                 $write("[%0d] EXCEPTION - ILLEGAL INSTRUCTION: %8h %8h\n", $time, NPC, instruction);
 
-            end else if(i==ECALL) begin
+            end else if (i==ECALL) begin
                 RAISE_EXCEPTION <= 1;
                 Exception_Code <= ECALL_FROM_MMODE;
                 MACHINE_RETURN <= 0;
                 Interupt_ACK <= 0;
                 $write("[%0d] EXCEPTION - ECALL_FROM_MMODE: %8h %8h\n", $time, NPC, instruction);
 
-            end else if(i==EBREAK) begin
+            end else if (i==EBREAK) begin
                 RAISE_EXCEPTION <= 1;
                 Exception_Code <= BREAKPOINT;
                 MACHINE_RETURN <= 0;
                 Interupt_ACK <= 0;
                 $write("[%0d] EXCEPTION - EBREAK: %8h %8h\n", $time, NPC, instruction);
 
-            end else if(i==MRET) begin
+            end else if (i==MRET) begin
                 RAISE_EXCEPTION <= 0;
                 Exception_Code <= NE;
                 MACHINE_RETURN <= 1;
@@ -157,7 +157,7 @@ module retire(
 
                 $write("[%0d] MRET: %8h %8h\n", $time, NPC, instruction);
 
-            end else if(Interupt_pending==1 && jump==0) begin
+            end else if (Interupt_pending==1 && jump==0) begin
                 RAISE_EXCEPTION <= 0;
                 Exception_Code <= NE;
                 MACHINE_RETURN <= 0;
@@ -170,6 +170,7 @@ module retire(
                 MACHINE_RETURN <= 0;
                 Interupt_ACK <= 0;
             end
+
         end else begin
             RAISE_EXCEPTION <= 0;
             Exception_Code <= NE;

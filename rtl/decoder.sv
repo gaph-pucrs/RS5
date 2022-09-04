@@ -24,7 +24,7 @@
 
 import my_pkg::*;
 
-module decoder #(parameter DEPTH = 2)(
+module decoder (
     input logic clk,
     input logic reset,
     input logic we,
@@ -35,7 +35,7 @@ module decoder #(parameter DEPTH = 2)(
     input logic [31:0]  dataB,                  // Data read from register bank
     output logic [4:0]  regA_add,               // Address of the 1st register, conected directly in the register bank
     output logic [4:0]  regB_add,               // Address of the 2nd register, conected directly in the register bank
-    output logic [31:1] wrAddr,                 // Write Address to register bank
+    output logic [4:0] wrAddr,                  // Write Address to register bank
     output logic [31:0] opA_out,                // First operand output register
     output logic [31:0] opB_out,                // Second operand output register
     output logic [31:0] opC_out,                // Third operand output register
@@ -45,18 +45,19 @@ module decoder #(parameter DEPTH = 2)(
     output logic [3:0]  tag_out,                // Instruction Tag
     output logic        hazard,                 // Bubble issue indicator (0 active)
     output logic        exception
-    );
+);
 
-    logic [31:0] imed, opA, opB, opC, regD_add, target, instruction, last_inst;
+    logic [31:0] imed, opA, opB, opC, instruction, last_inst;
     logic hazard_r;
-    wor [31:0] locked;
-    logic [31:0] lock_queue[DEPTH];
+    logic [4:0] lock_reg[2];
+    logic [4:0] regD_add;
+    logic is_store;
+    logic lock_mem[2];
 
     fmts fmt;
     i_type i;
 
 ///////////////////////////////////////////////// RE-DECODE INST TEST //////////////////////////////////////////////////////////////
-
     always @(posedge clk ) begin
         last_inst <= instruction;               // Holds the last cycle instruction
         hazard_r <= hazard;                     // Holds the last cycle state
@@ -66,7 +67,8 @@ module decoder #(parameter DEPTH = 2)(
         if (hazard_r == 1)                      // If last cycle had a pipe stall
             instruction = last_inst;            // Re-decode last cycle instruction
         else
-            instruction = instruction_in; 
+            instruction = instruction_in;
+
 ///////////////////////////////////////////////// find out the type of the instruction //////////////////////////////////////////////////////////////
     always_comb
              if (instruction[6:0]==7'b0110111) i<=LUI;
@@ -146,13 +148,14 @@ module decoder #(parameter DEPTH = 2)(
             default:                                fmt <= R_type;
         endcase
 
-///////////////////////////////////////////////// Read Addresses to RegBank /////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////// Addresses to RegBank //////////////////////////////////////////////////////////////////////////////
     assign regA_add = instruction[19:15];
     assign regB_add = instruction[24:20];
+    assign wrAddr = lock_reg[1];
 
 ///////////////////////////////////////////////// Extract the immediate based on instruction type ///////////////////////////////////////////////////
     always_comb
-        case(fmt)
+        case (fmt)
             I_type: begin
                         imed[31:11] <= (instruction[31]==0) ? '0 : '1;
                         imed[10:0] <= instruction[30:20];
@@ -196,48 +199,45 @@ module decoder #(parameter DEPTH = 2)(
         opC <= (fmt==S_type)               ? dataB : imed;
     end
 
-////////////////////////////////////////////////// Conversion to one-hot codification ///////////////////////////////////////////////////////////////
-    always_comb begin
-        regD_add <= 1 << instruction[11:7];
-        ///////////////////////////////////
-        if(i==SB || i==SH || i==SW) // [0] Indicates a pending write in memory, used to avoid data hazards in memory
-            regD_add[0] = 1;
-        else
-            regD_add[0] = 0;
-    end
-
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    always @(*)
-        if(hazard)                                         // If a bubble is being issued then regD=0 is inserted in queue (to avoid deadlock)
-            target <= '0;
-        else                                                // Otherwise the instruction regD is the target to be inserted in queue
-            target <=regD_add; 
+////////////////////////////////////////////////// TARGET DEFINITIONS ///////////////////////////////////////////////////////////////////////////////
+    always_comb
+        if (!hazard) begin
+            regD_add <= instruction[11:7];
+            ///////////////////////////////////
+            if (i==SB || i==SH || i==SW)                    // Indicates a pending write in memory, used to avoid data hazards in memory
+                is_store <= 1;
+            else
+                is_store <= 0;
+        
+        end else begin
+            regD_add <= '0;
+            is_store <= 0;
+        end
 
 ////////////////////////////////////////////////// REGISTER LOCK QUEUE //////////////////////////////////////////////////////////////////////////////
     always @(posedge clk or negedge reset)  
-        if(!reset)                                          // Reset clears the queue
-            for (int j = 0; j < DEPTH; j++)
-                lock_queue[j] <= '0;
-        else begin
-            for (int k = 0; k < DEPTH-1; k++)
-                lock_queue[k+1] <= lock_queue[k];           // Move the queue forward
-            lock_queue[0] <= target;                        // and inserts a new Target in the queue 
+        if (!reset) begin                               // Reset clears the queues
+            lock_reg[0] <= '0;
+            lock_reg[1] <= '0;
+            lock_mem[0] <= '0;
+            lock_mem[1] <= '0;
+
+        end else begin
+            lock_reg[0] <= regD_add;                    // Inserts a new Target in the queue 
+            lock_mem[0] <= is_store;
+            lock_reg[1] <= lock_reg[0];                 // Move the queue forward
+            lock_mem[1] <= lock_mem[0];
         end
-
-    generate                                                // Assign to wire or (wor) signal to generate the mask of locked registers (register with pending writes)
-    for(genvar w = 0; w < DEPTH; w++) 
-        assign locked = lock_queue[w];
-    endgenerate
-
-    assign wrAddr = lock_queue[DEPTH-1][31:1] & {32{&we}};  // Write Address is the last position with a bitwise AND with the write enable signal
 
 ///////////////////////////////////////////////// HAZARD SIGNAL GENERATION //////////////////////////////////////////////////////////////////////////
     always_comb
-        if(locked[0]==1 && (i==LB || i==LBU || i==LH || i==LH || i==LW)) //Can't read from memory if a write in memory is pending
+        if ((lock_mem[0] || lock_mem[1]) && (i==LB || i==LBU || i==LH || i==LH || i==LW))
             hazard <= 1;
-        else if(locked[regA_add]==1 || locked[regB_add]==1) // Checks if rs1 and rs2 are not in the list of pending write registers
+        else if ((lock_reg[0]==regA_add || lock_reg[1]==regA_add) && regA_add!=0)
             hazard <= 1;
-        else                                                // No Hazards identified
+        else if ((lock_reg[0]==regB_add || lock_reg[1]==regB_add) && regB_add!=0)
+            hazard <= 1;
+        else
             hazard <= 0;
 
 ///////////////////////////////////////////////// Output registers //////////////////////////////////////////////////////////////////////////////////
@@ -252,7 +252,7 @@ module decoder #(parameter DEPTH = 2)(
             tag_out <= '0;
             exception <= 0;
 
-         end else if(hazard) begin                     // Propagate bubble
+         end else if (hazard) begin                     // Propagate bubble
             opA_out <= '0;
             opB_out <= '0;
             opC_out <= '0;
@@ -262,7 +262,7 @@ module decoder #(parameter DEPTH = 2)(
             tag_out <= '0;
             exception <= 0;
 
-        end else if(!hazard) begin                       // Propagate instruction
+        end else begin                       // Propagate instruction
             opA_out <= opA;
             opB_out <= opB;
             opC_out <= opC;

@@ -35,40 +35,39 @@ module fetch  #(parameter start_address='0)(  //Generic start address
     input logic         EXCEPTION_RAISED,
     input logic         MACHINE_RETURN,
     input logic         Interupt_ACK
-    );
+);
 
     logic [31:0] PC, PC_plus4;
     logic [3:0] next_tag, curr_tag;
 
 ///////////////////////////////////////////////// PC Control ////////////////////////////////////////////////////////////////////////////////////////
     always @(posedge clk or negedge reset)
-        if(!reset)                                      // Reset
+        if (!reset)                                      // Reset
             PC <= start_address;
-        else if(MACHINE_RETURN)                                   
+        else if (MACHINE_RETURN)                                   
             PC <= mepc;
-        else if(EXCEPTION_RAISED || Interupt_ACK)                                   
+        else if (EXCEPTION_RAISED || Interupt_ACK)                                   
             PC <= mtvec;
-
-        else if(jump)                                   // If a branch was taken then PC receives a new value from retire unit
+        else if (jump)                                   // If a branch was taken then PC receives a new value from retire unit
             PC <= result;
-        else if(!hazard)                                // If there is no bubble being issued: PC <= PC+4
+        else if (!hazard)                                // If there is no bubble being issued: PC <= PC+4
             PC <= PC_plus4;                             // Otherwise(when bubble==0) holds the current value
 
     assign PC_plus4 = PC + 4;
 
 ///////////////////////////////////////////////// Sensitive Outputs /////////////////////////////////////////////////////////////////////////////////
     always @(posedge clk)
-        if(!hazard)                                       // If there is no bubble then the internal signals are assigned to the outputs
+        if(!hazard)                                     // If there is no bubble then the internal signals are assigned to the outputs
             NPC <= PC;
 
 ///////////////////////////////////////////////// TAG Calculator ////////////////////////////////////////////////////////////////////////////////////
     always @(posedge clk or negedge reset)
-        if(!reset) begin                                // Reset
+        if (!reset) begin                                // Reset
             curr_tag <= 0;
             next_tag <= 0;
         end else if (jump | EXCEPTION_RAISED | MACHINE_RETURN | Interupt_ACK)  // If a Branch is taken then the instruction tag is increased
             next_tag <= curr_tag + 1;
-        else if(!hazard)                                  // It is increased only when a bubbles is not being propagated
+        else if (!hazard)                                  // It is increased only when a bubbles is not being propagated
             curr_tag <= next_tag;
 
 ///////////////////////////////////////////////// Non-Sensitive Outputs /////////////////////////////////////////////////////////////////////////////

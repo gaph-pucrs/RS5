@@ -24,7 +24,7 @@ module CSRBank (
 
     output logic [31:0] mtvec,
     output logic [31:0] mepc
-    );
+);
 
     CSRs CSR;
     logic [31:0] mstatus, misa, mie, mtvec_r, mcounteren, mstatush, mscratch, mepc_r, mcause, mtval, mip, mtinst, mtval2;
