@@ -70,8 +70,8 @@ module CSRBank (
         else
             wr_data <= 'Z;
 
-    always @(negedge reset or posedge clk) begin
-        if(!reset) begin
+    always @(posedge clk) begin
+        if (reset) begin
             mstatus <= '0;
             mstatus[3] <= 0;        // MIE  = 0
             mstatus[17] <= 0;       // MPRV = 0
@@ -164,8 +164,8 @@ module CSRBank (
         else
             out <= '0;
 
-    always @(negedge reset or posedge clk)
-        if(!reset)
+    always @(posedge clk)
+        if (reset)
             mip <= '0;
         else
             mip <= IRQ;
@@ -185,8 +185,8 @@ module CSRBank (
 
 //##################################################################################
     // PERFORMANCE MONITORS
-    always @(negedge reset or posedge clk)
-        if(!reset) begin
+    always @(posedge clk)
+        if (reset) begin
             cycle <= '0;
             instret <= '0;
         end else begin

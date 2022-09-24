@@ -1466,11 +1466,11 @@
         <spirit:parameters>
           <spirit:parameter>
             <spirit:name>GENtimestamp</spirit:name>
-            <spirit:value>Sun Sep 04 21:12:30 UTC 2022</spirit:value>
+            <spirit:value>Tue Sep 20 21:45:50 UTC 2022</spirit:value>
           </spirit:parameter>
           <spirit:parameter>
             <spirit:name>outputProductCRC</spirit:name>
-            <spirit:value>9:c5cd60f9</spirit:value>
+            <spirit:value>9:9c04ee4e</spirit:value>
           </spirit:parameter>
         </spirit:parameters>
       </spirit:view>
@@ -1486,11 +1486,11 @@
         <spirit:parameters>
           <spirit:parameter>
             <spirit:name>GENtimestamp</spirit:name>
-            <spirit:value>Sun Sep 04 21:12:32 UTC 2022</spirit:value>
+            <spirit:value>Tue Sep 20 21:45:52 UTC 2022</spirit:value>
           </spirit:parameter>
           <spirit:parameter>
             <spirit:name>outputProductCRC</spirit:name>
-            <spirit:value>9:c5cd60f9</spirit:value>
+            <spirit:value>9:9c04ee4e</spirit:value>
           </spirit:parameter>
         </spirit:parameters>
       </spirit:view>
@@ -1501,7 +1501,7 @@
         <spirit:parameters>
           <spirit:parameter>
             <spirit:name>outputProductCRC</spirit:name>
-            <spirit:value>9:c5cd60f9</spirit:value>
+            <spirit:value>9:9c04ee4e</spirit:value>
           </spirit:parameter>
         </spirit:parameters>
       </spirit:view>
@@ -1517,11 +1517,11 @@
         <spirit:parameters>
           <spirit:parameter>
             <spirit:name>GENtimestamp</spirit:name>
-            <spirit:value>Sun Sep 04 21:12:32 UTC 2022</spirit:value>
+            <spirit:value>Tue Sep 20 21:45:52 UTC 2022</spirit:value>
           </spirit:parameter>
           <spirit:parameter>
             <spirit:name>outputProductCRC</spirit:name>
-            <spirit:value>9:c5cd60f9</spirit:value>
+            <spirit:value>9:9c04ee4e</spirit:value>
           </spirit:parameter>
         </spirit:parameters>
       </spirit:view>
@@ -1536,11 +1536,11 @@
         <spirit:parameters>
           <spirit:parameter>
             <spirit:name>GENtimestamp</spirit:name>
-            <spirit:value>Sun Sep 04 21:12:32 UTC 2022</spirit:value>
+            <spirit:value>Tue Sep 20 21:45:52 UTC 2022</spirit:value>
           </spirit:parameter>
           <spirit:parameter>
             <spirit:name>outputProductCRC</spirit:name>
-            <spirit:value>9:46dc5e48</spirit:value>
+            <spirit:value>9:048951aa</spirit:value>
           </spirit:parameter>
         </spirit:parameters>
       </spirit:view>
@@ -1556,11 +1556,11 @@
         <spirit:parameters>
           <spirit:parameter>
             <spirit:name>GENtimestamp</spirit:name>
-            <spirit:value>Sun Sep 04 21:12:32 UTC 2022</spirit:value>
+            <spirit:value>Tue Sep 20 21:45:52 UTC 2022</spirit:value>
           </spirit:parameter>
           <spirit:parameter>
             <spirit:name>outputProductCRC</spirit:name>
-            <spirit:value>9:46dc5e48</spirit:value>
+            <spirit:value>9:048951aa</spirit:value>
           </spirit:parameter>
         </spirit:parameters>
       </spirit:view>
@@ -1574,11 +1574,11 @@
         <spirit:parameters>
           <spirit:parameter>
             <spirit:name>GENtimestamp</spirit:name>
-            <spirit:value>Sun Sep 04 21:12:32 UTC 2022</spirit:value>
+            <spirit:value>Tue Sep 20 21:45:52 UTC 2022</spirit:value>
           </spirit:parameter>
           <spirit:parameter>
             <spirit:name>outputProductCRC</spirit:name>
-            <spirit:value>9:c5cd60f9</spirit:value>
+            <spirit:value>9:9c04ee4e</spirit:value>
           </spirit:parameter>
         </spirit:parameters>
       </spirit:view>
@@ -1592,11 +1592,11 @@
         <spirit:parameters>
           <spirit:parameter>
             <spirit:name>GENtimestamp</spirit:name>
-            <spirit:value>Sun Sep 04 21:12:32 UTC 2022</spirit:value>
+            <spirit:value>Tue Sep 20 21:45:52 UTC 2022</spirit:value>
           </spirit:parameter>
           <spirit:parameter>
             <spirit:name>outputProductCRC</spirit:name>
-            <spirit:value>9:c5cd60f9</spirit:value>
+            <spirit:value>9:9c04ee4e</spirit:value>
           </spirit:parameter>
         </spirit:parameters>
       </spirit:view>
@@ -1666,7 +1666,7 @@
         <spirit:vendorExtensions>
           <xilinx:portInfo>
             <xilinx:enablement>
-              <xilinx:isEnabled xilinx:resolve="dependent" xilinx:id="PORT_ENABLEMENT.ena" xilinx:dependency="((spirit:decode(id(&apos;MODELPARAM_VALUE.C_HAS_ENA&apos;)) != 0) and (spirit:decode(id(&apos;MODELPARAM_VALUE.C_INTERFACE_TYPE&apos;)) != 1))">false</xilinx:isEnabled>
+              <xilinx:isEnabled xilinx:resolve="dependent" xilinx:id="PORT_ENABLEMENT.ena" xilinx:dependency="((spirit:decode(id(&apos;MODELPARAM_VALUE.C_HAS_ENA&apos;)) != 0) and (spirit:decode(id(&apos;MODELPARAM_VALUE.C_INTERFACE_TYPE&apos;)) != 1))">true</xilinx:isEnabled>
             </xilinx:enablement>
           </xilinx:portInfo>
         </spirit:vendorExtensions>
@@ -3196,7 +3196,7 @@
       </spirit:modelParameter>
       <spirit:modelParameter spirit:dataType="INTEGER">
         <spirit:name>C_HAS_ENA</spirit:name>
-        <spirit:value spirit:format="long" spirit:resolve="generated" spirit:id="MODELPARAM_VALUE.C_HAS_ENA">0</spirit:value>
+        <spirit:value spirit:format="long" spirit:resolve="generated" spirit:id="MODELPARAM_VALUE.C_HAS_ENA">1</spirit:value>
       </spirit:modelParameter>
       <spirit:modelParameter spirit:dataType="INTEGER">
         <spirit:name>C_HAS_REGCEA</spirit:name>
@@ -3691,7 +3691,7 @@
       <spirit:vendorExtensions>
         <xilinx:parameterInfo>
           <xilinx:enablement>
-            <xilinx:isEnabled xilinx:resolve="dependent" xilinx:id="PARAM_ENABLEMENT.PRIM_type_to_Implement">true</xilinx:isEnabled>
+            <xilinx:isEnabled xilinx:resolve="dependent" xilinx:id="PARAM_ENABLEMENT.PRIM_type_to_Implement">false</xilinx:isEnabled>
           </xilinx:enablement>
         </xilinx:parameterInfo>
       </spirit:vendorExtensions>
@@ -3929,7 +3929,7 @@
     </spirit:parameter>
     <spirit:parameter>
       <spirit:name>Enable_A</spirit:name>
-      <spirit:value spirit:resolve="user" spirit:id="PARAM_VALUE.Enable_A" spirit:choiceRef="choice_pairs_3949ecbf" spirit:order="24">Always_Enabled</spirit:value>
+      <spirit:value spirit:resolve="user" spirit:id="PARAM_VALUE.Enable_A" spirit:choiceRef="choice_pairs_3949ecbf" spirit:order="24">Use_ENA_Pin</spirit:value>
       <spirit:vendorExtensions>
         <xilinx:parameterInfo>
           <xilinx:enablement>
@@ -4094,7 +4094,7 @@
     </spirit:parameter>
     <spirit:parameter>
       <spirit:name>Coe_File</spirit:name>
-      <spirit:value spirit:resolve="user" spirit:id="PARAM_VALUE.Coe_File" spirit:order="39">../../../../../init_mem.coe</spirit:value>
+      <spirit:value spirit:resolve="user" spirit:id="PARAM_VALUE.Coe_File" spirit:order="39">../../../../../Berkeley_Privileged.coe</spirit:value>
       <spirit:vendorExtensions>
         <xilinx:parameterInfo>
           <xilinx:enablement>

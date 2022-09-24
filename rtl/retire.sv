@@ -73,8 +73,8 @@ module retire(
             killed <= 0;
 
 ///////////////////////////////////////////////// TAG control based on signals Jump and Killed //////////////////////////////////////////////////////
-    always @(posedge clk or negedge reset)
-        if (!reset)
+    always @(posedge clk)
+        if (reset)
             curr_tag <= 0;
         else if ((jump_out==1|| RAISE_EXCEPTION==1 || MACHINE_RETURN==1 || Interupt_ACK==1) && killed==0)          // If a jump was taken and the tag is correct then increases the internal tag
             curr_tag <= curr_tag + 1;
@@ -115,7 +115,7 @@ module retire(
             mem_data <= DATA_in;
 
 ///////////////////////////////////////////////// Memory write control //////////////////////////////////////////////////////////////////////////////
-    always @(posedge clk)
+    always_comb
         if (we_mem_in!=0 && killed==0) begin            // If is a Store instruction and tag is valid then effectuate the Write
             write <= we_mem_in;
             write_address <= result[1];

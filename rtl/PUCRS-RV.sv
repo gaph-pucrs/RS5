@@ -34,17 +34,18 @@ import my_pkg::*;
 module PUCRS_RV (
     input  logic        clk,
     input  logic        reset,
-    output logic [31:0] i_address,                      // Instruction Address in Memory
-    input  logic [31:0] instruction,                    // Object Code coming from Memory
-    input  logic [31:0] DATA_in,                        // Data coming from Memory
-    output logic [31:0] DATA_out,                       // Data to be written in Memory
+    input  logic        stall,
+    output logic [31:0] i_address,
+    input  logic [31:0] instruction,
+    output logic        enable,
+    output logic [3:0]  write,
     output logic [31:0] DATA_address,
-    output logic        enable,                         // Memory chip enable
-    output logic [3:0]  write,                          // Memory Write signal One Hot, each bit address 1 byte
+    input  logic [31:0] DATA_in,
+    output logic [31:0] DATA_out,
     input  logic [31:0] IRQ
 );
 
-    logic jump_wb, jump_retire, hazard, we_retire, pipe_clear;
+    logic jump_wb, jump_retire, hazard, we_retire;
     logic [3:0] we_mem_retire;
     logic regD_we;
     logic [31:0] dataA, dataB;
@@ -80,6 +81,7 @@ module PUCRS_RV (
     fetch fetch1 (
         .clk(clk), 
         .reset(reset), 
+        .stall(stall),
         .hazard(hazard), 
         .jump(jump_wb), 
         .result(New_pc),
@@ -98,21 +100,22 @@ module PUCRS_RV (
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     decoder decoder1 (
         .clk(clk), 
-        .reset(reset), 
+        .reset(reset),
+        .stall(stall),
         .we(regD_we), 
-        .NPC(NPC_decode), 
+        .NPC_in(NPC_decode), 
         .instruction_in(instruction), 
         .tag_in(decode_tag), 
         .dataA(dataA), 
         .dataB(dataB), 
         .regA_add(regA_add), 
         .regB_add(regB_add), 
-        .opA_out(opA_execute), 
-        .opB_out(opB_execute), 
-        .opC_out(opC_execute), 
-        .NPC_out(NPC_execute), 
+        .opA(opA_execute), 
+        .opB(opB_execute), 
+        .opC(opC_execute), 
+        .NPC(NPC_execute), 
         .i_out(i_execute), 
-        .tag_out(execute_tag), 
+        .tag(execute_tag), 
         .wrAddr(wrAddr), 
         .hazard(hazard), 
         .instruction_out(instruction_execute), 
@@ -161,7 +164,7 @@ module PUCRS_RV (
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     execute execute1 (
         .clk(clk), 
-        .reset(reset), 
+        .stall(stall),
         .NPC(NPC_execute), 
         .opA(opA_execute), 
         .opB(opB_execute), 

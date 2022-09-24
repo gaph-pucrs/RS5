@@ -1,11 +1,11 @@
-with open("../bin/test.bin", "rb") as file_in:
+with open("../app/riscv-tests/test.bin", "rb") as file_in:
     rd = file_in.read(-1)
     byteArray = bytearray(rd)
 
     while len(byteArray) < 65536:
         byteArray.append(0)
 
-with open("./init_mem.coe", "w") as file_out:
+with open("./Berkeley_Privileged.coe", "w") as file_out:
     file_out.write("memory_initialization_radix=16;\n")
     file_out.write("memory_initialization_vector=\n")
 

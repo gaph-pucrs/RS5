@@ -25,32 +25,33 @@
 import my_pkg::*;
 
 module decoder (
-    input logic clk,
-    input logic reset,
-    input logic we,
+    input logic         clk,
+    input logic         reset,
+    input logic         stall,
+    input logic         we,
     input logic [31:0]  instruction_in,         // Object code of the instruction to extract the immediate operand
-    input logic [31:0]  NPC,                    // Bypassed to execute unit as an operand
+    input logic [31:0]  NPC_in,                 // Bypassed to execute unit as an operand
     input logic [3:0]   tag_in,                 // Instruction Tag
     input logic [31:0]  dataA,                  // Data read from register bank
     input logic [31:0]  dataB,                  // Data read from register bank
     output logic [4:0]  regA_add,               // Address of the 1st register, conected directly in the register bank
     output logic [4:0]  regB_add,               // Address of the 2nd register, conected directly in the register bank
-    output logic [4:0] wrAddr,                  // Write Address to register bank
-    output logic [31:0] opA_out,                // First operand output register
-    output logic [31:0] opB_out,                // Second operand output register
-    output logic [31:0] opC_out,                // Third operand output register
-    output logic [31:0] NPC_out,                // PC operand output register
+    output logic [4:0]  wrAddr,                 // Write Address to register bank
+    output logic [31:0] opA,                    // First operand output register
+    output logic [31:0] opB,                    // Second operand output register
+    output logic [31:0] opC,                    // Third operand output register
+    output logic [31:0] NPC,                    // PC operand output register
     output logic [31:0] instruction_out,        // Instruction Used in exceptions and CSR operations
-    output i_type i_out,                        // Instruction operation (OP0, OP1...)
-    output logic [3:0]  tag_out,                // Instruction Tag
+    output i_type       i_out,                  // Instruction operation (OP0, OP1...)
+    output logic [3:0]  tag,                    // Instruction Tag
     output logic        hazard,                 // Bubble issue indicator (0 active)
     output logic        exception
-);
+    );
 
-    logic [31:0] imed, opA, opB, opC, instruction, last_inst;
-    logic hazard_r;
+    logic [31:0] imed, opA_int, opB_int, opC_int, instruction, last_inst;
+    logic last_hazard;
     logic [4:0] lock_reg[2];
-    logic [4:0] regD_add;
+    logic [4:0] target;
     logic is_store;
     logic lock_mem[2];
 
@@ -60,11 +61,11 @@ module decoder (
 ///////////////////////////////////////////////// RE-DECODE INST TEST //////////////////////////////////////////////////////////////
     always @(posedge clk ) begin
         last_inst <= instruction;               // Holds the last cycle instruction
-        hazard_r <= hazard;                     // Holds the last cycle state
+        last_hazard <= hazard;                  // Holds the last cycle state
     end
 
     always_comb
-        if (hazard_r == 1)                      // If last cycle had a pipe stall
+        if (last_hazard == 1)                   // If last cycle had a pipe stall
             instruction = last_inst;            // Re-decode last cycle instruction
         else
             instruction = instruction_in;
@@ -194,15 +195,15 @@ module decoder (
 
 ///////////////////////////////////////////////// Control of the exits based on format //////////////////////////////////////////////////////////////
     always_comb begin
-        opA <= (fmt==U_type | fmt==J_type) ? NPC   : dataA;
-        opB <= (fmt==R_type | fmt==B_type) ? dataB : imed;
-        opC <= (fmt==S_type)               ? dataB : imed;
+        opA_int <= (fmt==U_type | fmt==J_type) ? NPC_in: dataA;
+        opB_int <= (fmt==R_type | fmt==B_type) ? dataB : imed;
+        opC_int <= (fmt==S_type)               ? dataB : imed;
     end
 
 ////////////////////////////////////////////////// TARGET DEFINITIONS ///////////////////////////////////////////////////////////////////////////////
     always_comb
         if (!hazard) begin
-            regD_add <= instruction[11:7];
+            target <= instruction[11:7];
             ///////////////////////////////////
             if (i==SB || i==SH || i==SW)                    // Indicates a pending write in memory, used to avoid data hazards in memory
                 is_store <= 1;
@@ -210,20 +211,20 @@ module decoder (
                 is_store <= 0;
         
         end else begin
-            regD_add <= '0;
+            target <= '0;
             is_store <= 0;
         end
 
 ////////////////////////////////////////////////// REGISTER LOCK QUEUE //////////////////////////////////////////////////////////////////////////////
-    always @(posedge clk or negedge reset)  
-        if (!reset) begin                               // Reset clears the queues
+    always @(posedge clk)  
+        if (reset) begin                                // Reset clears the queues
             lock_reg[0] <= '0;
             lock_reg[1] <= '0;
             lock_mem[0] <= '0;
             lock_mem[1] <= '0;
 
-        end else begin
-            lock_reg[0] <= regD_add;                    // Inserts a new Target in the queue 
+        end else if (!stall) begin
+            lock_reg[0] <= target;                      // Inserts a new Target in the queue 
             lock_mem[0] <= is_store;
             lock_reg[1] <= lock_reg[0];                 // Move the queue forward
             lock_mem[1] <= lock_mem[0];
@@ -241,35 +242,45 @@ module decoder (
             hazard <= 0;
 
 ///////////////////////////////////////////////// Output registers //////////////////////////////////////////////////////////////////////////////////
-    always @(posedge clk or negedge reset)
-        if (!reset) begin                                   // Reset
-            opA_out <= '0;
-            opB_out <= '0;
-            opC_out <= '0;
-            NPC_out <= '0;
+    always @(posedge clk)
+        if (reset) begin
+            opA <= '0;
+            opB <= '0;
+            opC <= '0;
+            NPC <= '0;
             instruction_out <= '0;
             i_out <= NOP;
-            tag_out <= '0;
+            tag <= '0;
             exception <= 0;
+
+        end else if (stall) begin                       // HOLD
+            opA <= opA;
+            opB <= opB;
+            opC <= opC;
+            NPC <= NPC;
+            instruction_out <= instruction_out;
+            i_out <= i_out;
+            tag <= tag;
+            exception <= exception;
 
          end else if (hazard) begin                     // Propagate bubble
-            opA_out <= '0;
-            opB_out <= '0;
-            opC_out <= '0;
-            NPC_out <= '0;
+            opA <= '0;
+            opB <= '0;
+            opC <= '0;
+            NPC <= '0;
             instruction_out <= '0;
             i_out <= NOP;
-            tag_out <= '0;
+            tag <= '0;
             exception <= 0;
 
-        end else begin                       // Propagate instruction
-            opA_out <= opA;
-            opB_out <= opB;
-            opC_out <= opC;
-            NPC_out <= NPC;
+        end else if (!stall) begin                      // Propagate instruction
+            opA <= opA_int;
+            opB <= opB_int;
+            opC <= opC_int;
+            NPC <= NPC_in;
             instruction_out <= instruction;
             i_out <= i;
-            tag_out <= tag_in;
+            tag <= tag_in;
             exception <= (i==INVALID) ? 1 : 0;
         end
     

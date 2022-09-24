@@ -26,9 +26,7 @@ import my_pkg::*;
 module Testbench_With_BRAMs ();
 
 logic         clk=1, rstCPU;
-logic         enable;
-logic [31:0]  data_read, DATA_address, data_write;
-logic [3:0]   write;
+logic [7:0]   gpioa_out, gpioa_addr;
 logic [31:0]  IRQ;
 byte          char;
 
@@ -37,8 +35,22 @@ assign IRQ = '0;
 ////////////////////////////////////////////////////// RESET CPU ////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     initial begin
-        rstCPU = 0;
-        #100 rstCPU = 1;
+        rstCPU = 1;
+        #1000 rstCPU = 0;
+/*
+        #5000
+        IRQ[11] <= 1;
+        #100
+        IRQ[11] <= 0;
+        #30
+        IRQ[3] <= 1;
+        #70
+        IRQ[3] <= 0;
+        #30
+        IRQ[7] <= 1;
+        #70
+        IRQ[7] <= 0;
+*/    
     end
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -55,34 +67,26 @@ assign IRQ = '0;
     PUCR5_With_BRAMs dut (
         .clk(clk), 
         .reset(rstCPU), 
-        .DATA_in(data_read), 
-        .DATA_out(data_write), 
-        .DATA_address(DATA_address),
-        .enable(enable),
-        .write(write),
-        .IRQ(IRQ)
+        .gpioa_out(gpioa_out),
+        .gpioa_addr(gpioa_addr)
+//        .IRQ(IRQ)
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////// Memory Mapped regs ///////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    always @(posedge clk) 
-        if(enable) begin
-            ///////////////////////////////////// OUTPUT REG ///////////////////////////////////
-            if((DATA_address == 32'h80004000 || DATA_address == 32'h80001000) && write!=0) begin
-                char <= data_write[7:0];
-                $write("%c",char);
-            end
-            ///////////////////////////////////// END REG //////////////////////////////////////
-            if(DATA_address==32'h80000000 && write!=0) begin
-                $display("# %t END OF SIMULATION",$time);
-                $finish;
-            end
-            ///////////////////////////////////// TIMER REG ////////////////////////////////////
-            if(DATA_address==32'h80006000 && write==0)
-                data_read <= $time/1000;
-        
-        end else
-            data_read <= '0;
+    always @(posedge clk) begin
+        ///////////////////////////////////// OUTPUT REG ///////////////////////////////////
+        if(gpioa_addr == 8'h84 || gpioa_addr == 8'h81) begin
+            char <= gpioa_out;
+            $write("%c",char);
+        end
+        ///////////////////////////////////// END REG //////////////////////////////////////
+        else if (gpioa_addr==8'h80) begin
+            $display("\n#%0t END OF SIMULATION\n",$time);
+            $finish;
+        end
+    end
+
 
 endmodule

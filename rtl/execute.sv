@@ -26,7 +26,7 @@ import my_pkg::*;
 
 module execute(
     input logic         clk,
-    input logic         reset,
+    input logic         stall,
     input logic         exception_in,
     input logic [31:0]  instruction_in,
     input logic [31:0]  NPC,                // Operand from Operand Fetch stage
@@ -56,6 +56,7 @@ module execute(
 );
     
     logic jump_int;
+    logic we_branchUnit, we_memoryUnit;
     logic csr_exception;
     logic [3:0] we_mem_int;
     logic [31:0] result [7:0];
@@ -87,51 +88,53 @@ module execute(
 
 ///////////////////////////////////////////////// DEMUX ////////////////////////////////////////////////////
     always@(posedge clk) begin                    // RESULT[0]
-        if(xu_sel==adder)
-            result_out[0] <= result[0];
-        else if(xu_sel==logical)
-            result_out[0] <= result[1];
-        else if(xu_sel==shifter)
-            result_out[0] <= result[2];
-        else if(xu_sel==branch)
-            result_out[0] <= result[3];
-        else if(xu_sel==memory)
-            result_out[0] <= result[6];
-        else if(xu_sel==csri)
-            result_out[0] <= csr_data_rd;
-        else
-            result_out[0] <= result[5];
-   ////////////////////////////////////
-        if(xu_sel==branch)             // RESULT[1]
-            result_out[1] <= result[4];
-        else if(xu_sel==memory)
-            result_out[1] <= result[7];
-        else 
-            result_out[1] <= '0;
-   ////////////////////////////////////
-        if(xu_sel==branch)             // JUMP_OUT
-            jump_out <= jump_int;
-        else
-            jump_out <= '0;
-   ////////////////////////////////////
-        if(xu_sel==memory)             // WRITE
-            we_mem <= we_mem_int;
-         else 
-            we_mem <= '0;
-        
-   ////////////////////////////////////
-        if(xu_sel==branch)             // WE_OUT
-            we_out <= we_branchUnit;
-        else if(xu_sel==memory)
-            we_out <= we_memoryUnit;
-        else
-            we_out <= 1;
-   ////////////////////////////////////
-        tag_out <= tag_in;
-        i_out <= i;
-        instruction_out <= instruction_in;
-        NPC_out <= NPC;
-        exception_out <= exception_in | csr_exception;
+        if (!stall) begin
+            if (xu_sel==adder)
+                result_out[0] <= result[0];
+            else if (xu_sel==logical)
+                result_out[0] <= result[1];
+            else if (xu_sel==shifter)
+                result_out[0] <= result[2];
+            else if (xu_sel==branch)
+                result_out[0] <= result[3];
+            else if (xu_sel==memory)
+                result_out[0] <= result[6];
+            else if (xu_sel==csri)
+                result_out[0] <= csr_data_rd;
+            else
+                result_out[0] <= result[5];
+    ////////////////////////////////////
+            if (xu_sel==branch)             // RESULT[1]
+                result_out[1] <= result[4];
+            else if (xu_sel==memory)
+                result_out[1] <= result[7];
+            else 
+                result_out[1] <= '0;
+    ////////////////////////////////////
+            if (xu_sel==branch)             // JUMP_OUT
+                jump_out <= jump_int;
+            else
+                jump_out <= '0;
+    ////////////////////////////////////
+            if (xu_sel==memory)             // WRITE
+                we_mem <= we_mem_int;
+            else 
+                we_mem <= '0;
+            
+    ////////////////////////////////////
+            if (xu_sel==branch)             // WE_OUT
+                we_out <= we_branchUnit;
+            else if (xu_sel==memory)
+                we_out <= we_memoryUnit;
+            else
+                we_out <= 1;
+    ////////////////////////////////////
+            tag_out <= tag_in;
+            i_out <= i;
+            instruction_out <= instruction_in;
+            NPC_out <= NPC;
+            exception_out <= exception_in | csr_exception;
+        end
     end
 
 endmodule

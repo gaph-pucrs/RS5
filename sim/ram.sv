@@ -25,7 +25,6 @@ import my_pkg::*;
 
 module RAM_mem (
     input logic clk,
-    input logic rst,
     input logic [15:0] i_addr, 
     output logic [31:0] i_data,
     input logic en,
@@ -40,7 +39,7 @@ module RAM_mem (
     int fd_i, fd_r, fd_w;
 
     initial begin
-        fd = $fopen ("/home/williannunes/pucrs-rv/bin/test.bin", "r");
+        fd = $fopen ("/home/williannunes/pucrs-rv/app/riscv-tests/test.bin", "r");
 
         r = $fread(RAM, fd);
         $display("read %d elements \n", r);

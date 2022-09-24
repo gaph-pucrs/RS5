@@ -57,6 +57,7 @@ logic [31:0]  IRQ;
     PUCRS_RV dut (
         .clk(clk), 
         .reset(rstCPU), 
+        .stall(0),
         .instruction(instruction), 
         .i_address(i_address), 
         .enable(enable_int), 
@@ -72,7 +73,6 @@ logic [31:0]  IRQ;
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     RAM_mem RAM_MEM(
         .clk(clk), 
-        .rst(rstCPU), 
         .en(enable_ram), 
         .i_data(instruction),
         .w_en(write), 
@@ -127,10 +127,10 @@ integer TIMER;
 ////////////////////////////////////////////////////// RESET CPU ////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     initial begin
-        rstCPU = 0;                                          // RESET for CPU initialization
+        rstCPU = 1;                                          // RESET for CPU initialization
         IRQ <= '0;
         
-        #100 rstCPU = 1;                                     // Hold state for 100 ns
+        #100 rstCPU = 0;                                     // Hold state for 100 ns
 /*
         #300
         IRQ[11] <= 1;
