@@ -11,12 +11,15 @@ module Peripherals (
     output logic [7:0]  gpioa_out,
     output logic [7:0]  gpioa_addr,
     output logic        UART_TX,
-    output logic        stall
+    output logic        stall,
+    input logic         Interupt_ACK
 );
 
 logic stall_r;
-logic [31:0] DATA_r;
-logic UART_send, UART_ready, UART_rst;
+logic [31:0] DATA_r, counter;
+logic Buffer_write, Buffer_read, Buffer_empty, Buffer_full;
+logic [7:0] Buffer_data;
+logic UART_send, UART_ready;
 logic [7:0] UART_data;
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////// Writes in Peripherals ////////////////////////////////////////////////////////////////////////
@@ -24,41 +27,36 @@ logic [7:0] UART_data;
     always @(posedge clk)
         if (enable==1 && write!=0) begin
             ///////////////////////////////////// OUTPUT REG ///////////////////////////////////
-            if ((DATA_address == 32'h80004000 || DATA_address == 32'h80001000) && UART_ready==1 && UART_rst==0) begin
+            if ((DATA_address == 32'h80004000 || DATA_address == 32'h80001000) && Buffer_full==0) begin
                 gpioa_out <= DATA_in[7:0];
                 gpioa_addr <= 8'h84;
-                UART_send <= 1;
-                UART_data <= DATA_in[7:0];
+                Buffer_write <= 1;
+                Buffer_data <= DATA_in[7:0];
             end
             ///////////////////////////////////// END REG //////////////////////////////////////
             else if (DATA_address==32'h80000000)
                 gpioa_addr <= 8'h80;
-            ///////////////////////////////////// UART REG /////////////////////////////////////
-            else if (DATA_address==32'h90001000) begin
-                UART_send <= 1;
-                UART_data <= DATA_in[7:0];
-            end
             ///////////////////////////////////// NOTHING //////////////////////////////////////
             else begin
                 gpioa_out <= '0;
                 gpioa_addr <= '0;
-                UART_send <= '0;         
+                Buffer_write <= '0;         
             end
 
         end else begin
             gpioa_out <= '0;
             gpioa_addr <= '0;
-            UART_send <= '0;         
+            Buffer_write <= '0;         
         end
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////// Reads from Peripherals ///////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    always @(posedge clk) 
+    always @(posedge clk)
         if (enable==1 && write==0) begin
         ///////////////////////////////////// TIMER REG ////////////////////////////////////
             if (DATA_address==32'h80006000)
-                DATA_r <= 1000;
+                DATA_r <= counter;
             else
                 DATA_r <= '0;
 
@@ -66,25 +64,43 @@ logic [7:0] UART_data;
             DATA_r <= '0;
         end
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////// STALL GENERATION /////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     always_comb
-        if (enable==1 && write==0 && stall_r!=1)
-            if (DATA_address==32'h80006000)
-                stall <= 1;
+        if(enable==1) begin
+            ///////////////////////////////////// READS ////////////////////////////////////////////
+            if (write==0 && stall_r!=1)
+                if (DATA_address==32'h80006000)
+                    stall <= 1;
+                else
+                    stall <= 0;
+            ///////////////////////////////////// WRITES ///////////////////////////////////////////
+            else if (write!=0)
+                if ((DATA_address == 32'h80004000 || DATA_address == 32'h80001000) && Buffer_full==1)
+                    stall <= 1;
+                else
+                    stall <= 0;
+
             else
                 stall <= 0;
-        else if (enable==1 && write!=0)
-            if (UART_rst==1)
-                stall <= 1;
-            else if ((DATA_address == 32'h80004000 || DATA_address == 32'h80001000) && UART_ready==0)
-                stall <= 1;
-            else
+
+        end else
                 stall <= 0;
-        else
-            stall <= 0;
 
     always @(posedge clk) begin
         stall_r <= stall;
         DATA_out <= DATA_r;
+    end
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////// TIMER IMPLEMENTATION /////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    always @(posedge clk) begin
+        if (reset)
+            counter <= 0;
+        else
+            counter <= counter + 1;
     end
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -98,17 +114,24 @@ logic [7:0] UART_data;
         .UART_TX(UART_TX)
     );
 
-int RESET_CNTR_MAX = 200000;
-int reset_cntr;
-always @(posedge clk)
-    if (reset) begin
-        reset_cntr <= '0;
-        UART_rst <= 1;
-    end else if ((reset_cntr == RESET_CNTR_MAX)) begin
-        reset_cntr <= '0;
-        UART_rst <= 0;
-    end else begin
-        reset_cntr <= reset_cntr + 1;
-        UART_rst <= 1;
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////// UART BUFFER //////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    FIFO_BUFFER_UART FIFO_BUFFER_UART1 (
+    .clk(clk),                // input wire clk
+    .srst(reset),             // input wire srst
+    .din(Buffer_data),        // input wire [7 : 0] din
+    .wr_en(Buffer_write),     // input wire wr_en
+    .rd_en(Buffer_read),      // input wire rd_en
+    .dout(UART_data),         // output wire [7 : 0] dout
+    .full(Buffer_full),       // output wire full
+    .empty(Buffer_empty)      // output wire empty
+    );
+
+    assign Buffer_read = UART_ready & !Buffer_empty & !UART_send;
+
+    always @(posedge clk ) begin
+        UART_send <= Buffer_read;
     end
+
 endmodule

@@ -205,7 +205,7 @@ module decoder (
         if (!hazard) begin
             target <= instruction[11:7];
             ///////////////////////////////////
-            if (i==SB || i==SH || i==SW)                    // Indicates a pending write in memory, used to avoid data hazards in memory
+            if (i==SB || i==SH || i==SW)                // Indicates a pending write operation, used to avoid data hazards in memory
                 is_store <= 1;
             else
                 is_store <= 0;
@@ -232,7 +232,7 @@ module decoder (
 
 ///////////////////////////////////////////////// HAZARD SIGNAL GENERATION //////////////////////////////////////////////////////////////////////////
     always_comb
-        if ((lock_mem[0] || lock_mem[1]) && (i==LB || i==LBU || i==LH || i==LH || i==LW))
+        if ((lock_mem[0] || lock_mem[1]) && (xu'(i[5:3])==memory))
             hazard <= 1;
         else if ((lock_reg[0]==regA_add || lock_reg[1]==regA_add) && regA_add!=0)
             hazard <= 1;

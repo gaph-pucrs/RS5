@@ -121,9 +121,9 @@ module retire(
             write_address <= result[1];
             DATA_out <= result[0];
         end else begin                                  // Otherwise do nothing
-            write <= 'Z;
-            write_address <= 'Z;
-            DATA_out <= 'Z;
+            write <= '0;
+            write_address <= '0;
+            DATA_out <= '0;
         end
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     always_comb

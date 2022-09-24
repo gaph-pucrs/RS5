@@ -1,0 +1,2 @@
+FIFO_BUFFER_UART.v,verilog,xil_defaultlib,../../../../privileged.gen/sources_1/ip/FIFO_BUFFER_UART/sim/FIFO_BUFFER_UART.v,
+glbl.v,Verilog,xil_defaultlib,glbl.v

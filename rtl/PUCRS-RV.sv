@@ -42,7 +42,8 @@ module PUCRS_RV (
     output logic [31:0] DATA_address,
     input  logic [31:0] DATA_in,
     output logic [31:0] DATA_out,
-    input  logic [31:0] IRQ
+    input  logic [31:0] IRQ,
+    output logic        Interupt_ACK
 );
 
     logic jump_wb, jump_retire, hazard, we_retire;

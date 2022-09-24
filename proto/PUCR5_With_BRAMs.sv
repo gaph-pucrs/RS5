@@ -15,7 +15,7 @@ module PUCR5_With_BRAMs (
     logic [31:0] DATA_BRAM, DATA_peripherals;
     logic enable_int, enable_bram, enable_peripherals, enable_r;
     logic [3:0] write;
-    logic stall;
+    logic stall, Interupt_ACK;
 
     assign enable_peripherals = (DATA_address > 32'h0000FFFF && enable_int) ? 1 : 0;
     assign enable_bram = (DATA_address <= 32'h0000FFFF && enable_int) ? 1 : 0;
@@ -38,7 +38,8 @@ module PUCR5_With_BRAMs (
         .DATA_address(DATA_address), 
         .DATA_in(DATA_in_cpu), 
         .DATA_out(DATA_out_cpu), 
-        .IRQ('0)
+        .IRQ('0),
+        .Interupt_ACK(Interupt_ACK)
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -74,7 +75,8 @@ module PUCR5_With_BRAMs (
         .gpioa_out(gpioa_out),
         .gpioa_addr(gpioa_addr),
         .UART_TX(UART_TX),
-        .stall(stall)
+        .stall(stall),
+        .Interupt_ACK(Interupt_ACK)
     );
 
 
