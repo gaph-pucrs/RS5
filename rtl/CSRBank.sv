@@ -19,8 +19,8 @@ module CSRBank (
     input logic [31:0]  instruction,
 
     input logic [31:0]  IRQ,
-    input logic Interupt_ACK,
-    output logic Interupt_pending,
+    input logic Interrupt_ACK,
+    output logic Interrupt_pending,
 
     output logic [31:0] mtvec,
     output logic [31:0] mepc
@@ -32,7 +32,7 @@ module CSRBank (
     
     logic [31:0] wr_data, wmask, current_val;
     //logic [31:0] medeleg, mideleg; // NOT IMPLEMENTED YET (REQUIRED ONLY WHEN SYSTEM HAVE S-MODE)
-    INTERRUPT_CODE Interuption_Code;
+    INTERRUPT_CODE Interruption_Code;
 
     assign mtvec = mtvec_r;
     assign mepc = mepc_r;
@@ -102,9 +102,9 @@ module CSRBank (
             mepc_r          <= (Exception_Code==ECALL_FROM_MMODE) ? PC : PC+4;                // Return address
             mtval           <= (Exception_Code==ILLEGAL_INSTRUCTION) ? instruction : PC;
 
-        end else if(Interupt_ACK) begin
+        end else if(Interrupt_ACK) begin
             mcause[31]      <= '1;
-            mcause[30:0]    <= Interuption_Code;
+            mcause[30:0]    <= Interruption_Code;
             mstatus[12:11]  <= privilege;           // MPP = previous privilege
             // privilege    <= MACHINE
             mstatus[7]      <= mstatus[3];          // MPIE = MIE
@@ -171,17 +171,17 @@ module CSRBank (
             mip <= IRQ;
     
     always @(posedge clk)
-        if(mstatus[3]==1 && (mie & mip) && Interupt_ACK==0) begin
-            Interupt_pending <= 1;
+        if(mstatus[3]==1 && (mie & mip) && Interrupt_ACK==0) begin
+            Interrupt_pending <= 1;
             if(mip[11] & mie[11])                   // Machine External
-                Interuption_Code <= M_EXT_INT;
+                Interruption_Code <= M_EXT_INT;
             else if(mip[3] & mie[3])                // Machine Software
-                Interuption_Code <= M_SW_INT;
+                Interruption_Code <= M_SW_INT;
             else if(mip[7] & mie[7])                // Machine Timer
-                Interuption_Code <= M_TIM_INT;
+                Interruption_Code <= M_TIM_INT;
 
         end else
-            Interupt_pending <= 0;
+            Interrupt_pending <= 0;
 
 //##################################################################################
     // PERFORMANCE MONITORS

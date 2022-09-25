@@ -43,7 +43,7 @@ module PUCRS_RV (
     input  logic [31:0] DATA_in,
     output logic [31:0] DATA_out,
     input  logic [31:0] IRQ,
-    output logic        Interupt_ACK
+    output logic        Interrupt_ACK
 );
 
     logic jump_wb, jump_retire, hazard, we_retire;
@@ -71,7 +71,7 @@ module PUCRS_RV (
     logic [31:0] mepc, mtvec;
     logic RAISE_EXCEPTION, MACHINE_RETURN;
     EXCEPT_CODE   Exception_Code;
-    logic Interupt_pending, Interupt_ACK;
+    logic Interrupt_pending;
 
     logic [31:0] read_address;
     logic [31:0] write_address;
@@ -91,7 +91,7 @@ module PUCRS_RV (
         .tag_out(decode_tag),
         .EXCEPTION_RAISED(RAISE_EXCEPTION), 
         .MACHINE_RETURN(MACHINE_RETURN), 
-        .Interupt_ACK(Interupt_ACK),
+        .Interrupt_ACK(Interrupt_ACK),
         .mepc(mepc), 
         .mtvec(mtvec)
     );
@@ -219,8 +219,8 @@ module PUCRS_RV (
         .RAISE_EXCEPTION(RAISE_EXCEPTION), 
         .Exception_Code(Exception_Code),
         .MACHINE_RETURN(MACHINE_RETURN),
-        .Interupt_pending(Interupt_pending), 
-        .Interupt_ACK(Interupt_ACK)
+        .Interrupt_pending(Interrupt_pending), 
+        .Interrupt_ACK(Interrupt_ACK)
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -245,8 +245,8 @@ module PUCRS_RV (
         .mepc(mepc), 
         .mtvec(mtvec),
         .IRQ(IRQ), 
-        .Interupt_pending(Interupt_pending), 
-        .Interupt_ACK(Interupt_ACK)
+        .Interrupt_pending(Interrupt_pending), 
+        .Interrupt_ACK(Interrupt_ACK)
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

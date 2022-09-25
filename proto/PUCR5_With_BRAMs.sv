@@ -5,17 +5,18 @@ module PUCR5_With_BRAMs (
     input logic         reset,
     output logic [7:0]  gpioa_out,
     output logic [7:0]  gpioa_addr,
+    input logic         BTND,
     output logic        UART_TX
-    //input logic [31:0]  IRQ
     );
 
-    logic [31:0]  i_address, instruction;
-
-    logic [31:0] DATA_address, DATA_in_cpu, DATA_out_cpu;
-    logic [31:0] DATA_BRAM, DATA_peripherals;
-    logic enable_int, enable_bram, enable_peripherals, enable_r;
-    logic [3:0] write;
-    logic stall, Interupt_ACK;
+    logic [31:0]    i_address, instruction;
+    logic [31:0]    DATA_address, DATA_in_cpu, DATA_out_cpu;
+    logic [31:0]    DATA_BRAM, DATA_peripherals;
+    logic           enable_int, enable_bram, enable_peripherals, enable_r;
+    logic [3:0]     write;
+    logic           stall;
+    logic [31:0]    IRQ;
+    logic           Interrupt_ACK;
 
     assign enable_peripherals = (DATA_address > 32'h0000FFFF && enable_int) ? 1 : 0;
     assign enable_bram = (DATA_address <= 32'h0000FFFF && enable_int) ? 1 : 0;
@@ -29,7 +30,7 @@ module PUCR5_With_BRAMs (
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     PUCRS_RV dut (
         .clk(clk), 
-        .reset(reset),
+        .reset(!reset),
         .stall(stall),
         .instruction(instruction), 
         .i_address(i_address), 
@@ -38,8 +39,8 @@ module PUCR5_With_BRAMs (
         .DATA_address(DATA_address), 
         .DATA_in(DATA_in_cpu), 
         .DATA_out(DATA_out_cpu), 
-        .IRQ('0),
-        .Interupt_ACK(Interupt_ACK)
+        .IRQ(IRQ),
+        .Interrupt_ACK(Interrupt_ACK)
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -66,7 +67,7 @@ module PUCR5_With_BRAMs (
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     Peripherals Peripherals1 (
         .clk(clk), 
-        .reset(reset), 
+        .reset(!reset), 
         .enable(enable_peripherals), 
         .write(write),
         .DATA_address(DATA_address), 
@@ -74,9 +75,11 @@ module PUCR5_With_BRAMs (
         .DATA_out(DATA_peripherals),
         .gpioa_out(gpioa_out),
         .gpioa_addr(gpioa_addr),
+        .BTND(BTND),
         .UART_TX(UART_TX),
         .stall(stall),
-        .Interupt_ACK(Interupt_ACK)
+        .IRQ(IRQ),
+        .Interrupt_ACK(Interrupt_ACK)
     );
 
 

@@ -83,8 +83,8 @@ assign IRQ = '0;
         end
         ///////////////////////////////////// END REG //////////////////////////////////////
         else if (gpioa_addr==8'h80) begin
-            $display("\n#%0t END OF SIMULATION\n",$time);
-            $finish;
+//            $display("\n#%0t END OF SIMULATION\n",$time);
+//            $finish;
         end
     end
 
