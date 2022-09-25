@@ -109,13 +109,13 @@ begin
 			if (bitDone = '1') then
 				bitTmr <= (others => '0');
 			else
-				bitTmr <= bitTmr + 10000;
+				bitTmr <= bitTmr + 1;
 			end if;
 		end if;
 	end if;
 end process;
 
-bitDone <= '1' when (bitTmr >= BIT_TMR_MAX) else
+bitDone <= '1' when (bitTmr = BIT_TMR_MAX) else
 				'0';
 
 bit_counting_process : process (CLK)
