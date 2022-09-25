@@ -138,6 +138,7 @@ module LSUnit (
     input logic [31:0]  opB,                            // Offset
     input logic [31:0]  data,                           // Data to be Written in memory
     input op_type       i,                              // Instruction type
+    input logic         en,                             // enable memory operation based on instruction
     output logic [31:0] read_address,                   // Read Memory csr_address
     output logic        read,                           // Signal that allows memory read
     output logic [31:0] write_address,                  // Adrress to Write in memory
@@ -151,51 +152,57 @@ module LSUnit (
 
 ///////////////////////////////////// generate all signals for read or write ////////////////////////////////////////////////////////////////////////
     always_comb begin
-        if (i==OP0 | i==OP1) begin                      // Load Byte signed and unsigned (LB | LBU)
-            read <= 1;
-            write_data <= '0;
-            we_mem <= 4'b0000;
+        if (en) begin
+            if (i==OP0 | i==OP1) begin                      // Load Byte signed and unsigned (LB | LBU)
+                read <= 1;
+                write_data <= '0;
+                we_mem <= 4'b0000;
 
-        end else if (i==OP2 | i==OP3) begin             // Load Half(16b) signed and unsigned (LH | LHU)
-            read <= 1;
-            write_data <= '0;
-            we_mem <= 4'b0000;
+            end else if (i==OP2 | i==OP3) begin             // Load Half(16b) signed and unsigned (LH | LHU)
+                read <= 1;
+                write_data <= '0;
+                we_mem <= 4'b0000;
 
-        end else if (i==OP4) begin                      // Load Word(32b) (LW)
-            read <= 1;
-            write_data <= '0;
-            we_mem <= 4'b0000;
+            end else if (i==OP4) begin                      // Load Word(32b) (LW)
+                read <= 1;
+                write_data <= '0;
+                we_mem <= 4'b0000;
 
-        end else if (i==OP5) begin                      // Store Byte (SB)
-            read <= 0;
-            write_data[31:24] <= data[7:0];
-            write_data[23:16] <= data[7:0];
-            write_data[15:8] <= data[7:0];
-            write_data[7:0] <= data[7:0];
-            case (sum[1:0])
-                2'b11:   we_mem <= 4'b1000;
-                2'b10:   we_mem <= 4'b0100;
-                2'b01:   we_mem <= 4'b0010;
-                default: we_mem <= 4'b0001;
-            endcase
+            end else if (i==OP5) begin                      // Store Byte (SB)
+                read <= 0;
+                write_data[31:24] <= data[7:0];
+                write_data[23:16] <= data[7:0];
+                write_data[15:8] <= data[7:0];
+                write_data[7:0] <= data[7:0];
+                case (sum[1:0])
+                    2'b11:   we_mem <= 4'b1000;
+                    2'b10:   we_mem <= 4'b0100;
+                    2'b01:   we_mem <= 4'b0010;
+                    default: we_mem <= 4'b0001;
+                endcase
+                
+            end else if (i==OP6) begin                      // Store Half(16b) (SH)
+                read <= 0;
+                write_data[31:16] <= data[15:0];    
+                write_data[15:0] <= data[15:0];
+                we_mem <= (write_address[1]==1) ? 4'b1100 : 4'b0011;
+
+            end else if (i==OP7) begin                      // Store Word (SW)
+                read <= 0;
+                write_data[31:0] <= data[31:0];  
+                we_mem <= 4'b1111;
+
+            end else begin
+                read <= 0;
+                write_data[31:0] <= '0;  
+                we_mem <= '0;
+            end
             
-        end else if (i==OP6) begin                      // Store Half(16b) (SH)
-            read <= 0;
-            write_data[31:16] <= data[15:0];    
-            write_data[15:0] <= data[15:0];
-            we_mem <= (write_address[1]==1) ? 4'b1100 : 4'b0011;
-
-        end else if (i==OP7) begin                      // Store Word (SW)
-            read <= 0;
-            write_data[31:0] <= data[31:0];  
-            we_mem <= 4'b1111;
-
         end else begin
             read <= 0;
             write_data[31:0] <= '0;  
             we_mem <= '0;
         end
-
 
         //////////////////////////////////////////////
         read_address = sum;

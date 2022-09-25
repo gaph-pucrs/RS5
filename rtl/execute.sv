@@ -60,36 +60,29 @@ module execute(
     logic csr_exception;
     logic [3:0] we_mem_int;
     logic [31:0] result [7:0];
-    op_type adder_op, logic_op, shift_op, branch_op, memory_op, csrU_op;
+    op_type xus_op, memory_op;
     xu xu_sel;
 
     assign xu_sel = xu'(i[5:3]);
-///////////////////////////////////////////////////// Instantiation of execution units  ////////////////////
-    adderUnit   adder1 (.opA(opA), .opB(opB), .i(adder_op), .result(result[0]));
-    logicUnit   logical1 (.opA(opA), .opB(opB), .i(logic_op), .result(result[1]));
-    shiftUnit   shift1 (.opA(opA), .opB(opB[4:0]), .i(shift_op), .result(result[2]));
-    branchUnit  branch1 (.opA(opA), .opB(opB), .offset(opC), .NPC(NPC), .i(branch_op),
+    assign xus_op = op_type'(i[2:0]);
+
+///////////////////////////////////////////////// Instantiation of execution units  ////////////////////////
+    adderUnit   adder1 (.opA(opA), .opB(opB), .i(xus_op), .result(result[0]));
+    logicUnit   logical1 (.opA(opA), .opB(opB), .i(xus_op), .result(result[1]));
+    shiftUnit   shift1 (.opA(opA), .opB(opB[4:0]), .i(xus_op), .result(result[2]));
+    branchUnit  branch1 (.opA(opA), .opB(opB), .offset(opC), .NPC(NPC), .i(xus_op),
                 .result(result[4]), .result_jal(result[3]), .jump(jump_int), .we(we_branchUnit));
-    LSUnit      memory1 (.opA(opA), .opB(opB), .data(opC), .i(memory_op), 
+    LSUnit      memory1 (.opA(opA), .opB(opB), .data(opC), .i(xus_op), .en(xu_sel==memory),
                 .read_address(read_address), .read(read),
                 .write_address(result[7]), .write_data(result[6]),  .we_mem(we_mem_int), .we_rb(we_memoryUnit));
-    csrUnit     CSRaccess (.opA(opA), .instruction(instruction_in), .i(csrU_op), .privilege(Privilege'(2'b11)), .csr_exception(csr_exception),
-                .csr_rd_en(csr_rd_en), .csr_wr_en(csr_wr_en), .csr_op(csr_op), .csr_addr(csr_addr), .csr_data(csr_data) );
-
+    csrUnit     CSRaccess (.opA(opA), .instruction(instruction_in), .i(xus_op), .privilege(Privilege'(2'b11)), .csr_exception(csr_exception),
+                .csr_rd_en(csr_rd_en), .csr_wr_en(csr_wr_en), .csr_op(csr_op), .csr_addr(csr_addr), .csr_data(csr_data));
     assign result[5] = opB; // bypass
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    assign adder_op  = (xu_sel==adder)   ? op_type'(i[2:0]) : NOTOKEN;
-    assign logic_op  = (xu_sel==logical) ? op_type'(i[2:0]) : NOTOKEN;
-    assign shift_op  = (xu_sel==shifter) ? op_type'(i[2:0]) : NOTOKEN;
-    assign branch_op = (xu_sel==branch)  ? op_type'(i[2:0]) : NOTOKEN;
-    assign memory_op = (xu_sel==memory)  ? op_type'(i[2:0]) : NOTOKEN;
-    assign csrU_op   = (xu_sel==csri)    ? op_type'(i[2:0]) : NOTOKEN;
-
 ///////////////////////////////////////////////// DEMUX ////////////////////////////////////////////////////
-    always@(posedge clk) begin                    // RESULT[0]
+    always@(posedge clk) begin
         if (!stall) begin
-            if (xu_sel==adder)
+            if (xu_sel==adder)              // RESULT[0]
                 result_out[0] <= result[0];
             else if (xu_sel==logical)
                 result_out[0] <= result[1];

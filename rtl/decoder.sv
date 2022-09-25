@@ -217,16 +217,16 @@ module decoder (
 
 ////////////////////////////////////////////////// REGISTER LOCK QUEUE //////////////////////////////////////////////////////////////////////////////
     always @(posedge clk)  
-        if (reset) begin                                // Reset clears the queues
+        if (reset) begin
             lock_reg[0] <= '0;
             lock_reg[1] <= '0;
             lock_mem[0] <= '0;
             lock_mem[1] <= '0;
 
         end else if (!stall) begin
-            lock_reg[0] <= target;                      // Inserts a new Target in the queue 
+            lock_reg[0] <= target;
             lock_mem[0] <= is_store;
-            lock_reg[1] <= lock_reg[0];                 // Move the queue forward
+            lock_reg[1] <= lock_reg[0];
             lock_mem[1] <= lock_mem[0];
         end
 

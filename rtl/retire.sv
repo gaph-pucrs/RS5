@@ -48,18 +48,16 @@ module retire(
     output EXCEPT_CODE  Exception_Code,
     output logic        RAISE_EXCEPTION,
     output logic        MACHINE_RETURN,
-
-    input logic Interrupt_pending,
-    output logic Interrupt_ACK
+    input logic         Interrupt_pending,
+    output logic        Interrupt_ACK
 );
-    
+
     logic [31:0] mem_data;
     logic [3:0] curr_tag;
     logic killed;
     xu xu_sel;
 
     assign curr_retire_tag = curr_tag;
-
     assign xu_sel = xu'(i[5:3]);
 
 ///////////////////////////////////////////////// Assign to Register Bank Write Back ////////////////////////////////////////////////////////////////
@@ -67,7 +65,7 @@ module retire(
 
 ///////////////////////////////////////////////// Killed signal generation //////////////////////////////////////////////////////////////////////////
     always_comb
-        if (curr_tag != tag_in)                     // If tags don't match then kill the instruction
+        if (curr_tag != tag_in)
             killed <= 1;
         else
             killed <= 0;
@@ -76,28 +74,29 @@ module retire(
     always @(posedge clk)
         if (reset)
             curr_tag <= 0;
-        else if ((jump_out==1|| RAISE_EXCEPTION==1 || MACHINE_RETURN==1 || Interrupt_ACK==1) && killed==0)          // If a jump was taken and the tag is correct then increases the internal tag
+        else if ((jump_out==1|| RAISE_EXCEPTION==1 || MACHINE_RETURN==1 || Interrupt_ACK==1) && killed==0)
             curr_tag <= curr_tag + 1;
 
 ///////////////////////////////////////////////// Flow Control //////////////////////////////////////////////////////////////////////////////////////
     always_comb
-        if (killed)                                  // If tags mismatch then do not write back
+        if (killed)
           reg_we <= 0;
-        else                                        // Otherwise depends on instruction type
+        else
           reg_we <= we;
 
 ///////////////////////////////////////////////// PC Flow control signal generation /////////////////////////////////////////////////////////////////
     always_comb
-        if (jump==1 && killed==0) begin             // If it is a branch instruction and tag is valid then effectuate the branch
+        if (jump==1 && killed==0) begin
             New_pc <= result[1];
             jump_out <= 1;
-        end else begin                              // Otherwise do nothing
+        end else begin
             New_pc <= '0;
             jump_out <= '0;
         end
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     always_comb
-        if (i==LB || i==LBU) begin                      // LB | LBU
+        if (i==LB || i==LBU) begin
             case (result[1][1:0])
                 2'b11:   begin mem_data[7:0] <= DATA_in[31:24]; mem_data[31:8] <= (DATA_in[31]==1 & i==LB) ? '1 : '0; end
                 2'b10:   begin mem_data[7:0] <= DATA_in[23:16]; mem_data[31:8] <= (DATA_in[23]==1 & i==LB) ? '1 : '0; end
@@ -105,26 +104,27 @@ module retire(
                 default: begin mem_data[7:0] <= DATA_in[7:0];   mem_data[31:8] <= (DATA_in[7]==1 & i==LB)  ? '1 : '0; end
             endcase
 
-        end else if (i==LH || i==LHU) begin             // LH | LHU
+        end else if (i==LH || i==LHU) begin
             case (result[1][1])
                 1'b1:    begin mem_data[15:0] <= DATA_in[31:16]; mem_data[31:16] <= (DATA_in[31]==1 & i==LH) ? '1 : '0; end
                 default: begin mem_data[15:0] <= DATA_in[15:0];  mem_data[31:16] <= (DATA_in[15]==1 & i==LH) ? '1 : '0; end
             endcase
 
-        end else                                        // LW
+        end else
             mem_data <= DATA_in;
 
 ///////////////////////////////////////////////// Memory write control //////////////////////////////////////////////////////////////////////////////
     always_comb
-        if (we_mem_in!=0 && killed==0) begin            // If is a Store instruction and tag is valid then effectuate the Write
+        if (we_mem_in!=0 && killed==0) begin
             write <= we_mem_in;
             write_address <= result[1];
             DATA_out <= result[0];
-        end else begin                                  // Otherwise do nothing
+        end else begin
             write <= '0;
             write_address <= '0;
             DATA_out <= '0;
         end
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     always_comb
         if (killed==0) begin
@@ -177,6 +177,5 @@ module retire(
             MACHINE_RETURN <= 0;
             Interrupt_ACK <= 0;
         end
-
 
 endmodule
