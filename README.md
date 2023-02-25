@@ -2,19 +2,20 @@
 
 ### Description 
 
-PUCRS-RV is a processor that implements the RISC-V 32 bits integer Module (RV32I). It was written in a Hardware Description Language (HDL) called SystemVerilog.
+PUC-RS5 is a processor that implements the RISC-V 32 bits integer Module (RV32I) alongside with the Zicsr Extension and the Machine Mode of the RISC-V Privileged Architecture. It is written in the SystemVerilog Hardware Description Language (HDL) and implements the following interface:
+
+<img src="PUCRS5_Interface.png" alt="Processor Interface">
 
 This project was designed at the Hardware development support Group (GAPH) of the School of Technology, PUCRS, Brazil.
 
-The processor is a 5 stage pipeline, synchronized to the rising edge of clock. The stages are:
+The processor is a 4 stage pipeline, synchronized to the rising edge of clock. The stages are:
 
 - Fetch: Contains the Program Counter (PC) Logic, that indexes the Instruction memory.
-- Decoder: Decodes the instruction, extracting it's type, format, operantion and register addresses.
-- Operand Fetch: Fetches the operands in the register Bank and performs data hazards detections. When a hazard is detected, it insert bubbles until the conflict has been solved.
-- Execute: Performs the given operation on the received operands. It has 6 units where each one is responsible for one kind of operation, such as shift operantions are performed in "Shift Unit" or memory instructions are performed by "Memory Unit".
+- Decode and Operand Fetch: Decodes the instruction, extracting it's type, format, operantion and register addresses, also Fetches the operands in the register Bank and performs data hazards detections. When a hazard is detected, it insert NOP instructions (bubbles) until the conflict become resolved.
+- Execute: Performs the given operation on the received operands. It has 7 units where each one is responsible for one kind of operation, such as shift operantions are performed in "Shift Unit" or memory instructions are performed by "Memory Unit".
 - Retire: Make the retirement of the instructions, it can be a write-back in register bank, or performing a write in data memory or performing a branch.
 
-<img src="RISCV_block.png" alt="block diagram">
+<img src="PUCRS5_Block.png" alt="Block Diagram">
 > PUCRS-RV BLOCK DIAGRAM.
 
 
@@ -22,23 +23,19 @@ The processor is a 5 stage pipeline, synchronized to the rising edge of clock. T
 
 This processor organization is based in an Asynchronous RISCV High-level Functional Model written in GO language. That can be found in the [ARV Go High-level Functional Model](https://github.com/marlls1989/arv) repository.
 
-The processor is a 5 stage pipeline, synchronized to the rising edge of clock and is characterized by three main loops that controls the processor flow.
-
-- First Stage: 
-This stage is the the Fetch Stage and is implemented by the [Fetch Unit](https://github.com/Willian-Nunes/pucrs-rv/blob/master/rtl/fetch.sv), this unit contains the Program Counter (PC) logic, the value contained in this register is used to index the intruction memory, at each clock cycle it is updated, it can be updated to the following instruction address (PC+4), or to a branch address, it can alo mantain the same address in case of a bubble being inserted due to a detection of a data hazard. The jump/branch prediction policy is "never taken".
+T- First Stage: 
+This stage is the the Fetch Stage and is implemented by the [Fetch Unit](https://github.com/gaph-pucrs/PUC-RS5/blob/master/rtl/fetch.sv), this unit contains the Program Counter (PC) logic, the value contained in this register is used to index the intruction memory, at each clock cycle it is updated, it can be updated to the following instruction address (PC+4), or to a branch address, it can alo mantain the same address in case of a bubble being inserted due to a detection of a data hazard. The jump/branch prediction policy is "never taken".
 Each instruction that leaves the first stage is linked to a Tag that will follow the instruction until the last stage. This Tag indicates the flow of that instruction. Every time a jump/branch occurs the tag will be increased meaning that the fetched instrctions now belong to a new flow.
 
 - Second Stage:
-It comprehend the [Decoder Unit](https://github.com/Willian-Nunes/pucrs-rv/blob/master/rtl/decoder.sv), It is responsible for the generation of the control signals, based in the instruction object code fetched by the last stage. The first signal decoded by this unit is the instruction type (e.g. addi, bne), based on this it then generate the signal that indexex the execute unit responsible for that kind of operation and also the number of operation that the execute unit must perform. It also decodes the instruction format (e.g. Immediate, Branch).
-
-- Third Stage: It is the Operand Fetch Stage and is implemented by the [Operand Fetch Unit](https://github.com/Willian-Nunes/pucrs-rv/blob/master/rtl/operandFetch.sv). This unit is responsible for sending to the register bank the read addresses that are directly extracted from the instruction object code, the object code is also used for the immediate operand extractiong, based in the instruction format. The instruction format also determines the operands that will be sent to the next stage. This unit also implements the Data Hazard Detection mechanism, for that, it uses a queue of blocked registers, registers with pending writes, this queue receive a new entry at every time that a instruction leaves the stage, the value inserted is the Destiny register (regD) of the given instruction, in a one-hot format (each bit of the signal represents a register of the register bank). This queue have the lenght of the remaining stages in the pipeline (2 in this case), each position of the queue is merged into a OR operation generating a mask that indicates the blocked registers (registers with pending writes). A Data Hazard is detected when the instruction being processed by the operand fetch stage have a operator that must be read from one of the blocked registers, this issues a signal called "bubble" that indicates that bubbles must be issued until the data conflict gets resolved. This unit also look for data memory hazards, cases where a read is performed right after a write in memory, for that it uses the bit zero of the regD one-hot signal, since it is a dont care, once register bank zero register is read only. 
+It comprehend the [Decoder Unit](https://github.com/gaph-pucrs/PUC-RS5/blob/master/rtl/decode.sv), It is responsible for the generation of the control signals, based in the instruction object code fetched by the last stage. The first signal decoded by this unit is the instruction type (e.g. addi, bne), based on this it then generate the signal that indexex the execute unit responsible for that kind of operation and also the number of operation that the execute unit must perform. It also decodes the instruction format (e.g. Immediate, Branch). This unit is also responsible for sending to the register bank the read addresses that are directly extracted from the instruction object code, the object code is also used for the immediate operand extraction, based in the instruction format. The instruction format also determines the operands that will be sent to the next stage. Also implements the Data Hazard Detection mechanism, for that, it uses a queue of blocked registers, registers with pending writes, this queue receive a new entry at every time that a instruction leaves the stage, the value inserted is the Destiny register (regD) of the given instruction. This queue have the lenght of the remaining stages in the pipeline (2 in this case), each position of the queue is merged into a OR operation generating a mask that indicates the blocked registers (registers with pending writes). A Data Hazard is detected when the instruction being processed by the operand fetch stage have a operator that must be read from one of the blocked registers, this issues a signal called "bubble" that indicates that bubbles must be issued until the data conflict gets resolved. This unit also look for data memory hazards, cases where a read is performed right after a write in memory, for that it uses the bit zero of the regD one-hot signal, since it is a dont care, once register bank zero register is read only. 
 The same queue used to detect the hazard is used to generate the register bank write-enable, the last position of the queue holds the index of the register that must receive the write-back. This signal is bitwised in a AND operation with the write enable received from the fifth stage. 
 
-- Fourth Stage:
-This stage comprehends the Execute Stage that is implemented by the [Execute Unit](https://github.com/Willian-Nunes/pucrs-rv/blob/master/rtl/execute.sv), this stage instantiates the six execution units (adder, bypass, branch, logic, memory and shift). Each unit receives data to be processed only when the instruction type corresponds to it kind of operation, for example, the adder unit only receives the operands when the instruction types are ADD(I), SUB(I and SLT(U), in every other instruction it will be assigned to a High impedance state ('Z). This behaviour is implemented by a dispatcher that only dispatch the instruction to the designed unit and keep all the other units in 'Z' state. The execution units after receiveing the opperands and the operation, perform the computation and output the result. At the end of the stage is a demultiplexer that forward to the next stage only the results of the instruction that performed the operation.
+- Third Stage:
+This stage comprehends the Execute Stage that is implemented by the [Execute Unit](https://github.com/gaph-pucrs/PUC-RS5/blob/master/rtl/execute.sv), this stage instantiates the six execution units (adder, bypass, branch, logic, memory and shift). Each unit receives data to be processed only when the instruction type corresponds to it kind of operation, for example, the adder unit only receives the operands when the instruction types are ADD(I), SUB(I and SLT(U), in every other instruction it will be assigned to a High impedance state ('Z). This behaviour is implemented by a dispatcher that only dispatch the instruction to the designed unit and keep all the other units in 'Z' state. The execution units after receiveing the opperands and the operation, perform the computation and output the result. At the end of the stage is a demultiplexer that forward to the next stage only the results of the instruction that performed the operation.
 
-- Fifth Stage:
-This is the last stage and it is responsible for the retirement of the instructions, it is implemented by the [Retire Unit](https://github.com/Willian-Nunes/pucrs-rv/blob/master/rtl/retire.sv) the instructions that enter this stage first have a flow validation, this validation is made by a comparison of the instruction tag and the Retire Tag, if they are equal it means that the instruction is valid (belongs to the same Flow), otherwise it means that after the instruction was fetched a jump/branch occured and the flow was changed to a new one, this means the instruction must be discarded. Every time a jump/branch occurs the internal tag is increased and in the next cycle the Tag of the Fetch stage will also be increased to match.
+- Forth Stage:
+This is the last stage and it is responsible for the retirement of the instructions, it is implemented by the [Retire Unit](https://github.com/gaph-pucrs/PUC-RS5/blob/master/rtl/retire.sv) the instructions that enter this stage first have a flow validation, this validation is made by a comparison of the instruction tag and the Retire Tag, if they are equal it means that the instruction is valid (belongs to the same Flow), otherwise it means that after the instruction was fetched a jump/branch occured and the flow was changed to a new one, this means the instruction must be discarded. Every time a jump/branch occurs the internal tag is increased and in the next cycle the Tag of the Fetch stage will also be increased to match.
 This unit is responsible for performing the action of the instructions, this actions are performed the signals issued by this unit, that are 3 possible actions: 
 1) Write-back operantion in the register bank - performed by sending the "write enable" signal and the "data" to be written.
 2) Jump/Branch operation in the fetch unit - performed by sending the "jump" signal and the jump/branch address.
@@ -54,6 +51,10 @@ The Control of the processor flow is made by three main loops:
 
 3) The third loop comprehends the data hazard conflict mechanism that is implemented by the queue of register with pending writes.
 
+### Memory Interface
+<img src="PUCRS5_MemoryInterface.png" alt="Processor Interface">
+
+The processor implements The memory interface depicted in the above image. The Memory is a True dual port RAM where one port is used as a read-only port for instruction fetching and the other port is used read and write operations.
 
 ## Requirements
 
