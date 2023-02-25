@@ -1,1 +1,1 @@
-vopt -64 +acc=npr -l elaborate.log -L xil_defaultlib -L dist_mem_gen_v8_0_13 -L unisims_ver -L unimacro_ver -L secureip -work xil_defaultlib xil_defaultlib.regBankB xil_defaultlib.glbl -o regBankB_opt
+vopt -64 +acc=npr -l elaborate.log -L xil_defaultlib -L xpm -L dist_mem_gen_v8_0_13 -L unisims_ver -L unimacro_ver -L secureip -work xil_defaultlib xil_defaultlib.regBankB xil_defaultlib.glbl -o regBankB_opt
