@@ -1,29 +1,30 @@
 import my_pkg::*;
 
 module CSRBank (
-    input logic         clk,
-    input logic         reset,
-    input logic         rd_en,
-    input logic         wr_en,
-    input logic         killed,
-    input csr_ops       csr_op,
-    input logic [11:0]  addr,
-    input logic [31:0]  data,
-    output logic [31:0] out,
+    input   logic               clk,
+    input   logic               reset,
 
-    input logic         RAISE_EXCEPTION,
-    input logic         MACHINE_RETURN,
-    input EXCEPT_CODE   Exception_Code,
-    input Privilege     privilege,
-    input logic [31:0]  PC,
-    input logic [31:0]  instruction,
+    input   logic               read_enable_i,
+    input   logic               write_enable_i,
+    input   csrOperation_e      operation_i,
+    input   logic [11:0]        address_i,
+    input   logic [31:0]        data_i,
+    input   logic               killed,
+    output  logic [31:0]        out,
 
-    input logic [31:0]  IRQ,
-    input logic Interrupt_ACK,
-    output logic Interrupt_pending,
+    input   logic               raise_exception_i,
+    input   logic               machine_return_i,
+    input   exceptionCode_e     exception_code_i,
+    input   privilegeLevel_e    privilege_i,
+    input   logic [31:0]        pc_i,
+    input   logic [31:0]        instruction_i,
 
-    output logic [31:0] mtvec,
-    output logic [31:0] mepc
+    input   logic [31:0]        IRQ_i,
+    input   logic               interrupt_ack_i,
+    output  logic               interrupt_pending_o,
+
+    output  logic [31:0]        mtvec,
+    output  logic [31:0]        mepc
 );
 
     CSRs CSR;
@@ -32,12 +33,12 @@ module CSRBank (
     
     logic [31:0] wr_data, wmask, current_val;
     //logic [31:0] medeleg, mideleg; // NOT IMPLEMENTED YET (REQUIRED ONLY WHEN SYSTEM HAVE S-MODE)
-    INTERRUPT_CODE Interruption_Code;
+    interruptionCode_e Interruption_Code;
 
     assign mtvec = mtvec_r;
     assign mepc = mepc_r;
 
-    assign CSR = CSRs'(addr);
+    assign CSR = CSRs'(address_i);
 
     always_comb begin
         wmask <= '1;
@@ -61,12 +62,12 @@ module CSRBank (
     end
 
     always_comb
-        if(csr_op==WRITE)
-            wr_data <= data & wmask;
-        else if(csr_op==SET)
-            wr_data <= (current_val | data) & wmask;
-        else if(csr_op==CLEAR)
-            wr_data <= (current_val & (~data)) & wmask;
+        if(operation_i == WRITE)
+            wr_data <= data_i & wmask;
+        else if(operation_i == SET)
+            wr_data <= (current_val | data_i) & wmask;
+        else if(operation_i == CLEAR)
+            wr_data <= (current_val & (~data_i)) & wmask;
         else
             wr_data <= 'Z;
 
@@ -88,30 +89,34 @@ module CSRBank (
             mtval <= '0;
             //mip <= '0;
 
-        end else if(MACHINE_RETURN) begin
+        end else if(machine_return_i == 1) begin
             mstatus[3]      <= mstatus[7];          // MIE = MPIE
             // privilege = mstatus[12:11]           // priv = MPP
 
-        end else if(RAISE_EXCEPTION) begin
+        end else if(raise_exception_i == 1) begin
             mcause[31]       <= '0;
-            mcause[30:0]    <= Exception_Code;
-            mstatus[12:11]  <= privilege;           // MPP previous privilege
+            mcause[30:0]    <= exception_code_i;
+            mstatus[12:11]  <= privilege_i;           // MPP previous privilege
             // privilege    <= MACHINE
             mstatus[7]      <= mstatus[3];          // MPIE = MIE
             mstatus[3]      <= 0;                   // MIE = 0
-            mepc_r          <= (Exception_Code==ECALL_FROM_MMODE) ? PC : PC+4;                // Return address
-            mtval           <= (Exception_Code==ILLEGAL_INSTRUCTION) ? instruction : PC;
+            mepc_r          <= (exception_code_i == ECALL_FROM_MMODE) 
+                                ? pc_i 
+                                : pc_i+4;             // Return address
+            mtval           <= (exception_code_i == ILLEGAL_INSTRUCTION) 
+                                ? instruction_i 
+                                : pc_i;
 
-        end else if(Interrupt_ACK) begin
+        end else if(interrupt_ack_i == 1) begin
             mcause[31]      <= '1;
             mcause[30:0]    <= Interruption_Code;
-            mstatus[12:11]  <= privilege;           // MPP = previous privilege
+            mstatus[12:11]  <= privilege_i;           // MPP = previous privilege
             // privilege    <= MACHINE
             mstatus[7]      <= mstatus[3];          // MPIE = MIE
             mstatus[3]      <= 0;                   // MIE = 0
-            mepc_r          <= PC;                  // Return address
+            mepc_r          <= pc_i;                  // Return address
         
-        end else if(wr_en==1 && killed==0) begin
+        end else if(write_enable_i == 1 && killed == 0) begin
             case(CSR)
                 MSTATUS:    mstatus     <= wr_data;
                 MISA:       misa        <= wr_data;
@@ -131,7 +136,7 @@ module CSRBank (
     end
 
     always_comb
-        if(rd_en==1 && killed==0)
+        if(read_enable_i == 1 && killed == 0)
             case(CSR)
                 //RO
                 MVENDORID:  out <= '0;
@@ -168,11 +173,11 @@ module CSRBank (
         if (reset)
             mip <= '0;
         else
-            mip <= IRQ;
+            mip <= IRQ_i;
     
     always @(posedge clk)
-        if(mstatus[3]==1 && (mie & mip) && Interrupt_ACK==0) begin
-            Interrupt_pending <= 1;
+        if(mstatus[3] == 1 && (mie & mip) && interrupt_ack_i == 0) begin
+            interrupt_pending_o <= 1;
             if(mip[11] & mie[11])                   // Machine External
                 Interruption_Code <= M_EXT_INT;
             else if(mip[3] & mie[3])                // Machine Software
@@ -181,7 +186,7 @@ module CSRBank (
                 Interruption_Code <= M_TIM_INT;
 
         end else
-            Interrupt_pending <= 0;
+            interrupt_pending_o <= 0;
 
 //##################################################################################
     // PERFORMANCE MONITORS
@@ -191,7 +196,9 @@ module CSRBank (
             instret <= '0;
         end else begin
             cycle <= cycle + 1;
-            instret <= (killed == 1) ? instret : instret + 1;
+            instret <= (killed == 1) 
+                        ? instret 
+                        : instret + 1;
         end
 
 endmodule

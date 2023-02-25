@@ -14,65 +14,92 @@
  *
  * \detailed
  * Fetch Unit is the first stage of the PUCRS-RV processor. It has an
- * internal loop that contains the Program Counter(PC) that is increased by four 
+ * internal loop that contains the Program Counter(pc) that is increased by four 
  * on a new clock cycle or is replaced by a new address in case of a branch. 
  * It has a internal tag calculator that is increased in branchs and mantained
  * in regular flows, the tag leaves the unit with the instruction fetched.
  */
 
 module fetch  #(parameter start_address='0)(  //Generic start address
-    input logic         clk,
-    input logic         reset,
-    input logic         stall,
-    input logic         hazard,
-    input logic         jump,
-    input logic [31:0]  result,
-    output logic [31:0] i_address,
-    output logic [31:0] NPC,
-    output logic [3:0]  tag_out,
-    ///////////////////////////////
-    input logic [31:0]  mtvec,
-    input logic [31:0]  mepc,
-    input logic         EXCEPTION_RAISED,
-    input logic         MACHINE_RETURN,
-    input logic         Interrupt_ACK
+    input   logic           clk,
+    input   logic           reset,
+    input   logic           stall,
+
+    input   logic           hazard_i,
+    input   logic           jump_i,
+    input   logic [31:0]    jump_target_i,
+    
+    output  logic [31:0]    instruction_address_o,
+    output  logic [31:0]    pc_o,
+    output  logic [2:0]     tag_o,
+
+    input   logic [31:0]    mtvec_i,
+    input   logic [31:0]    mepc_i,
+    input   logic           exception_raised_i,
+    input   logic           machine_return_i,
+    input   logic           interrupt_ack_i
 );
 
-    logic [31:0] PC, PC_plus4;
-    logic [3:0] next_tag, curr_tag;
+    logic [31:0] pc, pc_plus4;
+    logic [2:0] next_tag, current_tag;
 
-///////////////////////////////////////////////// PC Control ////////////////////////////////////////////////////////////////////////////////////////
-    always @(posedge clk)
-        if (reset)
-            PC <= start_address;
-        else if (MACHINE_RETURN)                                   
-            PC <= mepc;
-        else if (EXCEPTION_RAISED || Interrupt_ACK)                                   
-            PC <= mtvec;
-        else if (jump)
-            PC <= result;
-        else if (!hazard && !stall)
-            PC <= PC_plus4;
+//////////////////////////////////////////////////////////////////////////////
+// PC Control
+//////////////////////////////////////////////////////////////////////////////
 
-    assign PC_plus4 = PC + 4;
-
-///////////////////////////////////////////////// Sensitive Outputs /////////////////////////////////////////////////////////////////////////////////
-    always @(posedge clk)
-        if(!hazard && !stall)
-            NPC <= PC;
-
-///////////////////////////////////////////////// TAG Calculator ////////////////////////////////////////////////////////////////////////////////////
-    always @(posedge clk)
+    always @(posedge clk) begin
         if (reset) begin
-            curr_tag <= 0;
-            next_tag <= 0;
-        end else if (jump | EXCEPTION_RAISED | MACHINE_RETURN | Interrupt_ACK)
-            next_tag <= curr_tag + 1;
-        else if (!hazard && !stall)
-            curr_tag <= next_tag;
+            pc <= start_address;
+        end
+        else if (machine_return_i == 1) begin                              
+            pc <= mepc_i;
+        end
+        else if (exception_raised_i == 1 || interrupt_ack_i == 1) begin                               
+            pc <= mtvec_i;
+        end
+        else if (jump_i == 1) begin
+            pc <= jump_target_i;
+        end
+        else if (hazard_i == 0 && stall == 0) begin
+            pc <= pc_plus4;
+        end
+    end
 
-///////////////////////////////////////////////// Non-Sensitive Outputs /////////////////////////////////////////////////////////////////////////////
-    assign i_address = PC;
-    assign tag_out = curr_tag;
+    assign pc_plus4 = pc + 4;
+
+//////////////////////////////////////////////////////////////////////////////
+// Sensitive Outputs 
+//////////////////////////////////////////////////////////////////////////////
+
+    always @(posedge clk) begin
+        if(hazard_i == 0 && stall == 0) begin
+            pc_o <= pc;
+        end
+    end
+
+//////////////////////////////////////////////////////////////////////////////
+// Non-Sensitive Outputs 
+//////////////////////////////////////////////////////////////////////////////
+
+    assign instruction_address_o = pc;
+    assign tag_o = current_tag;
+
+//////////////////////////////////////////////////////////////////////////////
+// TAG Calculator 
+//////////////////////////////////////////////////////////////////////////////
+
+    always @(posedge clk) begin
+        if (reset) begin
+            current_tag <= 0;
+            next_tag <= 0;
+        end
+        else if (jump_i == 1 || exception_raised_i == 1 || machine_return_i == 1 || interrupt_ack_i == 1) begin
+            next_tag <= current_tag + 1;
+        end
+        else if (hazard_i == 0 && stall == 0) begin
+            current_tag <= next_tag;
+        end
+
+    end
 
 endmodule

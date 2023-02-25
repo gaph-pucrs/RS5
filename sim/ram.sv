@@ -19,19 +19,21 @@
 `timescale 1ns/1ps
 import my_pkg::*;
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////// SYNC RAM MEMORY IMPLEMENTATION ////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+// RAM MEMORY
+//////////////////////////////////////////////////////////////////////////////
 
 module RAM_mem (
     input logic clk,
-    input logic [15:0] i_addr, 
-    output logic [31:0] i_data,
-    input logic en,
-    input logic [3:0] w_en,
-    input logic [15:0] d_addr,
-    input logic [31:0] w_data,
-    output logic [31:0] r_data
+
+    input logic [15:0] instruction_address_i, 
+    output logic [31:0] instruction_o,
+
+    input logic operation_enable_i,
+    input logic [3:0] write_enable_i,
+    input logic [15:0] data_address_i,
+    input logic [31:0] data_i,
+    output logic [31:0] data_o
 );
 
     reg [7:0] RAM [0:65535];
@@ -39,7 +41,7 @@ module RAM_mem (
     int fd_i, fd_r, fd_w;
 
     initial begin
-        fd = $fopen ("/home/williannunes/pucrs-rv/app/riscv-tests/test.bin", "r");
+        fd = $fopen ("../bin/test.bin", "r");
 
         r = $fread(RAM, fd);
         $display("read %d elements \n", r);
@@ -52,48 +54,58 @@ module RAM_mem (
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////// DATA MEMORY ////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    always @(posedge clk)
-        if (en==1) begin
+    always @(posedge clk) begin
+        if (operation_enable_i == 1) begin
             ///////////////////////////// Writes  ///////////////////////////////////////////
-            if (w_en!=0) begin
-                if (w_en[3]==1)                                  // Store Word(4 bytes)
-                    RAM[d_addr+3] <= w_data[31:24];
-                if (w_en[2]==1)                                  // Store Word(4 bytes)
-                    RAM[d_addr+2] <= w_data[23:16];
-                if (w_en[1]==1)                                  // Store Half(2 bytes)
-                    RAM[d_addr+1] <= w_data[15:8];
-                if (w_en[0]==1)                                  // Store Byte(1 byte)
-                    RAM[d_addr]   <= w_data[7:0];
+            if (write_enable_i != 0) begin
+                if (write_enable_i[3] == 1) begin                                 // Store Word(4 bytes)
+                    RAM[data_address_i+3] <= data_i[31:24];
+                end 
+                if (write_enable_i[2] == 1) begin                                 // Store Word(4 bytes)
+                    RAM[data_address_i+2] <= data_i[23:16];
+                end
+                if (write_enable_i[1] == 1) begin                                 // Store Half(2 bytes)
+                    RAM[data_address_i+1] <= data_i[15:8];
+                end
+                if (write_enable_i[0] == 1) begin                                 // Store Byte(1 byte)
+                    RAM[data_address_i]   <= data_i[7:0];
+                end
 
                 $fwrite(fd_w,"[%0d] ", $time);
-                if (w_en[3]==1) $fwrite(fd_w,"%h ", w_data[31:24]); else $fwrite(fd_w,"-- ");
-                if (w_en[2]==1) $fwrite(fd_w,"%h ", w_data[23:16]); else $fwrite(fd_w,"-- ");
-                if (w_en[1]==1) $fwrite(fd_w,"%h ", w_data[15:8]);  else $fwrite(fd_w,"-- ");
-                if (w_en[0]==1) $fwrite(fd_w,"%h ", w_data[7:0]);   else $fwrite(fd_w,"-- ");
-                $fwrite(fd_w," --> 0x%4h\n", d_addr);
+                if (write_enable_i[3] == 1) $fwrite(fd_w,"%h ", data_i[31:24]); else $fwrite(fd_w,"-- ");
+                if (write_enable_i[2] == 1) $fwrite(fd_w,"%h ", data_i[23:16]); else $fwrite(fd_w,"-- ");
+                if (write_enable_i[1] == 1) $fwrite(fd_w,"%h ", data_i[15:8]);  else $fwrite(fd_w,"-- ");
+                if (write_enable_i[0] == 1) $fwrite(fd_w,"%h ", data_i[7:0]);   else $fwrite(fd_w,"-- ");
+                $fwrite(fd_w," --> 0x%4h\n", data_address_i);
             //////////////////////////// Reads //////////////////////////////////////////////
-            end else begin
-                r_data[31:24] <= RAM[d_addr+3];
-                r_data[23:16] <= RAM[d_addr+2];
-                r_data[15:8]  <= RAM[d_addr+1];
-                r_data[7:0]   <= RAM[d_addr];
+            end 
+            else begin
+                data_o[31:24] <= RAM[data_address_i+3];
+                data_o[23:16] <= RAM[data_address_i+2];
+                data_o[15:8]  <= RAM[data_address_i+1];
+                data_o[7:0]   <= RAM[data_address_i];
 
-                if (d_addr!=0)
-                    $fwrite(fd_r,"[%0d] %h %h %h %h <-- 0x%4h\n", $time, RAM[d_addr+3], RAM[d_addr+2], RAM[d_addr+1], RAM[d_addr], d_addr);
+                if (data_address_i != 0) begin
+                    $fwrite(fd_r,"[%0d] %h %h %h %h <-- 0x%4h\n", 
+                                $time, RAM[data_address_i+3], RAM[data_address_i+2], RAM[data_address_i+1], RAM[data_address_i], data_address_i);
+                end
             end
-
-        end else
-            r_data <= '0;
+        end 
+        else begin
+            data_o <= '0;
+        end
+    end
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////// INSTRUCTION MEMORY /////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     always @(posedge clk) begin
-        i_data[31:24] <= RAM[i_addr+3];
-        i_data[23:16] <= RAM[i_addr+2];
-        i_data[15:8]  <= RAM[i_addr+1];
-        i_data[7:0]   <= RAM[i_addr];
+        instruction_o[31:24] <= RAM[instruction_address_i+3];
+        instruction_o[23:16] <= RAM[instruction_address_i+2];
+        instruction_o[15:8]  <= RAM[instruction_address_i+1];
+        instruction_o[7:0]   <= RAM[instruction_address_i];
 
-        $fwrite(fd_i,"[%0d] %h -> %h %h %h %h \n", $time, i_addr, RAM[i_addr+3], RAM[i_addr+2], RAM[i_addr+1], RAM[i_addr]);
+        $fwrite(fd_i,"[%0d] %h -> %h %h %h %h \n", 
+                    $time, instruction_address_i, RAM[instruction_address_i+3], RAM[instruction_address_i+2], RAM[instruction_address_i+1], RAM[instruction_address_i]);
     end
 endmodule

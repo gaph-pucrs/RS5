@@ -3,105 +3,127 @@ import my_pkg::*;
 module Peripherals (
     input logic         clk,
     input logic         reset,
-    input logic         enable,
-    input logic [3:0]   write,
-    input logic [31:0]  DATA_address,
-    input logic [31:0]  DATA_in,
-    output logic [31:0] DATA_out,
+    
+    input logic         enable_i,
+    input logic [3:0]   write_enable_i,
+    input logic [31:0]  data_address_i,
+    input logic [31:0]  data_i,
+    output logic [31:0] data_o,
     output logic [7:0]  gpioa_out,
     output logic [7:0]  gpioa_addr,
     input logic         BTND,
     output logic        UART_TX,
-    output logic        stall,
-    output logic [31:0] IRQ,
-    input logic         Interrupt_ACK
+    output logic        stall_o,
+    output logic [31:0] IRQ_o,
+    input logic         interrupt_ack_i
 );
 
 logic stall_r;
-logic [31:0] DATA_r, counter;
-logic Buffer_write, Buffer_read, Buffer_empty, Buffer_full;
-logic [7:0] Buffer_data;
+logic [31:0] data_r, counter;
+logic BUFFER_write, BUFFER_read, BUFFER_empty, BUFFER_full;
+logic [7:0] BUFFER_data;
 logic UART_send, UART_ready;
 logic [7:0] UART_data;
 logic BTND_Debounced, BTND_Debounced_r, Button_Detected, Button_request;
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////// Writes in Peripherals ////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    always @(posedge clk)
-        if (enable==1 && write!=0) begin
-            ///////////////////////////////////// OUTPUT REG ///////////////////////////////////
-            if ((DATA_address == 32'h80004000 || DATA_address == 32'h80001000) && Buffer_full==0) begin
-                gpioa_out <= DATA_in[7:0];
+
+//////////////////////////////////////////////////////////////////////////////
+// Writes in Peripherals
+//////////////////////////////////////////////////////////////////////////////
+
+    always @(posedge clk) begin
+        if (enable_i == 1 && write_enable_i != 0) begin
+            /// OUTPUT REG
+            if ((data_address_i == 32'h80004000 || data_address_i == 32'h80001000) && BUFFER_full==0) begin
+                gpioa_out <= data_i[7:0];
                 gpioa_addr <= 8'h84;
-                Buffer_write <= 1;
-                Buffer_data <= DATA_in[7:0];
+                BUFFER_write <= 1;
+                BUFFER_data <= data_i[7:0];
             end
-            ///////////////////////////////////// END REG //////////////////////////////////////
-            else if (DATA_address==32'h80000000)
+            // END REG
+            else if (data_address_i == 32'h80000000) begin
                 gpioa_addr <= 8'h80;
-            ///////////////////////////////////// NOTHING //////////////////////////////////////
+            end
+            // NOTHING
             else begin
                 gpioa_out <= '0;
                 gpioa_addr <= '0;
-                Buffer_write <= '0;         
+                BUFFER_write <= '0;         
             end
 
         end else begin
             gpioa_out <= '0;
             gpioa_addr <= '0;
-            Buffer_write <= '0;         
+            BUFFER_write <= '0;         
         end
+    end
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////// Reads from Peripherals ///////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    always @(posedge clk)
-        if (enable==1 && write==0) begin
+//////////////////////////////////////////////////////////////////////////////
+// Reads from Peripherals
+//////////////////////////////////////////////////////////////////////////////
+
+    always @(posedge clk) begin
+        if (enable_i == 1 && write_enable_i == 0) begin
         ///////////////////////////////////// TIMER REG ////////////////////////////////////
-            if (DATA_address==32'h80006000)
-                DATA_r <= counter;
+            if (data_address_i == 32'h80006000)
+                data_r <= counter;
             else
-                DATA_r <= '0;
+                data_r <= '0;
 
         end else begin
-            DATA_r <= '0;
+            data_r <= '0;
         end
+    end
+//////////////////////////////////////////////////////////////////////////////
+// INTERRUPT CONTROL
+//////////////////////////////////////////////////////////////////////////////
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////// INTERRUPT CONTROL ////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    always @(posedge clk)
-        if (reset)
-            IRQ <= '0;
-        ///////////////////////////////////// EXTERNAL /////////////////////////////////////
-        else if (IRQ[11]==1 && Interrupt_ACK)
-            IRQ[11] <= 0;
-        else if (Button_request==1)
-            IRQ[11] <= 1;
-        ///////////////////////////////////// TIMER ////////////////////////////////////////
-        else if (IRQ[7]==1 && Interrupt_ACK)
-            IRQ[7] <= 0;
-        else if (counter>=32'h0EE6B280)              // 1 SEC = (02FAF080)50000000 * 20ns                * 5 =  h0EE6B280
-            IRQ[7] <= 1;
+    always @(posedge clk) begin
+        if (reset == 1) begin
+            IRQ_o <= '0;
+        end
+        // EXTERNAL
+        else if (IRQ_o[11] == 1 && interrupt_ack_i == 1) begin
+            IRQ_o[11] <= 0;
+        end
+        else if (Button_request == 1) begin
+            IRQ_o[11] <= 1;
+        end
+        // TIMER
+        else if (IRQ_o[7] == 1 && interrupt_ack_i == 1) begin
+            IRQ_o[7] <= 0;
+        end
+        else if (counter >= 32'h0EE6B280) begin
+            IRQ_o[7] <= 1;
+        end
+    end
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////// TIMER AND BUTTON /////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    always @(posedge clk)
-        if (reset)
+//////////////////////////////////////////////////////////////////////////////
+// TIMER AND BUTTON
+//////////////////////////////////////////////////////////////////////////////
+
+    always @(posedge clk) begin
+        if (reset == 1) begin
             counter <= 0;
-        else if (IRQ[7]==1 && Interrupt_ACK)
+        end
+        else if (IRQ_o[7] == 1 && interrupt_ack_i == 1) begin
             counter <= 0;
-        else
+        end
+        else begin
             counter <= counter + 1;
+        end
+    end
 
-    always @(posedge clk )
-        if (reset)
+    always @(posedge clk) begin
+        if (reset == 1) begin
             Button_request <= 0;
-        else if (IRQ[11]==1 && Interrupt_ACK)
+        end
+        else if (IRQ_o[11] == 1 && interrupt_ack_i == 1) begin
             Button_request <= 0;
-        else if (Button_Detected==1 || Button_request)
+        end
+        else if (Button_Detected == 1 || Button_request == 1) begin
             Button_request <= 1;
+        end
+    end
 
     debouncer #(.DEBNC_CLOCKS(2**16), .PORT_WIDTH(1)) Debouncer (
         .CLK_I(clk),
@@ -109,42 +131,53 @@ logic BTND_Debounced, BTND_Debounced_r, Button_Detected, Button_request;
         .SIGNAL_O(BTND_Debounced)
     );
 
-    always @(posedge clk )
-        BTND_Debounced_r <= BTND_Debounced;
-
-    assign Button_Detected = (BTND_Debounced_r==0 && BTND_Debounced==1);
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////// STALL GENERATION /////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    always_comb
-        if(enable==1) begin
-            ///////////////////////////////////// READS ////////////////////////////////////////////
-            if (write==0 && stall_r!=1)
-                if (DATA_address==32'h80006000)
-                    stall <= 1;
-                else
-                    stall <= 0;
-            ///////////////////////////////////// WRITES ///////////////////////////////////////////
-            else if (write!=0)
-                if ((DATA_address == 32'h80004000 || DATA_address == 32'h80001000) && Buffer_full==1)
-                    stall <= 1;
-                else
-                    stall <= 0;
-
-            else
-                stall <= 0;
-
-        end else
-                stall <= 0;
-
     always @(posedge clk) begin
-        stall_r <= stall;
-        DATA_out <= DATA_r;
+        BTND_Debounced_r <= BTND_Debounced;
+    end
+    assign Button_Detected = (BTND_Debounced_r == 0 && BTND_Debounced == 1);
+
+//////////////////////////////////////////////////////////////////////////////
+// STALL GENERATION
+//////////////////////////////////////////////////////////////////////////////
+
+    always_comb begin
+        if (enable_i == 1) begin
+            // READS
+            if (write_enable_i == 0 && stall_r != 1) begin
+                if (data_address_i == 32'h80006000) begin
+                    stall_o <= 1;
+                end
+                else begin
+                    stall_o <= 0;
+                end
+            end
+            // WRITES
+            else if (write_enable_i != 0) begin
+                if ((data_address_i == 32'h80004000 || data_address_i == 32'h80001000) && BUFFER_full == 1) begin
+                    stall_o <= 1;
+                end
+                else begin
+                    stall_o <= 0;
+                end
+            end
+            else begin
+                stall_o <= 0;
+            end
+        end 
+        else begin
+            stall_o <= 0;
+        end
     end
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////// UART INSTANTIATION ///////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    always @(posedge clk) begin
+        stall_r <= stall_o;
+        data_o <= data_r;
+    end
+
+//////////////////////////////////////////////////////////////////////////////
+// UART INSTANTIATION
+//////////////////////////////////////////////////////////////////////////////
+
     UART_TX_CTRL UART(
         .CLK(clk),
         .SEND(UART_send),
@@ -153,24 +186,25 @@ logic BTND_Debounced, BTND_Debounced_r, Button_Detected, Button_request;
         .UART_TX(UART_TX)
     );
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////// UART BUFFER //////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+// UART BUFFER
+//////////////////////////////////////////////////////////////////////////////
+
     FIFO_BUFFER_UART FIFO_BUFFER_UART1 (
     .clk(clk),                // input wire clk
     .srst(reset),             // input wire srst
-    .din(Buffer_data),        // input wire [7 : 0] din
-    .wr_en(Buffer_write),     // input wire wr_en
-    .rd_en(Buffer_read),      // input wire rd_en
+    .din(BUFFER_data),        // input wire [7 : 0] din
+    .wr_en(BUFFER_write),     // input wire wr_en
+    .rd_en(BUFFER_read),      // input wire rd_en
     .dout(UART_data),         // output wire [7 : 0] dout
-    .full(Buffer_full),       // output wire full
-    .empty(Buffer_empty)      // output wire empty
+    .full(BUFFER_full),       // output wire full
+    .empty(BUFFER_empty)      // output wire empty
     );
 
-    assign Buffer_read = UART_ready & !Buffer_empty & !UART_send;
+    assign BUFFER_read = UART_ready & !BUFFER_empty & !UART_send;
 
-    always @(posedge clk ) begin
-        UART_send <= Buffer_read;
+    always @(posedge clk) begin
+        UART_send <= BUFFER_read;
     end
 
 endmodule

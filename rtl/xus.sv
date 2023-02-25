@@ -18,306 +18,378 @@
 
 import my_pkg::*;
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-///                                    ADDER                                                    ///
-///////////////////////////////////////////////////////////////////////////////////////////////////
+//--------------------------------------------------------------------------------------------------
+// ADDER UNIT
+//--------------------------------------------------------------------------------------------------
 
 module adderUnit (
-    input logic [31:0]  opA,
-    input logic [31:0]  opB,
-    input op_type       i,
-    output logic [31:0] result
+    input   logic [31:0]        first_operand_i,
+    input   logic [31:0]        second_operand_i,
+    input   operationType_e     operation_i,
+
+    output  logic [31:0]        result_o
 );
 
-    always_comb
-        if (i==OP3)                                     // Set if opA is less than opB (SLT)
-            if ($signed(opA) < $signed(opB))
-                result <= 32'b1;
-            else
-                result <= 32'b0;
-
-        else if (i==OP2)                                // Set if opA is less than opB UNSIGNED (SLTU)
-            if ($unsigned(opA) < $unsigned(opB))
-                result <= 32'b1;
-            else
-                result <= 32'b0;
-
-        else if (i==OP1)                                // SUBTRACT (SUB)
-            result <= opA - opB;
-
-        else                                            // ADD (ADD,ADDI and AUIPC)
-            result <= opA + opB;
+    always_comb begin
+        if (operation_i == OP3) begin
+            if ($signed(first_operand_i) < $signed(second_operand_i)) begin
+                result_o <= 32'b1;
+            end
+            else begin
+                result_o <= 32'b0;
+            end
+        end
+        else if (operation_i == OP2) begin
+            if ($unsigned(first_operand_i) < $unsigned(second_operand_i)) begin
+                result_o <= 32'b1;
+            end
+            else begin
+                result_o <= 32'b0;
+            end
+        end
+        else if (operation_i == OP1) begin
+            result_o <= first_operand_i - second_operand_i;
+        end
+        else begin
+            result_o <= first_operand_i + second_operand_i;
+        end
+    end
 endmodule
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-///                                    BRANCH                                                   ///
-///////////////////////////////////////////////////////////////////////////////////////////////////
+//--------------------------------------------------------------------------------------------------
+// BRANCH UNIT
+//--------------------------------------------------------------------------------------------------
 
 module branchUnit (
-    input logic [31:0]  opA,                            // In JALR is used to calculate the target and in conditional is used as condition
-    input logic [31:0]  opB,                            // In JALR is used to calculate the target and in conditional is used as condition
-    input logic [31:0]  offset,                         // Immediate OFFSET is added to PC value
-    input logic [31:0]  NPC,                            // PC value
-    input op_type       i,                              // Instruction Type
-    output logic [31:0] result,                         // Branch target
-    output logic [31:0] result_jal,                     // Return csr_addres to a JAL instruction (NPC+4)
-    output logic        jump,                           // Signal that indicate a jump/branch
-    output logic        we                              // Wrtie enable to register bank (used only in JAL)
+    input   logic [31:0]        first_operand_i,                // In JALR is used to calculate the target and in conditional is used as condition
+    input   logic [31:0]        second_operand_i,               // In JALR is used to calculate the target and in conditional is used as condition
+    input   logic [31:0]        offset_i,                       // Immediate OFFSET is added to PC value
+    input   logic [31:0]        pc_i,                           // PC value
+    input   operationType_e     operation_i,                    // Operation Type
+
+    output  logic [31:0]        result_o,                       // Branch target
+    output  logic [31:0]        result_jal_o,                   // Return csr_addres to a JAL instruction (pc_i+4)
+    output  logic               jump_o,                         // Signal that indicate a jump/branch
+    output  logic               write_enable_o                  // Write enable to register bank (used only in JAL)
 );
 
     logic [31:0]        sum;
 
-///////////////////////////////////////////////// Result assign /////////////////////////////////////////////////////////////////////////////////////
-    assign sum = opA + opB;                             // Generates the JALR target
-    assign result_jal = NPC + 4;
+//////////////////////////////////////////////////////////////////////////////
+// Result assignment
+//////////////////////////////////////////////////////////////////////////////
 
-    always_comb
-        if (i==OP6)                                     // JAL
-            result <= sum;                              // Branch target is Sum of opA and opB
+    assign sum          = first_operand_i + second_operand_i;
+    assign result_jal_o = pc_i + 4;
 
-        else if (i==OP7) begin                          // JALR
-            result[31:1] <= sum[31:1];                  // Branch target is opA+opB with
-            result[0]<=0;                               // The less significant digit in 0
+    always_comb begin
+        if (operation_i == OP6) begin                       // JAL - Branch target is Sum of first_operand_i and second_operand_i
+            result_o <= sum;
+        end
+        else if (operation_i == OP7) begin                  // JALR - Branch target is first_operand_i+second_operand_i with
+            result_o[31:1] <= sum[31:1];
+            result_o[0]    <= 0;
+        end 
+        else begin                                          // Conditional Branches - Branch target is PC + immediate
+            result_o <= pc_i + offset_i;
+        end
+    end
 
-        end else                                        // Conditional Branches
-            result <= NPC + offset;                     // Branch target is PC + immediate
+//////////////////////////////////////////////////////////////////////////////
+// Genarates the branch signal
+//////////////////////////////////////////////////////////////////////////////
 
-///////////////////////////////////////////////// Genarates the branch signal ///////////////////////////////////////////////////////////////////////
-    always_comb
-      if (i==OP0)                                       // Branch if equals (BEQ)
-        jump <= (opA == opB);
-      else if (i==OP1)                                  // Branch if not equal (BNE)
-        jump <= (opA != opB);
-      else if (i==OP2)                                  // Branch if less than (BLT)
-        jump <= ($signed(opA) < $signed(opB));
-      else if (i==OP3)                                  // Branch if less than unsigned (BLTU)
-        jump <= ($unsigned(opA) < $unsigned(opB));
-      else if (i==OP4)                                  // Branch if greather or equals than (BGE)
-        jump <= ($signed(opA) >= $signed(opB));
-      else if (i==OP5)                                  // Branch if greather or equals than unsigned (BGEU)
-        jump <= ($unsigned(opA) >= $unsigned(opB));
-      else if (i==OP6 || i==OP7)                        // Unconditional Branches
-        jump <= 1;
-      else
-        jump <= 0;
+    always_comb begin
+        if (operation_i == OP0) begin                                    // Branch if equals (BEQ)
+            jump_o <= (first_operand_i == second_operand_i);
+        end
+        
+        else if (operation_i == OP1) begin                               // Branch if not equal (BNE)
+            jump_o <= (first_operand_i != second_operand_i);
+        end
+        
+        else if (operation_i == OP2) begin                               // Branch if less than (BLT)
+            jump_o <= ($signed(first_operand_i) < $signed(second_operand_i));
+        end
+        
+        else if (operation_i == OP3) begin                               // Branch if less than unsigned (BLTU)
+            jump_o <= ($unsigned(first_operand_i) < $unsigned(second_operand_i));
+        end
+        
+        else if (operation_i == OP4) begin                               // Branch if greather or equals than (BGE)
+            jump_o <= ($signed(first_operand_i) >= $signed(second_operand_i));
+        end
+        
+        else if (operation_i == OP5) begin                               // Branch if greather or equals than unsigned (BGEU)
+            jump_o <= ($unsigned(first_operand_i) >= $unsigned(second_operand_i));
+        end
+        
+        else if (operation_i == OP6 || operation_i == OP7) begin         // Unconditional Branches
+            jump_o <= 1;
+        end
+        
+        else begin
+            jump_o <= 0;
+        end
+    end
 
-///////////////////////////////////////////////// Write enable signal generator /////////////////////////////////////////////////////////////////////
-    always_comb                                         // Register write enable is 1 in JAL and JALR instructions
-        if (i==OP6 || i==OP7)
-            we <= '1;
-        else 
-            we <= '0;
+//////////////////////////////////////////////////////////////////////////////
+// Write enable signal generator
+//////////////////////////////////////////////////////////////////////////////
+
+    always_comb begin  // Register write enable is 1 in JAL and JALR instructions
+        if (operation_i == OP6 || operation_i == OP7) begin
+            write_enable_o <= '1;
+        end
+        else begin
+            write_enable_o <= '0;
+        end
+    end
+
 endmodule
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-///                                    LOGIC                                                    ///
-///////////////////////////////////////////////////////////////////////////////////////////////////
+//--------------------------------------------------------------------------------------------------
+// LOGIC UNIT
+//--------------------------------------------------------------------------------------------------
 
 module logicUnit (
-    input logic [31:0]  opA,
-    input logic [31:0]  opB,
-    input op_type       i,
-    output logic [31:0] result
+    input   logic [31:0]        first_operand_i,
+    input   logic [31:0]        second_operand_i,
+    input   operationType_e     operation_i,
+    output  logic [31:0]        result_o
 );
 
-    always_comb
-        if (i==OP0)                      // XOR
-            result <= opA ^ opB;
-        else if (i==OP1)                 // OR
-            result <= opA | opB;
-        else                             // AND
-            result <= opA & opB;
+    always_comb begin
+        if (operation_i == OP0) begin
+            result_o <= first_operand_i ^ second_operand_i;
+        end
+        else if (operation_i == OP1) begin
+            result_o <= first_operand_i | second_operand_i;
+        end
+        else begin
+            result_o <= first_operand_i & second_operand_i;
+        end
+    end
 endmodule
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-///                                    MEMORY                                                   ///
-///////////////////////////////////////////////////////////////////////////////////////////////////
+//--------------------------------------------------------------------------------------------------
+// LOAD-STORE UNIT
+//--------------------------------------------------------------------------------------------------
 
 module LSUnit (
-    input logic [31:0]  opA,                            // Base csr_address
-    input logic [31:0]  opB,                            // Offset
-    input logic [31:0]  data,                           // Data to be Written in memory
-    input op_type       i,                              // Instruction type
-    input logic         en,                             // enable memory operation based on instruction
-    output logic [31:0] read_address,                   // Read Memory csr_address
-    output logic        read,                           // Signal that allows memory read
-    output logic [31:0] write_address,                  // Adrress to Write in memory
-    output logic [31:0] write_data,                     // Data to be Written in Register Bank or in memory
-    output logic [3:0]  we_mem,                         // Signal that indicates the size of Write in memory(byte(1),half(2),word(4))
-    output logic        we_rb                           // Write enable signal to register bank, in Stores=0 and in Loads=1
+    input   logic [31:0]        first_operand_i,                // Base csr_address
+    input   logic [31:0]        second_operand_i,               // Offset
+    input   logic [31:0]        data_i,                         // Data to be Written in memory
+    input   operationType_e     operation_i,
+    input   logic               enable_i,                       // enable memory operation based on instruction
+
+    output  logic [31:0]        read_address_o,                 // Read Memory csr_address
+    output  logic               read_o,                         // Signal that allows memory read
+    output  logic [31:0]        write_address_o,                // Adrress to Write in memory
+    output  logic [31:0]        write_data_o,                   // Data to be Written in Register Bank or in memory
+    output  logic [3:0]         write_enable_o,                 // Signal that indicates the size of Write in memory(byte(1),half(2),word(4))
+    output  logic               write_enable_regBank            // Write enable signal to register bank, in Stores=0 and in Loads=1
 );
 
     logic [31:0] sum;
-    assign sum = opA + opB;
 
-///////////////////////////////////// generate all signals for read or write ////////////////////////////////////////////////////////////////////////
+//--------------------------------------------------------------------------------------------------
+// Generate all signals for read or write
+//--------------------------------------------------------------------------------------------------
+
     always_comb begin
-        if (en) begin
-            if (i==OP0 | i==OP1) begin                      // Load Byte signed and unsigned (LB | LBU)
-                read <= 1;
-                write_data <= '0;
-                we_mem <= 4'b0000;
-
-            end else if (i==OP2 | i==OP3) begin             // Load Half(16b) signed and unsigned (LH | LHU)
-                read <= 1;
-                write_data <= '0;
-                we_mem <= 4'b0000;
-
-            end else if (i==OP4) begin                      // Load Word(32b) (LW)
-                read <= 1;
-                write_data <= '0;
-                we_mem <= 4'b0000;
-
-            end else if (i==OP5) begin                      // Store Byte (SB)
-                read <= 0;
-                write_data[31:24] <= data[7:0];
-                write_data[23:16] <= data[7:0];
-                write_data[15:8] <= data[7:0];
-                write_data[7:0] <= data[7:0];
+        if (enable_i == 1) begin
+            if (operation_i == OP0 || operation_i == OP1) begin // LB | LBU
+                read_o          <= 1;
+                write_data_o    <= '0;
+                write_enable_o  <= 4'b0000;
+            end 
+            else if (operation_i == OP2 || operation_i == OP3) begin // LH | LHU
+                read_o          <= 1;
+                write_data_o    <= '0;
+                write_enable_o  <= 4'b0000;
+            end 
+            else if (operation_i == OP4) begin // LW
+                read_o          <= 1;
+                write_data_o    <= '0;
+                write_enable_o  <= 4'b0000;
+            end 
+            else if (operation_i == OP5) begin // SB
+                read_o <= 0;
+                write_data_o[31:24] <= data_i[7:0];
+                write_data_o[23:16] <= data_i[7:0];
+                write_data_o[15:8]  <= data_i[7:0];
+                write_data_o[7:0]   <= data_i[7:0];
                 case (sum[1:0])
-                    2'b11:   we_mem <= 4'b1000;
-                    2'b10:   we_mem <= 4'b0100;
-                    2'b01:   we_mem <= 4'b0010;
-                    default: we_mem <= 4'b0001;
+                    2'b11:   write_enable_o <= 4'b1000;
+                    2'b10:   write_enable_o <= 4'b0100;
+                    2'b01:   write_enable_o <= 4'b0010;
+                    default: write_enable_o <= 4'b0001;
                 endcase
-                
-            end else if (i==OP6) begin                      // Store Half(16b) (SH)
-                read <= 0;
-                write_data[31:16] <= data[15:0];    
-                write_data[15:0] <= data[15:0];
-                we_mem <= (write_address[1]==1) ? 4'b1100 : 4'b0011;
-
-            end else if (i==OP7) begin                      // Store Word (SW)
-                read <= 0;
-                write_data[31:0] <= data[31:0];  
-                we_mem <= 4'b1111;
-
-            end else begin
-                read <= 0;
-                write_data[31:0] <= '0;  
-                we_mem <= '0;
+            end 
+            else if (operation_i == OP6) begin // SH
+                read_o              <= 0;
+                write_data_o[31:16] <= data_i[15:0];    
+                write_data_o[15:0]  <= data_i[15:0];
+                write_enable_o      <= (write_address_o[1] == 1) 
+                                        ? 4'b1100 
+                                        : 4'b0011;
+            end 
+            else if (operation_i == OP7) begin // SW
+                read_o              <= 0;
+                write_data_o[31:0]  <= data_i[31:0];  
+                write_enable_o      <= 4'b1111;
+            end 
+            else begin
+                read_o              <= 0;
+                write_data_o[31:0]  <= '0;  
+                write_enable_o      <= '0;
             end
-            
-        end else begin
-            read <= 0;
-            write_data[31:0] <= '0;  
-            we_mem <= '0;
+        end 
+        else begin
+            read_o              <= 0;
+            write_data_o[31:0]  <= '0;  
+            write_enable_o      <= '0;
         end
-
-        //////////////////////////////////////////////
-        read_address = sum;
     end
 
-///////////////////////////////////////////////// Write enable to register bank ///////////////////////////////////////////////////////////////////////////
-    always_comb
-        if (i==OP5 || i==OP6 || i==OP7)                 // Stores do not write in regbank
-            we_rb <= '0;
-        else
-            we_rb <= '1;
+//////////////////////////////////////////////////////////////////////////////
+// Write enable to register bank
+//////////////////////////////////////////////////////////////////////////////
 
-///////////////////////////////////////////////// Output registers //////////////////////////////////////////////////////////////////////////////////
-    assign write_address = sum;
+    always_comb begin
+        if (operation_i == OP5 || operation_i == OP6 || operation_i == OP7) begin
+            write_enable_regBank <= '0;
+        end
+        else begin
+            write_enable_regBank <= '1;
+        end
+    end
+
+//////////////////////////////////////////////////////////////////////////////
+// Outputs assignment
+//////////////////////////////////////////////////////////////////////////////
+
+    assign sum = first_operand_i + second_operand_i;
+
+    assign write_address_o = sum;
+    assign read_address_o  = sum;
 
 endmodule
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-///                                    SHIFT                                                    ///
-///////////////////////////////////////////////////////////////////////////////////////////////////
+//--------------------------------------------------------------------------------------------------
+// SHIFT UNIT
+//--------------------------------------------------------------------------------------------------
 
 module shiftUnit (
-    input logic [31:0]  opA,
-    input logic [4:0]   opB,
-    input op_type i,
-    output logic [31:0] result
+    input   logic [31:0]        first_operand_i,
+    input   logic [4:0]         second_operand_i,
+    input   operationType_e     operation_i,
+
+    output  logic [31:0]        result_o
 );
 
-    always_comb 
-        if (i==OP0)                                     // Logical Left Shift (SLL)
-            result <= opA << opB;
-        else if (i==OP1)                                // Logical Right Shift (SRL)
-            result <= opA >> opB;
-        else                                            // Arithmetic Right Shift  (SRA)
-            result <= $signed(opA) >>> opB;
+    always_comb begin
+        if (operation_i == OP0) begin  // SLL
+            result_o <= first_operand_i << second_operand_i;
+        end
+        else if (operation_i == OP1) begin // SRL
+            result_o <= first_operand_i >> second_operand_i;
+        end
+        else begin // SRA
+            result_o <= $signed(first_operand_i) >>> second_operand_i;
+        end
+    end
 endmodule
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-///                                    CSR                                                      ///
-///////////////////////////////////////////////////////////////////////////////////////////////////
+//--------------------------------------------------------------------------------------------------
+// CSR UNIT
+//--------------------------------------------------------------------------------------------------
 
 module csrUnit (
-    input logic [31:0]  opA,
-    input logic [31:0]  instruction,
-    input op_type       i,
-    input Privilege     privilege,
-    output logic        csr_rd_en,
-    output logic        csr_wr_en,
-    output csr_ops      csr_op,
-    output logic [11:0] csr_addr,
-    output logic [31:0] csr_data,
-    output logic        csr_exception
+    input   logic [31:0]        first_operand_i,
+    input   logic [31:0]        instruction_i,
+    input   operationType_e     operation_i,
+    input   privilegeLevel_e    privilege_i,
+
+    output  logic               read_enable_o,
+    output  logic               write_enable_o,
+    output  csrOperation_e      operation_o,
+    output  logic [11:0]        address_o,
+    output  logic [31:0]        data_o,
+    output  logic               exception_o
 );
 
     logic csr_rd_en_int, csr_wr_en_int;
     logic [4:0] rd, rs1;
-    logic [11:0] csr_addr_int;
 
-    assign rd  = instruction[11:7];
-    assign rs1 = instruction[19:15];
-    assign csr_addr_int = instruction[31:20];
+    assign rd  = instruction_i[11:7];
+    assign rs1 = instruction_i[19:15];
 
-    assign csr_rd_en = csr_rd_en_int & !csr_exception;
-    assign csr_wr_en = csr_wr_en_int & !csr_exception;
+    assign address_o = instruction_i[31:20];
+
+    assign read_enable_o = csr_rd_en_int & !exception_o;
+    assign write_enable_o = csr_wr_en_int & !exception_o;
 
     always_comb begin
-        if (i==OP0 || i==OP3) begin                     // CSSRW or CSSRWI
+        if (operation_i == OP0 || operation_i == OP3) begin // CSSRW | CSSRWI
             csr_wr_en_int = 1;
-            if (rd==0)
+            if (rd == 0)
                 csr_rd_en_int = 0;
             else
                 csr_rd_en_int = 1;
 
-        end else if (i==OP1 || i==OP2 || i==OP4 || i==OP5) begin     // CSRRS/C and CSRRS/CI
+        end 
+        else if (operation_i == OP1 || operation_i == OP2 || operation_i == OP4 || operation_i == OP5) begin // CSRRS/C | CSRRS/CI
             csr_rd_en_int = 1;
-            if (rs1==0)
-                csr_wr_en_int = 0;
+            if (rs1 == 0)
+                csr_wr_en_int <= 0;
             else
-                csr_wr_en_int = 1;
-        
-        end else begin
+                csr_wr_en_int <= 1;
+        end 
+        else begin
             csr_rd_en_int <= 0;
             csr_wr_en_int <= 0;
         end
     end
 
-    always_comb begin
-        csr_addr <= csr_addr_int;
-        
-        if (i==OP0 || i==OP1 || i==OP2)
-            csr_data <= opA;
-        else
-            csr_data <= '0 & rs1;
+    always_comb begin      
+        if (operation_i == OP0 || operation_i == OP1 || operation_i == OP2) begin
+            data_o <= first_operand_i;
+        end
+        else begin
+            data_o <= '0 & rs1;
+        end
     end
 
-    always_comb 
-        if (i==OP0 || i==OP3)               // WRITE
-            csr_op <= WRITE;
-        else if (i==OP1 || i==OP4)          // SET
-            csr_op <= SET;
-        else if (i==OP2 || i==OP5)          // CLEAR
-            csr_op <= CLEAR;
-        else                                // NONE
-            csr_op <= NONE;
-
+    always_comb begin
+        if (operation_i == OP0 || operation_i == OP3) begin
+            operation_o <= WRITE;
+        end
+        else if (operation_i == OP1 || operation_i == OP4) begin
+            operation_o <= SET;
+        end
+        else if (operation_i == OP2 || operation_i == OP5) begin
+            operation_o <= CLEAR;
+        end
+        else begin
+            operation_o <= NONE;
+        end
+    end
     
     always_comb begin
         // Raise exeption if CSR is read only and write enable is true
-        if ((csr_addr[11:10] == 2'b11) && (csr_wr_en_int == 1))
-            csr_exception <= 1;
+        if (address_o[11:10] == 2'b11 && csr_wr_en_int == 1) begin
+            exception_o <= 1;
+        end
         // Check Level privileges
-        else if ((csr_addr[9:8] < privilege) && ((csr_rd_en_int == 1) || (csr_wr_en_int == 1)))
-            csr_exception <= 1;
+        else if (address_o[9:8] < privilege_i && (csr_rd_en_int == 1 || csr_wr_en_int == 1)) begin
+            exception_o <= 1;
+        end
         // No exception is raised
-        else
-            csr_exception <= 0;
+        else begin
+            exception_o <= 0;
+        end
     end
+
 endmodule
