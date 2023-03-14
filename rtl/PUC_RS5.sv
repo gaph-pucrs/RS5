@@ -29,7 +29,7 @@
 */
 import my_pkg::*;
 
-`define PROTO 1
+//`define PROTO 1
 
 module PUC_RS5 (
     input  logic        clk,
@@ -138,14 +138,14 @@ module PUC_RS5 (
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// DECODER /////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    assign rs1_data_read = (rs1 == rd && rd != '0) 
+    assign rs1_data_read = (rs1 == rd && rd != '0 && regbank_write_enable == 1) 
                             ? regbank_data_writeback 
                             : regbank_data1;
 
-    assign rs2_data_read = (rs2 == rd && rd != '0) 
+    assign rs2_data_read = (rs2 == rd && rd != '0 && regbank_write_enable == 1) 
                             ? regbank_data_writeback 
                             : regbank_data2;
-    
+
     decode decoder1 (
         .clk(clk), 
         .reset(reset),
@@ -153,8 +153,8 @@ module PUC_RS5 (
         .instruction_i(instruction_i), 
         .pc_i(pc_decode), 
         .tag_i(tag_decode), 
-        .rs1_data_read(rs1_data_read), 
-        .rs2_data_read(rs2_data_read), 
+        .rs1_data_read_i(rs1_data_read), 
+        .rs2_data_read_i(rs2_data_read), 
         .rs1_o(rs1), 
         .rs2_o(rs2), 
         .rd_o(rd), 

@@ -51,7 +51,7 @@ module decode (
 
     logic [31:0] immediate, first_operand_int, second_operand_int, third_operand_int, instruction_int, last_instruction;
     logic last_hazard;
-    logic [4:0] locked_register;
+    logic [4:0] locked_registers[2];
     logic [4:0] target_register;
     logic is_store;
     logic locked_memory[2];
@@ -221,10 +221,7 @@ module decode (
 
     assign rs1_o = instruction_int[19:15];
     assign rs2_o = instruction_int[24:20];
-
-    always @(posedge clk ) begin
-        rd_o  <= locked_register;
-    end
+    assign rd_o  = locked_registers[1];
 
 //////////////////////////////////////////////////////////////////////////////
 // Target definitions
@@ -253,13 +250,15 @@ module decode (
 
     always @(posedge clk) begin
         if (reset) begin
-            locked_register     <= '0;
+            locked_registers[0] <= '0;
+            locked_registers[1] <= '0;
             locked_memory[0]    <= '0;
             locked_memory[1]    <= '0;
         end 
         else if (stall == 0) begin
-            locked_register     <= target_register;
+            locked_registers[0] <= target_register;
             locked_memory[0]    <= is_store;
+            locked_registers[1] <= locked_registers[0];
             locked_memory[1]    <= locked_memory[0];
         end
     end
@@ -272,10 +271,10 @@ module decode (
         if ((locked_memory[0] == 1 || locked_memory[1] == 1) && (executionUnit_e'(instruction_operation[5:3]) == MEMORY_UNIT)) begin
             hazard_o <= 1;
         end
-        else if (locked_register == rs1_o && rs1_o != 0) begin
+        else if ((locked_registers[0] == rs1_o) && rs1_o != 0) begin
             hazard_o <= 1;
         end
-        else if (locked_register == rs2_o && rs2_o != 0) begin
+        else if ((locked_registers[0] == rs2_o) && rs2_o != 0) begin
             hazard_o <= 1;
         end
         else begin
@@ -324,8 +323,8 @@ module decode (
             instruction_operation_o <= instruction_operation_o;
             tag_o <= tag_o;
             exception_o <= exception_o;
-         end 
-         else if (hazard_o == 1) begin
+        end 
+        else if (hazard_o == 1) begin
             first_operand_o <= '0;
             second_operand_o <= '0;
             third_operand_o <= '0;

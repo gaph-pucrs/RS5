@@ -61,7 +61,7 @@ logic enable_tb_r;
 // CPU INSTANTIATION
 //////////////////////////////////////////////////////////////////////////////
 
-    PUCRS_RV dut (
+    PUC_RS5 dut (
         .clk(clk), 
         .reset(rstCPU), 
         .stall(1'b0),

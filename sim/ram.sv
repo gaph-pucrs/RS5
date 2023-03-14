@@ -87,7 +87,7 @@ module RAM_mem (
 
                 if (data_address_i != 0) begin
                     $fwrite(fd_r,"[%0d] %h %h %h %h <-- 0x%4h\n", 
-                                $time, RAM[data_address_i+3], RAM[data_address_i+2], RAM[data_address_i+1], RAM[data_address_i], data_address_i);
+                        $time, RAM[data_address_i+3], RAM[data_address_i+2], RAM[data_address_i+1], RAM[data_address_i], data_address_i);
                 end
             end
         end 
@@ -106,6 +106,6 @@ module RAM_mem (
         instruction_o[7:0]   <= RAM[instruction_address_i];
 
         $fwrite(fd_i,"[%0d] %h -> %h %h %h %h \n", 
-                    $time, instruction_address_i, RAM[instruction_address_i+3], RAM[instruction_address_i+2], RAM[instruction_address_i+1], RAM[instruction_address_i]);
+            $time, instruction_address_i, RAM[instruction_address_i+3], RAM[instruction_address_i+2], RAM[instruction_address_i+1], RAM[instruction_address_i]);
     end
 endmodule
