@@ -46,6 +46,7 @@ byte          char;
 logic [31:0]  data_ram, data_tb;
 logic [31:0]  IRQ;
 logic interrupt_ack;
+logic enable_tb_r;
 
 //////////////////////////////////////////////////////////////////////////////
 // Clock generator
@@ -98,9 +99,14 @@ logic interrupt_ack;
                         ? 1 
                         : 0;
 
-    assign mem_data_read = (enable_tb) 
+    assign mem_data_read = (enable_tb_r) 
                         ? data_tb 
                         : data_ram;
+    
+    always @(posedge clk) begin
+        enable_tb_r <= enable_tb;
+    end
+
 
 //////////////////////////////////////////////////////////////////////////////
 // Memory Mapped regs
@@ -124,7 +130,7 @@ logic interrupt_ack;
             end
         end 
         else begin
-                data_tb <= '0;
+            data_tb <= '0;
         end
     end
 

@@ -32,8 +32,8 @@ module decode (
     input   logic [31:0]    instruction_i,          // Object code of the instruction_int to extract the immediate operand
     input   logic [31:0]    pc_i,                   // Bypassed to execute unit as an operand
     input   logic [2:0]     tag_i,                  // Instruction tag_o
-    input   logic [31:0]    regbank_data1_i,        // Data read from register bank
-    input   logic [31:0]    regbank_data2_i,        // Data read from register bank
+    input   logic [31:0]    rs1_data_read_i,        // Data read from register bank
+    input   logic [31:0]    rs2_data_read_i,        // Data read from register bank
 
     output  logic [4:0]     rs1_o,                  // Address of the 1st register, conected directly in the register bank
     output  logic [4:0]     rs2_o,                  // Address of the 2nd register, conected directly in the register bank
@@ -51,7 +51,7 @@ module decode (
 
     logic [31:0] immediate, first_operand_int, second_operand_int, third_operand_int, instruction_int, last_instruction;
     logic last_hazard;
-    logic [4:0] locked_registers[2];
+    logic [4:0] locked_register;
     logic [4:0] target_register;
     logic is_store;
     logic locked_memory[2];
@@ -221,7 +221,10 @@ module decode (
 
     assign rs1_o = instruction_int[19:15];
     assign rs2_o = instruction_int[24:20];
-    assign rd_o  = locked_registers[1];
+
+    always @(posedge clk ) begin
+        rd_o  <= locked_register;
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 // Target definitions
@@ -250,15 +253,13 @@ module decode (
 
     always @(posedge clk) begin
         if (reset) begin
-            locked_registers[0] <= '0;
-            locked_registers[1] <= '0;
+            locked_register     <= '0;
             locked_memory[0]    <= '0;
             locked_memory[1]    <= '0;
         end 
         else if (stall == 0) begin
-            locked_registers[0] <= target_register;
+            locked_register     <= target_register;
             locked_memory[0]    <= is_store;
-            locked_registers[1] <= locked_registers[0];
             locked_memory[1]    <= locked_memory[0];
         end
     end
@@ -271,10 +272,10 @@ module decode (
         if ((locked_memory[0] == 1 || locked_memory[1] == 1) && (executionUnit_e'(instruction_operation[5:3]) == MEMORY_UNIT)) begin
             hazard_o <= 1;
         end
-        else if ((locked_registers[0] == rs1_o || locked_registers[1] == rs1_o) && rs1_o != 0) begin
+        else if (locked_register == rs1_o && rs1_o != 0) begin
             hazard_o <= 1;
         end
-        else if ((locked_registers[0] == rs2_o || locked_registers[1] == rs2_o) && rs2_o != 0) begin
+        else if (locked_register == rs2_o && rs2_o != 0) begin
             hazard_o <= 1;
         end
         else begin
@@ -288,14 +289,14 @@ module decode (
     always_comb begin
         first_operand_int <= (instruction_format == U_TYPE || instruction_format==J_TYPE) 
                             ? pc_i  
-                            : regbank_data1_i;
+                            : rs1_data_read_i;
 
         second_operand_int <= (instruction_format == R_TYPE || instruction_format==B_TYPE) 
-                            ? regbank_data2_i 
+                            ? rs2_data_read_i 
                             : immediate;
 
         third_operand_int  <= (instruction_format == S_TYPE) 
-                            ? regbank_data2_i 
+                            ? rs2_data_read_i 
                             : immediate;
     end
 

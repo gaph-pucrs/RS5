@@ -70,7 +70,7 @@ module PUC_RS5 (
 //////////////////////////////////////////////////////////////////////////////
 
     logic [4:0] rs1, rs2;
-    logic [31:0] regbank_data1, regbank_data2;
+    logic [31:0] regbank_data1, regbank_data2, rs1_data_read, rs2_data_read;
     logic write_enable_regbank_int, regbank_write_enable;
     logic [4:0] rd;
     logic [31:0] regbank_data_writeback;
@@ -138,6 +138,14 @@ module PUC_RS5 (
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// DECODER /////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    assign rs1_data_read = (rs1 == rd && rd != '0) 
+                            ? regbank_data_writeback 
+                            : regbank_data1;
+
+    assign rs2_data_read = (rs2 == rd && rd != '0) 
+                            ? regbank_data_writeback 
+                            : regbank_data2;
+    
     decode decoder1 (
         .clk(clk), 
         .reset(reset),
@@ -145,8 +153,8 @@ module PUC_RS5 (
         .instruction_i(instruction_i), 
         .pc_i(pc_decode), 
         .tag_i(tag_decode), 
-        .regbank_data1_i(regbank_data1), 
-        .regbank_data2_i(regbank_data2), 
+        .rs1_data_read(rs1_data_read), 
+        .rs2_data_read(rs2_data_read), 
         .rs1_o(rs1), 
         .rs2_o(rs2), 
         .rd_o(rd), 
