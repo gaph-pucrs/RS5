@@ -79,7 +79,6 @@ module PUC_RS5 (
 // Execute signals
 //////////////////////////////////////////////////////////////////////////////
 
-    executionUnit_e xu_execute;
     iType_e instruction_operation_execute;
     logic [31:0] first_operand_execute, second_operand_execute, third_operand_execute;
     logic [31:0] instruction_execute;
