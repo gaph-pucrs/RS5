@@ -249,7 +249,7 @@ module decode (
 //////////////////////////////////////////////////////////////////////////////
 
     always @(posedge clk) begin
-        if (reset) begin
+        if (reset == 1) begin
             locked_registers[0] <= '0;
             locked_registers[1] <= '0;
             locked_memory[0]    <= '0;
@@ -271,10 +271,10 @@ module decode (
         if ((locked_memory[0] == 1 || locked_memory[1] == 1) && (executionUnit_e'(instruction_operation[5:3]) == MEMORY_UNIT)) begin
             hazard_o <= 1;
         end
-        else if ((locked_registers[0] == rs1_o) && rs1_o != 0) begin
+        else if (locked_registers[0] == rs1_o && rs1_o != 0) begin
             hazard_o <= 1;
         end
-        else if ((locked_registers[0] == rs2_o) && rs2_o != 0) begin
+        else if (locked_registers[0] == rs2_o && rs2_o != 0) begin
             hazard_o <= 1;
         end
         else begin
@@ -304,7 +304,7 @@ module decode (
 //////////////////////////////////////////////////////////////////////////////
 
     always @(posedge clk) begin
-        if (reset) begin
+        if (reset == 1) begin
             first_operand_o <= '0;
             second_operand_o <= '0;
             third_operand_o <= '0;
@@ -331,7 +331,7 @@ module decode (
             pc_o <= '0;
             instruction_o <= '0;
             instruction_operation_o <= NOP;
-            tag_o <= '0;
+            tag_o <= tag_i;
             exception_o <= 0;
         end 
         else if (stall == 0) begin

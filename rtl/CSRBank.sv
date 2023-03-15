@@ -72,7 +72,7 @@ module CSRBank (
             wr_data <= 'Z;
 
     always @(posedge clk) begin
-        if (reset) begin
+        if (reset == 1) begin
             mstatus <= '0;
             mstatus[3] <= 0;        // MIE  = 0
             mstatus[17] <= 0;       // MPRV = 0
@@ -170,7 +170,7 @@ module CSRBank (
             out <= '0;
 
     always @(posedge clk)
-        if (reset)
+        if (reset == 1)
             mip <= '0;
         else
             mip <= IRQ_i;
@@ -191,7 +191,7 @@ module CSRBank (
 //##################################################################################
     // PERFORMANCE MONITORS
     always @(posedge clk)
-        if (reset) begin
+        if (reset == 1) begin
             cycle <= '0;
             instret <= '0;
         end else begin

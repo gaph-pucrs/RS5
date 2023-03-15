@@ -42,6 +42,7 @@ module retire(
     output  logic [31:0]    regbank_data_o,             // WriteBack data to Register Bank
     output  logic [31:0]    jump_target_o,              // Branch target to fetch Unit
     output  logic           jump_o,                     // Jump signal to Fetch Unit
+    output  logic           killed_o,
 
     output  logic [31:0]    mem_write_address_o,        // Memory mem_write_enable_o address
     output  logic [3:0]     mem_write_enable_o,         // Memory mem_write_enable_o enable
@@ -75,7 +76,8 @@ module retire(
 //////////////////////////////////////////////////////////////////////////////
 // Killed signal generation
 //////////////////////////////////////////////////////////////////////////////
-
+    assign killed_o = killed;
+    
     always_comb begin
         if (curr_tag != tag_i) begin
             killed <= 1;
@@ -90,7 +92,7 @@ module retire(
 //////////////////////////////////////////////////////////////////////////////
 
     always @(posedge clk) begin
-        if (reset) begin
+        if (reset == 1) begin
             curr_tag <= 0;
         end
         else if (killed == 0 && (jump_o == 1 || raise_exception_o == 1 || machine_return_o == 1 || interrupt_ack_o == 1)) begin
@@ -104,10 +106,10 @@ module retire(
 
     always_comb begin
         if (killed == 1) begin
-          regbank_write_enable_o <= 0;
+            regbank_write_enable_o <= 0;
         end 
         else begin
-          regbank_write_enable_o <= write_enable_i;
+            regbank_write_enable_o <= write_enable_i;
         end
     end
 
@@ -187,12 +189,12 @@ module retire(
 
     always_comb begin
         if (mem_write_enable_i != 0 && killed == 0) begin
-            mem_write_enable_o    <= mem_write_enable_i;
+            mem_write_enable_o  <= mem_write_enable_i;
             mem_write_address_o <= results_i[1];
             mem_data_o          <= results_i[0];
         end 
         else begin
-            mem_write_enable_o    <= '0;
+            mem_write_enable_o  <= '0;
             mem_write_address_o <= '0;
             mem_data_o          <= '0;
         end
@@ -253,5 +255,4 @@ module retire(
             interrupt_ack_o   <= 0;
         end
     end
-
 endmodule

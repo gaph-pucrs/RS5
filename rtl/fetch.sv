@@ -48,7 +48,7 @@ module fetch  #(parameter start_address='0)(  //Generic start address
 //////////////////////////////////////////////////////////////////////////////
 
     always @(posedge clk) begin
-        if (reset) begin
+        if (reset == 1) begin
             pc <= start_address;
         end
         else if (machine_return_i == 1) begin                              
@@ -89,7 +89,7 @@ module fetch  #(parameter start_address='0)(  //Generic start address
 //////////////////////////////////////////////////////////////////////////////
 
     always @(posedge clk) begin
-        if (reset) begin
+        if (reset == 1) begin
             current_tag <= 0;
             next_tag <= 0;
         end
