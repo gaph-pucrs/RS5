@@ -1,0 +1,65 @@
+FINISHED SIMULATION!!!
+
+Clock Cycles:                 16759
+Instructions Retired:         14631
+Instructions Killed:           2128
+Context Switches:               707
+Jumps:                          707
+Exceptions Raised:                0
+Interrupts Acked:                 0
+
+CYCLES WITH::
+HAZARDS:                       4040
+STALL:                            0
+HAZARDS AND STALL:                0
+
+INSTRUCTIONS PER EXECUTE UNIT:
+BYPASS:                        4855
+ADDER:                         6493
+LOGICAL:                        180
+SHIFTER:                        264
+BRANCHES:                      2052
+LOAD/STORE:                     787
+CSR:                              0
+
+INSTRUCTION COUNTERS:
+NOP:                           4042
+LUI:                           1116
+SRET:                             0
+MRET:                             0
+WFI:                              0
+ECALL:                            0
+EBREAK:                           0
+INVALID:                          0
+ADD:                           6358
+SUB:                             53
+SLT:                             81
+SLTU:                             1
+XOR:                             60
+OR:                              60
+AND:                             60
+SLL:                             87
+SRL:                             87
+SRA:                             90
+BEQ:                            193
+BNE:                           1485
+BLT:                             39
+BLTU:                            39
+BGE:                             45
+BGEU:                            45
+JAL:                            197
+JALR:                             9
+LB:                             211
+LBU:                             24
+LH:                              58
+LHU:                             24
+LW:                              59
+SB:                             337
+SH:                              35
+SW:                              39
+CSRRW:                            0
+CSRRS:                            0
+CSRRC:                            0
+CSRRWI:                           0
+CSRRSI:                           0
+CSRRCI:                           0
