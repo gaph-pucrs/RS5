@@ -19,7 +19,7 @@
 
 package my_pkg;
 
-    const int            MEMORY_SIZE = 65535;
+    // const int            MEMORY_SIZE = 65535;
 
     typedef enum  logic[2:0] {R_TYPE, I_TYPE, S_TYPE, B_TYPE, U_TYPE, J_TYPE} formatType_e;
 
