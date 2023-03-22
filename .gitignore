@@ -30,3 +30,4 @@ sim/debug/**
 sim/obj_dir
 *.lst
 *.bin
+*.elf
