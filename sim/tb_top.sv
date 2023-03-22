@@ -29,22 +29,6 @@ module tb_top
         IRQ <= '0;
         
         #100 rstCPU = 0;                                     // Hold state for 100 ns
-/*
-        #300
-        IRQ[11] <= 1;
-        #70
-        IRQ[11] <= 0;
-        #30
-        IRQ[3] <= 1;
-        #70
-        IRQ[3] <= 0;
-        #30
-        IRQ[7] <= 1;
-        #70
-        IRQ[7] <= 0;
-        #70
-        IRQ[7] <= 'Z;
-*/
     end
 
 endmodule

@@ -29,33 +29,26 @@
 `include "../rtl/PUC_RS5.sv"
 `include "./ram.sv"
 
-import my_pkg::*;
-
 //////////////////////////////////////////////////////////////////////////////
 // CPU TESTBENCH
 //////////////////////////////////////////////////////////////////////////////
 
-module PUC_RS5_tb ();
+module testbench
+    import my_pkg::*;
+(
+    input logic clk = 1,
+    input logic rstCPU,
+    input logic [31:0]  IRQ
+);
 
-logic         clk = 1, rstCPU;
 logic [31:0]  instruction_address, instruction;
 logic         enable_ram, enable_tb;
 logic [31:0]  mem_address, mem_data_read, mem_data_write;
 logic [3:0]   mem_write_enable;
 byte          char;
 logic [31:0]  data_ram, data_tb;
-logic [31:0]  IRQ;
 logic interrupt_ack;
 logic enable_tb_r;
-
-//////////////////////////////////////////////////////////////////////////////
-// Clock generator
-//////////////////////////////////////////////////////////////////////////////
-
-    always begin
-        #5.0 clk = 0;
-        #5.0 clk = 1;
-    end
 
 //////////////////////////////////////////////////////////////////////////////
 // CPU INSTANTIATION
@@ -149,17 +142,6 @@ integer TIMER;
 //            if(TIMER % 500 == 0)
 //                IRQ[7] <= 1;
         end
-    end
-
-//////////////////////////////////////////////////////////////////////////////
-// RESET CPU
-//////////////////////////////////////////////////////////////////////////////
-
-    initial begin
-        rstCPU = 1;                                          // RESET for CPU initialization
-        IRQ <= '0;
-        
-        #100 rstCPU = 0;                                     // Hold state for 100 ns
     end
 
 endmodule
