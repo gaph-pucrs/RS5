@@ -12,7 +12,7 @@ module tb_top
     testbench tb(
         .clk_i(clk),
         .rst_i(rstCPU),
-        .IRQ(IRQ)
+        .IRQ_i(IRQ)
     );
 
 ///////////////////////////////////////// Clock generator //////////////////////////////

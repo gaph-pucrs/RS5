@@ -31,7 +31,7 @@ int main(int argc, char** argv, char** env) {
     // Construct the Verilated model, from Vtestbench.h generated from Verilating "testbench.sv".
     const auto top = std::make_unique<Vtestbench>(contextp.get());
 
-    top->IRQ = 0;
+    top->IRQ_i = 0;
 
     // Simulate until $finish
     while (!contextp->gotFinish()) {
