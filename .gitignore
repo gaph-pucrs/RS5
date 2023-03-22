@@ -28,3 +28,5 @@ sim/debug/**
 *.axf
 *.bin
 sim/obj_dir
+*.lst
+*.bin
