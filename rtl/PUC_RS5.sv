@@ -18,8 +18,13 @@
  * ans also defines the interface ports(inputs and outputs) os the processor.
  */
 /*
-`include "../rtl/pkg.sv"
-`include "../rtl/xus.sv"
+`include "../rtl/my_pkg.sv"
+`include "../rtl/adderUnit.sv"
+`include "../rtl/csrUnit.sv"
+`include "../rtl/branchUnit.sv"
+`include "../rtl/logicUnit.sv"
+`include "../rtl/LSUnit.sv"
+`include "../rtl/shiftUnit.sv"
 `include "../rtl/fetch.sv"
 `include "../rtl/decode.sv"
 `include "../rtl/execute.sv"
@@ -27,13 +32,14 @@
 `include "../rtl/regbank.sv"
 `include "../rtl/CSRBank.sv"
 */
-import my_pkg::*;
 
 //`define PROTO 1
 `define DEBUG 1
 
 
-module PUC_RS5 (
+module PUC_RS5 
+    import my_pkg::*;
+(
     input  logic        clk,
     input  logic        reset,
     input  logic        stall,
@@ -56,8 +62,9 @@ module PUC_RS5 (
 
     logic           hazard;
     logic   [31:0]  jump_target;
-
+    /* verilator lint_off UNUSEDSIGNAL */
     logic   [31:0]  mem_read_address_int;
+    /* verilator lint_on UNUSEDSIGNAL */
     logic   [31:0]  mem_write_address_int;
 
 //////////////////////////////////////////////////////////////////////////////
@@ -100,7 +107,9 @@ module PUC_RS5 (
     logic   [2:0]   tag_retire;
     logic   [2:0]   curr_retire_tag;
     logic   [31:0]  pc_retire;
+    /* verilator lint_off UNUSEDSIGNAL */
     logic           exception_retire;
+    /* verilator lint_on UNUSEDSIGNAL */
     logic           killed;
 
 //////////////////////////////////////////////////////////////////////////////
@@ -120,6 +129,8 @@ module PUC_RS5 (
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////// FETCH //////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    logic jump;
+    
     fetch fetch1 (
         .clk(clk), 
         .reset(reset), 
@@ -214,6 +225,8 @@ module PUC_RS5 (
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// EXECUTE /////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    logic read;
+    
     execute execute1 (
         .clk(clk), 
         .stall(stall),
@@ -307,18 +320,18 @@ module PUC_RS5 (
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     always_comb begin
         if (mem_write_enable_o != '0) begin
-            mem_address_o[31:2] <= mem_write_address_int[31:2];
+            mem_address_o[31:2] = mem_write_address_int[31:2];
         end
         else begin
-            mem_address_o[31:2] <= mem_read_address_int[31:2];
+            mem_address_o[31:2] = mem_read_address_int[31:2];
         end
-        mem_address_o[1:0] <= '0;
+        mem_address_o[1:0] = '0;
 
         if (mem_write_enable_o != '0 || read == 1) begin
-            mem_operation_enable_o <= 1;
+            mem_operation_enable_o = 1;
         end
         else begin
-            mem_operation_enable_o <= 0;
+            mem_operation_enable_o = 0;
         end
     end
 
@@ -344,69 +357,69 @@ module PUC_RS5 (
 
     assign execution_unit_selection_retire = executionUnit_e'(instruction_operation_retire[5:3]);
 
-    always @(posedge clk) begin
-        if (reset == 1) begin
-            clock_counter               = 0;
-            instuctions_retired_counter = 0;
-            instructions_killed_counter = 0;
-            jumps_counter               = 0;
-            nop_counter                 = 0;
+    always_ff @(posedge clk) begin
+        if (reset) begin
+            clock_counter               <= 0;
+            instuctions_retired_counter <= 0;
+            instructions_killed_counter <= 0;
+            jumps_counter               <= 0;
+            nop_counter                 <= 0;
 
-            hazard_counter              = 0;
-            stall_counter               = 0;
-            hazard_stall_counter        = 0;
+            hazard_counter              <= 0;
+            stall_counter               <= 0;
+            hazard_stall_counter        <= 0;
 
-            interrupt_ack_counter       = 0;
-            raise_exception_counter     = 0;
-            context_switch_counter      = 0;
+            interrupt_ack_counter       <= 0;
+            raise_exception_counter     <= 0;
+            context_switch_counter      <= 0;
 
-            bypass_counter              = 0;
-            adder_counter               = 0;
-            logical_counter             = 0;
-            shifter_counter             = 0;
-            branch_counter            = 0;
-            memory_counter              = 0;
-            csr_counter                 = 0;
+            bypass_counter              <= 0;
+            adder_counter               <= 0;
+            logical_counter             <= 0;
+            shifter_counter             <= 0;
+            branch_counter              <= 0;
+            memory_counter              <= 0;
+            csr_counter                 <= 0;
 
-            lui_counter                 = 0;
-            sret_counter                = 0;
-            mret_counter                = 0;
-            wfi_counter                 = 0;
-            ecall_counter               = 0;
-            ebreak_counter              = 0;
-            invalid_counter             = 0;
-            add_counter                 = 0;
-            sub_counter                 = 0;
-            sltu_counter                = 0;
-            slt_counter                 = 0;
-            xor_counter                 = 0;
-            or_counter                  = 0;
-            and_counter                 = 0;
-            sll_counter                 = 0;
-            srl_counter                 = 0;
-            sra_counter                 = 0;
-            beq_counter                 = 0;
-            bne_counter                 = 0;
-            blt_counter                 = 0;
-            bltu_counter                = 0;
-            bge_counter                 = 0;
-            bgeu_counter                = 0;
-            jal_counter                 = 0;
-            jalr_counter                = 0;
-            lb_counter                  = 0;
-            lbu_counter                 = 0;
-            lh_counter                  = 0;
-            lhu_counter                 = 0;
-            lw_counter                  = 0;
-            sb_counter                  = 0;
-            sh_counter                  = 0;
-            sw_counter                  = 0;
-            csrrw_counter               = 0;
-            csrrs_counter               = 0;
-            csrrc_counter               = 0;
-            csrrwi_counter              = 0;
-            csrrsi_counter              = 0;
-            csrrci_counter              = 0;
+            lui_counter                 <= 0;
+            sret_counter                <= 0;
+            mret_counter                <= 0;
+            wfi_counter                 <= 0;
+            ecall_counter               <= 0;
+            ebreak_counter              <= 0;
+            invalid_counter             <= 0;
+            add_counter                 <= 0;
+            sub_counter                 <= 0;
+            sltu_counter                <= 0;
+            slt_counter                 <= 0;
+            xor_counter                 <= 0;
+            or_counter                  <= 0;
+            and_counter                 <= 0;
+            sll_counter                 <= 0;
+            srl_counter                 <= 0;
+            sra_counter                 <= 0;
+            beq_counter                 <= 0;
+            bne_counter                 <= 0;
+            blt_counter                 <= 0;
+            bltu_counter                <= 0;
+            bge_counter                 <= 0;
+            bgeu_counter                <= 0;
+            jal_counter                 <= 0;
+            jalr_counter                <= 0;
+            lb_counter                  <= 0;
+            lbu_counter                 <= 0;
+            lh_counter                  <= 0;
+            lhu_counter                 <= 0;
+            lw_counter                  <= 0;
+            sb_counter                  <= 0;
+            sh_counter                  <= 0;
+            sw_counter                  <= 0;
+            csrrw_counter               <= 0;
+            csrrs_counter               <= 0;
+            csrrc_counter               <= 0;
+            csrrwi_counter              <= 0;
+            csrrsi_counter              <= 0;
+            csrrci_counter              <= 0;
         end
         else begin
             clock_counter  <= clock_counter + 1;

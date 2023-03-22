@@ -22,9 +22,9 @@
  * 3) Memory mem_write_enable_o signals (Data, address and mem_write_enable_o enable)
  */
 
-import my_pkg::*;
-
-module retire(
+module retire
+    import my_pkg::*;
+(
     input   logic           clk,
     input   logic           reset,
     
@@ -80,10 +80,10 @@ module retire(
     
     always_comb begin
         if (curr_tag != tag_i) begin
-            killed <= 1;
+            killed = 1;
         end
         else begin
-            killed <= 0;
+            killed = 0;
         end
     end
 
@@ -91,7 +91,7 @@ module retire(
 // TAG control based on signals Jump and Killed
 //////////////////////////////////////////////////////////////////////////////
 
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (reset == 1) begin
             curr_tag <= 0;
         end
@@ -106,10 +106,10 @@ module retire(
 
     always_comb begin
         if (killed == 1) begin
-            regbank_write_enable_o <= 0;
+            regbank_write_enable_o = 0;
         end 
         else begin
-            regbank_write_enable_o <= write_enable_i;
+            regbank_write_enable_o = write_enable_i;
         end
     end
 
@@ -119,12 +119,12 @@ module retire(
 
     always_comb begin
         if (jump_i == 1 && killed == 0) begin
-            jump_target_o <= results_i[1];
-            jump_o        <= 1;
+            jump_target_o = results_i[1];
+            jump_o        = 1;
         end 
         else begin
-            jump_target_o <= '0;
-            jump_o        <= '0;
+            jump_target_o = '0;
+            jump_o        = '0;
         end
     end
 
@@ -136,26 +136,26 @@ module retire(
         if (instruction_operation_i == LB || instruction_operation_i == LBU) begin
             case (results_i[1][1:0])
                 2'b11:   begin 
-                            memory_data[7:0] <= mem_data_i[31:24]; 
-                            memory_data[31:8] <= (mem_data_i[31] == 1 && instruction_operation_i == LB) 
+                            memory_data[7:0]  = mem_data_i[31:24]; 
+                            memory_data[31:8] = (mem_data_i[31] == 1 && instruction_operation_i == LB) 
                                                 ? '1 
                                                 : '0;
                         end
                 2'b10:   begin 
-                            memory_data[7:0] <= mem_data_i[23:16]; 
-                            memory_data[31:8] <= (mem_data_i[23] == 1 && instruction_operation_i == LB) 
+                            memory_data[7:0]  = mem_data_i[23:16]; 
+                            memory_data[31:8] = (mem_data_i[23] == 1 && instruction_operation_i == LB) 
                                                 ? '1 
                                                 : '0; 
                         end
                 2'b01:   begin 
-                            memory_data[7:0] <= mem_data_i[15:8];
-                            memory_data[31:8] <= (mem_data_i[15] == 1 && instruction_operation_i == LB) 
+                            memory_data[7:0]  = mem_data_i[15:8];
+                            memory_data[31:8] = (mem_data_i[15] == 1 && instruction_operation_i == LB) 
                                                 ? '1 
                                                 : '0; 
                         end
                 default: begin 
-                            memory_data[7:0]  <= mem_data_i[7:0]; 
-                            memory_data[31:8] <= (mem_data_i[7]  == 1 && instruction_operation_i == LB) 
+                            memory_data[7:0]  = mem_data_i[7:0]; 
+                            memory_data[31:8] = (mem_data_i[7]  == 1 && instruction_operation_i == LB) 
                                                 ? '1 
                                                 : '0; 
                         end
@@ -164,14 +164,14 @@ module retire(
         else if (instruction_operation_i == LH || instruction_operation_i == LHU) begin
             case (results_i[1][1])
                 1'b1:    begin 
-                            memory_data[15:0]  <= mem_data_i[31:16]; 
-                            memory_data[31:16] <= (mem_data_i[31] == 1 && instruction_operation_i == LH) 
+                            memory_data[15:0]  = mem_data_i[31:16]; 
+                            memory_data[31:16] = (mem_data_i[31] == 1 && instruction_operation_i == LH) 
                                                 ? '1 
                                                 : '0; 
                         end
                 default: begin  
-                            memory_data[15:0]  <= mem_data_i[15:0]; 
-                            memory_data[31:16] <= (mem_data_i[15] == 1 && instruction_operation_i == LH) 
+                            memory_data[15:0]  = mem_data_i[15:0]; 
+                            memory_data[31:16] = (mem_data_i[15] == 1 && instruction_operation_i == LH) 
                                                 ? '1 
                                                 : '0; 
                         end
@@ -179,7 +179,7 @@ module retire(
 
         end 
         else begin
-            memory_data <= mem_data_i;
+            memory_data = mem_data_i;
         end
     end
 
@@ -189,14 +189,14 @@ module retire(
 
     always_comb begin
         if (mem_write_enable_i != 0 && killed == 0) begin
-            mem_write_enable_o  <= mem_write_enable_i;
-            mem_write_address_o <= results_i[1];
-            mem_data_o          <= results_i[0];
+            mem_write_enable_o  = mem_write_enable_i;
+            mem_write_address_o = results_i[1];
+            mem_data_o          = results_i[0];
         end 
         else begin
-            mem_write_enable_o  <= '0;
-            mem_write_address_o <= '0;
-            mem_data_o          <= '0;
+            mem_write_enable_o  = '0;
+            mem_write_address_o = '0;
+            mem_data_o          = '0;
         end
     end
 
@@ -207,52 +207,52 @@ module retire(
     always_comb begin
         if (killed == 0) begin
             if (exception_i == 1) begin
-                raise_exception_o <= 1;
-                exception_code_o  <= ILLEGAL_INSTRUCTION;
-                machine_return_o  <= 0;
-                interrupt_ack_o   <= 0;
+                raise_exception_o = 1;
+                exception_code_o  = ILLEGAL_INSTRUCTION;
+                machine_return_o  = 0;
+                interrupt_ack_o   = 0;
                 $write("[%0d] EXCEPTION - ILLEGAL INSTRUCTION: %8h %8h\n", $time, pc_i, instruction_i);
             end 
             else if (instruction_operation_i == ECALL) begin
-                raise_exception_o <= 1;
-                exception_code_o  <= ECALL_FROM_MMODE;
-                machine_return_o  <= 0;
-                interrupt_ack_o   <= 0;
+                raise_exception_o = 1;
+                exception_code_o  = ECALL_FROM_MMODE;
+                machine_return_o  = 0;
+                interrupt_ack_o   = 0;
                 $write("[%0d] EXCEPTION - ECALL_FROM_MMODE: %8h %8h\n", $time, pc_i, instruction_i);
             end 
             else if (instruction_operation_i == EBREAK) begin
-                raise_exception_o <= 1;
-                exception_code_o  <= BREAKPOINT;
-                machine_return_o  <= 0;
-                interrupt_ack_o   <= 0;
+                raise_exception_o = 1;
+                exception_code_o  = BREAKPOINT;
+                machine_return_o  = 0;
+                interrupt_ack_o   = 0;
                 $write("[%0d] EXCEPTION - EBREAK: %8h %8h\n", $time, pc_i, instruction_i);
             end 
             else if (instruction_operation_i == MRET) begin
-                raise_exception_o <= 0;
-                exception_code_o  <= NE;
-                machine_return_o  <= 1;
-                interrupt_ack_o   <= 0;
+                raise_exception_o = 0;
+                exception_code_o  = NE;
+                machine_return_o  = 1;
+                interrupt_ack_o   = 0;
                 $write("[%0d] MRET: %8h %8h\n", $time, pc_i, instruction_i);
             end 
             else if (interrupt_pending_i == 1 && jump_i == 0) begin
-                raise_exception_o <= 0;
-                exception_code_o  <= NE;
-                machine_return_o  <= 0;
-                interrupt_ack_o   <= 1;
+                raise_exception_o = 0;
+                exception_code_o  = NE;
+                machine_return_o  = 0;
+                interrupt_ack_o   = 1;
                 $write("[%0d] Interrupt Acked\n", $time);
             end 
             else begin
-                raise_exception_o <= 0;
-                exception_code_o  <= NE;
-                machine_return_o  <= 0;
-                interrupt_ack_o   <= 0;
+                raise_exception_o = 0;
+                exception_code_o  = NE;
+                machine_return_o  = 0;
+                interrupt_ack_o   = 0;
             end
         end
         else begin
-            raise_exception_o <= 0;
-            exception_code_o  <= NE;
-            machine_return_o  <= 0;
-            interrupt_ack_o   <= 0;
+            raise_exception_o = 0;
+            exception_code_o  = NE;
+            machine_return_o  = 0;
+            interrupt_ack_o   = 0;
         end
     end
 endmodule

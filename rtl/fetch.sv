@@ -20,7 +20,7 @@
  * in regular flows, the tag leaves the unit with the instruction fetched.
  */
 
-module fetch  #(parameter start_address='0)(  //Generic start address
+module fetch  #(parameter start_address = 32'b0)(  //Generic start address
     input   logic           clk,
     input   logic           reset,
     input   logic           stall,
@@ -47,8 +47,8 @@ module fetch  #(parameter start_address='0)(  //Generic start address
 // PC Control
 //////////////////////////////////////////////////////////////////////////////
 
-    always @(posedge clk) begin
-        if (reset == 1) begin
+    always_ff @(posedge clk) begin
+        if (reset) begin
             pc <= start_address;
         end
         else if (machine_return_i == 1) begin                              
@@ -71,7 +71,7 @@ module fetch  #(parameter start_address='0)(  //Generic start address
 // Sensitive Outputs 
 //////////////////////////////////////////////////////////////////////////////
 
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if(hazard_i == 0 && stall == 0) begin
             pc_o <= pc;
         end
@@ -88,7 +88,7 @@ module fetch  #(parameter start_address='0)(  //Generic start address
 // TAG Calculator 
 //////////////////////////////////////////////////////////////////////////////
 
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (reset == 1) begin
             current_tag <= 0;
             next_tag <= 0;

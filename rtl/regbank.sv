@@ -55,7 +55,7 @@ module regbank(
     initial 
         fd = $fopen ("./debug/regBank.txt", "w");
 
-    always @(posedge clk ) begin
+    always_ff @(posedge clk ) begin
         $fwrite(fd,"[%0d] %02d - %8h \t %02d - %8h\n", $time, rs1, data1_o, rs2, data2_o);
         if(rd != '0) begin
             $fwrite(fd,"[%0d] --------------------------------- %02d - %8h\n", $time, rd, data_i);

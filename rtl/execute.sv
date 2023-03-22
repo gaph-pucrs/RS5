@@ -22,9 +22,9 @@
  * the result only from the given module and BYPASS it to the next stage.
  */
 
-import my_pkg::*;
-
-module execute(
+module execute
+    import my_pkg::*;
+(
     input   logic          clk,
     input   logic          stall,
 
@@ -68,7 +68,7 @@ module execute(
     operationType_e execution_unit_operation;
     executionUnit_e execution_unit_selector;
 
-    assign execution_unit_selector = executionUnit_e'(instruction_operation_i[5:3]);
+    assign execution_unit_selector  = executionUnit_e'(instruction_operation_i[5:3]);
     assign execution_unit_operation = operationType_e'(instruction_operation_i[2:0]);
 
 //////////////////////////////////////////////////////////////////////////////
@@ -141,7 +141,7 @@ module execute(
 // Demux
 //////////////////////////////////////////////////////////////////////////////
 
-    always @(posedge clk) begin 
+    always_ff @(posedge clk) begin 
         if (stall == 0) begin
             if (execution_unit_selector == ADDER_UNIT)
                 result_o[0] <= results_int[0];
@@ -160,7 +160,7 @@ module execute(
         end
     end
 
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (stall == 0) begin
             if (execution_unit_selector == BRANCH_UNIT)
                 result_o[1] <= results_int[4];
@@ -171,7 +171,7 @@ module execute(
         end
     end  
     
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (stall == 0) begin
             if (execution_unit_selector == BRANCH_UNIT)
                 jump_o <= jump_int;
@@ -180,7 +180,7 @@ module execute(
         end
     end  
 
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (stall == 0) begin
             if (execution_unit_selector == MEMORY_UNIT)
                 mem_write_enable_o <= mem_write_enable_int;
@@ -189,7 +189,7 @@ module execute(
         end
     end  
 
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (stall == 0) begin
             if (execution_unit_selector == BRANCH_UNIT)
                 write_enable_o <= write_enable_regbank_branch_unit;
@@ -200,13 +200,13 @@ module execute(
         end
     end  
 
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (stall == 0) begin
-            tag_o <= tag_i;
+            tag_o                   <= tag_i;
             instruction_operation_o <= instruction_operation_i;
-            instruction_o <= instruction_i;
-            pc_o <= pc_i;
-            exception_o <= exception_i | csr_exception;
+            instruction_o           <= instruction_i;
+            pc_o                    <= pc_i;
+            exception_o             <= exception_i | csr_exception;
         end
     end
 
