@@ -1,3 +1,28 @@
+/*!\file CSRBank.sv
+ * PUC-RS5 VERSION - 1.0.0 - Public Release
+ *
+ * Distribution:  March 2023
+ *
+ * Willian Nunes   <willian.nunes@edu.pucrs.br>
+ * Marcos Sartori  <marcos.sartori@acad.pucrs.br>
+ * Ney calazans    <ney.calazans@pucrs.br>
+ *
+ * Research group: GAPH-PUCRS  <>
+ *
+ * \brief
+ * The CSR Bank contains all the Control and Status register.
+ *
+ * \detailed
+ * The CSR Bank contains all the Control and Status register,
+ * Each CSR has a associated mask that is used to implement
+ * the CSR behaviors. There are three posible operations in CSRs,
+ * 1) Write - Writes the given data in the given CRS.
+ * 2) Set - Uses the given data as a mask to set bits in the CSR,
+ * 3) Clear - Uses the given data as a mask to clear bits in CSR.
+ * Each operation applies the CSR mask alongside with the CSR 
+ * current content in a determined way to generate the new CSR content.
+ */
+
 import my_pkg::*;
 
 module CSRBank (
