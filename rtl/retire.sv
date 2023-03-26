@@ -20,6 +20,7 @@
  * 1) Register bank - data and write enable
  * 2) Branch - jump target
  * 3) Memory write - memory signals (Data, address and operation enable)
+ * 4) Manage Exceptions and Interrupts and Privilege Switch.
  */
 
 import my_pkg::*;
