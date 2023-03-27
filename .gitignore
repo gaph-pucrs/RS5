@@ -33,3 +33,5 @@ sim/obj_dir
 *.elf
 *.jou
 *.log
+*.str
+*.tmp
