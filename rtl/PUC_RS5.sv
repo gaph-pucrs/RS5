@@ -151,11 +151,11 @@ module PUC_RS5
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// DECODER /////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    assign rs1_data_read = (rs1 == rd && rd != '0 && regbank_write_enable == 1) 
+    assign rs1_data_read = (rs1 == rd && rd != '0 && regbank_write_enable) 
                             ? regbank_data_writeback 
                             : regbank_data1;
 
-    assign rs2_data_read = (rs2 == rd && rd != '0 && regbank_write_enable == 1) 
+    assign rs2_data_read = (rs2 == rd && rd != '0 && regbank_write_enable) 
                             ? regbank_data_writeback 
                             : regbank_data2;
 
@@ -436,7 +436,7 @@ module PUC_RS5
             context_switch_counter  <= (jump == 1 || RAISE_EXCEPTION == 1 || MACHINE_RETURN == 1 || interrupt_ack_o == 1) ? context_switch_counter + 1 : context_switch_counter;
             nop_counter             <= (instruction_operation_retire == NOP) ? nop_counter + 1 : nop_counter;
 
-            if (killed == 0) begin
+            if (!killed) begin
 
                 bypass_counter  <= (execution_unit_selection_retire == BYPASS_UNIT)  ? bypass_counter  + 1 : bypass_counter;
                 adder_counter   <= (execution_unit_selection_retire == ADDER_UNIT)   ? adder_counter   + 1 : adder_counter;

@@ -42,10 +42,10 @@ module regbank(
     // Reset and Write control
     for (genvar i = 1; i < 32 ; i++) begin
         always_ff @(posedge clk) begin
-            if (reset == 1) begin
+            if (reset) begin
                 regfile[i] <= '0;
             end
-            else if (rd == i && enable == 1) begin
+            else if (rd == i && enable) begin
                 regfile[i] <= data_i;
             end
         end

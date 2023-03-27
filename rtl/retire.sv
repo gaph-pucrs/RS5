@@ -92,7 +92,7 @@ module retire
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk) begin
-        if (reset == 1) begin
+        if (reset) begin
             curr_tag <= 0;
         end
         else if (killed == 0 && (jump_o == 1 || raise_exception_o == 1 || machine_return_o == 1 || interrupt_ack_o == 1)) begin
@@ -105,7 +105,7 @@ module retire
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        if (killed == 1) begin
+        if (killed) begin
             regbank_write_enable_o = 0;
         end 
         else begin
@@ -118,7 +118,7 @@ module retire
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        if (jump_i == 1 && killed == 0) begin
+        if (jump_i && !killed) begin
             jump_target_o = results_i[1];
             jump_o        = 1;
         end 
@@ -205,8 +205,8 @@ module retire
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        if (killed == 0) begin
-            if (exception_i == 1) begin
+        if (!killed) begin
+            if (exception_i) begin
                 raise_exception_o = 1;
                 exception_code_o  = ILLEGAL_INSTRUCTION;
                 machine_return_o  = 0;
@@ -234,7 +234,7 @@ module retire
                 interrupt_ack_o   = 0;
                 $write("[%0d] MRET: %8h %8h\n", $time, pc_i, instruction_i);
             end 
-            else if (interrupt_pending_i == 1 && jump_i == 0) begin
+            else if (interrupt_pending_i && !jump_i) begin
                 raise_exception_o = 0;
                 exception_code_o  = NE;
                 machine_return_o  = 0;

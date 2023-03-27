@@ -142,7 +142,7 @@ module execute
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk) begin 
-        if (stall == 0) begin
+        if (!stall) begin
             if (execution_unit_selector == ADDER_UNIT) begin
                 result_o[0] <= results_int[0];
             end
@@ -168,7 +168,7 @@ module execute
     end
 
     always_ff @(posedge clk) begin
-        if (stall == 0) begin
+        if (!stall) begin
             if (execution_unit_selector == BRANCH_UNIT) begin
                 result_o[1] <= results_int[4];
             end
@@ -182,7 +182,7 @@ module execute
     end  
     
     always_ff @(posedge clk) begin
-        if (stall == 0) begin
+        if (!stall) begin
             if (execution_unit_selector == BRANCH_UNIT) begin
                 jump_o <= jump_int;
             end
@@ -193,7 +193,7 @@ module execute
     end  
 
     always_ff @(posedge clk) begin
-        if (stall == 0) begin
+        if (!stall) begin
             if (execution_unit_selector == MEMORY_UNIT) begin
                 mem_write_enable_o <= mem_write_enable_int;
             end
@@ -204,7 +204,7 @@ module execute
     end  
 
     always_ff @(posedge clk) begin
-        if (stall == 0) begin
+        if (!stall) begin
             if (execution_unit_selector == BRANCH_UNIT) begin
                 write_enable_o <= write_enable_regbank_branch_unit;
             end
@@ -218,7 +218,7 @@ module execute
     end  
 
     always_ff @(posedge clk) begin
-        if (stall == 0) begin
+        if (!stall) begin
             tag_o                   <= tag_i;
             instruction_operation_o <= instruction_operation_i;
             instruction_o           <= instruction_i;

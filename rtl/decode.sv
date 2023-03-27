@@ -69,7 +69,7 @@ module decode
     end
 
     always_comb begin
-        if (last_hazard == 1) begin
+        if (last_hazard) begin
             instruction_int = last_instruction;
         end
         else begin
@@ -228,7 +228,7 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        if (hazard_o == 0) begin
+        if (!hazard_o) begin
             target_register = instruction_int[11:7];
             ///////////////////////////////////
             if (instruction_operation == SB || instruction_operation == SH || instruction_operation == SW) begin
@@ -249,13 +249,13 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk) begin
-        if (reset == 1) begin
+        if (reset) begin
             locked_registers[0] <= '0;
             locked_registers[1] <= '0;
             locked_memory[0]    <= '0;
             locked_memory[1]    <= '0;
         end 
-        else if (stall == 0) begin
+        else if (!stall) begin
             locked_registers[0] <= target_register;
             locked_memory[0]    <= is_store;
             locked_registers[1] <= locked_registers[0];
@@ -268,7 +268,7 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        if ((locked_memory[0] == 1 || locked_memory[1] == 1) && (executionUnit_e'(instruction_operation[5:3]) == MEMORY_UNIT)) begin
+        if ((locked_memory[0] || locked_memory[1]) && (executionUnit_e'(instruction_operation[5:3]) == MEMORY_UNIT)) begin
             hazard_o = 1;
         end
         else if (locked_registers[0] == rs1_o && rs1_o != 0) begin
@@ -305,7 +305,7 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk) begin
-        if (reset == 1) begin
+        if (reset) begin
             first_operand_o  <= '0;
             second_operand_o <= '0;
             third_operand_o  <= '0;
@@ -315,7 +315,7 @@ module decode
             tag_o            <= '0;
             exception_o      <= 0;
         end 
-        else if (stall == 1) begin
+        else if (stall) begin
             first_operand_o   <= first_operand_o;
             second_operand_o  <= second_operand_o;
             third_operand_o   <= third_operand_o;
@@ -325,7 +325,7 @@ module decode
             tag_o             <= tag_o;
             exception_o       <= exception_o;
         end 
-        else if (hazard_o == 1) begin
+        else if (hazard_o) begin
             first_operand_o  <= '0;
             second_operand_o <= '0;
             third_operand_o  <= '0;
@@ -335,7 +335,7 @@ module decode
             tag_o            <= tag_i;
             exception_o      <= 0;
         end 
-        else if (stall == 0) begin
+        else if (!stall) begin
             first_operand_o  <= first_operand_int;
             second_operand_o <= second_operand_int;
             third_operand_o  <= third_operand_int;

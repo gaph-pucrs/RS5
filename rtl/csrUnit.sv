@@ -78,11 +78,11 @@ module csrUnit
     
     always_comb begin
         // Raise exeption if CSR is read only and write enable is true
-        if (address_o[11:10] == 2'b11 && csr_wr_en_int == 1) begin
+        if (address_o[11:10] == 2'b11 && csr_wr_en_int) begin
             exception_o = 1;
         end
         // Check Level privileges
-        else if (address_o[9:8] < privilege_i && (csr_rd_en_int == 1 || csr_wr_en_int == 1)) begin
+        else if (address_o[9:8] < privilege_i && (csr_rd_en_int || csr_wr_en_int)) begin
             exception_o = 1;
         end
         // No exception is raised

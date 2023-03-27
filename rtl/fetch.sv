@@ -51,16 +51,16 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
         if (reset) begin
             pc <= start_address;
         end
-        else if (machine_return_i == 1) begin                              
+        else if (machine_return_i) begin                              
             pc <= mepc_i;
         end
-        else if (exception_raised_i == 1 || interrupt_ack_i == 1) begin                               
+        else if (exception_raised_i || interrupt_ack_i) begin                               
             pc <= mtvec_i;
         end
-        else if (jump_i == 1) begin
+        else if (jump_i) begin
             pc <= jump_target_i;
         end
-        else if (hazard_i == 0 && stall == 0) begin
+        else if (!hazard_i && !stall) begin
             pc <= pc_plus4;
         end
     end
@@ -72,7 +72,7 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk) begin
-        if(hazard_i == 0 && stall == 0) begin
+        if(!hazard_i && !stall) begin
             pc_o <= pc;
         end
     end
@@ -89,14 +89,14 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk) begin
-        if (reset == 1) begin
+        if (reset) begin
             current_tag <= 0;
             next_tag <= 0;
         end
-        else if (jump_i == 1 || exception_raised_i == 1 || machine_return_i == 1 || interrupt_ack_i == 1) begin
+        else if (jump_i || exception_raised_i || machine_return_i || interrupt_ack_i) begin
             next_tag <= current_tag + 1;
         end
-        else if (hazard_i == 0 && stall == 0) begin
+        else if (!hazard_i && !stall) begin
             current_tag <= next_tag;
         end
 

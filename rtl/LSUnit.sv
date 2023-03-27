@@ -25,7 +25,7 @@ module LSUnit
 //--------------------------------------------------------------------------------------------------
 
     always_comb begin
-        if (enable_i == 1) begin
+        if (enable_i) begin
             if (operation_i == OP0 || operation_i == OP1) begin // LB | LBU
                 read_o          = 1;
                 write_data_o    = '0;

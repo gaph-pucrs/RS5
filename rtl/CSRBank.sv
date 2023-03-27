@@ -77,7 +77,7 @@ module CSRBank
     end
 
     always_ff @(posedge clk) begin
-        if (reset == 1) begin
+        if (reset) begin
             mstatus     <= '0;
             mstatus[3]  <= 0;        // MIE  = 0
             mstatus[17] <= 0;       // MPRV = 0
@@ -125,7 +125,7 @@ module CSRBank
             mepc_r          <= pc_i;                  // Return address
         
         end 
-        else if(write_enable_i == 1 && killed == 0) begin
+        else if(write_enable_i && !killed) begin
             case(CSR)
                 MSTATUS:      mstatus     <= wr_data;
                 MISA:         misa        <= wr_data;
@@ -146,7 +146,7 @@ module CSRBank
     end
 
     always_comb begin
-        if(read_enable_i == 1 && killed == 0) begin
+        if(read_enable_i && !killed) begin
             case(CSR)
                 //RO
                 MVENDORID:  out = '0;
@@ -184,7 +184,7 @@ module CSRBank
     end
 
     always_ff @(posedge clk) begin
-        if (reset == 1) begin
+        if (reset) begin
             mip <= '0;
         end
         else begin
@@ -193,7 +193,7 @@ module CSRBank
     end
     
     always_ff @(posedge clk) begin
-        if(mstatus[3] == 1 && (mie & mip) != 0 && interrupt_ack_i == 0) begin
+        if(mstatus[3] && (mie & mip) != 0 && !interrupt_ack_i) begin
             interrupt_pending_o <= 1;
             if(mip[11] & mie[11])                   // Machine External
                 Interruption_Code <= M_EXT_INT;
@@ -211,7 +211,7 @@ module CSRBank
 //##################################################################################
     // PERFORMANCE MONITORS
     always_ff @(posedge clk) begin
-        if (reset == 1) begin
+        if (reset) begin
             cycle   <= '0;
             instret <= '0;
         end 
