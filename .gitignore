@@ -31,3 +31,5 @@ sim/obj_dir
 *.lst
 *.bin
 *.elf
+*.jou
+*.log
