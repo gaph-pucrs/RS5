@@ -82,7 +82,7 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin 
-             if (instruction_int[6:0] == 7'b0110111) instruction_operation = LUI;
+        if (instruction_int[6:0] == 7'b0110111) instruction_operation = LUI;
         else if (instruction_int[6:0] == 7'b0010111) instruction_operation = ADD;    //AUIPC
         
         else if (instruction_int[6:0] == 7'b1101111) instruction_operation = JAL;
@@ -267,7 +267,7 @@ module decode
 // Hazard signal generation
 //////////////////////////////////////////////////////////////////////////////
 
-    always_comb
+    always_comb begin
         if ((locked_memory[0] == 1 || locked_memory[1] == 1) && (executionUnit_e'(instruction_operation[5:3]) == MEMORY_UNIT)) begin
             hazard_o = 1;
         end
@@ -280,6 +280,7 @@ module decode
         else begin
             hazard_o = 0;
         end
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 // Control of the exits based on format

@@ -40,12 +40,16 @@ module regbank(
             data2_o = regfile[rs2];
     
     // Reset and Write control
-    for (genvar i = 1; i < 32 ; i++)
-        always_ff @(posedge clk)
-            if (reset == 1)
+    for (genvar i = 1; i < 32 ; i++) begin
+        always_ff @(posedge clk) begin
+            if (reset == 1) begin
                 regfile[i] <= '0;
-            else if (rd == i && enable == 1)
+            end
+            else if (rd == i && enable == 1) begin
                 regfile[i] <= data_i;
+            end
+        end
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 // DEBUG 

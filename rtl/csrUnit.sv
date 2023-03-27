@@ -30,18 +30,21 @@ module csrUnit
     always_comb begin
         if (operation_i == OP0 || operation_i == OP3) begin // CSSRW | CSSRWI
             csr_wr_en_int = 1;
-            if (rd == 0)
+            if (rd == 0) begin
                 csr_rd_en_int = 0;
-            else
+            end
+            else begin
                 csr_rd_en_int = 1;
-
+            end
         end 
         else if (operation_i == OP1 || operation_i == OP2 || operation_i == OP4 || operation_i == OP5) begin // CSRRS/C | CSRRS/CI
             csr_rd_en_int = 1;
-            if (rs1 == 0)
+            if (rs1 == 0) begin
                 csr_wr_en_int = 0;
-            else
+            end
+            else begin
                 csr_wr_en_int = 1;
+            end
         end 
         else begin
             csr_rd_en_int = 0;

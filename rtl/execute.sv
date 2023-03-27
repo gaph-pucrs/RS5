@@ -143,60 +143,77 @@ module execute
 
     always_ff @(posedge clk) begin 
         if (stall == 0) begin
-            if (execution_unit_selector == ADDER_UNIT)
+            if (execution_unit_selector == ADDER_UNIT) begin
                 result_o[0] <= results_int[0];
-            else if (execution_unit_selector == LOGICAL_UNIT)
+            end
+            else if (execution_unit_selector == LOGICAL_UNIT) begin
                 result_o[0] <= results_int[1];
-            else if (execution_unit_selector == SHIFTER_UNIT)
+            end
+            else if (execution_unit_selector == SHIFTER_UNIT) begin
                 result_o[0] <= results_int[2];
-            else if (execution_unit_selector == BRANCH_UNIT)
+            end
+            else if (execution_unit_selector == BRANCH_UNIT) begin
                 result_o[0] <= results_int[3];
-            else if (execution_unit_selector == MEMORY_UNIT)
+            end
+            else if (execution_unit_selector == MEMORY_UNIT) begin
                 result_o[0] <= results_int[6];
-            else if (execution_unit_selector == CSR_UNIT)
+            end
+            else if (execution_unit_selector == CSR_UNIT) begin
                 result_o[0] <= csr_data_read_i;
-            else
+            end
+            else begin
                 result_o[0] <= results_int[5];
+            end
         end
     end
 
     always_ff @(posedge clk) begin
         if (stall == 0) begin
-            if (execution_unit_selector == BRANCH_UNIT)
+            if (execution_unit_selector == BRANCH_UNIT) begin
                 result_o[1] <= results_int[4];
-            else if (execution_unit_selector == MEMORY_UNIT)
+            end
+            else if (execution_unit_selector == MEMORY_UNIT) begin
                 result_o[1] <= results_int[7];
-            else 
+            end
+            else begin 
                 result_o[1] <= '0;
+            end
         end
     end  
     
     always_ff @(posedge clk) begin
         if (stall == 0) begin
-            if (execution_unit_selector == BRANCH_UNIT)
+            if (execution_unit_selector == BRANCH_UNIT) begin
                 jump_o <= jump_int;
-            else
+            end
+            else begin
                 jump_o <= '0;
+            end
         end
     end  
 
     always_ff @(posedge clk) begin
         if (stall == 0) begin
-            if (execution_unit_selector == MEMORY_UNIT)
+            if (execution_unit_selector == MEMORY_UNIT) begin
                 mem_write_enable_o <= mem_write_enable_int;
-            else 
+            end
+            else begin
                 mem_write_enable_o <= '0;
+            end
         end
     end  
 
     always_ff @(posedge clk) begin
         if (stall == 0) begin
-            if (execution_unit_selector == BRANCH_UNIT)
+            if (execution_unit_selector == BRANCH_UNIT) begin
                 write_enable_o <= write_enable_regbank_branch_unit;
-            else if (execution_unit_selector == MEMORY_UNIT)
+            end
+            else if (execution_unit_selector == MEMORY_UNIT) begin
                 write_enable_o <= write_enable_regbank_memory_unit;
-            else
+            end
+            else begin
                 write_enable_o <= 1;
+            end
         end
     end  
 

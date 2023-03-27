@@ -61,15 +61,20 @@ module CSRBank
         endcase
     end
 
-    always_comb
-        if(operation_i == WRITE)
+    always_comb begin
+        if(operation_i == WRITE) begin
             wr_data = data_i & wmask;
-        else if(operation_i == SET)
+        end
+        else if(operation_i == SET) begin
             wr_data = (current_val | data_i) & wmask;
-        else if(operation_i == CLEAR)
+        end
+        else if(operation_i == CLEAR) begin
             wr_data = (current_val & (~data_i)) & wmask;
-        else
+        end
+        else begin
             wr_data = 'Z;
+        end
+    end
 
     always_ff @(posedge clk) begin
         if (reset == 1) begin
@@ -89,11 +94,13 @@ module CSRBank
             mtval       <= '0;
             //mip       <= '0;
 
-        end else if(machine_return_i) begin
+        end 
+        else if(machine_return_i) begin
             mstatus[3]  <= mstatus[7];          // MIE = MPIE
             //privilege <= mstatus[12:11]       // priv = MPP
 
-        end else if(raise_exception_i) begin
+        end
+        else if(raise_exception_i) begin
             mcause[31]      <= '0;
             mcause[30:0]    <= {26'b0, exception_code_i};
             mstatus[12:11]  <= privilege_i;         // MPP previous privilege
@@ -107,7 +114,8 @@ module CSRBank
                                 ? instruction_i 
                                 : pc_i;
 
-        end else if(interrupt_ack_i) begin
+        end 
+        else if(interrupt_ack_i) begin
             mcause[31]      <= '1;
             mcause[30:0]    <=  {26'b0, Interruption_Code};
             mstatus[12:11]  <= privilege_i;           // MPP = previous privilege
@@ -116,7 +124,8 @@ module CSRBank
             mstatus[3]      <= 0;                   // MIE = 0
             mepc_r          <= pc_i;                  // Return address
         
-        end else if(write_enable_i == 1 && killed == 0) begin
+        end 
+        else if(write_enable_i == 1 && killed == 0) begin
             case(CSR)
                 MSTATUS:      mstatus     <= wr_data;
                 MISA:         misa        <= wr_data;
@@ -136,8 +145,8 @@ module CSRBank
         end
     end
 
-    always_comb
-        if(read_enable_i == 1 && killed == 0)
+    always_comb begin
+        if(read_enable_i == 1 && killed == 0) begin
             case(CSR)
                 //RO
                 MVENDORID:  out = '0;
@@ -168,16 +177,22 @@ module CSRBank
                 INSTRETH:   out = instret[63:32];
                 default:    out = '0;
             endcase
-        else
+        end
+        else begin
             out = '0;
+        end
+    end
 
-    always_ff @(posedge clk)
-        if (reset == 1)
+    always_ff @(posedge clk) begin
+        if (reset == 1) begin
             mip <= '0;
-        else
+        end
+        else begin
             mip <= IRQ_i;
+        end
+    end
     
-    always_ff @(posedge clk)
+    always_ff @(posedge clk) begin
         if(mstatus[3] == 1 && (mie & mip) != 0 && interrupt_ack_i == 0) begin
             interrupt_pending_o <= 1;
             if(mip[11] & mie[11])                   // Machine External
@@ -187,20 +202,25 @@ module CSRBank
             else if(mip[7] & mie[7])                // Machine Timer
                 Interruption_Code <= M_TIM_INT;
 
-        end else
+        end 
+        else begin
             interrupt_pending_o <= 0;
+        end
+    end
 
 //##################################################################################
     // PERFORMANCE MONITORS
-    always_ff @(posedge clk)
+    always_ff @(posedge clk) begin
         if (reset == 1) begin
             cycle   <= '0;
             instret <= '0;
-        end else begin
+        end 
+        else begin
             cycle  <= cycle + 1;
             instret <= (killed == 1) 
                         ? instret 
                         : instret + 1;
         end
+    end
 
 endmodule
