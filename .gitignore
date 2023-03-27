@@ -4,9 +4,6 @@ vsim*
 work
 xcelium*
 xrun.*
-proto/project_1/project_1.sim/**
-proto/project_1/project_1.runs/**
-proto/project_1/project_1.cache/**
 proto/privileged/privileged.sim/**
 proto/privileged/privileged.runs/**
 proto/privileged/privileged.cache/**
