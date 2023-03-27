@@ -1,2 +1,0 @@
-regBankB.v,verilog,xil_defaultlib,../../../../privileged.gen/sources_1/ip/regBankB/sim/regBankB.v,
-glbl.v,Verilog,xil_defaultlib,glbl.v
