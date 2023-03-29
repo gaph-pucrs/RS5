@@ -19,12 +19,12 @@
 `timescale 1ns/1ps
 
 `include "../rtl/my_pkg.sv"
-`include "../rtl/adderUnit.sv"
-`include "../rtl/csrUnit.sv"
-`include "../rtl/branchUnit.sv"
-`include "../rtl/logicUnit.sv"
-`include "../rtl/LSUnit.sv"
-`include "../rtl/shiftUnit.sv"
+`include "../rtl/xus/adderUnit.sv"
+`include "../rtl/xus/csrUnit.sv"
+`include "../rtl/xus/branchUnit.sv"
+`include "../rtl/xus/logicUnit.sv"
+`include "../rtl/xus/LSUnit.sv"
+`include "../rtl/xus/shiftUnit.sv"
 `include "../rtl/fetch.sv"
 `include "../rtl/decode.sv"
 `include "../rtl/execute.sv"
