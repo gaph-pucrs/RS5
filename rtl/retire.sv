@@ -95,7 +95,7 @@ module retire
         if (reset) begin
             curr_tag <= 0;
         end
-        else if (killed == 0 && (jump_o == 1 || raise_exception_o == 1 || machine_return_o == 1 || interrupt_ack_o == 1)) begin
+        else if (!killed && (jump_o || raise_exception_o || machine_return_o || interrupt_ack_o)) begin
             curr_tag <= curr_tag + 1;
         end
     end
@@ -137,25 +137,25 @@ module retire
             case (results_i[1][1:0])
                 2'b11:   begin 
                             memory_data[7:0]  = mem_data_i[31:24]; 
-                            memory_data[31:8] = (mem_data_i[31] == 1 && instruction_operation_i == LB) 
+                            memory_data[31:8] = (mem_data_i[31] && instruction_operation_i == LB) 
                                                 ? '1 
                                                 : '0;
                         end
                 2'b10:   begin 
                             memory_data[7:0]  = mem_data_i[23:16]; 
-                            memory_data[31:8] = (mem_data_i[23] == 1 && instruction_operation_i == LB) 
+                            memory_data[31:8] = (mem_data_i[23] && instruction_operation_i == LB) 
                                                 ? '1 
                                                 : '0; 
                         end
                 2'b01:   begin 
                             memory_data[7:0]  = mem_data_i[15:8];
-                            memory_data[31:8] = (mem_data_i[15] == 1 && instruction_operation_i == LB) 
+                            memory_data[31:8] = (mem_data_i[15] && instruction_operation_i == LB) 
                                                 ? '1 
                                                 : '0; 
                         end
                 default: begin 
                             memory_data[7:0]  = mem_data_i[7:0]; 
-                            memory_data[31:8] = (mem_data_i[7]  == 1 && instruction_operation_i == LB) 
+                            memory_data[31:8] = (mem_data_i[7] && instruction_operation_i == LB) 
                                                 ? '1 
                                                 : '0; 
                         end
@@ -165,13 +165,13 @@ module retire
             case (results_i[1][1])
                 1'b1:    begin 
                             memory_data[15:0]  = mem_data_i[31:16]; 
-                            memory_data[31:16] = (mem_data_i[31] == 1 && instruction_operation_i == LH) 
+                            memory_data[31:16] = (mem_data_i[31] && instruction_operation_i == LH) 
                                                 ? '1 
                                                 : '0; 
                         end
                 default: begin  
                             memory_data[15:0]  = mem_data_i[15:0]; 
-                            memory_data[31:16] = (mem_data_i[15] == 1 && instruction_operation_i == LH) 
+                            memory_data[31:16] = (mem_data_i[15] && instruction_operation_i == LH) 
                                                 ? '1 
                                                 : '0; 
                         end
@@ -188,7 +188,7 @@ module retire
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        if (mem_write_enable_i != 0 && killed == 0) begin
+        if (mem_write_enable_i != '0 && !killed) begin
             mem_write_enable_o  = mem_write_enable_i;
             mem_write_address_o = results_i[1];
             mem_data_o          = results_i[0];

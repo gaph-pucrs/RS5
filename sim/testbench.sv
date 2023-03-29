@@ -114,19 +114,19 @@ logic         enable_tb_r;
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk_i) begin
-        if (enable_tb == 1) begin
+        if (enable_tb) begin
             // OUTPUT REG
-            if ((mem_address == 32'h80004000 || mem_address == 32'h80001000) && mem_write_enable != 0) begin
+            if ((mem_address == 32'h80004000 || mem_address == 32'h80001000) && mem_write_enable != '0) begin
                 char <= mem_data_write[7:0];
                 $write("%c",char);
             end
             // END REG
-            if (mem_address == 32'h80000000 && mem_write_enable != 0) begin
+            if (mem_address == 32'h80000000 && mem_write_enable != '0) begin
                 $display("# %t END OF SIMULATION",$time);
                 $finish;
             end
             // TIMER REG
-            if (mem_address == 32'h80006000 && mem_write_enable == 0) begin
+            if (mem_address == 32'h80006000 && mem_write_enable == '0) begin
                 data_tb <= 32'($time/1000);
             end
         end 
