@@ -51,7 +51,7 @@ logic [31:0]  Rd_data, Wr_address, Wr_data;
 
 // data memory signals --------------------------------------------------------
   always_comb
-    if(write!=0) begin
+    if (write!=0) begin
         Wr_address <= write_address;                            // Wr_address - write_address
         Wr_data <= data_write;                                  // Wr_data - data_write
     end else begin 
@@ -60,8 +60,8 @@ logic [31:0]  Rd_data, Wr_address, Wr_data;
     end
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   always_comb
-    if(read==1) begin
-        if(read_address==32'h80006000)
+    if (read==1) begin
+        if (read_address==32'h80006000)
             data_read <= $time/1000;
         else 
             data_read <= Rd_data; 
@@ -72,12 +72,12 @@ logic [31:0]  Rd_data, Wr_address, Wr_data;
 ////////////////////////////////////////////////////// Memory Mapped regs ///////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   always @(posedge clk) begin
-    if((write_address == 32'h80004000 | write_address == 32'h80001000) & write!=0) begin
+    if ((write_address == 32'h80004000 | write_address == 32'h80001000) & write!=0) begin
         char <= data_write[7:0];
         $write("%c",char);
     end
 
-    if(write_address==32'h80000000) begin
+    if (write_address==32'h80000000) begin
         $display("# %t END OF SIMULATION",$time);
         $finish;
     end

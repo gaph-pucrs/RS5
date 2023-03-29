@@ -72,7 +72,7 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk) begin
-        if(!hazard_i && !stall) begin
+        if (!hazard_i && !stall) begin
             pc_o <= pc;
         end
     end

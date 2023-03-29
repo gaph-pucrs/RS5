@@ -147,7 +147,7 @@ integer TIMER;
         end
         else begin
             TIMER <= TIMER + 1;
-//            if(TIMER % 500 == 0)
+//            if (TIMER % 500 == 0)
 //                IRQ[7] <= 1;
         end
     end

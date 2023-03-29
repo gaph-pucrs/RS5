@@ -62,13 +62,13 @@ module CSRBank
     end
 
     always_comb begin
-        if(operation_i == WRITE) begin
+        if (operation_i == WRITE) begin
             wr_data = data_i & wmask;
         end
-        else if(operation_i == SET) begin
+        else if (operation_i == SET) begin
             wr_data = (current_val | data_i) & wmask;
         end
-        else if(operation_i == CLEAR) begin
+        else if (operation_i == CLEAR) begin
             wr_data = (current_val & (~data_i)) & wmask;
         end
         else begin
@@ -95,12 +95,12 @@ module CSRBank
             //mip       <= '0;
 
         end 
-        else if(machine_return_i) begin
+        else if (machine_return_i) begin
             mstatus[3]  <= mstatus[7];          // MIE = MPIE
             //privilege <= mstatus[12:11]       // priv = MPP
 
         end
-        else if(raise_exception_i) begin
+        else if (raise_exception_i) begin
             mcause[31]      <= '0;
             mcause[30:0]    <= {26'b0, exception_code_i};
             mstatus[12:11]  <= privilege_i;         // MPP previous privilege
@@ -115,7 +115,7 @@ module CSRBank
                                 : pc_i;
 
         end 
-        else if(interrupt_ack_i) begin
+        else if (interrupt_ack_i) begin
             mcause[31]      <= '1;
             mcause[30:0]    <=  {26'b0, Interruption_Code};
             mstatus[12:11]  <= privilege_i;           // MPP = previous privilege
@@ -125,7 +125,7 @@ module CSRBank
             mepc_r          <= pc_i;                  // Return address
         
         end 
-        else if(write_enable_i && !killed) begin
+        else if (write_enable_i && !killed) begin
             case(CSR)
                 MSTATUS:      mstatus     <= wr_data;
                 MISA:         misa        <= wr_data;
@@ -146,7 +146,7 @@ module CSRBank
     end
 
     always_comb begin
-        if(read_enable_i && !killed) begin
+        if (read_enable_i && !killed) begin
             case(CSR)
                 //RO
                 MVENDORID:  out = '0;
@@ -193,13 +193,13 @@ module CSRBank
     end
     
     always_ff @(posedge clk) begin
-        if(mstatus[3] && (mie & mip) != '0 && !interrupt_ack_i) begin
+        if (mstatus[3] && (mie & mip) != '0 && !interrupt_ack_i) begin
             interrupt_pending_o <= 1;
-            if(mip[11] & mie[11])                   // Machine External
+            if (mip[11] & mie[11])                   // Machine External
                 Interruption_Code <= M_EXT_INT;
-            else if(mip[3] & mie[3])                // Machine Software
+            else if (mip[3] & mie[3])                // Machine Software
                 Interruption_Code <= M_SW_INT;
-            else if(mip[7] & mie[7])                // Machine Timer
+            else if (mip[7] & mie[7])                // Machine Timer
                 Interruption_Code <= M_TIM_INT;
 
         end 
