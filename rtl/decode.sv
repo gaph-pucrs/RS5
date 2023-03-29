@@ -1,7 +1,7 @@
 /*!\file decode.sv
- * PUCRS-RV VERSION - 1.0 - Public Release
+ * PUC-RS5 VERSION - 1.0.0 - Public Release
  *
- * Distribution:  September 2021
+ * Distribution:  March 2023
  *
  * Willian Nunes   <willian.nunes@edu.pucrs.br>
  * Marcos Sartori  <marcos.sartori@acad.pucrs.br>
@@ -10,16 +10,16 @@
  * Research group: GAPH-PUCRS  <>
  *
  * \brief
- * Decoder Unit is the second stag_oe of PUCRS-RV processor.
+ * Decoder Unit is the second stage of PUC-RS5 processor core.
  *
  * \detailed
- * The decoder unit is the second stage of the PUCRS-RV processor and 
- * is responsible for identify the instruction_int type and based on that 
- * extracts the execute module of the instruction_int and the operation. 
- * Also fetch the operands in the register bank, calculate the immediate
- * operand and also have a mechanism of hazard_o detection, if a hazard_o is
- * detected (e.g. write after read) a bubble is issued. The bubble
- * consists in a NOP (NO Operation) instruction_int.
+ * The decoder unit is the second stage of the PUC-RS5 processor core and 
+ * is responsible for identify the instruction operation and based on that 
+ * extracts the execution unit for that kind of instruction and
+ * also fetches the operands in the register bank, calculate the immediate
+ * operand and contains the mechanism of hazard detection, if a hazard is
+ * detected (e.g. write after read) a bubble is issued which
+ * consists in a NOP (NO Operation) instruction.
  */
 
 module decode 

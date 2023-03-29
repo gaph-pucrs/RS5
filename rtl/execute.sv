@@ -1,7 +1,7 @@
 /*!\file execute.sv
- * PUCRS-RV VERSION - 1.0 - Public Release
+ * PUC-RS5 VERSION - 1.0.0 - Public Release
  *
- * Distribution:  September 2021
+ * Distribution:  March 2023
  *
  * Willian Nunes   <willian.nunes@edu.pucrs.br>
  * Marcos Sartori  <marcos.sartori@acad.pucrs.br>
@@ -10,16 +10,16 @@
  * Research group: GAPH-PUCRS  <>
  *
  * \brief
- * Execute Unit is the fourth stage of the processor.
+ * Execute Unit is the third stage of the processor core.
  *
  * \detailed
- * Execute Unit is the fourth stage of the PUCRS-RV processor. At the
- * entry it implements a dispatcher that assigns the operands only to the
- * module responsible for that kind of instruction, the modules are: 
- * 1) Adder 2) Branch 3) Bypass 4) Logic 5) Memory 6) Shift. Each module is
- * defined in a separeted file. These files must be included in this Unit
- * if not compiled separately. At the other end it has a demux that collects
- * the result only from the given module and BYPASS it to the next stage.
+ * Execute Unit is the third stage of the PUC-RS5 processor core. At the
+ * entry it implements a dispatcher that assigns the operands to the
+ * execution units that are: 
+ * 1) Adder 2) Branch 3) Bypass 4) Logic 5) Memory 6) Shift 7) CSR access. 
+ * Each module is defined in a separeted file. At the other end it has a 
+ * demultiplexer that collects the result only from the given module and 
+ * pass it to the retirement stage.
  */
 
 module execute

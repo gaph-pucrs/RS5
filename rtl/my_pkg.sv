@@ -1,7 +1,7 @@
 /*!\file pkg.sv
- * PUCRS-RV VERSION - 1.0 - Public Release
+ * PUC-RS5 VERSION - 1.0.0 - Public Release
  *
- * Distribution:  September 2021
+ * Distribution:  March 2023
  *
  * Willian Nunes   <willian.nunes@edu.pucrs.br>
  * Marcos Sartori  <marcos.sartori@acad.pucrs.br>
@@ -48,8 +48,8 @@ package my_pkg;
                                 MSCRATCH = 12'h340, MEPC, MCAUSE, MTVAL, MIP, MTINST = 12'h34A, MTVAL2,
                                 CYCLE = 12'hC00, TIME, INSTRET, CYCLEH=12'hC80, TIMEH, INSTRETH} CSRs;
 
-    typedef enum  logic[4:0] { INSTRUCTION_ADDRESS_MISALIGNED, INSTRUCTION_ACCESS_FAULT, ILLEGAL_INSTRUCTION, BREAKPOINT, LOAD_ADDRESS_MISALIGNED,
-		                        LOAD_ACCESS_FAULT, STORE_AMO_ADDRESS_MISALIGNED, STORE_AMO_ACCESS_FAULT, ECALL_FROM_UMODE,ECALL_FROM_SMODE,
+    typedef enum  logic[4:0] {  INSTRUCTION_ADDRESS_MISALIGNED, INSTRUCTION_ACCESS_FAULT, ILLEGAL_INSTRUCTION, BREAKPOINT, LOAD_ADDRESS_MISALIGNED,
+		                            LOAD_ACCESS_FAULT, STORE_AMO_ADDRESS_MISALIGNED, STORE_AMO_ACCESS_FAULT, ECALL_FROM_UMODE,ECALL_FROM_SMODE,
                                 ECALL_FROM_MMODE = 11, INSTRUCTION_PAGE_FAULT, LOAD_PAGE_FAULT, STORE_AMO_PAGE_FAULT = 15, NE} exceptionCode_e;
 
     typedef enum  logic[4:0] { S_SW_INT = 1, M_SW_INT = 3, S_TIM_INT = 5, M_TIM_INT = 7, S_EXT_INT = 9, M_EXT_INT = 11} interruptionCode_e;

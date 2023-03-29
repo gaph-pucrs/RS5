@@ -1,7 +1,7 @@
 /*!\file fetch.sv
- * PUCRS-RV VERSION - 1.0 - Public Release
+ * PUC-RS5 VERSION - 1.0.0 - Public Release
  *
- * Distribution:  September 2021
+ * Distribution:  March 2023
  *
  * Willian Nunes   <willian.nunes@edu.pucrs.br>
  * Marcos Sartori  <marcos.sartori@acad.pucrs.br>
@@ -10,11 +10,11 @@
  * Research group: GAPH-PUCRS  <>
  *
  * \brief
- * Fetch Unit is the first stage of the processor and fetch the instruction in memory.
+ * Fetch Unit is the first stage of the processor core and fetch the instruction in memory.
  *
  * \detailed
- * Fetch Unit is the first stage of the PUCRS-RV processor. It has an
- * internal loop that contains the Program Counter(pc) that is increased by four 
+ * Fetch Unit is the first stage of the PUC-RS5 processor core. It has an
+ * internal loop that contains the Program Counter(PC) that is increased by four 
  * on a new clock cycle or is replaced by a new address in case of a branch. 
  * It has a internal tag calculator that is increased in branchs and mantained
  * in regular flows, the tag leaves the unit with the instruction fetched.
@@ -99,7 +99,5 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
         else if (!hazard_i && !stall) begin
             current_tag <= next_tag;
         end
-
     end
-
 endmodule

@@ -1,7 +1,7 @@
-/*!\file PUCRS-RV.sv
- * PUCRS-RV VERSION - 1.0 - Public Release
+/*!\file PUC_RS5.sv
+ * PUC-RS5 VERSION - 1.0.0 - Public Release
  *
- * Distribution:  September 2021
+ * Distribution:  March 2023
  *
  * Willian Nunes   <willian.nunes@edu.pucrs.br>
  * Marcos Sartori  <marcos.sartori@acad.pucrs.br>
@@ -10,13 +10,14 @@
  * Research group: GAPH-PUCRS  <>
  *
  * \brief
- * Is the top Module of PUCRS-RV.
+ * Is the top Module of PUC-RS5 processor core.
  *
  * \detailed
- * This is the top Module of the PUCRS-RV processor
+ * This is the top Module of the PUC-RS5 processor core
  * and is responsible for the instantiation of the lower level modules
- * ans also defines the interface ports(inputs and outputs) os the processor.
+ * ans also defines the interface ports (inputs and outputs) os the processor.
  */
+ 
 /*
 `include "../rtl/my_pkg.sv"
 `include "../rtl/xus/adderUnit.sv"

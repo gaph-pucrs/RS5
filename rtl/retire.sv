@@ -1,7 +1,7 @@
 /*!\file retire.sv
- * PUCRS-RV VERSION - 1.0 - Public Release
+ * PUC-RS5 VERSION - 1.0.0 - Public Release
  *
- * Distribution:  September 2021
+ * Distribution:  March 2023
  *
  * Willian Nunes   <willian.nunes@edu.pucrs.br>
  * Marcos Sartori  <marcos.sartori@acad.pucrs.br>
@@ -10,16 +10,17 @@
  * Research group: GAPH-PUCRS  <>
  *
  * \brief
- * Retire is the last stage of the PUCRS-RV processor.
+ * Retire is the last stage of the PUC-RS5 processor core.
  *
  * \detailed
- * Retire is the last stage of the PUCRS-RV processor and is reponsible for closing the loops.
- * First compares the instruction_i tag and the internal tag, if they does not match then the 
- * instruction_i is killed and no operation is performed, otherwise it sends the data received 
- * to the designed outputs, they are: 
- * 1) Register bank mem_write_enable_o data and mem_write_enable_o enable
- * 2) Branch address (New_PC)
- * 3) Memory mem_write_enable_o signals (Data, address and mem_write_enable_o enable)
+ * Retire is the last stage of the PUC-RS5 processor core and is reponsible for closing the loops.
+ * First compares the instruction tag with the internal tag, if they do not match then the 
+ * instruction is killed and no operation is performed, otherwise it sends the data received 
+ * for the given output, they are: 
+ * 1) Register bank - data and write enable
+ * 2) Branch - jump target
+ * 3) Memory write - memory signals (Data, address and operation enable)
+ * 4) Manage Exceptions and Interrupts and Privilege Switch.
  */
 
 module retire
