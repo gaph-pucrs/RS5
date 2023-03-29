@@ -8,6 +8,7 @@
 // For std::unique_ptr
 #include <memory>
 #include <iostream>
+#include <chrono>
 
 // Include common routines
 #include <verilated.h>
@@ -31,6 +32,8 @@ int main(int argc, char** argv, char** env) {
     // Construct the Verilated model, from Vtestbench.h generated from Verilating "testbench.sv".
     const auto top = std::make_unique<Vtestbench>(contextp.get());
 
+    auto then = std::chrono::high_resolution_clock::now();
+
     top->IRQ_i = 0;
 
     // Simulate until $finish
@@ -52,6 +55,11 @@ int main(int argc, char** argv, char** env) {
         // Evaluate model
         top->eval();
     }
+
+    auto now = std::chrono::high_resolution_clock::now();
+	auto diff = now - then;
+	std::cout << std::endl << "Simulation time: " << ((contextp->time() * 10.0) / 1000.0 / 1000.0) << "ms" << std::endl;
+	std::cout << "Wall time: " << std::chrono::duration_cast<std::chrono::duration<double>>(diff).count() << "s" << std::endl;
 
     return 0;
 }
