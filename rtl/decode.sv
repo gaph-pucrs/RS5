@@ -171,14 +171,14 @@ module decode
     always_comb begin
         case (instruction_format)
             I_TYPE: begin
-                        immediate[31:11] = (instruction_int[31] == 0) 
+                        immediate[31:11] = (!instruction_int[31]) 
                                             ? '0 
                                             : '1;
                         immediate[10:0]  = instruction_int[30:20];
                     end
 
             S_TYPE: begin
-                        immediate[31:11] = (instruction_int[31] == 0) 
+                        immediate[31:11] = (!instruction_int[31]) 
                                             ? '0 
                                             : '1;
                         immediate[10:5]  = instruction_int[30:25];
@@ -186,7 +186,7 @@ module decode
                     end
 
             B_TYPE: begin
-                        immediate[31:12] = (instruction_int[31] == 0) 
+                        immediate[31:12] = (!instruction_int[31]) 
                                             ? '0 
                                             : '1;
                         immediate[11]    = instruction_int[7];
@@ -201,7 +201,7 @@ module decode
                     end
 
             J_TYPE: begin
-                        immediate[31:20] = (instruction_int[31] == 0) 
+                        immediate[31:20] = (!instruction_int[31]) 
                                             ? '0 
                                             : '1;
                         immediate[19:12] = instruction_int[19:12];
@@ -271,10 +271,10 @@ module decode
         if ((locked_memory[0] || locked_memory[1]) && (executionUnit_e'(instruction_operation[5:3]) == MEMORY_UNIT)) begin
             hazard_o = 1;
         end
-        else if (locked_registers[0] == rs1_o && rs1_o != 0) begin
+        else if (locked_registers[0] == rs1_o && rs1_o != '0) begin
             hazard_o = 1;
         end
-        else if (locked_registers[0] == rs2_o && rs2_o != 0) begin
+        else if (locked_registers[0] == rs2_o && rs2_o != '0) begin
             hazard_o = 1;
         end
         else begin

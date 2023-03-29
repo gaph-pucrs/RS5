@@ -54,27 +54,27 @@ module RAM_mem
 ////////////////////////////////////////////////////////////// DATA MEMORY ////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     always_ff @(posedge clk) begin
-        if (operation_enable_i == 1) begin
+        if (operation_enable_i) begin
             ///////////////////////////// Writes  ///////////////////////////////////////////
-            if (write_enable_i != 0) begin
-                if (write_enable_i[3] == 1) begin                                 // Store Word(4 bytes)
+            if (write_enable_i != '0) begin
+                if (write_enable_i[3]) begin                                 // Store Word(4 bytes)
                     RAM[data_address_i+3] <= data_i[31:24];
                 end 
-                if (write_enable_i[2] == 1) begin                                 // Store Word(4 bytes)
+                if (write_enable_i[2]) begin                                 // Store Word(4 bytes)
                     RAM[data_address_i+2] <= data_i[23:16];
                 end
-                if (write_enable_i[1] == 1) begin                                 // Store Half(2 bytes)
+                if (write_enable_i[1]) begin                                 // Store Half(2 bytes)
                     RAM[data_address_i+1] <= data_i[15:8];
                 end
-                if (write_enable_i[0] == 1) begin                                 // Store Byte(1 byte)
+                if (write_enable_i[0]) begin                                 // Store Byte(1 byte)
                     RAM[data_address_i]   <= data_i[7:0];
                 end
 
                 $fwrite(fd_w,"[%0d] ", $time);
-                if (write_enable_i[3] == 1) $fwrite(fd_w,"%h ", data_i[31:24]); else $fwrite(fd_w,"-- ");
-                if (write_enable_i[2] == 1) $fwrite(fd_w,"%h ", data_i[23:16]); else $fwrite(fd_w,"-- ");
-                if (write_enable_i[1] == 1) $fwrite(fd_w,"%h ", data_i[15:8]);  else $fwrite(fd_w,"-- ");
-                if (write_enable_i[0] == 1) $fwrite(fd_w,"%h ", data_i[7:0]);   else $fwrite(fd_w,"-- ");
+                if (write_enable_i[3]) $fwrite(fd_w,"%h ", data_i[31:24]); else $fwrite(fd_w,"-- ");
+                if (write_enable_i[2]) $fwrite(fd_w,"%h ", data_i[23:16]); else $fwrite(fd_w,"-- ");
+                if (write_enable_i[1]) $fwrite(fd_w,"%h ", data_i[15:8]);  else $fwrite(fd_w,"-- ");
+                if (write_enable_i[0]) $fwrite(fd_w,"%h ", data_i[7:0]);   else $fwrite(fd_w,"-- ");
                 $fwrite(fd_w," --> 0x%4h\n", data_address_i);
             //////////////////////////// Reads //////////////////////////////////////////////
             end 
@@ -84,7 +84,7 @@ module RAM_mem
                 data_o[15:8]  <= RAM[data_address_i+1];
                 data_o[7:0]   <= RAM[data_address_i];
 
-                if (data_address_i != 0) begin
+                if (data_address_i != '0) begin
                     $fwrite(fd_r,"[%0d] %h %h %h %h <-- 0x%4h\n", 
                         $time, RAM[data_address_i+3], RAM[data_address_i+2], RAM[data_address_i+1], RAM[data_address_i], data_address_i);
                 end

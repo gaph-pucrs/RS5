@@ -193,7 +193,7 @@ module CSRBank
     end
     
     always_ff @(posedge clk) begin
-        if(mstatus[3] && (mie & mip) != 0 && !interrupt_ack_i) begin
+        if(mstatus[3] && (mie & mip) != '0 && !interrupt_ack_i) begin
             interrupt_pending_o <= 1;
             if(mip[11] & mie[11])                   // Machine External
                 Interruption_Code <= M_EXT_INT;
@@ -217,7 +217,7 @@ module CSRBank
         end 
         else begin
             cycle  <= cycle + 1;
-            instret <= (killed == 1) 
+            instret <= (killed) 
                         ? instret 
                         : instret + 1;
         end

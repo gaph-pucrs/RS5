@@ -58,7 +58,7 @@ module LSUnit
                 read_o              = 0;
                 write_data_o[31:16] = data_i[15:0];    
                 write_data_o[15:0]  = data_i[15:0];
-                write_enable_o      = (write_address_o[1] == 1) 
+                write_enable_o      = (write_address_o[1]) 
                                         ? 4'b1100 
                                         : 4'b0011;
             end 
