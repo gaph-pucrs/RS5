@@ -40,7 +40,7 @@ module RAM_mem
     int fd_i, fd_r, fd_w;
 
     initial begin
-        fd = $fopen ("../bin/test.bin", "r");
+        fd = $fopen ("../app/berkeley_suite/test.bin", "r");
 
         r = $fread(RAM, fd);
         $display("read %d elements \n", r);
