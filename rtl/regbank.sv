@@ -40,12 +40,16 @@ module regbank(
             data2_o = regfile[rs2];
     
     // Reset and Write control
-    for (genvar i = 1; i < 32 ; i++)
-        always_ff @(posedge clk)
-            if (reset == 1)
+    for (genvar i = 1; i < 32 ; i++) begin
+        always_ff @(posedge clk) begin
+            if (reset) begin
                 regfile[i] <= '0;
-            else if (rd == i && enable == 1)
+            end
+            else if (rd == i && enable) begin
                 regfile[i] <= data_i;
+            end
+        end
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 // DEBUG 
@@ -55,9 +59,9 @@ module regbank(
     initial 
         fd = $fopen ("./debug/regBank.txt", "w");
 
-    always @(posedge clk ) begin
+    always_ff @(posedge clk ) begin
         $fwrite(fd,"[%0d] %02d - %8h \t %02d - %8h\n", $time, rs1, data1_o, rs2, data2_o);
-        if(rd != '0) begin
+        if (rd != '0) begin
             $fwrite(fd,"[%0d] --------------------------------- %02d - %8h\n", $time, rd, data_i);
         end
     end

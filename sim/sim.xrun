@@ -1,2 +1,2 @@
--smartorder -top PUC_RS5_tb 
-./testbench.sv
+-smartorder -top tb_top 
+./tb_top.sv

@@ -31,9 +31,9 @@ logic BTND_Debounced, BTND_Debounced_r, Button_Detected, Button_request;
 //////////////////////////////////////////////////////////////////////////////
 
     always @(posedge clk) begin
-        if (enable_i == 1 && write_enable_i != 0) begin
+        if (enable_i && write_enable_i != '0) begin
             /// OUTPUT REG
-            if ((data_address_i == 32'h80004000 || data_address_i == 32'h80001000) && BUFFER_full==0) begin
+            if ((data_address_i == 32'h80004000 || data_address_i == 32'h80001000) && BUFFER_full == '0) begin
                 gpioa_out <= data_i[7:0];
                 gpioa_addr <= 8'h84;
                 BUFFER_write <= 1;
@@ -62,7 +62,7 @@ logic BTND_Debounced, BTND_Debounced_r, Button_Detected, Button_request;
 //////////////////////////////////////////////////////////////////////////////
 
     always @(posedge clk) begin
-        if (enable_i == 1 && write_enable_i == 0) begin
+        if (enable_i && write_enable_i == '0) begin
         ///////////////////////////////////// TIMER REG ////////////////////////////////////
             if (data_address_i == 32'h80006000)
                 data_r <= counter;
@@ -78,18 +78,18 @@ logic BTND_Debounced, BTND_Debounced_r, Button_Detected, Button_request;
 //////////////////////////////////////////////////////////////////////////////
 
     always @(posedge clk) begin
-        if (reset == 1) begin
+        if (reset) begin
             IRQ_o <= '0;
         end
         // EXTERNAL
-        else if (IRQ_o[11] == 1 && interrupt_ack_i == 1) begin
+        else if (IRQ_o[11] && interrupt_ack_i) begin
             IRQ_o[11] <= 0;
         end
-        else if (Button_request == 1) begin
+        else if (Button_request) begin
             IRQ_o[11] <= 1;
         end
         // TIMER
-        else if (IRQ_o[7] == 1 && interrupt_ack_i == 1) begin
+        else if (IRQ_o[7] && interrupt_ack_i) begin
             IRQ_o[7] <= 0;
         end
         else if (counter >= 32'h0EE6B280) begin
@@ -101,11 +101,11 @@ logic BTND_Debounced, BTND_Debounced_r, Button_Detected, Button_request;
 // TIMER AND BUTTON
 //////////////////////////////////////////////////////////////////////////////
 
-    always @(posedge clk) begin
-        if (reset == 1) begin
+    always_ff @(posedge clk) begin
+        if (reset) begin
             counter <= 0;
         end
-        else if (IRQ_o[7] == 1 && interrupt_ack_i == 1) begin
+        else if (IRQ_o[7] && interrupt_ack_i) begin
             counter <= 0;
         end
         else begin
@@ -113,14 +113,14 @@ logic BTND_Debounced, BTND_Debounced_r, Button_Detected, Button_request;
         end
     end
 
-    always @(posedge clk) begin
-        if (reset == 1) begin
+    always_ff @(posedge clk) begin
+        if (reset) begin
             Button_request <= 0;
         end
-        else if (IRQ_o[11] == 1 && interrupt_ack_i == 1) begin
+        else if (IRQ_o[11] && interrupt_ack_i) begin
             Button_request <= 0;
         end
-        else if (Button_Detected == 1 || Button_request == 1) begin
+        else if (Button_Detected || Button_request) begin
             Button_request <= 1;
         end
     end
@@ -131,45 +131,45 @@ logic BTND_Debounced, BTND_Debounced_r, Button_Detected, Button_request;
         .SIGNAL_O(BTND_Debounced)
     );
 
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         BTND_Debounced_r <= BTND_Debounced;
     end
-    assign Button_Detected = (BTND_Debounced_r == 0 && BTND_Debounced == 1);
+    assign Button_Detected = (!BTND_Debounced_r && BTND_Debounced);
 
 //////////////////////////////////////////////////////////////////////////////
 // STALL GENERATION
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        if (enable_i == 1) begin
+        if (enable_i) begin
             // READS
-            if (write_enable_i == 0 && stall_r != 1) begin
+            if (write_enable_i == '0 && !stall_r) begin
                 if (data_address_i == 32'h80006000) begin
-                    stall_o <= 1;
+                    stall_o = 1;
                 end
                 else begin
-                    stall_o <= 0;
+                    stall_o = 0;
                 end
             end
             // WRITES
-            else if (write_enable_i != 0) begin
-                if ((data_address_i == 32'h80004000 || data_address_i == 32'h80001000) && BUFFER_full == 1) begin
-                    stall_o <= 1;
+            else if (write_enable_i != '0) begin
+                if ((data_address_i == 32'h80004000 || data_address_i == 32'h80001000) && BUFFER_full) begin
+                    stall_o = 1;
                 end
                 else begin
-                    stall_o <= 0;
+                    stall_o = 0;
                 end
             end
             else begin
-                stall_o <= 0;
+                stall_o = 0;
             end
         end 
         else begin
-            stall_o <= 0;
+            stall_o = 0;
         end
     end
 
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         stall_r <= stall_o;
         data_o <= data_r;
     end
@@ -203,7 +203,7 @@ logic BTND_Debounced, BTND_Debounced_r, Button_Detected, Button_request;
 
     assign BUFFER_read = UART_ready & !BUFFER_empty & !UART_send;
 
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         UART_send <= BUFFER_read;
     end
 

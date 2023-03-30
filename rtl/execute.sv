@@ -22,9 +22,9 @@
  * pass it to the retirement stage.
  */
 
-import my_pkg::*;
-
-module execute(
+module execute
+    import my_pkg::*;
+(
     input   logic          clk,
     input   logic          stall,
 
@@ -68,7 +68,7 @@ module execute(
     operationType_e execution_unit_operation;
     executionUnit_e execution_unit_selector;
 
-    assign execution_unit_selector = executionUnit_e'(instruction_operation_i[5:3]);
+    assign execution_unit_selector  = executionUnit_e'(instruction_operation_i[5:3]);
     assign execution_unit_operation = operationType_e'(instruction_operation_i[2:0]);
 
 //////////////////////////////////////////////////////////////////////////////
@@ -141,72 +141,89 @@ module execute(
 // Demux
 //////////////////////////////////////////////////////////////////////////////
 
-    always @(posedge clk) begin 
-        if (stall == 0) begin
-            if (execution_unit_selector == ADDER_UNIT)
+    always_ff @(posedge clk) begin 
+        if (!stall) begin
+            if (execution_unit_selector == ADDER_UNIT) begin
                 result_o[0] <= results_int[0];
-            else if (execution_unit_selector == LOGICAL_UNIT)
+            end
+            else if (execution_unit_selector == LOGICAL_UNIT) begin
                 result_o[0] <= results_int[1];
-            else if (execution_unit_selector == SHIFTER_UNIT)
+            end
+            else if (execution_unit_selector == SHIFTER_UNIT) begin
                 result_o[0] <= results_int[2];
-            else if (execution_unit_selector == BRANCH_UNIT)
+            end
+            else if (execution_unit_selector == BRANCH_UNIT) begin
                 result_o[0] <= results_int[3];
-            else if (execution_unit_selector == MEMORY_UNIT)
+            end
+            else if (execution_unit_selector == MEMORY_UNIT) begin
                 result_o[0] <= results_int[6];
-            else if (execution_unit_selector == CSR_UNIT)
+            end
+            else if (execution_unit_selector == CSR_UNIT) begin
                 result_o[0] <= csr_data_read_i;
-            else
+            end
+            else begin
                 result_o[0] <= results_int[5];
+            end
         end
     end
 
-    always @(posedge clk) begin
-        if (stall == 0) begin
-            if (execution_unit_selector == BRANCH_UNIT)
+    always_ff @(posedge clk) begin
+        if (!stall) begin
+            if (execution_unit_selector == BRANCH_UNIT) begin
                 result_o[1] <= results_int[4];
-            else if (execution_unit_selector == MEMORY_UNIT)
+            end
+            else if (execution_unit_selector == MEMORY_UNIT) begin
                 result_o[1] <= results_int[7];
-            else 
+            end
+            else begin 
                 result_o[1] <= '0;
+            end
         end
     end  
     
-    always @(posedge clk) begin
-        if (stall == 0) begin
-            if (execution_unit_selector == BRANCH_UNIT)
+    always_ff @(posedge clk) begin
+        if (!stall) begin
+            if (execution_unit_selector == BRANCH_UNIT) begin
                 jump_o <= jump_int;
-            else
+            end
+            else begin
                 jump_o <= '0;
+            end
         end
     end  
 
-    always @(posedge clk) begin
-        if (stall == 0) begin
-            if (execution_unit_selector == MEMORY_UNIT)
+    always_ff @(posedge clk) begin
+        if (!stall) begin
+            if (execution_unit_selector == MEMORY_UNIT) begin
                 mem_write_enable_o <= mem_write_enable_int;
-            else 
+            end
+            else begin
                 mem_write_enable_o <= '0;
+            end
         end
     end  
 
-    always @(posedge clk) begin
-        if (stall == 0) begin
-            if (execution_unit_selector == BRANCH_UNIT)
+    always_ff @(posedge clk) begin
+        if (!stall) begin
+            if (execution_unit_selector == BRANCH_UNIT) begin
                 write_enable_o <= write_enable_regbank_branch_unit;
-            else if (execution_unit_selector == MEMORY_UNIT)
+            end
+            else if (execution_unit_selector == MEMORY_UNIT) begin
                 write_enable_o <= write_enable_regbank_memory_unit;
-            else
+            end
+            else begin
                 write_enable_o <= 1;
+            end
         end
     end  
 
-    always @(posedge clk) begin
-        if (stall == 0) begin
-            tag_o <= tag_i;
+    always_ff @(posedge clk) begin
+        if (!stall) begin
+            tag_o                   <= tag_i;
             instruction_operation_o <= instruction_operation_i;
-            instruction_o <= instruction_i;
-            pc_o <= pc_i;
-            exception_o <= exception_i | csr_exception;
+            instruction_o           <= instruction_i;
+            pc_o                    <= pc_i;
+            exception_o             <= exception_i | csr_exception;
         end
     end
 
