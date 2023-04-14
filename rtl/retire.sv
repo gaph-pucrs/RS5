@@ -241,13 +241,20 @@ module retire
                 machine_return_o  = 0;
                 interrupt_ack_o   = 1;
                 $write("[%0d] Interrupt Acked\n", $time);
-            end 
+            end
             else begin
                 raise_exception_o = 0;
                 exception_code_o  = NE;
                 machine_return_o  = 0;
                 interrupt_ack_o   = 0;
             end
+        end
+        else if (interrupt_pending_i && !jump_i) begin
+            raise_exception_o = 0;
+            exception_code_o  = NE;
+            machine_return_o  = 0;
+            interrupt_ack_o   = 1;
+            $write("[%0d] Interrupt Acked\n", $time);
         end
         else begin
             raise_exception_o = 0;
