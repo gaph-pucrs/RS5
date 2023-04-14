@@ -32,6 +32,7 @@
 `include "../rtl/regbank.sv"
 `include "../rtl/CSRBank.sv"
 `include "../rtl/PUC_RS5.sv"
+`include "../rtl/rtc.sv"
 `include "./RAM_mem.sv"
 
 //////////////////////////////////////////////////////////////////////////////
@@ -42,21 +43,26 @@ module testbench
     import my_pkg::*;
 (
     input logic clk_i,
-    input logic rst_i,
-    input logic [31:0]  IRQ_i
+    input logic rst_i
 );
 
 /* verilator lint_off UNUSEDSIGNAL */
 logic [31:0]  instruction_address;
 logic         interrupt_ack;
+logic [63:0]  mtime;
+logic [63:0]  data_rtc;
 /* verilator lint_on UNUSEDSIGNAL */
 logic [31:0]  instruction;
-logic         enable_ram, enable_tb, mem_operation_enable;
+logic         enable_ram, enable_tb, enable_rtc, mem_operation_enable;
 logic [31:0]  mem_address, mem_data_read, mem_data_write;
 logic [3:0]   mem_write_enable;
 byte          char;
 logic [31:0]  data_ram, data_tb;
-logic         enable_tb_r;
+logic         enable_tb_r, enable_rtc_r;
+logic [31:0]  IRQ;
+logic         mti;
+
+assign IRQ = {24'h0, mti, 7'h0};
 
 //////////////////////////////////////////////////////////////////////////////
 // CPU INSTANTIATION
@@ -68,7 +74,7 @@ logic         enable_tb_r;
         .stall(1'b0),
         .instruction_i(instruction), 
         .mem_data_i(mem_data_read), 
-        .IRQ_i(IRQ_i),
+        .IRQ_i(IRQ),
         .instruction_address_o(instruction_address), 
         .mem_operation_enable_o(mem_operation_enable), 
         .mem_write_enable_o(mem_write_enable),
@@ -92,20 +98,58 @@ logic         enable_tb_r;
         .data_o(data_ram)
     );
 
-    assign enable_tb = (mem_address > 32'h0000FFFF && mem_operation_enable) 
-                        ? 1 
-                        : 0;
+    rtc rtc(
+        .clk(clk_i),
+        .reset(rst_i),
+        .en_i(enable_rtc),
+        .addr_i(mem_address[3:0]),
+        .we_i({4'h0, mem_write_enable}),
+        .data_i({32'h0, mem_data_write}),
+        .data_o(data_rtc),     
+        .mti_o(mti),
+        .mtime_o(mtime)
+    );
 
-    assign enable_ram = (mem_address <= 32'h0000FFFF && mem_operation_enable) 
-                        ? 1 
-                        : 0;
+    always_comb begin
+        if (enable_tb_r) begin
+            mem_data_read = data_tb;
+        end
+        else if (enable_rtc_r) begin
+            mem_data_read = data_rtc[31:0];
+        end
+        else begin
+            mem_data_read = data_ram;
+        end
+    end
 
-    assign mem_data_read = (enable_tb_r) 
-                        ? data_tb 
-                        : data_ram;
+    always_comb begin
+        if (mem_operation_enable) begin
+            if (mem_address[31:28] < 4'h2) begin
+                enable_ram = 1'b1;
+                enable_tb  = 1'b0;
+                enable_rtc = 1'b0;
+            end
+            else if (mem_address[31:28] < 4'h8) begin
+                enable_ram = 1'b0;
+                enable_tb  = 1'b0;
+                enable_rtc = 1'b1;
+            end
+            else begin
+                enable_ram = 1'b0;
+                enable_tb  = 1'b1;
+                enable_rtc = 1'b0;
+            end
+        end
+        else begin
+            enable_ram = 1'b0;
+            enable_tb  = 1'b0;
+            enable_rtc = 1'b0;
+        end
+    end
     
     always_ff @(posedge clk_i) begin
-        enable_tb_r <= enable_tb;
+        enable_tb_r  <= enable_tb;
+        enable_rtc_r <= enable_rtc;
     end
 
 
@@ -132,23 +176,6 @@ logic         enable_tb_r;
         end 
         else begin
             data_tb <= '0;
-        end
-    end
-
-//////////////////////////////////////////////////////////////////////////////
-// TIMER generator
-//////////////////////////////////////////////////////////////////////////////
-
-integer TIMER;
-
-    always_ff @(posedge clk_i) begin
-        if (rst_i) begin
-            TIMER <= 0;
-        end
-        else begin
-            TIMER <= TIMER + 1;
-//            if (TIMER % 500 == 0)
-//                IRQ[7] <= 1;
         end
     end
 

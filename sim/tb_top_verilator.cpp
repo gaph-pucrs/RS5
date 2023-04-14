@@ -34,8 +34,6 @@ int main(int argc, char** argv, char** env) {
 
     auto then = std::chrono::high_resolution_clock::now();
 
-    top->IRQ_i = 0;
-
     // Simulate until $finish
     while (!contextp->gotFinish()) {
         contextp->timeInc(5);  // 5 timeprecision period passes...
