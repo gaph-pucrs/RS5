@@ -1,4 +1,4 @@
-with open("../app/riscv-tests/test.bin", "rb") as file_in:
+with open("../app/berkeley_suite/test.bin", "rb") as file_in:
     rd = file_in.read(-1)
     byteArray = bytearray(rd)
 
