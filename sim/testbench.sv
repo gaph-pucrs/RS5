@@ -100,7 +100,6 @@ assign IRQ = {24'h0, mti, 7'h0};
 
     rtc rtc(
         .clk(clk_i),
-        .reset(rst_i),
         .en_i(enable_rtc),
         .addr_i(mem_address[3:0]),
         .we_i({4'h0, mem_write_enable}),

@@ -110,7 +110,6 @@ module PUC_RS5_With_BRAMs
 
     rtc rtc(
         .clk(clk),
-        .reset(!reset),
         .en_i(enable_rtc),
         .addr_i(CPU_data_address[3:0]),
         .we_i({4'h0, CPU_write_enable}),
