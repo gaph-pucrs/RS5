@@ -1,3 +1,5 @@
+.equ MMR_BASE, 0x20000000
+
 	.section .text.init
 	.global _entry
 _entry:
@@ -14,6 +16,14 @@ boot:
     # Habilita Interrupções Externas
     li t2, 0x888                # Seta os bits 11, 7 e 3 (MEIE, MTIE e MSIE)
     csrs mie, t2                # do registrador mie
+
+	# Configura timer
+	li	t0, MMR_BASE
+	li	t1, 500000	# 2.5 seconds (time / period)
+	sw	zero,  0(t0)
+	sw  zero,  4(t0)
+	sw    t1,  8(t0)
+	sw  zero, 12(t0)
 
     # Ajusta o mscratch
     li t1, 60000	            # Coloca o endereço do buffer para salvar
@@ -101,6 +111,10 @@ MTI_handler:
 	sw a3,0(a1)
 	sw a4,0(a1)
 	sw a5,0(a1)
+
+	li	a1, MMR_BASE
+	sw  zero, 0(a1)
+	sw  zero, 4(a1)
 
 	li a1,0x90001000
 	addi a2,zero,'Z'
@@ -241,7 +255,7 @@ main:
 	sw a3,0(a0)
 	sw a4,0(a0)
 	sw a5,0(a0)
-.end:	
-	li	s10, 0x80000000		# this will interrupt the simulation (assertion)
-	sw	zero, 0(s10)
+.end:
+	# li	s10, 0x80000000		# this will interrupt the simulation (assertion)
+	# sw	zero, 0(s10)
 	jal zero, .end
