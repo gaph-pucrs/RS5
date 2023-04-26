@@ -2,8 +2,6 @@
 	.global _entry
 _entry:
 
-.equ MMR_BASE, 0x20000000
-
 boot:
     # Configura o tratador de interrupções
     la t0, trap_handler         # Grava o endereço do rótulo trap_handler
@@ -14,7 +12,7 @@ boot:
     csrs mstatus, t1            # do registrador mstatus
 
     # Habilita Interrupções Externas
-    li t2, 0x800                # Seta o bit 11 (MEIE)
+    li t2, 0x888                # Seta os bits 11, 7 e 3 (MEIE, MTIE e MSIE)
     csrs mie, t2                # do registrador mie
 
     # Ajusta o mscratch
@@ -108,30 +106,11 @@ MTI_handler:
 	addi a2,zero,'Z'
 	sw a2,0(a1)
 
-	/* Zera mtime */
-	li t0, MMR_BASE
-	sw zero, 0(t0)
-	
-	li	s10, 0x80000000		# this will interrupt the simulation (assertion)
-	sw	zero, 0(s10)
-
     j return
 
 exc_handler:
     # TRATA A EXCECAO
-	li t0, MMR_BASE
-
-	/* Ativar a interrupção por tempo a cada 500 ms */
-	li t1, 50000000  // (500 ms / periodo (10ns))          
-	sw t1, 8(t0)
-
-    /* ativar bit no mie */
-	li t2, 0x80                 # Seta o bit 7 (MTIE)
-    csrs mie, t2                # do registrador mie
-
-	/* zerar o tempo do mtime */
-    sw zero, 0(t0)
-
+    
     # Ajustando MEPC para retornar de uma chamada de sistema
     csrr a1, mepc # carrega endereço de retorno
     
@@ -262,9 +241,7 @@ main:
 	sw a3,0(a0)
 	sw a4,0(a0)
 	sw a5,0(a0)
-
-	/* Fazer uma ecall */
-	ecall
-	/* A ecall ativa interrupção de tempo */
 .end:	
-	j .end
+	li	s10, 0x80000000		# this will interrupt the simulation (assertion)
+	sw	zero, 0(s10)
+	jal zero, .end
