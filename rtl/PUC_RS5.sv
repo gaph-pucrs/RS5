@@ -34,7 +34,7 @@
 `include "../rtl/CSRBank.sv"
 */
 
-//`define PROTO 1
+// `define PROTO 1
 `define DEBUG 1
 
 
