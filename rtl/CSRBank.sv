@@ -44,6 +44,9 @@ module CSRBank
     input   logic [31:0]        pc_i,
     input   logic [31:0]        instruction_i,
 
+    input   logic               jump_i,
+    input   logic [31:0]        jump_target_i,
+
     input   logic [31:0]        IRQ_i,
     input   logic               interrupt_ack_i,
     output  logic               interrupt_pending_o,
@@ -143,11 +146,15 @@ module CSRBank
         else if (interrupt_ack_i) begin
             mcause[31]      <= '1;
             mcause[30:0]    <=  {26'b0, Interruption_Code};
-            mstatus[12:11]  <= privilege_i;           // MPP = previous privilege
+            mstatus[12:11]  <= privilege_i;         // MPP = previous privilege
             // privilege    <= MACHINE
             mstatus[7]      <= mstatus[3];          // MPIE = MIE
             mstatus[3]      <= 0;                   // MIE = 0
-            mepc_r          <= pc_i;                  // Return address
+
+            if(jump_i)
+                mepc_r          <= jump_target_i;
+            else
+                mepc_r          <= pc_i;            // Return address
         
         end 
         else if (write_enable_i && !killed) begin

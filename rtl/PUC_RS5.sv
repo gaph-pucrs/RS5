@@ -308,6 +308,8 @@ module PUC_RS5
         .privilege_i(privilegeLevel_e'(2'b11)), 
         .pc_i(pc_retire), 
         .instruction_i(instruction_retire),
+        .jump_i(jump),
+        .jump_target_i(jump_target),
         .IRQ_i(IRQ_i), 
         .interrupt_ack_i(interrupt_ack_o),
         .interrupt_pending_o(Interrupt_pending), 
