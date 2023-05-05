@@ -34,3 +34,4 @@ sim/obj_dir
 *.log
 *.str
 *.tmp
+*.coe
