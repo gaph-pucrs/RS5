@@ -37,7 +37,6 @@
 // `define PROTO 1
 `define DEBUG 1
 
-
 module PUC_RS5 
     import my_pkg::*;
 (
@@ -97,7 +96,7 @@ module PUC_RS5
     logic   [2:0]   tag_execute;
     logic           exception_execute;
     logic   [2:0]   forwarding;
-    logic [31:0] execute_data_writeback;
+    logic   [31:0]  execute_data_writeback;
 
 //////////////////////////////////////////////////////////////////////////////
 // Retire signals
