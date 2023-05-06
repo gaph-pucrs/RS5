@@ -1,25 +1,24 @@
-import my_pkg::*;
-
-module Peripherals (
-    input logic         clk,
-    input logic         reset,
+module Peripherals
+    import my_pkg::*;
+(
+    input  logic        clk,
+    input  logic        reset,
     
-    input logic         enable_i,
-    input logic [3:0]   write_enable_i,
-    input logic [31:0]  data_address_i,
-    input logic [31:0]  data_i,
+    input  logic        enable_i,
+    input  logic [3:0]  write_enable_i,
+    input  logic [31:0] data_address_i,
+    input  logic [31:0] data_i,
     output logic [31:0] data_o,
     output logic [7:0]  gpioa_out,
     output logic [7:0]  gpioa_addr,
-    input logic         BTND,
+    input  logic        BTND,
     output logic        UART_TX,
     output logic        stall_o,
-    output logic [31:0] IRQ_o,
-    input logic         interrupt_ack_i
+    output logic        mei_o,
+    input  logic        interrupt_ack_i
 );
 
 logic stall_r;
-logic [31:0] data_r, counter;
 logic BUFFER_write, BUFFER_read, BUFFER_empty, BUFFER_full;
 logic [7:0] BUFFER_data;
 logic UART_send, UART_ready;
@@ -58,66 +57,31 @@ logic BTND_Debounced, BTND_Debounced_r, Button_Detected, Button_request;
     end
 
 //////////////////////////////////////////////////////////////////////////////
-// Reads from Peripherals
-//////////////////////////////////////////////////////////////////////////////
-
-    always @(posedge clk) begin
-        if (enable_i && write_enable_i == '0) begin
-        ///////////////////////////////////// TIMER REG ////////////////////////////////////
-            if (data_address_i == 32'h80006000)
-                data_r <= counter;
-            else
-                data_r <= '0;
-
-        end else begin
-            data_r <= '0;
-        end
-    end
-//////////////////////////////////////////////////////////////////////////////
 // INTERRUPT CONTROL
 //////////////////////////////////////////////////////////////////////////////
 
     always @(posedge clk) begin
         if (reset) begin
-            IRQ_o <= '0;
+            mei_o <= 1'b0;
         end
         // EXTERNAL
-        else if (IRQ_o[11] && interrupt_ack_i) begin
-            IRQ_o[11] <= 0;
+        else if (mei_o && interrupt_ack_i) begin
+            mei_o <= 1'b0;
         end
         else if (Button_request) begin
-            IRQ_o[11] <= 1;
-        end
-        // TIMER
-        else if (IRQ_o[7] && interrupt_ack_i) begin
-            IRQ_o[7] <= 0;
-        end
-        else if (counter >= 32'h0EE6B280) begin
-            IRQ_o[7] <= 1;
+            mei_o <= 1'b1;
         end
     end
 
 //////////////////////////////////////////////////////////////////////////////
-// TIMER AND BUTTON
+// BUTTON
 //////////////////////////////////////////////////////////////////////////////
-
-    always_ff @(posedge clk) begin
-        if (reset) begin
-            counter <= 0;
-        end
-        else if (IRQ_o[7] && interrupt_ack_i) begin
-            counter <= 0;
-        end
-        else begin
-            counter <= counter + 1;
-        end
-    end
 
     always_ff @(posedge clk) begin
         if (reset) begin
             Button_request <= 0;
         end
-        else if (IRQ_o[11] && interrupt_ack_i) begin
+        else if (mei_o && interrupt_ack_i) begin
             Button_request <= 0;
         end
         else if (Button_Detected || Button_request) begin
@@ -171,7 +135,7 @@ logic BTND_Debounced, BTND_Debounced_r, Button_Detected, Button_request;
 
     always_ff @(posedge clk) begin
         stall_r <= stall_o;
-        data_o <= data_r;
+        data_o <= '0;
     end
 
 //////////////////////////////////////////////////////////////////////////////

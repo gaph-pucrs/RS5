@@ -7,12 +7,10 @@ module tb_top
 ;
 
     logic        clk=1, rstCPU;
-    logic [31:0] IRQ;
-
+    
     testbench tb(
         .clk_i(clk),
-        .rst_i(rstCPU),
-        .IRQ_i(IRQ)
+        .rst_i(rstCPU)
     );
 
 ///////////////////////////////////////// Clock generator //////////////////////////////
@@ -26,7 +24,6 @@ module tb_top
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     initial begin
         rstCPU = 1;                                          // RESET for CPU initialization
-        IRQ <= '0;
         
         #100 rstCPU = 0;                                     // Hold state for 100 ns
     end

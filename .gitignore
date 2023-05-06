@@ -8,6 +8,7 @@ proto/privileged/privileged.sim/**
 proto/privileged/privileged.runs/**
 proto/privileged/privileged.cache/**
 proto/privileged/privileged.gen/**
+proto/privileged/privileged.ip_user_files/**
 *.d
 *.o
 Vtb_wrapper*
@@ -33,3 +34,4 @@ sim/obj_dir
 *.log
 *.str
 *.tmp
+*.coe
