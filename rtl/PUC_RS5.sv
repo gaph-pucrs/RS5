@@ -17,7 +17,7 @@
  * and is responsible for the instantiation of the lower level modules
  * ans also defines the interface ports (inputs and outputs) os the processor.
  */
- 
+
 /*
 `include "../rtl/my_pkg.sv"
 `include "../rtl/xus/adderUnit.sv"
@@ -96,6 +96,8 @@ module PUC_RS5
     logic   [31:0]  pc_execute;
     logic   [2:0]   tag_execute;
     logic           exception_execute;
+    logic   [2:0]   forwarding;
+    logic [31:0] execute_data_writeback;
 
 //////////////////////////////////////////////////////////////////////////////
 // Retire signals
@@ -171,7 +173,8 @@ module PUC_RS5
         .rs2_data_read_i(rs2_data_read), 
         .rs1_o(rs1), 
         .rs2_o(rs2), 
-        .rd_o(rd), 
+        .rd_o(rd),
+        .forwarding_o(forwarding),
         .first_operand_o(first_operand_execute), 
         .second_operand_o(second_operand_execute), 
         .third_operand_o(third_operand_execute), 
@@ -227,9 +230,15 @@ module PUC_RS5
 /////////////////////////////////////////////////////////// EXECUTE /////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     
+    assign execute_data_writeback = (rd == 0 || (tag_execute != curr_retire_tag)) 
+                                    ? 0 
+                                    : regbank_data_writeback; 
+
     execute execute1 (
         .clk(clk), 
         .stall(stall),
+        .forwarding_i(forwarding & {3{regbank_write_enable}}),
+        .regbank_data_writeback_i(execute_data_writeback),
         .instruction_i(instruction_execute), 
         .pc_i(pc_execute), 
         .first_operand_i(first_operand_execute), 

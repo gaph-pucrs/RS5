@@ -28,6 +28,9 @@ module execute
     input   logic          clk,
     input   logic          stall,
 
+    input   logic  [2:0]   forwarding_i,
+    input   logic [31:0]   regbank_data_writeback_i,
+
     input   logic [31:0]   instruction_i,
     input   logic [31:0]   pc_i,               // Operand from Operand Fetch stage
     input   logic [31:0]   first_operand_i,    //              ||
@@ -59,6 +62,7 @@ module execute
     output  logic          exception_o
 );
     
+    logic [31:0] first_operand, second_operand, third_operand;
     logic jump_int;
     logic write_enable_regbank_branch_unit, write_enable_regbank_memory_unit;
     logic csr_exception;
@@ -68,6 +72,22 @@ module execute
     operationType_e execution_unit_operation;
     executionUnit_e execution_unit_selector;
 
+//////////////////////////////////////////////////////////////////////////////
+// Inputs decoding
+//////////////////////////////////////////////////////////////////////////////
+
+    assign first_operand  = (forwarding_i[0] == 1) 
+                            ? regbank_data_writeback_i 
+                            : first_operand_i;
+
+    assign second_operand = (forwarding_i[1] == 1) 
+                            ? regbank_data_writeback_i 
+                            : second_operand_i;
+
+    assign third_operand  = (forwarding_i[2] == 1) 
+                            ? regbank_data_writeback_i 
+                            : third_operand_i;
+
     assign execution_unit_selector  = executionUnit_e'(instruction_operation_i[5:3]);
     assign execution_unit_operation = operationType_e'(instruction_operation_i[2:0]);
 
@@ -76,30 +96,30 @@ module execute
 //////////////////////////////////////////////////////////////////////////////
 
     adderUnit adder1 (
-        .first_operand_i(first_operand_i),
-        .second_operand_i(second_operand_i),
+        .first_operand_i(first_operand),
+        .second_operand_i(second_operand),
         .operation_i(execution_unit_operation),
         .result_o(results_int[0])
     );
 
     logicUnit logical1 (
-        .first_operand_i(first_operand_i),
-        .second_operand_i(second_operand_i),
+        .first_operand_i(first_operand),
+        .second_operand_i(second_operand),
         .operation_i(execution_unit_operation),
         .result_o(results_int[1])
     );
     
     shiftUnit shift1 (
-        .first_operand_i(first_operand_i),
-        .second_operand_i(second_operand_i[4:0]),
+        .first_operand_i(first_operand),
+        .second_operand_i(second_operand[4:0]),
         .operation_i(execution_unit_operation),
         .result_o(results_int[2])
     );
     
     branchUnit branch1 (
-        .first_operand_i(first_operand_i),
-        .second_operand_i(second_operand_i),
-        .offset_i(third_operand_i),
+        .first_operand_i(first_operand),
+        .second_operand_i(second_operand),
+        .offset_i(third_operand),
         .pc_i(pc_i),
         .operation_i(execution_unit_operation),
         .result_o(results_int[4]),
@@ -109,9 +129,9 @@ module execute
     );
 
     LSUnit memory1 (
-        .first_operand_i(first_operand_i),
-        .second_operand_i(second_operand_i),
-        .data_i(third_operand_i),
+        .first_operand_i(first_operand),
+        .second_operand_i(second_operand),
+        .data_i(third_operand),
         .operation_i(execution_unit_operation),
         .enable_i(execution_unit_selector == MEMORY_UNIT),
         .read_address_o(mem_read_address_o),
@@ -123,7 +143,7 @@ module execute
     );
     
     csrUnit CSRaccess (
-        .first_operand_i(first_operand_i),
+        .first_operand_i(first_operand),
         .instruction_i(instruction_i),
         .operation_i(execution_unit_operation),
         .privilege_i(privilegeLevel_e'(2'b11)),
@@ -135,7 +155,7 @@ module execute
         .exception_o(csr_exception)
     );
     
-    assign results_int[5] = second_operand_i; // BYPASS
+    assign results_int[5] = second_operand; // BYPASS
 
 //////////////////////////////////////////////////////////////////////////////
 // Demux

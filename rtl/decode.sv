@@ -34,6 +34,8 @@ module decode
     input   logic [2:0]     tag_i,                  // Instruction tag_o
     input   logic [31:0]    rs1_data_read_i,        // Data read from register bank
     input   logic [31:0]    rs2_data_read_i,        // Data read from register bank
+    
+    output  logic [2:0]     forwarding_o,
 
     output  logic [4:0]     rs1_o,                  // Address of the 1st register, conected directly in the register bank
     output  logic [4:0]     rs2_o,                  // Address of the 2nd register, conected directly in the register bank
@@ -51,10 +53,10 @@ module decode
 
     logic [31:0] immediate, first_operand_int, second_operand_int, third_operand_int, instruction_int, last_instruction;
     logic last_hazard;
-    logic [4:0] locked_registers[2];
+    logic [4:0] locked_register;
     logic [4:0] target_register;
     logic is_store;
-    logic locked_memory[2];
+    logic locked_memory;
 
     formatType_e instruction_format;
     iType_e instruction_operation;
@@ -221,7 +223,6 @@ module decode
 
     assign rs1_o = instruction_int[19:15];
     assign rs2_o = instruction_int[24:20];
-    assign rd_o  = locked_registers[1];
 
 //////////////////////////////////////////////////////////////////////////////
 // Target definitions
@@ -250,16 +251,14 @@ module decode
 
     always_ff @(posedge clk) begin
         if (reset) begin
-            locked_registers[0] <= '0;
-            locked_registers[1] <= '0;
-            locked_memory[0]    <= '0;
-            locked_memory[1]    <= '0;
+            locked_register <= '0;
+            locked_memory   <= '0;
+            rd_o            <= '0;
         end 
         else if (!stall) begin
-            locked_registers[0] <= target_register;
-            locked_memory[0]    <= is_store;
-            locked_registers[1] <= locked_registers[0];
-            locked_memory[1]    <= locked_memory[0];
+            locked_register <= target_register;
+            locked_memory   <= is_store;
+            rd_o            <= locked_register;
         end
     end
 
@@ -268,13 +267,7 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        if ((locked_memory[0] || locked_memory[1]) && (executionUnit_e'(instruction_operation[5:3]) == MEMORY_UNIT)) begin
-            hazard_o = 1;
-        end
-        else if (locked_registers[0] == rs1_o && rs1_o != '0) begin
-            hazard_o = 1;
-        end
-        else if (locked_registers[0] == rs2_o && rs2_o != '0) begin
+        if (locked_memory && (executionUnit_e'(instruction_operation[5:3]) == MEMORY_UNIT)) begin
             hazard_o = 1;
         end
         else begin
@@ -287,17 +280,34 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        first_operand_int = (instruction_format == U_TYPE || instruction_format==J_TYPE) 
+        first_operand_int = (instruction_format == U_TYPE || instruction_format == J_TYPE) 
                             ? pc_i  
                             : rs1_data_read_i;
 
-        second_operand_int = (instruction_format == R_TYPE || instruction_format==B_TYPE) 
+        second_operand_int = (instruction_format == R_TYPE || instruction_format == B_TYPE) 
                             ? rs2_data_read_i 
                             : immediate;
 
         third_operand_int  = (instruction_format == S_TYPE) 
                             ? rs2_data_read_i 
                             : immediate;
+    end
+
+//////////////////////////////////////////////////////////////////////////////
+// Forwarding Generation
+//////////////////////////////////////////////////////////////////////////////
+    always @(posedge clk ) begin
+        forwarding_o[0] <=  (locked_register == rs1_o && rs1_o != 0 && instruction_format != U_TYPE && instruction_format != J_TYPE) 
+                            ? 1 
+                            : 0;
+
+        forwarding_o[1] <=  (locked_register == rs2_o && rs2_o != 0 && (instruction_format == R_TYPE || instruction_format == B_TYPE)) 
+                            ? 1 
+                            : 0;
+
+        forwarding_o[2] <=  (locked_register == rs2_o && rs2_o != 0 && instruction_format == S_TYPE) 
+                            ? 1 
+                            : 0;
     end
 
 //////////////////////////////////////////////////////////////////////////////
