@@ -40,7 +40,6 @@ module CSRBank
     input   logic               raise_exception_i,
     input   logic               machine_return_i,
     input   exceptionCode_e     exception_code_i,
-    input   privilegeLevel_e    privilege_i,
     input   logic [31:0]        pc_i,
     input   logic [31:0]        instruction_i,
 
@@ -51,20 +50,38 @@ module CSRBank
     input   logic               interrupt_ack_i,
     output  logic               interrupt_pending_o,
 
+    output  privilegeLevel_e    privilege_o,
+
     output  logic [31:0]        mtvec,
-    output  logic [31:0]        mepc
+    output  logic [31:0]        mepc,
+
+    output  logic               mvmctl_o,
+    output  logic [31:0]        mvmdb_o, 
+    output  logic [31:0]        mvmib_o, 
+    output  logic [31:0]        mvmdl_o, 
+    output  logic [31:0]        mvmil_o     
 );
 
     CSRs CSR;
+    privilegeLevel_e privilege;
+
     logic [31:0] mstatus, misa, mie, mtvec_r, mscratch, mepc_r, mcause, mtval, mip;
+    logic [31:0] mvmdb, mvmib, mvmdl, mvmil;
+    logic        mvmctl;
     logic [63:0] mcycle, minstret;
     
     logic [31:0] wr_data, wmask, current_val;
     //logic [31:0] medeleg, mideleg; // NOT IMPLEMENTED YET (REQUIRED ONLY WHEN SYSTEM HAVE S-MODE)
     interruptionCode_e Interruption_Code;
 
-    assign mtvec = mtvec_r;
-    assign mepc  = mepc_r;
+    assign privilege_o = privilege;
+    assign mtvec       = mtvec_r;
+    assign mepc        = mepc_r;
+    assign mvmctl_o    = mvmctl;
+    assign mvmdb_o     = mvmdb;
+    assign mvmdl_o     = mvmdl;
+    assign mvmib_o     = mvmib;
+    assign mvmil_o     = mvmil;
 
     assign CSR = CSRs'(address_i);
 
@@ -84,6 +101,11 @@ module CSRBank
             MCAUSE:     begin current_val = mcause;    wmask = 32'hFFFFFFFF; end
             MTVAL:      begin current_val = mtval;     wmask = 32'hFFFFFFFF; end
             //MIP:        begin current_val = mip;     wmask = 32'h00000000; end
+            MVMDB:      begin current_val = mvmdb;     wmask = 32'hFFFFFFFC; end
+            MVMDL:      begin current_val = mvmdl;     wmask = 32'hFFFFFFFC; end
+            MVMIB:      begin current_val = mvmib;     wmask = 32'hFFFFFFFC; end
+            MVMIL:      begin current_val = mvmil;     wmask = 32'hFFFFFFFC; end
+            MVMCTL:     begin current_val = mvmctl;    wmask = 32'h00000001; end
 
             default:    begin current_val = '0;        wmask = 32'h00000000; end
         endcase
@@ -121,18 +143,22 @@ module CSRBank
             mcause      <= '0;
             mtval       <= '0;
             //mip       <= '0;
-
+            mvmctl      <= '0;
+            mvmdb       <= '0;
+            mvmdl       <= '0;
+            mvmib       <= '0;
+            mvmil       <= '0;
+            
         end 
         else if (machine_return_i) begin
-            mstatus[3]  <= mstatus[7];          // MIE = MPIE
-            //privilege <= mstatus[12:11]       // priv = MPP
-
+            mstatus[3] <= mstatus[7];          // MIE = MPIE
+            privilege  <= mstatus[12:11];      // priv = MPP
         end
         else if (raise_exception_i) begin
             mcause[31]      <= '0;
             mcause[30:0]    <= {26'b0, exception_code_i};
-            mstatus[12:11]  <= privilege_i;         // MPP previous privilege
-            // privilege    <= MACHINE
+            mstatus[12:11]  <= privilege;           // MPP = previous privilege
+            privilege       <= privilegeLevel_e'(2'b11);
             mstatus[7]      <= mstatus[3];          // MPIE = MIE
             mstatus[3]      <= 0;                   // MIE = 0
             mepc_r          <= (exception_code_i == ECALL_FROM_MMODE) 
@@ -146,8 +172,8 @@ module CSRBank
         else if (interrupt_ack_i) begin
             mcause[31]      <= '1;
             mcause[30:0]    <=  {26'b0, Interruption_Code};
-            mstatus[12:11]  <= privilege_i;         // MPP = previous privilege
-            // privilege    <= MACHINE
+            mstatus[12:11]  <= privilege;           // MPP = previous privilege
+            privilege       <= privilegeLevel_e'(2'b11);
             mstatus[7]      <= mstatus[3];          // MPIE = MIE
             mstatus[3]      <= 0;                   // MIE = 0
 
@@ -172,6 +198,11 @@ module CSRBank
                 MCAUSE:       mcause      <= wr_data;
                 MTVAL:        mtval       <= wr_data;
                 //MIP:        mip         <= wr_data;
+                MVMCTL:       mvmctl      <= wr_data;
+                MVMDB:        mvmdb       <= wr_data;
+                MVMDL:        mvmdl       <= wr_data;
+                MVMIB:        mvmib       <= wr_data;
+                MVMIL:        mvmil       <= wr_data;
                 default:    ; // no op
             endcase
         end
@@ -207,6 +238,13 @@ module CSRBank
                 MCYCLEH:     out = mcycle[63:32];
                 MINSTRET:    out = minstret[31:0];
                 MINSTRETH:   out = minstret[63:32];
+
+                MVMCTL:      out = {31'b0,mvmctl};
+                MVMDB:       out = mvmdb[31:0];
+                MVMDL:       out = mvmdl[31:0];
+                MVMIB:       out = mvmib[31:0];
+                MVMIL:       out = mvmil[31:0];
+
                 default:    out = '0;
             endcase
         end
