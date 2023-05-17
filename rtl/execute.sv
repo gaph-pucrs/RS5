@@ -25,38 +25,40 @@
 module execute
     import my_pkg::*;
 (
-    input   logic          clk,
-    input   logic          stall,
+    input   logic             clk,
+    input   logic             stall,
 
-    input   logic [31:0]   instruction_i,
-    input   logic [31:0]   pc_i,               // Operand from Operand Fetch stage
-    input   logic [31:0]   first_operand_i,    //              ||
-    input   logic [31:0]   second_operand_i,   //              ||
-    input   logic [31:0]   third_operand_i,    //              ||
-    input   iType_e        instruction_operation_i,
-    input   logic [2:0]    tag_i,              // Instruction tag
+    input   logic [31:0]      instruction_i,
+    input   logic [31:0]      pc_i,               // Operand from Operand Fetch stage
+    input   logic [31:0]      first_operand_i,    //              ||
+    input   logic [31:0]      second_operand_i,   //              ||
+    input   logic [31:0]      third_operand_i,    //              ||
+    input   iType_e           instruction_operation_i,
+    input   logic [2:0]       tag_i,              // Instruction tag
 
-    output  iType_e        instruction_operation_o,
-    output  logic [31:0]   instruction_o,
-    output  logic [31:0]   pc_o,
-    output  logic [31:0]   result_o [1:0],     // Results array
-    output  logic [2:0]    tag_o,              // Instruction tag
-    output  logic          jump_o,             // Signal that indicates a branch taken
-    output  logic          write_enable_o,     // Write enable to regbank
+    output  iType_e           instruction_operation_o,
+    output  logic [31:0]      instruction_o,
+    output  logic [31:0]      pc_o,
+    output  logic [31:0]      result_o [1:0],     // Results array
+    output  logic [2:0]       tag_o,              // Instruction tag
+    output  logic             jump_o,             // Signal that indicates a branch taken
+    output  logic             write_enable_o,     // Write enable to regbank
 
-    output  logic [31:0]   mem_read_address_o, // Memory Read Address
-    output  logic [3:0]    mem_write_enable_o, // Signal that indicates the write memory operation to retire
-    output  logic          mem_read_o,         // Allows memory read
+    output  logic [31:0]      mem_read_address_o, // Memory Read Address
+    output  logic [3:0]       mem_write_enable_o, // Signal that indicates the write memory operation to retire
+    output  logic             mem_read_o,         // Allows memory read
 
-    output  logic          csr_read_enable_o,
-    output  logic          csr_write_enable_o,
-    output  csrOperation_e csr_operation_o,
-    output  logic [11:0]   csr_address_o,
-    output  logic [31:0]   csr_data_o,
-    input   logic [31:0]   csr_data_read_i,
+    output  logic             csr_read_enable_o,
+    output  logic             csr_write_enable_o,
+    output  csrOperation_e    csr_operation_o,
+    output  logic [11:0]      csr_address_o,
+    output  logic [31:0]      csr_data_o,
+    input   logic [31:0]      csr_data_read_i,
 
-    input   logic          exception_i,
-    output  logic          exception_o
+    input   privilegeLevel_e  privilege_i,
+
+    input   logic             exception_i,
+    output  logic             exception_o
 );
     
     logic jump_int;
@@ -126,7 +128,7 @@ module execute
         .first_operand_i(first_operand_i),
         .instruction_i(instruction_i),
         .operation_i(execution_unit_operation),
-        .privilege_i(privilegeLevel_e'(2'b11)),
+        .privilege_i(privilege_i),
         .read_enable_o(csr_read_enable_o),
         .write_enable_o(csr_write_enable_o),
         .operation_o(csr_operation_o),
