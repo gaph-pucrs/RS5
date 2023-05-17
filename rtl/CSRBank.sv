@@ -57,7 +57,7 @@ module CSRBank
 
     CSRs CSR;
     logic [31:0] mstatus, misa, mie, mtvec_r, mscratch, mepc_r, mcause, mtval, mip;
-    logic [63:0] cycle, instret;
+    logic [63:0] mcycle, minstret;
     
     logic [31:0] wr_data, wmask, current_val;
     //logic [31:0] medeleg, mideleg; // NOT IMPLEMENTED YET (REQUIRED ONLY WHEN SYSTEM HAVE S-MODE)
@@ -203,10 +203,10 @@ module CSRBank
                 MIP:        out = mip;
 
                 //RO
-                CYCLE:      out = cycle[31:0];
-                CYCLEH:     out = cycle[63:32];
-                INSTRET:    out = instret[31:0];
-                INSTRETH:   out = instret[63:32];
+                MCYCLE:      out = mcycle[31:0];
+                MCYCLEH:     out = mcycle[63:32];
+                MINSTRET:    out = minstret[31:0];
+                MINSTRETH:   out = minstret[63:32];
                 default:    out = '0;
             endcase
         end
@@ -244,14 +244,14 @@ module CSRBank
     // PERFORMANCE MONITORS
     always_ff @(posedge clk) begin
         if (reset) begin
-            cycle   <= '0;
-            instret <= '0;
+            mcycle   <= '0;
+            minstret <= '0;
         end 
         else begin
-            cycle  <= cycle + 1;
-            instret <= (killed) 
-                        ? instret 
-                        : instret + 1;
+            mcycle  <= mcycle + 1;
+            minstret <= (killed) 
+                        ? minstret 
+                        : minstret + 1;
         end
     end
 
