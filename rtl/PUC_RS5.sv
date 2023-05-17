@@ -60,14 +60,22 @@ module PUC_RS5
 //////////////////////////////////////////////////////////////////////////////
 // Global signals
 //////////////////////////////////////////////////////////////////////////////
-    logic           read;
-    logic           jump;
-    logic           hazard;
-    logic   [31:0]  jump_target;
+    logic            read;
+    logic            jump;
+    logic            hazard;
+    logic            mmu_en;
+    logic            mmu_inst_fault;
+    logic            mmu_data_fault;
+    privilegeLevel_e privilege;
+    logic   [31:0]   jump_target;
     /* verilator lint_off UNUSEDSIGNAL */
-    logic   [31:0]  mem_read_address_int;
+    logic   [31:0]   mem_read_address_int;
     /* verilator lint_on UNUSEDSIGNAL */
-    logic   [31:0]  mem_write_address_int;
+    logic   [31:0]   mem_write_address_int;
+    logic   [31:0]   instruction_address;
+    logic   [31:0]   mem_address;
+
+    assign mmu_en = privilege != privilegeLevel_e'(2'b11) && mvmctl;
 
 //////////////////////////////////////////////////////////////////////////////
 // Decoder signals
@@ -126,7 +134,8 @@ module PUC_RS5
     logic           RAISE_EXCEPTION, MACHINE_RETURN;
     exceptionCode_e Exception_Code;
     logic           Interrupt_pending;
-
+    logic   [31:0]  mvmdb, mvmib, mvmdl, mvmil;
+    logic           mvmctl;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////// FETCH //////////////////////////////////////////////////////////////////////////////////
@@ -139,7 +148,7 @@ module PUC_RS5
         .hazard_i(hazard), 
         .jump_i(jump), 
         .jump_target_i(jump_target),
-        .instruction_address_o(instruction_address_o), 
+        .instruction_address_o(instruction_address), 
         .pc_o(pc_decode), 
         .tag_o(tag_decode),
         .mepc_i(mepc), 
@@ -147,6 +156,15 @@ module PUC_RS5
         .exception_raised_i(RAISE_EXCEPTION), 
         .machine_return_i(MACHINE_RETURN), 
         .interrupt_ack_i(interrupt_ack_o)
+    );
+
+    mmu i_mmu (
+        .en_i(mmu_en),
+        .base_i(mvmib),
+        .limit_i(mvmil),
+        .address_i(instruction_address),
+        .exception_o(mmu_inst_fault),
+        .address_o(instruction_address_o)
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -253,6 +271,7 @@ module PUC_RS5
         .csr_address_o(csr_addr), 
         .csr_data_o(csr_data_to_write), 
         .csr_data_read_i(csr_data_read),
+        .privilege_i(privilege),
         .exception_i(exception_execute),
         .exception_o(exception_retire)
     );
@@ -305,7 +324,6 @@ module PUC_RS5
         .raise_exception_i(RAISE_EXCEPTION), 
         .machine_return_i(MACHINE_RETURN),
         .exception_code_i(Exception_Code), 
-        .privilege_i(privilegeLevel_e'(2'b11)), 
         .pc_i(pc_retire), 
         .instruction_i(instruction_retire),
         .jump_i(jump),
@@ -313,8 +331,14 @@ module PUC_RS5
         .IRQ_i(IRQ_i), 
         .interrupt_ack_i(interrupt_ack_o),
         .interrupt_pending_o(Interrupt_pending), 
+        .privilege_o(privilege), 
         .mepc(mepc), 
-        .mtvec(mtvec)
+        .mtvec(mtvec),
+        .mvmctl_o(mvmctl),
+        .mvmdb_o(mvmdb),
+        .mvmdl_o(mvmdl),
+        .mvmib_o(mvmib),
+        .mvmil_o(mvmil)
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -322,20 +346,31 @@ module PUC_RS5
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     always_comb begin
         if (mem_write_enable_o != '0) begin
-            mem_address_o[31:2] = mem_write_address_int[31:2];
+            mem_address[31:2] = mem_write_address_int[31:2];
         end
         else begin
-            mem_address_o[31:2] = mem_read_address_int[31:2];
+            mem_address[31:2] = mem_read_address_int[31:2];
         end
-        mem_address_o[1:0] = '0;
+        mem_address[1:0] = '0;
+    end
 
-        if (mem_write_enable_o != '0 || read) begin
+    always_comb begin
+        if ((mem_write_enable_o != '0 || read) && !mmu_data_fault) begin
             mem_operation_enable_o = 1;
         end
         else begin
             mem_operation_enable_o = 0;
         end
     end
+
+    mmu d_mmu (
+        .en_i(mmu_en),
+        .base_i(mvmdb),
+        .limit_i(mvmdl),
+        .address_i(mem_address),
+        .exception_o(mmu_data_fault),
+        .address_o(mem_address_o)
+    );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// DEBUG ///////////////////////////////////////////////////////////////////////////////////
