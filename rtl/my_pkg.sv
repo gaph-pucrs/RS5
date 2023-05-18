@@ -46,8 +46,9 @@ package my_pkg;
     typedef enum  logic[11:0] { MVENDORID = 12'hF11, MARCHID, MIMPID, MHARTID, MCONFIGPTR, 
                                 MSTATUS = 12'h300, MISA, MEDELEG, MIDELEG, MIE, MTVEC, MCOUNTEREN, MSTATUSH = 12'h310, 
                                 MSCRATCH = 12'h340, MEPC, MCAUSE, MTVAL, MIP, MTINST = 12'h34A, MTVAL2,
-                                MCYCLE = 12'hC00, MINSTRET, MCYCLEH=12'hC80, MINSTRETH,
-                                MVMDB = 12'h7C0, MVMDL, MVMIB, MVMIL, MVMCTL} CSRs;
+                                MVMDB = 12'h7C0, MVMDL, MVMIB, MVMIL, MVMCTL,
+                                MCYCLE = 12'hB00, MINSTRET = 12'hB02, MCYCLEH = 12'hB80, MINSTRETH = 12'hB82,
+                                CYCLE = 12'hC00, TIME, INSTRET, CYCLEH=12'hC80, TIMEH, INSTRETH} CSRs;
 
     typedef enum  logic[4:0] {  INSTRUCTION_ADDRESS_MISALIGNED, INSTRUCTION_ACCESS_FAULT, ILLEGAL_INSTRUCTION, BREAKPOINT, LOAD_ADDRESS_MISALIGNED,
 		                            LOAD_ACCESS_FAULT, STORE_AMO_ADDRESS_MISALIGNED, STORE_AMO_ACCESS_FAULT, ECALL_FROM_UMODE, ECALL_FROM_SMODE,

@@ -48,6 +48,7 @@ module PUC_RS5
     input  logic [31:0] instruction_i,
     input  logic [31:0] mem_data_i,
     input  logic [31:0] IRQ_i,
+    input  logic [63:0] mtime_i,
 
     output logic [31:0] instruction_address_o,
     output logic        mem_operation_enable_o,
@@ -328,6 +329,7 @@ module PUC_RS5
         .instruction_i(instruction_retire),
         .jump_i(jump),
         .jump_target_i(jump_target),
+        .mtime_i(mtime_i),
         .IRQ_i(IRQ_i), 
         .interrupt_ack_i(interrupt_ack_o),
         .interrupt_pending_o(Interrupt_pending), 
