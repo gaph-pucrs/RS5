@@ -29,7 +29,7 @@ module decode
     input   logic           reset,
     input   logic           stall,
 
-    input   logic [31:0]    instruction_i,          // Object code of the instruction_int to extract the immediate operand
+    input   logic [31:0]    instruction_i,          // Object code of the instruction to extract the immediate operand
     input   logic [31:0]    pc_i,                   // Bypassed to execute unit as an operand
     input   logic [2:0]     tag_i,                  // Instruction tag_o
     input   logic [31:0]    rs1_data_read_i,        // Data read from register bank
@@ -49,32 +49,28 @@ module decode
     output  logic           exception_o
     );
 
-    logic [31:0] immediate, first_operand_int, second_operand_int, third_operand_int, instruction_int, last_instruction;
-    logic last_hazard;
-    logic [4:0] locked_registers[2];
-    logic [4:0] target_register;
-    logic is_store;
-    logic locked_memory[2];
+    logic   [31:0]  instruction, instruction_r;
+    formatType_e    instruction_format;
+    iType_e         instruction_operation;
+    logic   [31:0]  immediate, first_operand_int, second_operand_int, third_operand_int;
+    logic           hazard_r;
+    logic   [4:0]   locked_registers[2];
+    logic   [4:0]   target_register;
+    logic           is_store;
+    logic           locked_memory[2];
 
-    formatType_e instruction_format;
-    iType_e instruction_operation;
+    logic           inconditional_branch, conditional_branch;
+    logic           negative_offset, conditional_branch_taken, predict_branch_taken_o, predict_branch_pc_o;
 
 //////////////////////////////////////////////////////////////////////////////
-// Re-Decode isntruction on hazard
+// Re-Decode instruction on hazard
 //////////////////////////////////////////////////////////////////////////////
+
+    assign instruction = (hazard_r) ? instruction_r : instruction_i;
 
     always_ff @(posedge clk ) begin
-        last_instruction <= instruction_int;
-        last_hazard      <= hazard_o;
-    end
-
-    always_comb begin
-        if (last_hazard) begin
-            instruction_int = last_instruction;
-        end
-        else begin
-            instruction_int = instruction_i;
-        end
+        instruction_r <= instruction;
+        hazard_r      <= hazard_o;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -82,69 +78,69 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin 
-        if (instruction_int[6:0] == 7'b0110111) instruction_operation = LUI;
-        else if (instruction_int[6:0] == 7'b0010111) instruction_operation = ADD;    //AUIPC
+        if (instruction[6:0] == 7'b0110111) instruction_operation = LUI;
+        else if (instruction[6:0] == 7'b0010111) instruction_operation = ADD;    //AUIPC
         
-        else if (instruction_int[6:0] == 7'b1101111) instruction_operation = JAL;
-        else if (instruction_int[14:12] == 3'b000 && instruction_int[6:0] == 7'b1100111) instruction_operation = JALR;
+        else if (instruction[6:0] == 7'b1101111) instruction_operation = JAL;
+        else if (instruction[14:12] == 3'b000 && instruction[6:0] == 7'b1100111) instruction_operation = JALR;
 
-        else if (instruction_int[14:12] == 3'b000 && instruction_int[6:0] == 7'b1100011) instruction_operation = BEQ;
-        else if (instruction_int[14:12] == 3'b001 && instruction_int[6:0] == 7'b1100011) instruction_operation = BNE;
-        else if (instruction_int[14:12] == 3'b100 && instruction_int[6:0] == 7'b1100011) instruction_operation = BLT;
-        else if (instruction_int[14:12] == 3'b101 && instruction_int[6:0] == 7'b1100011) instruction_operation = BGE;
-        else if (instruction_int[14:12] == 3'b110 && instruction_int[6:0] == 7'b1100011) instruction_operation = BLTU;
-        else if (instruction_int[14:12] == 3'b111 && instruction_int[6:0] == 7'b1100011) instruction_operation = BGEU;
+        else if (instruction[14:12] == 3'b000 && instruction[6:0] == 7'b1100011) instruction_operation = BEQ;
+        else if (instruction[14:12] == 3'b001 && instruction[6:0] == 7'b1100011) instruction_operation = BNE;
+        else if (instruction[14:12] == 3'b100 && instruction[6:0] == 7'b1100011) instruction_operation = BLT;
+        else if (instruction[14:12] == 3'b101 && instruction[6:0] == 7'b1100011) instruction_operation = BGE;
+        else if (instruction[14:12] == 3'b110 && instruction[6:0] == 7'b1100011) instruction_operation = BLTU;
+        else if (instruction[14:12] == 3'b111 && instruction[6:0] == 7'b1100011) instruction_operation = BGEU;
 
-        else if (instruction_int[14:12] == 3'b000 && instruction_int[6:0] == 7'b0000011) instruction_operation = LB;
-        else if (instruction_int[14:12] == 3'b001 && instruction_int[6:0] == 7'b0000011) instruction_operation = LH;
-        else if (instruction_int[14:12] == 3'b010 && instruction_int[6:0] == 7'b0000011) instruction_operation = LW;
-        else if (instruction_int[14:12] == 3'b100 && instruction_int[6:0] == 7'b0000011) instruction_operation = LBU;
-        else if (instruction_int[14:12] == 3'b101 && instruction_int[6:0] == 7'b0000011) instruction_operation = LHU;
+        else if (instruction[14:12] == 3'b000 && instruction[6:0] == 7'b0000011) instruction_operation = LB;
+        else if (instruction[14:12] == 3'b001 && instruction[6:0] == 7'b0000011) instruction_operation = LH;
+        else if (instruction[14:12] == 3'b010 && instruction[6:0] == 7'b0000011) instruction_operation = LW;
+        else if (instruction[14:12] == 3'b100 && instruction[6:0] == 7'b0000011) instruction_operation = LBU;
+        else if (instruction[14:12] == 3'b101 && instruction[6:0] == 7'b0000011) instruction_operation = LHU;
 
-        else if (instruction_int[14:12] == 3'b000 && instruction_int[6:0] == 7'b0100011) instruction_operation = SB;
-        else if (instruction_int[14:12] == 3'b001 && instruction_int[6:0] == 7'b0100011) instruction_operation = SH;
-        else if (instruction_int[14:12] == 3'b010 && instruction_int[6:0] == 7'b0100011) instruction_operation = SW;
+        else if (instruction[14:12] == 3'b000 && instruction[6:0] == 7'b0100011) instruction_operation = SB;
+        else if (instruction[14:12] == 3'b001 && instruction[6:0] == 7'b0100011) instruction_operation = SH;
+        else if (instruction[14:12] == 3'b010 && instruction[6:0] == 7'b0100011) instruction_operation = SW;
         
-        else if (instruction_int[14:12] == 3'b000 && instruction_int[6:0] == 7'b0010011) instruction_operation = ADD;     // ADDI
-        else if (instruction_int[14:12] == 3'b010 && instruction_int[6:0] == 7'b0010011) instruction_operation = SLT;     // SLTI
-        else if (instruction_int[14:12] == 3'b011 && instruction_int[6:0] == 7'b0010011) instruction_operation = SLTU;    // SLTIU
-        else if (instruction_int[14:12] == 3'b100 && instruction_int[6:0] == 7'b0010011) instruction_operation = XOR;     // XORI
-        else if (instruction_int[14:12] == 3'b110 && instruction_int[6:0] == 7'b0010011) instruction_operation = OR;      // ORI
-        else if (instruction_int[14:12] == 3'b111 && instruction_int[6:0] == 7'b0010011) instruction_operation = AND;     // ANDI
+        else if (instruction[14:12] == 3'b000 && instruction[6:0] == 7'b0010011) instruction_operation = ADD;     // ADDI
+        else if (instruction[14:12] == 3'b010 && instruction[6:0] == 7'b0010011) instruction_operation = SLT;     // SLTI
+        else if (instruction[14:12] == 3'b011 && instruction[6:0] == 7'b0010011) instruction_operation = SLTU;    // SLTIU
+        else if (instruction[14:12] == 3'b100 && instruction[6:0] == 7'b0010011) instruction_operation = XOR;     // XORI
+        else if (instruction[14:12] == 3'b110 && instruction[6:0] == 7'b0010011) instruction_operation = OR;      // ORI
+        else if (instruction[14:12] == 3'b111 && instruction[6:0] == 7'b0010011) instruction_operation = AND;     // ANDI
 
-        else if (instruction_int[31:25] == 7'b0000000 && instruction_int[14:12] == 3'b001 && instruction_int[6:0] == 7'b0010011) instruction_operation = SLL;    // SLLI
-        else if (instruction_int[31:25] == 7'b0000000 && instruction_int[14:12] == 3'b101 && instruction_int[6:0] == 7'b0010011) instruction_operation = SRL;    // SRLI
-        else if (instruction_int[31:25] == 7'b0100000 && instruction_int[14:12] == 3'b101 && instruction_int[6:0] == 7'b0010011) instruction_operation = SRA;    // SRAI
+        else if (instruction[31:25] == 7'b0000000 && instruction[14:12] == 3'b001 && instruction[6:0] == 7'b0010011) instruction_operation = SLL;    // SLLI
+        else if (instruction[31:25] == 7'b0000000 && instruction[14:12] == 3'b101 && instruction[6:0] == 7'b0010011) instruction_operation = SRL;    // SRLI
+        else if (instruction[31:25] == 7'b0100000 && instruction[14:12] == 3'b101 && instruction[6:0] == 7'b0010011) instruction_operation = SRA;    // SRAI
 
-        else if (instruction_int[31:25] == 7'b0000000 && instruction_int[14:12] == 3'b000 && instruction_int[6:0] == 7'b0110011) instruction_operation = ADD;
-        else if (instruction_int[31:25] == 7'b0100000 && instruction_int[14:12] == 3'b000 && instruction_int[6:0] == 7'b0110011) instruction_operation = SUB;
-        else if (instruction_int[31:25] == 7'b0000000 && instruction_int[14:12] == 3'b001 && instruction_int[6:0] == 7'b0110011) instruction_operation = SLL;
-        else if (instruction_int[31:25] == 7'b0000000 && instruction_int[14:12] == 3'b010 && instruction_int[6:0] == 7'b0110011) instruction_operation = SLT;
-        else if (instruction_int[31:25] == 7'b0000000 && instruction_int[14:12] == 3'b011 && instruction_int[6:0] == 7'b0110011) instruction_operation = SLTU;
-        else if (instruction_int[31:25] == 7'b0000000 && instruction_int[14:12] == 3'b100 && instruction_int[6:0] == 7'b0110011) instruction_operation = XOR;
-        else if (instruction_int[31:25] == 7'b0000000 && instruction_int[14:12] == 3'b101 && instruction_int[6:0] == 7'b0110011) instruction_operation = SRL;
-        else if (instruction_int[31:25] == 7'b0100000 && instruction_int[14:12] == 3'b101 && instruction_int[6:0] == 7'b0110011) instruction_operation = SRA;
-        else if (instruction_int[31:25] == 7'b0000000 && instruction_int[14:12] == 3'b110 && instruction_int[6:0] == 7'b0110011) instruction_operation = OR;
-        else if (instruction_int[31:25] == 7'b0000000 && instruction_int[14:12] == 3'b111 && instruction_int[6:0] == 7'b0110011) instruction_operation = AND;
+        else if (instruction[31:25] == 7'b0000000 && instruction[14:12] == 3'b000 && instruction[6:0] == 7'b0110011) instruction_operation = ADD;
+        else if (instruction[31:25] == 7'b0100000 && instruction[14:12] == 3'b000 && instruction[6:0] == 7'b0110011) instruction_operation = SUB;
+        else if (instruction[31:25] == 7'b0000000 && instruction[14:12] == 3'b001 && instruction[6:0] == 7'b0110011) instruction_operation = SLL;
+        else if (instruction[31:25] == 7'b0000000 && instruction[14:12] == 3'b010 && instruction[6:0] == 7'b0110011) instruction_operation = SLT;
+        else if (instruction[31:25] == 7'b0000000 && instruction[14:12] == 3'b011 && instruction[6:0] == 7'b0110011) instruction_operation = SLTU;
+        else if (instruction[31:25] == 7'b0000000 && instruction[14:12] == 3'b100 && instruction[6:0] == 7'b0110011) instruction_operation = XOR;
+        else if (instruction[31:25] == 7'b0000000 && instruction[14:12] == 3'b101 && instruction[6:0] == 7'b0110011) instruction_operation = SRL;
+        else if (instruction[31:25] == 7'b0100000 && instruction[14:12] == 3'b101 && instruction[6:0] == 7'b0110011) instruction_operation = SRA;
+        else if (instruction[31:25] == 7'b0000000 && instruction[14:12] == 3'b110 && instruction[6:0] == 7'b0110011) instruction_operation = OR;
+        else if (instruction[31:25] == 7'b0000000 && instruction[14:12] == 3'b111 && instruction[6:0] == 7'b0110011) instruction_operation = AND;
 
-        else if (instruction_int[14:12] == 3'b000 && instruction_int[6:0] == 7'b0001111) instruction_operation = NOP;          // FENCE
+        else if (instruction[14:12] == 3'b000 && instruction[6:0] == 7'b0001111) instruction_operation = NOP;          // FENCE
 
-        else if (instruction_int[14:12] == 3'b001 && instruction_int[6:0] == 7'b1110011) instruction_operation = CSRRW;
-        else if (instruction_int[14:12] == 3'b010 && instruction_int[6:0] == 7'b1110011) instruction_operation = CSRRS;
-        else if (instruction_int[14:12] == 3'b011 && instruction_int[6:0] == 7'b1110011) instruction_operation = CSRRC;
-        else if (instruction_int[14:12] == 3'b101 && instruction_int[6:0] == 7'b1110011) instruction_operation = CSRRWI;
-        else if (instruction_int[14:12] == 3'b110 && instruction_int[6:0] == 7'b1110011) instruction_operation = CSRRSI;
-        else if (instruction_int[14:12] == 3'b111 && instruction_int[6:0] == 7'b1110011) instruction_operation = CSRRCI;
+        else if (instruction[14:12] == 3'b001 && instruction[6:0] == 7'b1110011) instruction_operation = CSRRW;
+        else if (instruction[14:12] == 3'b010 && instruction[6:0] == 7'b1110011) instruction_operation = CSRRS;
+        else if (instruction[14:12] == 3'b011 && instruction[6:0] == 7'b1110011) instruction_operation = CSRRC;
+        else if (instruction[14:12] == 3'b101 && instruction[6:0] == 7'b1110011) instruction_operation = CSRRWI;
+        else if (instruction[14:12] == 3'b110 && instruction[6:0] == 7'b1110011) instruction_operation = CSRRSI;
+        else if (instruction[14:12] == 3'b111 && instruction[6:0] == 7'b1110011) instruction_operation = CSRRCI;
 
-        else if (instruction_int[31:0] == 32'h00000073) instruction_operation = ECALL;
-        else if (instruction_int[31:0] == 32'h00100073) instruction_operation = EBREAK;
+        else if (instruction[31:0] == 32'h00000073) instruction_operation = ECALL;
+        else if (instruction[31:0] == 32'h00100073) instruction_operation = EBREAK;
 
-        else if (instruction_int[31:0] == 32'h10200073) instruction_operation = SRET;
-        else if (instruction_int[31:0] == 32'h30200073) instruction_operation = MRET;
+        else if (instruction[31:0] == 32'h10200073) instruction_operation = SRET;
+        else if (instruction[31:0] == 32'h30200073) instruction_operation = MRET;
 
-        else if (instruction_int[31:0] == 32'h10500073) instruction_operation = WFI;
+        else if (instruction[31:0] == 32'h10500073) instruction_operation = WFI;
 
-        else if (instruction_int[31:0] == 32'h00000013) instruction_operation = NOP;
+        else if (instruction[31:0] == 32'h00000013) instruction_operation = NOP;
 
         else instruction_operation = INVALID;
     end
@@ -154,7 +150,7 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        case (instruction_int[6:0])
+        case (instruction[6:0])
             7'b0010011, 7'b1100111, 7'b0000011:     instruction_format = I_TYPE;
             7'b0100011:                             instruction_format = S_TYPE;
             7'b1100011:                             instruction_format = B_TYPE;
@@ -171,43 +167,43 @@ module decode
     always_comb begin
         case (instruction_format)
             I_TYPE: begin
-                        immediate[31:11] = (!instruction_int[31]) 
+                        immediate[31:11] = (!instruction[31]) 
                                             ? '0 
                                             : '1;
-                        immediate[10:0]  = instruction_int[30:20];
+                        immediate[10:0]  = instruction[30:20];
                     end
 
             S_TYPE: begin
-                        immediate[31:11] = (!instruction_int[31]) 
+                        immediate[31:11] = (!instruction[31]) 
                                             ? '0 
                                             : '1;
-                        immediate[10:5]  = instruction_int[30:25];
-                        immediate[4:0]   = instruction_int[11:7];
+                        immediate[10:5]  = instruction[30:25];
+                        immediate[4:0]   = instruction[11:7];
                     end
 
             B_TYPE: begin
-                        immediate[31:12] = (!instruction_int[31]) 
+                        immediate[31:12] = (!instruction[31]) 
                                             ? '0 
                                             : '1;
-                        immediate[11]    = instruction_int[7];
-                        immediate[10:5]  = instruction_int[30:25];
-                        immediate[4:1]   = instruction_int[11:8];
+                        immediate[11]    = instruction[7];
+                        immediate[10:5]  = instruction[30:25];
+                        immediate[4:1]   = instruction[11:8];
                         immediate[0]     = 0;
                     end
 
             U_TYPE: begin
-                        immediate[31:12] = instruction_int[31:12];
+                        immediate[31:12] = instruction[31:12];
                         immediate[11:0]  = '0;
                     end
 
             J_TYPE: begin
-                        immediate[31:20] = (!instruction_int[31]) 
+                        immediate[31:20] = (!instruction[31]) 
                                             ? '0 
                                             : '1;
-                        immediate[19:12] = instruction_int[19:12];
-                        immediate[11]    = instruction_int[20];
-                        immediate[10:5]  = instruction_int[30:25];
-                        immediate[4:1]   = instruction_int[24:21];
+                        immediate[19:12] = instruction[19:12];
+                        immediate[11]    = instruction[20];
+                        immediate[10:5]  = instruction[30:25];
+                        immediate[4:1]   = instruction[24:21];
                         immediate[0]     = 0;
                     end
 
@@ -219,8 +215,8 @@ module decode
 // Addresses to RegBank
 //////////////////////////////////////////////////////////////////////////////
 
-    assign rs1_o = instruction_int[19:15];
-    assign rs2_o = instruction_int[24:20];
+    assign rs1_o = instruction[19:15];
+    assign rs2_o = instruction[24:20];
     assign rd_o  = locked_registers[1];
 
 //////////////////////////////////////////////////////////////////////////////
@@ -229,7 +225,7 @@ module decode
 
     always_comb begin
         if (!hazard_o) begin
-            target_register = instruction_int[11:7];
+            target_register = instruction[11:7];
             ///////////////////////////////////
             if (instruction_operation == SB || instruction_operation == SH || instruction_operation == SW) begin
                 is_store = 1;
@@ -283,6 +279,36 @@ module decode
     end
 
 //////////////////////////////////////////////////////////////////////////////
+// Branch Prediction
+//////////////////////////////////////////////////////////////////////////////
+/*
+ * This implements static branch prediction. It takes an instruction and its PC and determines if
+ * it's a branch or a jump and calculates its target. For jumps it will always predict taken. For
+ * branches it will predict taken if the PC offset is negative.
+ */
+    always_comb begin
+        if (executionUnit_e'(instruction_operation[5:3]) == BRANCH_UNIT) begin
+            if (instruction_operation == JAL || instruction_operation == JALR) begin
+                inconditional_branch    <= 1'b1;
+                conditional_branch      <= 1'b0;
+            end
+            else begin
+                inconditional_branch    <= 1'b0;
+                conditional_branch      <= 1'b1;
+            end
+        end
+        else begin
+            inconditional_branch    <= 1'b0;
+            conditional_branch      <= 1'b0;
+        end
+    end
+
+    assign negative_offset          = immediate[31];
+    assign conditional_branch_taken = conditional_branch   & negative_offset;
+    assign predict_branch_taken_o   = inconditional_branch | conditional_branch_taken;
+    assign predict_branch_pc_o      = pc_i + immediate;
+
+//////////////////////////////////////////////////////////////////////////////
 // Control of the exits based on format
 //////////////////////////////////////////////////////////////////////////////
 
@@ -306,44 +332,44 @@ module decode
 
     always_ff @(posedge clk) begin
         if (reset) begin
-            first_operand_o  <= '0;
-            second_operand_o <= '0;
-            third_operand_o  <= '0;
-            pc_o             <= '0;
-            instruction_o    <= '0;
+            first_operand_o         <= '0;
+            second_operand_o        <= '0;
+            third_operand_o         <= '0;
+            pc_o                    <= '0;
+            instruction_o           <= '0;
             instruction_operation_o <= NOP;
-            tag_o            <= '0;
-            exception_o      <= 0;
+            tag_o                   <= '0;
+            exception_o             <= 0;
         end 
         else if (stall) begin
-            first_operand_o   <= first_operand_o;
-            second_operand_o  <= second_operand_o;
-            third_operand_o   <= third_operand_o;
-            pc_o              <= pc_o;
-            instruction_o     <= instruction_o;
+            first_operand_o         <= first_operand_o;
+            second_operand_o        <= second_operand_o;
+            third_operand_o         <= third_operand_o;
+            pc_o                    <= pc_o;
+            instruction_o           <= instruction_o;
             instruction_operation_o <= instruction_operation_o;
-            tag_o             <= tag_o;
-            exception_o       <= exception_o;
+            tag_o                   <= tag_o;
+            exception_o             <= exception_o;
         end 
         else if (hazard_o) begin
-            first_operand_o  <= '0;
-            second_operand_o <= '0;
-            third_operand_o  <= '0;
-            pc_o             <= '0;
-            instruction_o    <= '0;
+            first_operand_o         <= '0;
+            second_operand_o        <= '0;
+            third_operand_o         <= '0;
+            pc_o                    <= '0;
+            instruction_o           <= '0;
             instruction_operation_o <= NOP;
-            tag_o            <= tag_i;
-            exception_o      <= 0;
+            tag_o                   <= tag_i;
+            exception_o             <= 0;
         end 
         else if (!stall) begin
-            first_operand_o  <= first_operand_int;
-            second_operand_o <= second_operand_int;
-            third_operand_o  <= third_operand_int;
-            pc_o             <= pc_i;
-            instruction_o    <= instruction_int;
+            first_operand_o         <= first_operand_int;
+            second_operand_o        <= second_operand_int;
+            third_operand_o         <= third_operand_int;
+            pc_o                    <= pc_i;
+            instruction_o           <= instruction;
             instruction_operation_o <= instruction_operation;
-            tag_o            <= tag_i;
-            exception_o      <= (instruction_operation==INVALID) ? 1 : 0;
+            tag_o                   <= tag_i;
+            exception_o             <= (instruction_operation==INVALID) ? 1 : 0;
         end
     end
 
