@@ -243,6 +243,12 @@ main:
 #	TEST(rem)
 #	TEST(remu)
 
+	TEST(csr)
+	TEST(mcsr)
+	TEST(ebreak)
+	TEST(ecall)
+	TEST(wfi)
+	TEST(zicntr)
 
 	li a0,0x80001000
 	addi a1,zero,'D'

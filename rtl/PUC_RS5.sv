@@ -35,7 +35,7 @@
 */
 
 // `define PROTO 1
-`define DEBUG 1
+// `define DEBUG 1
 
 
 module PUC_RS5 

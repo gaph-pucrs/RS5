@@ -57,7 +57,7 @@ module csrUnit
             data_o = first_operand_i;
         end
         else begin
-            data_o = '0 & {27'b0, rs1};
+            data_o = {27'b0, rs1};
         end
     end
 

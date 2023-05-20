@@ -135,9 +135,9 @@ module CSRBank
             // privilege    <= MACHINE
             mstatus[7]      <= mstatus[3];          // MPIE = MIE
             mstatus[3]      <= 0;                   // MIE = 0
-            mepc_r          <= (exception_code_i == ECALL_FROM_MMODE) 
+            mepc_r          <= (exception_code_i == ECALL_FROM_MMODE || exception_code_i == BREAKPOINT) 
                                 ? pc_i 
-                                : pc_i+4;             // Return address
+                                : pc_i+4;           // Return address
             mtval           <= (exception_code_i == ILLEGAL_INSTRUCTION) 
                                 ? instruction_i 
                                 : pc_i;
