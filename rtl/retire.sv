@@ -36,6 +36,7 @@ module retire
     input   logic [3:0]     mem_write_enable_i,         // Write enable memory
     input   logic           write_enable_i,             // Write enable from Execute(based on instruction_i type)
     input   logic           jump_i,                     // Jump signal from branch unit 
+    input   logic           predicted_branch_i,
     input   iType_e         instruction_operation_i,
     input   logic           exception_i,
 
@@ -102,7 +103,7 @@ module retire
     end
 
 //////////////////////////////////////////////////////////////////////////////
-// RegBank Writw Enable Generation
+// RegBank Write Enable Generation
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
@@ -119,13 +120,17 @@ module retire
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        if (jump_i && !killed) begin
-            jump_target_o = results_i[1];
-            jump_o        = 1;
-        end 
+        if (jump_i && !predicted_branch_i && !killed) begin
+            jump_o          = 1;
+            jump_target_o   = results_i[1];
+        end
+        else if (!jump_i && predicted_branch_i && !killed) begin
+            jump_o          = 1;
+            jump_target_o   = pc_i;
+        end
         else begin
-            jump_target_o = '0;
-            jump_o        = '0;
+            jump_o          = 0;
+            jump_target_o   = '0;
         end
     end
 

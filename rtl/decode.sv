@@ -46,7 +46,11 @@ module decode
     output  logic [2:0]     tag_o,                  // Instruction tag_o
     output  iType_e         instruction_operation_o,// Instruction operation
     output  logic           hazard_o,               // Bubble issue indicator (0 active)
-    output  logic           exception_o
+    output  logic           exception_o,
+    output  logic           predicted_branch_o,
+
+    output  logic           predict_branch_taken_o,
+    output  logic [31:0]    predict_branch_pc_o
     );
 
     logic   [31:0]  instruction, instruction_r;
@@ -54,13 +58,13 @@ module decode
     iType_e         instruction_operation;
     logic   [31:0]  immediate, first_operand_int, second_operand_int, third_operand_int;
     logic           hazard_r;
-    logic   [4:0]   locked_registers[2];
-    logic   [4:0]   target_register;
+    logic    [4:0]  locked_registers[2];
+    logic    [4:0]  target_register;
     logic           is_store;
     logic           locked_memory[2];
 
     logic           inconditional_branch, conditional_branch;
-    logic           negative_offset, conditional_branch_taken, predict_branch_taken_o, predict_branch_pc_o;
+    logic           negative_offset, conditional_branch_taken, predict_branch_taken;
 
 //////////////////////////////////////////////////////////////////////////////
 // Re-Decode instruction on hazard
@@ -305,8 +309,10 @@ module decode
 
     assign negative_offset          = immediate[31];
     assign conditional_branch_taken = conditional_branch   & negative_offset;
-    assign predict_branch_taken_o   = inconditional_branch | conditional_branch_taken;
+    assign predict_branch_taken     = inconditional_branch | conditional_branch_taken;
+
     assign predict_branch_pc_o      = pc_i + immediate;
+    assign predict_branch_taken_o   = predict_branch_taken;
 
 //////////////////////////////////////////////////////////////////////////////
 // Control of the exits based on format
@@ -331,6 +337,7 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk) begin
+        predicted_branch_o <= predict_branch_taken;
         if (reset) begin
             first_operand_o         <= '0;
             second_operand_o        <= '0;
