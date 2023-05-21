@@ -120,14 +120,17 @@ module retire
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
+        // If should have jumped and predicted not jump then jump
         if (jump_i && !predicted_branch_i && !killed) begin
             jump_o          = 1;
             jump_target_o   = results_i[1];
         end
+        // If should not have jumped and predicted jump then return
         else if (!jump_i && predicted_branch_i && !killed) begin
             jump_o          = 1;
             jump_target_o   = pc_i;
         end
+        // Predicted Right or not a Jump
         else begin
             jump_o          = 0;
             jump_target_o   = '0;
