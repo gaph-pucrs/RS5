@@ -37,7 +37,7 @@
 
 // `define PROTO 1
 // `define DEBUG 1
-// `define BRANCH_PREDICTION 1
+`define BRANCH_PREDICTION 1
 
 module PUC_RS5 
     import my_pkg::*;
