@@ -28,7 +28,8 @@ module decode
     input   logic           clk,
     input   logic           reset,
     input   logic           stall,
-
+    
+    input   logic           killed_i,
     input   logic [31:0]    instruction_i,          // Object code of the instruction to extract the immediate operand
     input   logic [31:0]    pc_i,                   // Bypassed to execute unit as an operand
     input   logic [2:0]     tag_i,                  // Instruction tag_o
@@ -292,8 +293,12 @@ module decode
  */
     always_comb begin
         if (executionUnit_e'(instruction_operation[5:3]) == BRANCH_UNIT) begin
-            if (instruction_operation == JAL || instruction_operation == JALR) begin
+            if (instruction_operation == JAL) begin
                 inconditional_branch    <= 1'b1;
+                conditional_branch      <= 1'b0;
+            end
+            else if (instruction_operation == JALR) begin
+                inconditional_branch    <= 1'b0;
                 conditional_branch      <= 1'b0;
             end
             else begin
@@ -309,7 +314,7 @@ module decode
 
     assign negative_offset          = immediate[31];
     assign conditional_branch_taken = conditional_branch   & negative_offset;
-    assign predict_branch_taken     = inconditional_branch | conditional_branch_taken;
+    assign predict_branch_taken     = (inconditional_branch | conditional_branch_taken) & !killed_i;
 
     assign predict_branch_pc_o      = pc_i + immediate;
     assign predict_branch_taken_o   = predict_branch_taken;
@@ -337,7 +342,6 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk) begin
-        predicted_branch_o <= predict_branch_taken;
         if (reset) begin
             first_operand_o         <= '0;
             second_operand_o        <= '0;
@@ -347,6 +351,7 @@ module decode
             instruction_operation_o <= NOP;
             tag_o                   <= '0;
             exception_o             <= 0;
+            predicted_branch_o      <= 0;
         end 
         else if (stall) begin
             first_operand_o         <= first_operand_o;
@@ -357,6 +362,7 @@ module decode
             instruction_operation_o <= instruction_operation_o;
             tag_o                   <= tag_o;
             exception_o             <= exception_o;
+            predicted_branch_o      <= 0;
         end 
         else if (hazard_o) begin
             first_operand_o         <= '0;
@@ -367,6 +373,7 @@ module decode
             instruction_operation_o <= NOP;
             tag_o                   <= tag_i;
             exception_o             <= 0;
+            predicted_branch_o      <= 0;
         end 
         else if (!stall) begin
             first_operand_o         <= first_operand_int;
@@ -377,6 +384,7 @@ module decode
             instruction_operation_o <= instruction_operation;
             tag_o                   <= tag_i;
             exception_o             <= (instruction_operation==INVALID) ? 1 : 0;
+            predicted_branch_o      <= predict_branch_taken;
         end
     end
 

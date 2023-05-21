@@ -172,6 +172,7 @@ module PUC_RS5
         .clk(clk), 
         .reset(reset),
         .stall(stall),
+        .killed_i(killed),
         .instruction_i(instruction_i), 
         .pc_i(pc_decode), 
         .tag_i(tag_decode), 

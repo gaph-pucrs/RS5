@@ -60,11 +60,11 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
         else if (exception_raised_i || interrupt_ack_i) begin                               
             pc <= mtvec_i;
         end
-        else if (predict_branch_taken_i) begin
-            pc <= predict_branch_pc_i + 4;
-        end
         else if (jump_i) begin
             pc <= jump_target_i;
+        end
+        else if (predict_branch_taken_i) begin
+            pc <= predict_branch_pc_i + 4;
         end
         else if (!hazard_i && !stall) begin
             pc <= pc_plus4;
@@ -79,7 +79,9 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
 
     always_ff @(posedge clk) begin
         if (!hazard_i && !stall) begin
-            pc_o <= pc;
+            pc_o <= (predict_branch_taken_i)
+                    ? predict_branch_pc_i
+                    : pc;
         end
     end
 
@@ -91,20 +93,17 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
                                     ? predict_branch_pc_i 
                                     : pc;
 
-    assign tag_o =  (predict_branch_taken_i) 
-                    ? current_tag + 1
-                    : current_tag;
+    assign tag_o = current_tag;
 
 //////////////////////////////////////////////////////////////////////////////
 // TAG Calculator 
 //////////////////////////////////////////////////////////////////////////////
-
     always_ff @(posedge clk) begin
         if (reset) begin
             current_tag <= 0;
             next_tag <= 0;
         end
-        else if (jump_i || exception_raised_i || machine_return_i || interrupt_ack_i || predict_branch_taken_i) begin
+        else if (jump_i || exception_raised_i || machine_return_i || interrupt_ack_i) begin
             next_tag <= current_tag + 1;
         end
         else if (!hazard_i && !stall) begin
