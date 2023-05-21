@@ -35,7 +35,11 @@ module execute
     input   logic [31:0]   third_operand_i,    //              ||
     input   iType_e        instruction_operation_i,
     input   logic [2:0]    tag_i,              // Instruction tag
+
+`ifdef BRANCH_PREDICTION
     input   logic          predicted_branch_i,
+    output  logic          predicted_branch_o,
+`endif
 
     output  iType_e        instruction_operation_o,
     output  logic [31:0]   instruction_o,
@@ -44,7 +48,6 @@ module execute
     output  logic [2:0]    tag_o,              // Instruction tag
     output  logic          jump_o,             // Signal that indicates a branch taken
     output  logic          write_enable_o,     // Write enable to regbank
-    output  logic          predicted_branch_o,
 
 
     output  logic [31:0]   mem_read_address_o, // Memory Read Address
@@ -223,11 +226,14 @@ module execute
     always_ff @(posedge clk) begin
         if (!stall) begin
             tag_o                   <= tag_i;
-            predicted_branch_o      <= predicted_branch_i;
             instruction_operation_o <= instruction_operation_i;
             instruction_o           <= instruction_i;
             pc_o                    <= pc_i;
             exception_o             <= exception_i | csr_exception;
+        
+        `ifdef BRANCH_PREDICTION
+            predicted_branch_o      <= predicted_branch_i;
+        `endif
         end
     end
 

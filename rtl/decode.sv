@@ -29,12 +29,18 @@ module decode
     input   logic           reset,
     input   logic           stall,
     
-    input   logic           killed_i,
     input   logic [31:0]    instruction_i,          // Object code of the instruction to extract the immediate operand
     input   logic [31:0]    pc_i,                   // Bypassed to execute unit as an operand
     input   logic [2:0]     tag_i,                  // Instruction tag_o
     input   logic [31:0]    rs1_data_read_i,        // Data read from register bank
     input   logic [31:0]    rs2_data_read_i,        // Data read from register bank
+
+`ifdef BRANCH_PREDICTION
+    input   logic           killed_i,
+    output  logic           predicted_branch_o,
+    output  logic           predict_branch_taken_o,
+    output  logic [31:0]    predict_branch_pc_o,
+`endif
 
     output  logic [4:0]     rs1_o,                  // Address of the 1st register, conected directly in the register bank
     output  logic [4:0]     rs2_o,                  // Address of the 2nd register, conected directly in the register bank
@@ -47,11 +53,7 @@ module decode
     output  logic [2:0]     tag_o,                  // Instruction tag_o
     output  iType_e         instruction_operation_o,// Instruction operation
     output  logic           hazard_o,               // Bubble issue indicator (0 active)
-    output  logic           exception_o,
-    output  logic           predicted_branch_o,
-
-    output  logic           predict_branch_taken_o,
-    output  logic [31:0]    predict_branch_pc_o
+    output  logic           exception_o
     );
 
     logic   [31:0]  instruction, instruction_r;
@@ -63,9 +65,10 @@ module decode
     logic    [4:0]  target_register;
     logic           is_store;
     logic           locked_memory[2];
-
-    logic           inconditional_branch, conditional_branch;
-    logic           negative_offset, conditional_branch_taken, predict_branch_taken;
+    
+`ifdef BRANCH_PREDICTION
+    logic           predict_branch_taken;
+`endif
 
 //////////////////////////////////////////////////////////////////////////////
 // Re-Decode instruction on hazard
@@ -283,6 +286,7 @@ module decode
         end
     end
 
+`ifdef BRANCH_PREDICTION
 //////////////////////////////////////////////////////////////////////////////
 // Branch Prediction
 //////////////////////////////////////////////////////////////////////////////
@@ -291,33 +295,20 @@ module decode
  * it's a branch or a jump and calculates its target. For jumps it will always predict taken. For
  * branches it will predict taken if the PC offset is negative.
  */
-    always_comb begin
-        if (executionUnit_e'(instruction_operation[5:3]) == BRANCH_UNIT) begin
-            if (instruction_operation == JAL) begin
-                inconditional_branch    <= 1'b1;
-                conditional_branch      <= 1'b0;
-            end
-            else if (instruction_operation == JALR) begin
-                inconditional_branch    <= 1'b0;
-                conditional_branch      <= 1'b0;
-            end
-            else begin
-                inconditional_branch    <= 1'b0;
-                conditional_branch      <= 1'b1;
-            end
-        end
-        else begin
-            inconditional_branch    <= 1'b0;
-            conditional_branch      <= 1'b0;
-        end
-    end
+    
+    branchPredict1 branchPredict (
+        .instruction_operation_i(instruction_operation),
+        .killed_i(killed_i),
+        .immediate_i(immediate),
+        .pc_i(pc_i),
 
-    assign negative_offset          = immediate[31];
-    assign conditional_branch_taken = conditional_branch   & negative_offset;
-    assign predict_branch_taken     = (inconditional_branch | conditional_branch_taken) & !killed_i;
+        .predict_branch_taken_o(predict_branch_taken),
+        .predict_branch_pc_o(predict_branch_pc_o)
+    );
 
-    assign predict_branch_pc_o      = pc_i + immediate;
-    assign predict_branch_taken_o   = predict_branch_taken;
+    assign predict_branch_taken_o = predict_branch_taken;
+    
+`endif
 
 //////////////////////////////////////////////////////////////////////////////
 // Control of the exits based on format
@@ -351,7 +342,9 @@ module decode
             instruction_operation_o <= NOP;
             tag_o                   <= '0;
             exception_o             <= 0;
+        `ifdef BRANCH_PREDICTION
             predicted_branch_o      <= 0;
+        `endif
         end 
         else if (stall) begin
             first_operand_o         <= first_operand_o;
@@ -362,7 +355,9 @@ module decode
             instruction_operation_o <= instruction_operation_o;
             tag_o                   <= tag_o;
             exception_o             <= exception_o;
+        `ifdef BRANCH_PREDICTION
             predicted_branch_o      <= 0;
+        `endif
         end 
         else if (hazard_o) begin
             first_operand_o         <= '0;
@@ -373,7 +368,9 @@ module decode
             instruction_operation_o <= NOP;
             tag_o                   <= tag_i;
             exception_o             <= 0;
+        `ifdef BRANCH_PREDICTION
             predicted_branch_o      <= 0;
+        `endif
         end 
         else if (!stall) begin
             first_operand_o         <= first_operand_int;
@@ -384,7 +381,9 @@ module decode
             instruction_operation_o <= instruction_operation;
             tag_o                   <= tag_i;
             exception_o             <= (instruction_operation==INVALID) ? 1 : 0;
+        `ifdef BRANCH_PREDICTION
             predicted_branch_o      <= predict_branch_taken;
+        `endif
         end
     end
 

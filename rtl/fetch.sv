@@ -29,8 +29,10 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
     input   logic           jump_i,
     input   logic [31:0]    jump_target_i,
 
+`ifdef BRANCH_PREDICTION
     input   logic           predict_branch_taken_i,
     input   logic [31:0]    predict_branch_pc_i,
+`endif
     
     output  logic [31:0]    instruction_address_o,
     output  logic [31:0]    pc_o,
@@ -63,9 +65,11 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
         else if (jump_i) begin
             pc <= jump_target_i;
         end
+    `ifdef BRANCH_PREDICTION
         else if (predict_branch_taken_i) begin
             pc <= predict_branch_pc_i + 4;
         end
+    `endif
         else if (!hazard_i && !stall) begin
             pc <= pc_plus4;
         end
@@ -76,7 +80,7 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
 //////////////////////////////////////////////////////////////////////////////
 // Sensitive Outputs 
 //////////////////////////////////////////////////////////////////////////////
-
+`ifdef BRANCH_PREDICTION
     always_ff @(posedge clk) begin
         if (!hazard_i && !stall) begin
             pc_o <= (predict_branch_taken_i)
@@ -84,14 +88,24 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
                     : pc;
         end
     end
+`else
+    always_ff @(posedge clk) begin
+        if (!hazard_i && !stall) begin
+            pc_o <= pc;
+        end
+    end
+`endif
 
 //////////////////////////////////////////////////////////////////////////////
 // Non-Sensitive Outputs 
 //////////////////////////////////////////////////////////////////////////////
-
+`ifdef BRANCH_PREDICTION
     assign instruction_address_o =  (predict_branch_taken_i) 
                                     ? predict_branch_pc_i 
                                     : pc;
+`else
+    assign instruction_address_o =  pc;
+`endif
 
     assign tag_o = current_tag;
 

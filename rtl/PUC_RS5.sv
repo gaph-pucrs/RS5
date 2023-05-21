@@ -27,6 +27,7 @@
 `include "../rtl/xus/LSUnit.sv"
 `include "../rtl/xus/shiftUnit.sv"
 `include "../rtl/fetch.sv"
+`include "../rtl/branchPredict.sv"
 `include "../rtl/decode.sv"
 `include "../rtl/execute.sv"
 `include "../rtl/retire.sv"
@@ -36,7 +37,7 @@
 
 // `define PROTO 1
 // `define DEBUG 1
-
+// `define BRANCH_PREDICTION 1
 
 module PUC_RS5 
     import my_pkg::*;
@@ -69,8 +70,10 @@ module PUC_RS5
     /* verilator lint_on UNUSEDSIGNAL */
     logic   [31:0]  mem_write_address_int;
 
+`ifdef BRANCH_PREDICTION
     logic           predict_branch_taken;
     logic   [31:0]  predict_branch_pc;
+`endif
 
 //////////////////////////////////////////////////////////////////////////////
 // Decoder signals
@@ -99,7 +102,10 @@ module PUC_RS5
     logic   [31:0]  pc_execute;
     logic    [2:0]  tag_execute;
     logic           exception_execute;
+
+`ifdef BRANCH_PREDICTION
     logic           predicted_branch_execute;
+`endif
 
 //////////////////////////////////////////////////////////////////////////////
 // Retire signals
@@ -117,8 +123,10 @@ module PUC_RS5
     logic           exception_retire;
     /* verilator lint_on UNUSEDSIGNAL */
     logic           killed;
-    logic           predicted_branch_retire;
 
+`ifdef BRANCH_PREDICTION
+    logic           predicted_branch_retire;
+`endif
 
 //////////////////////////////////////////////////////////////////////////////
 // CSR Bank signals
@@ -145,8 +153,10 @@ module PUC_RS5
         .hazard_i(hazard), 
         .jump_i(jump), 
         .jump_target_i(jump_target),
+    `ifdef BRANCH_PREDICTION
         .predict_branch_taken_i(predict_branch_taken),
         .predict_branch_pc_i(predict_branch_pc),
+    `endif
         .instruction_address_o(instruction_address_o), 
         .pc_o(pc_decode), 
         .tag_o(tag_decode),
@@ -178,6 +188,11 @@ module PUC_RS5
         .tag_i(tag_decode), 
         .rs1_data_read_i(rs1_data_read), 
         .rs2_data_read_i(rs2_data_read), 
+    `ifdef BRANCH_PREDICTION
+        .predicted_branch_o(predicted_branch_execute),
+        .predict_branch_taken_o(predict_branch_taken),
+        .predict_branch_pc_o(predict_branch_pc),
+    `endif
         .rs1_o(rs1), 
         .rs2_o(rs2), 
         .rd_o(rd), 
@@ -189,10 +204,7 @@ module PUC_RS5
         .tag_o(tag_execute), 
         .instruction_operation_o(instruction_operation_execute), 
         .hazard_o(hazard), 
-        .exception_o(exception_execute),
-        .predicted_branch_o(predicted_branch_execute),
-        .predict_branch_taken_o(predict_branch_taken),
-        .predict_branch_pc_o(predict_branch_pc)
+        .exception_o(exception_execute)
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -256,7 +268,9 @@ module PUC_RS5
         .result_o(result_retire), 
         .tag_o(tag_retire), 
         .jump_o(jump_retire),
+    `ifdef BRANCH_PREDICTION
         .predicted_branch_o(predicted_branch_retire),
+    `endif
         .write_enable_o(we_retire),
         .mem_read_address_o(mem_read_address_int), 
         .mem_write_enable_o(mem_write_enable_retire),
@@ -281,7 +295,9 @@ module PUC_RS5
         .pc_i(pc_retire),
         .results_i(result_retire), 
         .tag_i(tag_retire),
+    `ifdef BRANCH_PREDICTION
         .predicted_branch_i(predicted_branch_retire),
+    `endif
         .mem_write_enable_i(mem_write_enable_retire),
         .write_enable_i(we_retire),
         .jump_i(jump_retire), 
