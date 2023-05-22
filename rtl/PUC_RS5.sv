@@ -35,10 +35,6 @@
 `include "../rtl/CSRBank.sv"
 */
 
-// `define PROTO 1
-// `define DEBUG 1
-`define BRANCH_PREDICTION 1
-
 module PUC_RS5 
     import my_pkg::*;
 (
@@ -182,13 +178,13 @@ module PUC_RS5
         .clk(clk), 
         .reset(reset),
         .stall(stall),
-        .killed_i(killed),
         .instruction_i(instruction_i), 
         .pc_i(pc_decode), 
         .tag_i(tag_decode), 
         .rs1_data_read_i(rs1_data_read), 
         .rs2_data_read_i(rs2_data_read), 
     `ifdef BRANCH_PREDICTION
+        .killed_i(killed),
         .predicted_branch_o(predicted_branch_execute),
         .predict_branch_taken_o(predict_branch_taken),
         .predict_branch_pc_o(predict_branch_pc),
@@ -262,15 +258,15 @@ module PUC_RS5
         .instruction_operation_i(instruction_operation_execute), 
         .instruction_o(instruction_retire), 
         .tag_i(tag_execute), 
+    `ifdef BRANCH_PREDICTION
         .predicted_branch_i(predicted_branch_execute),
+        .predicted_branch_o(predicted_branch_retire),
+    `endif
         .instruction_operation_o(instruction_operation_retire), 
         .pc_o(pc_retire), 
         .result_o(result_retire), 
         .tag_o(tag_retire), 
         .jump_o(jump_retire),
-    `ifdef BRANCH_PREDICTION
-        .predicted_branch_o(predicted_branch_retire),
-    `endif
         .write_enable_o(we_retire),
         .mem_read_address_o(mem_read_address_int), 
         .mem_write_enable_o(mem_write_enable_retire),

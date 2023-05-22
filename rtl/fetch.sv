@@ -20,7 +20,10 @@
  * in regular flows, the tag leaves the unit with the instruction fetched.
  */
 
-module fetch  #(parameter start_address = 32'b0)(  //Generic start address
+module fetch  
+import my_pkg::*;
+#(parameter start_address = 32'b0)
+(
     input   logic           clk,
     input   logic           reset,
     input   logic           stall,

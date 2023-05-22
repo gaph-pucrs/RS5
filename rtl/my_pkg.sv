@@ -19,6 +19,10 @@
 
 package my_pkg;
 
+    // `define PROTO 1
+    // `define DEBUG 1
+    `define BRANCH_PREDICTION 1
+
     typedef enum  logic[2:0] {R_TYPE, I_TYPE, S_TYPE, B_TYPE, U_TYPE, J_TYPE} formatType_e;
 
     typedef enum  logic[2:0] {

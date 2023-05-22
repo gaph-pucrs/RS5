@@ -296,7 +296,7 @@ module decode
  * branches it will predict taken if the PC offset is negative.
  */
     
-    branchPredict1 branchPredict (
+    branchPredict branchPredict1 (
         .instruction_operation_i(instruction_operation),
         .killed_i(killed_i),
         .immediate_i(immediate),
