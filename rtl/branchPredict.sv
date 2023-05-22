@@ -19,7 +19,7 @@
 module branchPredict
     import my_pkg::*;
 (
-    input   iType_e         instruction_operation_i,
+    input   logic [6:0]     instruction_opcode_i,
     input   logic           killed_i,
     input   logic [31:0]    immediate_i,
     input   logic [31:0]    pc_i,
@@ -32,19 +32,13 @@ module branchPredict
     logic   negative_offset, conditional_branch_taken;
 
     always_comb begin
-        if (executionUnit_e'(instruction_operation_i[5:3]) == BRANCH_UNIT) begin
-            if (instruction_operation_i == JAL) begin
-                inconditional_branch    <= 1'b1;
-                conditional_branch      <= 1'b0;
-            end
-            else if (instruction_operation_i == JALR) begin
-                inconditional_branch    <= 1'b0;
-                conditional_branch      <= 1'b0;
-            end
-            else begin
-                inconditional_branch    <= 1'b0;
-                conditional_branch      <= 1'b1;
-            end
+        if (instruction_opcode_i == 7'h6f) begin
+            inconditional_branch    <= 1'b1;
+            conditional_branch      <= 1'b0;
+        end
+        else if (instruction_opcode_i == 7'h63) begin
+            inconditional_branch    <= 1'b0;
+            conditional_branch      <= 1'b1;
         end
         else begin
             inconditional_branch    <= 1'b0;
