@@ -297,7 +297,7 @@ module decode
  */
     
     branchPredict branchPredict1 (
-        .instruction_operation_i(instruction_operation),
+        .instruction_opcode_i(instruction[6:0]),
         .killed_i(killed_i),
         .immediate_i(immediate),
         .pc_i(pc_i),
