@@ -59,6 +59,7 @@ module decode
     logic   [31:0]  instruction, instruction_r;
     formatType_e    instruction_format;
     iType_e         instruction_operation;
+    logic   [31:0]  imm_i_type, imm_s_type, imm_b_type, imm_u_type, imm_j_type;
     logic   [31:0]  immediate, first_operand_int, second_operand_int, third_operand_int;
     logic           hazard_r;
     logic    [4:0]  locked_registers[2];
@@ -171,51 +172,58 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 // Extract the immediate based on instruction format
 //////////////////////////////////////////////////////////////////////////////
+    always_comb begin
+        // Immediate I Type
+        imm_i_type[31:11] = (instruction[31]) 
+                            ? '1 
+                            : '0;
+        imm_i_type[10:0]  = instruction[30:20];
+
+        // Immediate S Type
+        imm_s_type[31:11] = (instruction[31]) 
+                            ? '1 
+                            : '0;
+        imm_s_type[10:5]  = instruction[30:25];
+        imm_s_type[4:0]   = instruction[11:7];
+
+        // Immediate B Type
+        imm_b_type[31:12] =  (!instruction[31]) 
+                            ? '0 
+                            : '1;
+        imm_b_type[11]    = instruction[7];
+        imm_b_type[10:5]  = instruction[30:25];
+        imm_b_type[4:1]   = instruction[11:8];
+        imm_b_type[0]     = 0;
+
+        // Immediate U Type
+        imm_u_type[31:12] = instruction[31:12];
+        imm_u_type[11:0]  = '0;
+
+        // Immediate J Type
+        imm_j_type[31:20] = (!instruction[31]) 
+                            ? '0 
+                            : '1;
+        imm_j_type[19:12] = instruction[19:12];
+        imm_j_type[11]    = instruction[20];
+        imm_j_type[10:5]  = instruction[30:25];
+        imm_j_type[4:1]   = instruction[24:21];
+        imm_j_type[0]     = 0;
+    end
+
 
     always_comb begin
         case (instruction_format)
-            I_TYPE: begin
-                        immediate[31:11] = (!instruction[31]) 
-                                            ? '0 
-                                            : '1;
-                        immediate[10:0]  = instruction[30:20];
-                    end
+            I_TYPE: immediate = imm_i_type;
 
-            S_TYPE: begin
-                        immediate[31:11] = (!instruction[31]) 
-                                            ? '0 
-                                            : '1;
-                        immediate[10:5]  = instruction[30:25];
-                        immediate[4:0]   = instruction[11:7];
-                    end
+            S_TYPE: immediate = imm_s_type;
 
-            B_TYPE: begin
-                        immediate[31:12] = (!instruction[31]) 
-                                            ? '0 
-                                            : '1;
-                        immediate[11]    = instruction[7];
-                        immediate[10:5]  = instruction[30:25];
-                        immediate[4:1]   = instruction[11:8];
-                        immediate[0]     = 0;
-                    end
+            B_TYPE: immediate = imm_b_type;
 
-            U_TYPE: begin
-                        immediate[31:12] = instruction[31:12];
-                        immediate[11:0]  = '0;
-                    end
+            U_TYPE: immediate = imm_u_type;
 
-            J_TYPE: begin
-                        immediate[31:20] = (!instruction[31]) 
-                                            ? '0 
-                                            : '1;
-                        immediate[19:12] = instruction[19:12];
-                        immediate[11]    = instruction[20];
-                        immediate[10:5]  = instruction[30:25];
-                        immediate[4:1]   = instruction[24:21];
-                        immediate[0]     = 0;
-                    end
+            J_TYPE: immediate = imm_j_type;
 
-            default:    immediate        = '0;
+            default:immediate = '0;
         endcase
     end
 
@@ -299,7 +307,8 @@ module decode
     branchPredict branchPredict1 (
         .instruction_opcode_i(instruction[6:0]),
         .killed_i(killed_i),
-        .immediate_i(immediate),
+        .immediate_b_type_i(imm_b_type),
+        .immediate_j_type_i(imm_j_type),
         .pc_i(pc_i),
 
         .predict_branch_taken_o(predict_branch_taken),
