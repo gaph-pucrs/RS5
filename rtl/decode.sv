@@ -81,13 +81,13 @@ module decode
 // Find out the type of the instruction
 //////////////////////////////////////////////////////////////////////////////
 
-    iType_e decode_imm;
-    iType_e decode_op;
     iType_e decode_branch;
     iType_e decode_load;
     iType_e decode_store;
+    iType_e decode_op_imm;
+    iType_e decode_op;
+    iType_e decode_misc_mem;
     iType_e decode_system;
-    iType_e decode_priv;
 
     logic [2:0] funct3;
     logic [6:0] funct7;
@@ -98,157 +98,108 @@ module decode
     assign funct7 = instruction_int[31:25];
 
     always_comb begin
-        case (funct3_imm_e'(funct3))
-            F3_ADDI:            decode_imm = ADD;
-            F3_SLTI:            decode_imm = SLT;
-            F3_SLTIU:           decode_imm = SLTU;
-            F3_XORI:            decode_imm = XOR;
-            F3_ORI:             decode_imm = OR;
-            F3_ANDI:            decode_imm = AND;
-            F3_SLLI:        begin
-                case (funct7_sl_e'(funct7))
-                    F7_SLLI:    decode_imm = SLL;
-                    default:    decode_imm = INVALID;
-                endcase
-            end
-            F3_SRLI_SRAI:   begin
-                case (funct7_sr_e'(funct7))
-                    F7_SRAI:    decode_imm = SRA;
-                    F7_SRLI:    decode_imm = SRL;
-                    default:    decode_imm = INVALID;
-                endcase
-            end
-            default:            decode_imm = INVALID;
+        case (funct3)
+            3'b000:     decode_branch = BEQ;
+            3'b001:     decode_branch = BNE;
+            3'b100:     decode_branch = BLT;
+            3'b101:     decode_branch = BGE;
+            3'b110:     decode_branch = BLTU;
+            3'b111:     decode_branch = BGEU;
+            default:    decode_branch = INVALID;
         endcase
     end
 
     always_comb begin
-        case (funct7_sub_sra_e'(funct7))
-            '0:         begin
-                case (funct3_op_e'(funct3))
-                    F3_ADD:     decode_op = ADD;
-                    F3_SLL:     decode_op = SLL;
-                    F3_SLT:     decode_op = SLT;
-                    F3_SLTU:    decode_op = SLTU;
-                    F3_XOR:     decode_op = XOR;
-                    F3_SR:      decode_op = SRL;
-                    F3_OR:      decode_op = OR;
-                    F3_AND:     decode_op = AND;
-                    default:    decode_op = INVALID;
-                endcase
-            end
-            F7_SUB_SRA: begin
-                case (funct3_op_e'(funct3))
-                    F3_ADD:     decode_op = SUB;
-                    F3_SR:      decode_op = SRA;
-                    default:    decode_op = INVALID;
-                endcase
-            end
+        case (funct3)
+            3'b000:     decode_load = LB;
+            3'b001:     decode_load = LH;
+            3'b010:     decode_load = LW;
+            3'b100:     decode_load = LBU;
+            3'b101:     decode_load = LHU;
+            default:    decode_load = INVALID;
+        endcase
+    end
+
+    always_comb begin
+        case (funct3)
+            3'b000:     decode_store = SB;
+            3'b001:     decode_store = SH;
+            3'b010:     decode_store = SW;
+            default:    decode_store = INVALID;
+        endcase
+    end
+
+    always_comb begin
+        case ({funct7, funct3}) inside
+            10'b???????000:     decode_op_imm = ADD;    /* ADDI */
+            10'b0000000001:     decode_op_imm = SLL;    /* SLLI */
+            10'b???????010:     decode_op_imm = SLT;    /* SLTI */
+            10'b???????011:     decode_op_imm = SLTU;   /* SLTIU */
+            10'b???????100:     decode_op_imm = XOR;    /* XORI */
+            10'b0000000101:     decode_op_imm = SRL;    /* SRLI */
+            10'b0100000101:     decode_op_imm = SRA;    /* SRAI */
+            10'b???????110:     decode_op_imm = OR;     /* ORI */
+            10'b???????111:     decode_op_imm = AND;    /* ANDI */
+            default:            decode_op_imm = INVALID;
+        endcase
+    end
+
+    always_comb begin
+        case ({funct7, funct3})
+            10'b0000000000:     decode_op = ADD;
+            10'b0100000000:     decode_op = SUB;
+            10'b0000000001:     decode_op = SLL;
+            10'b0000000010:     decode_op = SLT;
+            10'b0000000011:     decode_op = SLTU;
+            10'b0000000100:     decode_op = XOR;
+            10'b0000000101:     decode_op = SRL;
+            10'b0100000101:     decode_op = SRA;
+            10'b0000000110:     decode_op = OR;
+            10'b0000000111:     decode_op = AND;
             default:            decode_op = INVALID;
         endcase
     end
 
     always_comb begin
-        case (funct3_branch_e'(funct3))
-            F3_BEQ:             decode_branch = BEQ;
-            F3_BNE:             decode_branch = BNE;
-            F3_BLT:             decode_branch = BLT;
-            F3_BGE:             decode_branch = BGE;
-            F3_BLTU:            decode_branch = BLTU;
-            F3_BGEU:            decode_branch = BGEU;
-            default:            decode_branch = INVALID;
+        case (funct3)
+            3'b000:     decode_misc_mem = NOP;  /* FENCE */
+            default:    decode_misc_mem = INVALID;
         endcase
     end
 
     always_comb begin
-        case (funct3_load_e'(funct3))
-            F3_LB:              decode_load = LB;
-            F3_LH:              decode_load = LH;
-            F3_LW:              decode_load = LW;
-            F3_LBU:             decode_load = LBU;
-            F3_LHU:             decode_load = LHU;
-            default:            decode_load = INVALID;
-        endcase
-    end
-
-    always_comb begin
-        case (funct3_store_e'(funct3))
-            F3_SB:              decode_store = SB;
-            F3_SH:              decode_store = SH;
-            F3_SW:              decode_store = SW;
-            default:            decode_store = INVALID;
-        endcase
-    end
-
-    always_comb begin
-        if (instruction_int[11:7] == '0 && rs1_o == '0) begin
-            case (funct7_priv_e'(funct7))
-                F7_ECALL_EBREAK:    begin
-                    case (rs2Op_e'(rs2_o))
-                        RS2_ECALL:  decode_priv = ECALL;
-                        RS2_EBREAK: decode_priv = EBREAK;
-                        default:    decode_priv = INVALID;
-                    endcase
-                end
-                F7_WFI:        begin
-                    case (rs2Op_e'(rs2_o))
-                        RS2_WFI:    decode_priv = WFI;
-                        default:    decode_priv = INVALID;
-                    endcase
-                end
-                F7_MRET:
-                    case (rs2Op_e'(rs2_o))
-                        RS2_RET:    decode_priv = MRET;
-                        default:    decode_priv = INVALID;
-                    endcase
-                default:            decode_priv = INVALID;
-            endcase
-        end
-        else begin
-                                    decode_priv = INVALID;
-        end
-    end
-
-    always_comb begin
-        case (funct3_system_e'(funct3))
-            F3_CSRRW:               decode_system = CSRRW;
-            F3_CSRRS:               decode_system = CSRRS;
-            F3_CSRRC:               decode_system = CSRRC;
-            F3_CSRRWI:              decode_system = CSRRWI;
-            F3_CSRRSI:              decode_system = CSRRSI;
-            F3_CSRRCI:              decode_system = CSRRCI;
-            F3_PRIV:                decode_system = decode_priv;
-            default:                decode_system = INVALID;
+        case (instruction_int[31:7]) inside
+            25'b0000000000000000000000000:  decode_system = ECALL;
+            25'b0000000000010000000000000:  decode_system = EBREAK;
+            25'b0001000000100000000000000:  decode_system = SRET;
+            25'b0011000000100000000000000:  decode_system = MRET;
+            25'b0001000001010000000000000:  decode_system = WFI;
+            25'b?????????????????001?????:  decode_system = CSRRW;
+            25'b?????????????????010?????:  decode_system = CSRRS;
+            25'b?????????????????011?????:  decode_system = CSRRC;
+            25'b?????????????????101?????:  decode_system = CSRRWI;
+            25'b?????????????????110?????:  decode_system = CSRRSI;
+            25'b?????????????????111?????:  decode_system = CSRRCI;
+            default:                        decode_system = INVALID;
         endcase
     end
 
     always_comb begin 
-        case (opcodes_e'(opcode))
-            OP_LUI:                 instruction_operation = LUI;
-            OP_AUIPC:               instruction_operation = ADD;
-            OP_JAL:                 instruction_operation = JAL;
-            OP_IMM:                 instruction_operation = decode_imm;
-            OP_OP:                  instruction_operation = decode_op;
-            OP_BRANCH:              instruction_operation = decode_branch;
-            OP_LOAD:                instruction_operation = decode_load;
-            OP_STORE:               instruction_operation = decode_store;
-            OP_SYSTEM:              instruction_operation = decode_system;
-            OP_MISC_MEM:    begin   
-                case (funct3_misc_mem_e'(funct3))
-                    F3_FENCE:       instruction_operation = NOP;
-                    default:        instruction_operation = INVALID;
-                endcase
-            end
-            OP_JALR:        begin
-                case (funct3_jalr_e'(funct3))
-                    F3_JALR:        instruction_operation = JALR;
-                    default:        instruction_operation = INVALID;
-                endcase
-            end
-            default:                instruction_operation = INVALID;
+        case (opcode)
+            7'b0110111: instruction_operation = LUI;
+            7'b0010111: instruction_operation = ADD;                /* AUIPC */
+            7'b1101111: instruction_operation = JAL;
+            7'b1100111: instruction_operation = JALR;
+            7'b1100011: instruction_operation = decode_branch;      /* BRANCH */
+            7'b0000011: instruction_operation = decode_load;        /* LOAD */
+            7'b0100011: instruction_operation = decode_store;       /* STORE */
+            7'b0010011: instruction_operation = decode_op_imm;      /* OP-IMM */
+            7'b0110011: instruction_operation = decode_op;          /* OP */
+            7'b0001111: instruction_operation = decode_misc_mem;    /* MISC-MEM */
+            7'b1110011: instruction_operation = decode_system;      /* SYSTEM */
+            default:    instruction_operation = INVALID;
         endcase
     end        
-    // else if (instruction_int[31:0] == 32'h00000013) instruction_operation = NOP; ???
 
 //////////////////////////////////////////////////////////////////////////////
 //  Decodes the instruction format
