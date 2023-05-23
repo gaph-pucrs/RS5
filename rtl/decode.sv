@@ -63,7 +63,7 @@ module decode
 // Re-Decode isntruction on hazard
 //////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk ) begin
+    always_ff @(posedge clk) begin
         last_instruction <= instruction_int;
         last_hazard      <= hazard_o;
     end
@@ -206,13 +206,13 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        case (opcode)
-            7'b0010011, 7'b1100111, 7'b0000011:     instruction_format = I_TYPE;
-            7'b0100011:                             instruction_format = S_TYPE;
-            7'b1100011:                             instruction_format = B_TYPE;
-            7'b0110111, 7'b0010111:                 instruction_format = U_TYPE;
-            7'b1101111:                             instruction_format = J_TYPE;
-            default:                                instruction_format = R_TYPE;
+        case (opcode[6:2])
+            5'b11001, 5'b00000, 5'b00100:   instruction_format = I_TYPE;    /* JALR, LOAD, OP-IMM */
+            5'b01000:                       instruction_format = S_TYPE;    /* STORE */
+            5'b11000:                       instruction_format = B_TYPE;    /* BRANCH */
+            5'b01101, 5'b00101:             instruction_format = U_TYPE;    /* LUI, AUIPC */
+            5'b11011:                       instruction_format = J_TYPE;    /* JAL */
+            default:                        instruction_format = R_TYPE;
         endcase
     end
 
@@ -223,24 +223,18 @@ module decode
     always_comb begin
         case (instruction_format)
             I_TYPE: begin
-                        immediate[31:11] = (!instruction_int[31]) 
-                                            ? '0 
-                                            : '1;
+                        immediate[31:11] = {21{instruction_int[31]}};
                         immediate[10:0]  = instruction_int[30:20];
                     end
 
             S_TYPE: begin
-                        immediate[31:11] = (!instruction_int[31]) 
-                                            ? '0 
-                                            : '1;
+                        immediate[31:11] = {21{instruction_int[31]}};
                         immediate[10:5]  = instruction_int[30:25];
                         immediate[4:0]   = instruction_int[11:7];
                     end
 
             B_TYPE: begin
-                        immediate[31:12] = (!instruction_int[31]) 
-                                            ? '0 
-                                            : '1;
+                        immediate[31:12] = {20{instruction_int[31]}};
                         immediate[11]    = instruction_int[7];
                         immediate[10:5]  = instruction_int[30:25];
                         immediate[4:1]   = instruction_int[11:8];
@@ -253,9 +247,7 @@ module decode
                     end
 
             J_TYPE: begin
-                        immediate[31:20] = (!instruction_int[31]) 
-                                            ? '0 
-                                            : '1;
+                        immediate[31:20] = {12{instruction_int[31]}};
                         immediate[19:12] = instruction_int[19:12];
                         immediate[11]    = instruction_int[20];
                         immediate[10:5]  = instruction_int[30:25];
@@ -283,7 +275,7 @@ module decode
         if (!hazard_o) begin
             target_register = instruction_int[11:7];
             ///////////////////////////////////
-            if (instruction_operation == SB || instruction_operation == SH || instruction_operation == SW) begin
+            if (opcode[6:2] == 5'b01000) begin
                 is_store = 1;
             end
             else begin
@@ -320,7 +312,7 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        if ((locked_memory[0] || locked_memory[1]) && (executionUnit_e'(instruction_operation[5:3]) == MEMORY_UNIT)) begin
+        if ((locked_memory[0] || locked_memory[1]) && (opcode[6] == 1'b0 && opcode[4:2] == 3'b000)) begin
             hazard_o = 1;
         end
         else if (locked_registers[0] == rs1_o && rs1_o != '0) begin
@@ -339,11 +331,11 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        first_operand_int = (instruction_format == U_TYPE || instruction_format==J_TYPE) 
+        first_operand_int = (instruction_format == U_TYPE || instruction_format == J_TYPE) 
                             ? pc_i  
                             : rs1_data_read_i;
 
-        second_operand_int = (instruction_format == R_TYPE || instruction_format==B_TYPE) 
+        second_operand_int = (instruction_format == R_TYPE || instruction_format == B_TYPE) 
                             ? rs2_data_read_i 
                             : immediate;
 
