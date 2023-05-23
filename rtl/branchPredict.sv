@@ -20,10 +20,13 @@ module branchPredict
     import my_pkg::*;
 (
     input   logic [6:0]     instruction_opcode_i,
+    input   logic           hazard_i,
     input   logic           killed_i,
+    input   logic           jump_i,
     input   logic [31:0]    immediate_b_type_i,
     input   logic [31:0]    immediate_j_type_i,
     input   logic [31:0]    pc_i,
+    input   logic           predicted_r,
 
     output  logic           predict_branch_taken_o,
     output  logic [31:0]    predict_branch_pc_o
@@ -53,7 +56,7 @@ module branchPredict
 
     assign negative_offset          = immediate[31];
     assign conditional_branch_taken = conditional_branch && negative_offset;
-    assign predict_branch_taken_o   = (inconditional_branch || conditional_branch_taken) && !killed_i;
+    assign predict_branch_taken_o   = (inconditional_branch || conditional_branch_taken) && !predicted_r && !killed_i && !jump_i && !hazard_i;
 
     assign predict_branch_pc_o      = pc_i + immediate;
 

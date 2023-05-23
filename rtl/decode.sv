@@ -36,6 +36,7 @@ module decode
     input   logic [31:0]    rs2_data_read_i,        // Data read from register bank
 
 `ifdef BRANCH_PREDICTION
+    input   logic           jump_i,
     input   logic           killed_i,
     output  logic           predicted_branch_o,
     output  logic           predict_branch_taken_o,
@@ -306,10 +307,13 @@ module decode
     
     branchPredict branchPredict1 (
         .instruction_opcode_i(instruction[6:0]),
+        .hazard_i(hazard_o),
         .killed_i(killed_i),
+        .jump_i(jump_i),
         .immediate_b_type_i(imm_b_type),
         .immediate_j_type_i(imm_j_type),
         .pc_i(pc_i),
+        .predicted_r(predicted_branch_o),
 
         .predict_branch_taken_o(predict_branch_taken),
         .predict_branch_pc_o(predict_branch_pc_o)

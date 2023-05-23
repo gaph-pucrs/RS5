@@ -29,6 +29,7 @@ import my_pkg::*;
     input   logic           stall,
 
     input   logic           hazard_i,
+    input   logic           wrong_prediction_i,
     input   logic           jump_i,
     input   logic [31:0]    jump_target_i,
 
@@ -65,12 +66,12 @@ import my_pkg::*;
         else if (exception_raised_i || interrupt_ack_i) begin                               
             pc <= mtvec_i;
         end
-        else if (jump_i) begin
+        else if (jump_i || wrong_prediction_i) begin
             pc <= jump_target_i;
         end
     `ifdef BRANCH_PREDICTION
         else if (predict_branch_taken_i) begin
-            pc <= predict_branch_pc_i + 4;
+            pc <= predict_branch_pc_i;
         end
     `endif
         else if (!hazard_i && !stall) begin
@@ -83,33 +84,17 @@ import my_pkg::*;
 //////////////////////////////////////////////////////////////////////////////
 // Sensitive Outputs 
 //////////////////////////////////////////////////////////////////////////////
-`ifdef BRANCH_PREDICTION
-    always_ff @(posedge clk) begin
-        if (!hazard_i && !stall) begin
-            pc_o <= (predict_branch_taken_i)
-                    ? predict_branch_pc_i
-                    : pc;
-        end
-    end
-`else
     always_ff @(posedge clk) begin
         if (!hazard_i && !stall) begin
             pc_o <= pc;
         end
     end
-`endif
 
 //////////////////////////////////////////////////////////////////////////////
 // Non-Sensitive Outputs 
 //////////////////////////////////////////////////////////////////////////////
-`ifdef BRANCH_PREDICTION
-    assign instruction_address_o =  (predict_branch_taken_i) 
-                                    ? predict_branch_pc_i 
-                                    : pc;
-`else
-    assign instruction_address_o =  pc;
-`endif
 
+    assign instruction_address_o =  pc;
     assign tag_o = current_tag;
 
 //////////////////////////////////////////////////////////////////////////////
@@ -120,8 +105,12 @@ import my_pkg::*;
             current_tag <= 0;
             next_tag <= 0;
         end
-        else if (jump_i || exception_raised_i || machine_return_i || interrupt_ack_i) begin
+        else if (jump_i || exception_raised_i || machine_return_i || interrupt_ack_i || predict_branch_taken_i) begin
             next_tag <= current_tag + 1;
+        end
+        else if (wrong_prediction_i) begin
+            next_tag <= next_tag - 1;
+            current_tag <= current_tag - 1;
         end
         else if (!hazard_i && !stall) begin
             current_tag <= next_tag;

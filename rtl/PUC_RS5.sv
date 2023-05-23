@@ -69,6 +69,7 @@ module PUC_RS5
 `ifdef BRANCH_PREDICTION
     logic           predict_branch_taken;
     logic   [31:0]  predict_branch_pc;
+    logic           wrong_prediction;
 `endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -152,6 +153,7 @@ module PUC_RS5
     `ifdef BRANCH_PREDICTION
         .predict_branch_taken_i(predict_branch_taken),
         .predict_branch_pc_i(predict_branch_pc),
+        .wrong_prediction_i(wrong_prediction),
     `endif
         .instruction_address_o(instruction_address_o), 
         .pc_o(pc_decode), 
@@ -185,6 +187,7 @@ module PUC_RS5
         .rs2_data_read_i(rs2_data_read), 
     `ifdef BRANCH_PREDICTION
         .killed_i(killed),
+        .jump_i(jump),
         .predicted_branch_o(predicted_branch_execute),
         .predict_branch_taken_o(predict_branch_taken),
         .predict_branch_pc_o(predict_branch_pc),
@@ -293,6 +296,7 @@ module PUC_RS5
         .tag_i(tag_retire),
     `ifdef BRANCH_PREDICTION
         .predicted_branch_i(predicted_branch_retire),
+        .wrong_prediction_o(wrong_prediction),
     `endif
         .mem_write_enable_i(mem_write_enable_retire),
         .write_enable_i(we_retire),

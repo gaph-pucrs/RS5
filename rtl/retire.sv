@@ -41,6 +41,7 @@ module retire
 
 `ifdef BRANCH_PREDICTION
     input   logic           predicted_branch_i,
+    output  logic           wrong_prediction_o,
 `endif
 
     output  logic           regbank_write_enable_o,     // Write Enable to Register Bank
@@ -100,7 +101,8 @@ module retire
         if (reset) begin
             curr_tag <= 0;
         end
-        else if (!killed && (jump_o || raise_exception_o || machine_return_o || interrupt_ack_o)) begin
+        else if (!killed && (jump_o || raise_exception_o || machine_return_o || interrupt_ack_o 
+            ||  (predicted_branch_i && jump_i && !killed))) begin
             curr_tag <= curr_tag + 1;
         end
     end
@@ -125,18 +127,21 @@ module retire
     always_comb begin
         // If should have jumped and predicted not jump then jump
         if (jump_i && !predicted_branch_i && !killed) begin
-            jump_o          = 1;
-            jump_target_o   = results_i[1];
+            wrong_prediction_o  = 0;
+            jump_o              = 1;
+            jump_target_o       = results_i[1];
         end
         // If should not have jumped and predicted jump then return
         else if (!jump_i && predicted_branch_i && !killed) begin
-            jump_o          = 1;
-            jump_target_o   = pc_i;
+            wrong_prediction_o  = 1;
+            jump_o              = 0;
+            jump_target_o       = pc_i + 8;
         end
         // Predicted Right or not a Jump
         else begin
-            jump_o          = 0;
-            jump_target_o   = '0;
+            wrong_prediction_o  = 0;
+            jump_o              = 0;
+            jump_target_o       = '0;
         end
     end
 `else
