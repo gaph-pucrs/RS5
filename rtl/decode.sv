@@ -54,7 +54,7 @@ module decode
     logic [4:0] locked_registers[2];
     logic [4:0] target_register;
     logic is_store;
-    logic locked_memory[2];
+    logic locked_memory;
 
     formatType_e instruction_format;
     iType_e instruction_operation;
@@ -296,14 +296,12 @@ module decode
         if (reset) begin
             locked_registers[0] <= '0;
             locked_registers[1] <= '0;
-            locked_memory[0]    <= '0;
-            locked_memory[1]    <= '0;
+            locked_memory       <= '0;
         end 
         else if (!stall) begin
             locked_registers[0] <= target_register;
-            locked_memory[0]    <= is_store;
             locked_registers[1] <= locked_registers[0];
-            locked_memory[1]    <= locked_memory[0];
+            locked_memory       <= is_store;
         end
     end
 
@@ -312,7 +310,7 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        if ((locked_memory[0] || locked_memory[1]) && (opcode[6] == 1'b0 && opcode[4:2] == 3'b000)) begin
+        if (locked_memory == 1'b1 && opcode[6] == 1'b0 && opcode[4:2] == 3'b000) begin
             hazard_o = 1;
         end
         else if (locked_registers[0] == rs1_o && rs1_o != '0) begin
