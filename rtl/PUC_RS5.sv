@@ -66,8 +66,8 @@ module PUC_RS5
     logic   [31:0]  jump_target;
     /* verilator lint_off UNUSEDSIGNAL */
     logic   [31:0]  mem_read_address_int;
-    /* verilator lint_on UNUSEDSIGNAL */
     logic   [31:0]  mem_write_address_int;
+    /* verilator lint_on UNUSEDSIGNAL */
 
 //////////////////////////////////////////////////////////////////////////////
 // Decoder signals
@@ -111,8 +111,8 @@ module PUC_RS5
     logic   [31:0]  pc_retire;
     /* verilator lint_off UNUSEDSIGNAL */
     logic           exception_retire;
-    /* verilator lint_on UNUSEDSIGNAL */
     logic           killed;
+    /* verilator lint_on UNUSEDSIGNAL */
 
 //////////////////////////////////////////////////////////////////////////////
 // CSR Bank signals
