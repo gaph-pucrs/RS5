@@ -51,7 +51,7 @@ module decode
 
     logic [31:0] immediate, first_operand_int, second_operand_int, third_operand_int, instruction_int, last_instruction;
     logic last_hazard;
-    logic [4:0] locked_registers[2];
+    logic [4:0] locked_register;
     logic [4:0] target_register;
     logic is_store;
     logic locked_memory;
@@ -265,7 +265,6 @@ module decode
 
     assign rs1_o = instruction_int[19:15];
     assign rs2_o = instruction_int[24:20];
-    assign rd_o  = locked_registers[1];
 
 //////////////////////////////////////////////////////////////////////////////
 // Target definitions
@@ -294,13 +293,13 @@ module decode
 
     always_ff @(posedge clk) begin
         if (reset) begin
-            locked_registers[0] <= '0;
-            locked_registers[1] <= '0;
+            rd_o                <= '0;
+            locked_register     <= '0;
             locked_memory       <= '0;
         end 
         else if (!stall) begin
-            locked_registers[0] <= target_register;
-            locked_registers[1] <= locked_registers[0];
+            rd_o                <= locked_register;
+            locked_register     <= target_register;
             locked_memory       <= is_store;
         end
     end
@@ -313,10 +312,10 @@ module decode
         if (locked_memory == 1'b1 && opcode[6] == 1'b0 && opcode[4:2] == 3'b000) begin
             hazard_o = 1;
         end
-        else if (locked_registers[0] == rs1_o && rs1_o != '0) begin
+        else if (locked_register == rs1_o && rs1_o != '0) begin
             hazard_o = 1;
         end
-        else if (locked_registers[0] == rs2_o && rs2_o != '0) begin
+        else if (locked_register == rs2_o && rs2_o != '0) begin
             hazard_o = 1;
         end
         else begin
