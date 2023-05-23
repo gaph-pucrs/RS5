@@ -81,80 +81,181 @@ module decode
 // Find out the type of the instruction
 //////////////////////////////////////////////////////////////////////////////
 
-    always_comb begin 
-        if (instruction_int[6:0] == 7'b0110111) instruction_operation = LUI;
-        else if (instruction_int[6:0] == 7'b0010111) instruction_operation = ADD;    //AUIPC
-        
-        else if (instruction_int[6:0] == 7'b1101111) instruction_operation = JAL;
-        else if (instruction_int[14:12] == 3'b000 && instruction_int[6:0] == 7'b1100111) instruction_operation = JALR;
+    iType_e decode_imm;
+    iType_e decode_op;
+    iType_e decode_branch;
+    iType_e decode_load;
+    iType_e decode_store;
+    iType_e decode_system;
+    iType_e decode_priv;
 
-        else if (instruction_int[14:12] == 3'b000 && instruction_int[6:0] == 7'b1100011) instruction_operation = BEQ;
-        else if (instruction_int[14:12] == 3'b001 && instruction_int[6:0] == 7'b1100011) instruction_operation = BNE;
-        else if (instruction_int[14:12] == 3'b100 && instruction_int[6:0] == 7'b1100011) instruction_operation = BLT;
-        else if (instruction_int[14:12] == 3'b101 && instruction_int[6:0] == 7'b1100011) instruction_operation = BGE;
-        else if (instruction_int[14:12] == 3'b110 && instruction_int[6:0] == 7'b1100011) instruction_operation = BLTU;
-        else if (instruction_int[14:12] == 3'b111 && instruction_int[6:0] == 7'b1100011) instruction_operation = BGEU;
+    logic [2:0] funct3;
+    logic [6:0] funct7;
+    logic [6:0] opcode;
 
-        else if (instruction_int[14:12] == 3'b000 && instruction_int[6:0] == 7'b0000011) instruction_operation = LB;
-        else if (instruction_int[14:12] == 3'b001 && instruction_int[6:0] == 7'b0000011) instruction_operation = LH;
-        else if (instruction_int[14:12] == 3'b010 && instruction_int[6:0] == 7'b0000011) instruction_operation = LW;
-        else if (instruction_int[14:12] == 3'b100 && instruction_int[6:0] == 7'b0000011) instruction_operation = LBU;
-        else if (instruction_int[14:12] == 3'b101 && instruction_int[6:0] == 7'b0000011) instruction_operation = LHU;
+    assign opcode = instruction_int[6:0];
+    assign funct3 = instruction_int[14:12];
+    assign funct7 = instruction_int[31:25];
 
-        else if (instruction_int[14:12] == 3'b000 && instruction_int[6:0] == 7'b0100011) instruction_operation = SB;
-        else if (instruction_int[14:12] == 3'b001 && instruction_int[6:0] == 7'b0100011) instruction_operation = SH;
-        else if (instruction_int[14:12] == 3'b010 && instruction_int[6:0] == 7'b0100011) instruction_operation = SW;
-        
-        else if (instruction_int[14:12] == 3'b000 && instruction_int[6:0] == 7'b0010011) instruction_operation = ADD;     // ADDI
-        else if (instruction_int[14:12] == 3'b010 && instruction_int[6:0] == 7'b0010011) instruction_operation = SLT;     // SLTI
-        else if (instruction_int[14:12] == 3'b011 && instruction_int[6:0] == 7'b0010011) instruction_operation = SLTU;    // SLTIU
-        else if (instruction_int[14:12] == 3'b100 && instruction_int[6:0] == 7'b0010011) instruction_operation = XOR;     // XORI
-        else if (instruction_int[14:12] == 3'b110 && instruction_int[6:0] == 7'b0010011) instruction_operation = OR;      // ORI
-        else if (instruction_int[14:12] == 3'b111 && instruction_int[6:0] == 7'b0010011) instruction_operation = AND;     // ANDI
-
-        else if (instruction_int[31:25] == 7'b0000000 && instruction_int[14:12] == 3'b001 && instruction_int[6:0] == 7'b0010011) instruction_operation = SLL;    // SLLI
-        else if (instruction_int[31:25] == 7'b0000000 && instruction_int[14:12] == 3'b101 && instruction_int[6:0] == 7'b0010011) instruction_operation = SRL;    // SRLI
-        else if (instruction_int[31:25] == 7'b0100000 && instruction_int[14:12] == 3'b101 && instruction_int[6:0] == 7'b0010011) instruction_operation = SRA;    // SRAI
-
-        else if (instruction_int[31:25] == 7'b0000000 && instruction_int[14:12] == 3'b000 && instruction_int[6:0] == 7'b0110011) instruction_operation = ADD;
-        else if (instruction_int[31:25] == 7'b0100000 && instruction_int[14:12] == 3'b000 && instruction_int[6:0] == 7'b0110011) instruction_operation = SUB;
-        else if (instruction_int[31:25] == 7'b0000000 && instruction_int[14:12] == 3'b001 && instruction_int[6:0] == 7'b0110011) instruction_operation = SLL;
-        else if (instruction_int[31:25] == 7'b0000000 && instruction_int[14:12] == 3'b010 && instruction_int[6:0] == 7'b0110011) instruction_operation = SLT;
-        else if (instruction_int[31:25] == 7'b0000000 && instruction_int[14:12] == 3'b011 && instruction_int[6:0] == 7'b0110011) instruction_operation = SLTU;
-        else if (instruction_int[31:25] == 7'b0000000 && instruction_int[14:12] == 3'b100 && instruction_int[6:0] == 7'b0110011) instruction_operation = XOR;
-        else if (instruction_int[31:25] == 7'b0000000 && instruction_int[14:12] == 3'b101 && instruction_int[6:0] == 7'b0110011) instruction_operation = SRL;
-        else if (instruction_int[31:25] == 7'b0100000 && instruction_int[14:12] == 3'b101 && instruction_int[6:0] == 7'b0110011) instruction_operation = SRA;
-        else if (instruction_int[31:25] == 7'b0000000 && instruction_int[14:12] == 3'b110 && instruction_int[6:0] == 7'b0110011) instruction_operation = OR;
-        else if (instruction_int[31:25] == 7'b0000000 && instruction_int[14:12] == 3'b111 && instruction_int[6:0] == 7'b0110011) instruction_operation = AND;
-
-        else if (instruction_int[14:12] == 3'b000 && instruction_int[6:0] == 7'b0001111) instruction_operation = NOP;          // FENCE
-
-        else if (instruction_int[14:12] == 3'b001 && instruction_int[6:0] == 7'b1110011) instruction_operation = CSRRW;
-        else if (instruction_int[14:12] == 3'b010 && instruction_int[6:0] == 7'b1110011) instruction_operation = CSRRS;
-        else if (instruction_int[14:12] == 3'b011 && instruction_int[6:0] == 7'b1110011) instruction_operation = CSRRC;
-        else if (instruction_int[14:12] == 3'b101 && instruction_int[6:0] == 7'b1110011) instruction_operation = CSRRWI;
-        else if (instruction_int[14:12] == 3'b110 && instruction_int[6:0] == 7'b1110011) instruction_operation = CSRRSI;
-        else if (instruction_int[14:12] == 3'b111 && instruction_int[6:0] == 7'b1110011) instruction_operation = CSRRCI;
-
-        else if (instruction_int[31:0] == 32'h00000073) instruction_operation = ECALL;
-        else if (instruction_int[31:0] == 32'h00100073) instruction_operation = EBREAK;
-
-        else if (instruction_int[31:0] == 32'h10200073) instruction_operation = SRET;
-        else if (instruction_int[31:0] == 32'h30200073) instruction_operation = MRET;
-
-        else if (instruction_int[31:0] == 32'h10500073) instruction_operation = WFI;
-
-        else if (instruction_int[31:0] == 32'h00000013) instruction_operation = NOP;
-
-        else instruction_operation = INVALID;
+    always_comb begin
+        case (funct3_imm_e'(funct3))
+            F3_ADDI:            decode_imm = ADD;
+            F3_SLTI:            decode_imm = SLT;
+            F3_SLTIU:           decode_imm = SLTU;
+            F3_XORI:            decode_imm = XOR;
+            F3_ORI:             decode_imm = OR;
+            F3_ANDI:            decode_imm = AND;
+            F3_SLLI:        begin
+                case (funct7_sl_e'(funct7))
+                    F7_SLLI:    decode_imm = SLL;
+                    default:    decode_imm = INVALID;
+                endcase
+            end
+            F3_SRLI_SRAI:   begin
+                case (funct7_sr_e'(funct7))
+                    F7_SRAI:    decode_imm = SRA;
+                    F7_SRLI:    decode_imm = SRL;
+                    default:    decode_imm = INVALID;
+                endcase
+            end
+            default:            decode_imm = INVALID;
+        endcase
     end
+
+    always_comb begin
+        case (funct7_sub_sra_e'(funct7))
+            '0:         begin
+                case (funct3_op_e'(funct3))
+                    F3_ADD:     decode_op = ADD;
+                    F3_SLL:     decode_op = SLL;
+                    F3_SLT:     decode_op = SLT;
+                    F3_SLTU:    decode_op = SLTU;
+                    F3_XOR:     decode_op = XOR;
+                    F3_SR:      decode_op = SRL;
+                    F3_OR:      decode_op = OR;
+                    F3_AND:     decode_op = AND;
+                    default:    decode_op = INVALID;
+                endcase
+            end
+            F7_SUB_SRA: begin
+                case (funct3_op_e'(funct3))
+                    F3_ADD:     decode_op = SUB;
+                    F3_SR:      decode_op = SRA;
+                    default:    decode_op = INVALID;
+                endcase
+            end
+            default:            decode_op = INVALID;
+        endcase
+    end
+
+    always_comb begin
+        case (funct3_branch_e'(funct3))
+            F3_BEQ:             decode_branch = BEQ;
+            F3_BNE:             decode_branch = BNE;
+            F3_BLT:             decode_branch = BLT;
+            F3_BGE:             decode_branch = BGE;
+            F3_BLTU:            decode_branch = BLTU;
+            F3_BGEU:            decode_branch = BGEU;
+            default:            decode_branch = INVALID;
+        endcase
+    end
+
+    always_comb begin
+        case (funct3_load_e'(funct3))
+            F3_LB:              decode_load = LB;
+            F3_LH:              decode_load = LH;
+            F3_LW:              decode_load = LW;
+            F3_LBU:             decode_load = LBU;
+            F3_LHU:             decode_load = LHU;
+            default:            decode_load = INVALID;
+        endcase
+    end
+
+    always_comb begin
+        case (funct3_store_e'(funct3))
+            F3_SB:              decode_store = SB;
+            F3_SH:              decode_store = SH;
+            F3_SW:              decode_store = SW;
+            default:            decode_store = INVALID;
+        endcase
+    end
+
+    always_comb begin
+        if (instruction_int[11:7] == '0 && rs1_o == '0) begin
+            case (funct7_priv_e'(funct7))
+                F7_ECALL_EBREAK:    begin
+                    case (rs2Op_e'(rs2_o))
+                        RS2_ECALL:  decode_priv = ECALL;
+                        RS2_EBREAK: decode_priv = EBREAK;
+                        default:    decode_priv = INVALID;
+                    endcase
+                end
+                F7_WFI:        begin
+                    case (rs2Op_e'(rs2_o))
+                        RS2_WFI:    decode_priv = WFI;
+                        default:    decode_priv = INVALID;
+                    endcase
+                end
+                F7_MRET:
+                    case (rs2Op_e'(rs2_o))
+                        RS2_RET:    decode_priv = MRET;
+                        default:    decode_priv = INVALID;
+                    endcase
+                default:            decode_priv = INVALID;
+            endcase
+        end
+        else begin
+                                    decode_priv = INVALID;
+        end
+    end
+
+    always_comb begin
+        case (funct3_system_e'(funct3))
+            F3_CSRRW:               decode_system = CSRRW;
+            F3_CSRRS:               decode_system = CSRRS;
+            F3_CSRRC:               decode_system = CSRRC;
+            F3_CSRRWI:              decode_system = CSRRWI;
+            F3_CSRRSI:              decode_system = CSRRSI;
+            F3_CSRRCI:              decode_system = CSRRCI;
+            F3_PRIV:                decode_system = decode_priv;
+            default:                decode_system = INVALID;
+        endcase
+    end
+
+    always_comb begin 
+        case (opcodes_e'(opcode))
+            OP_LUI:                 instruction_operation = LUI;
+            OP_AUIPC:               instruction_operation = ADD;
+            OP_JAL:                 instruction_operation = JAL;
+            OP_IMM:                 instruction_operation = decode_imm;
+            OP_OP:                  instruction_operation = decode_op;
+            OP_BRANCH:              instruction_operation = decode_branch;
+            OP_LOAD:                instruction_operation = decode_load;
+            OP_STORE:               instruction_operation = decode_store;
+            OP_SYSTEM:              instruction_operation = decode_system;
+            OP_MISC_MEM:    begin   
+                case (funct3_misc_mem_e'(funct3))
+                    F3_FENCE:       instruction_operation = NOP;
+                    default:        instruction_operation = INVALID;
+                endcase
+            end
+            OP_JALR:        begin
+                case (funct3_jalr_e'(funct3))
+                    F3_JALR:        instruction_operation = JALR;
+                    default:        instruction_operation = INVALID;
+                endcase
+            end
+            default:                instruction_operation = INVALID;
+        endcase
+    end        
+    // else if (instruction_int[31:0] == 32'h00000013) instruction_operation = NOP; ???
 
 //////////////////////////////////////////////////////////////////////////////
 //  Decodes the instruction format
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        case (instruction_int[6:0])
+        case (opcode)
             7'b0010011, 7'b1100111, 7'b0000011:     instruction_format = I_TYPE;
             7'b0100011:                             instruction_format = S_TYPE;
             7'b1100011:                             instruction_format = B_TYPE;
