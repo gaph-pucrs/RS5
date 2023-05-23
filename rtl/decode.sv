@@ -312,10 +312,10 @@ module decode
         if (locked_memory == 1'b1 && opcode[6] == 1'b0 && opcode[4:2] == 3'b000) begin
             hazard_o = 1;
         end
-        else if (locked_register == rs1_o && rs1_o != '0) begin
+        else if (locked_register == rs1_o && rs1_o != '0 && !(instruction_format inside {U_TYPE, J_TYPE})) begin
             hazard_o = 1;
         end
-        else if (locked_register == rs2_o && rs2_o != '0) begin
+        else if (locked_register == rs2_o && rs2_o != '0 && !(instruction_format inside {I_TYPE, U_TYPE, J_TYPE})) begin
             hazard_o = 1;
         end
         else begin
