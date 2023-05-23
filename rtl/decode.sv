@@ -331,17 +331,28 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        first_operand_int = (instruction_format == U_TYPE || instruction_format == J_TYPE) 
-                            ? pc_i  
-                            : rs1_data_read_i;
-
-        second_operand_int = (instruction_format == R_TYPE || instruction_format == B_TYPE) 
-                            ? rs2_data_read_i 
-                            : immediate;
-
-        third_operand_int  = (instruction_format == S_TYPE) 
-                            ? rs2_data_read_i 
-                            : immediate;
+        case (instruction_format)
+            U_TYPE, J_TYPE: begin
+                                first_operand_int   = pc_i;
+                                second_operand_int  = immediate;
+                                third_operand_int   = immediate;
+                            end
+            R_TYPE, B_TYPE: begin
+                                first_operand_int   = rs1_data_read_i;
+                                second_operand_int    = rs2_data_read_i;
+                                third_operand_int   = immediate;
+                            end
+            S_TYPE:         begin
+                                first_operand_int   = rs1_data_read_i;
+                                second_operand_int  = immediate;
+                                third_operand_int   = rs2_data_read_i;
+                            end
+            default:        begin
+                                first_operand_int   = rs1_data_read_i;
+                                second_operand_int  = immediate;
+                                third_operand_int   = immediate;
+                            end
+        endcase
     end
 
 //////////////////////////////////////////////////////////////////////////////

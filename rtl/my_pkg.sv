@@ -19,8 +19,13 @@
 
 package my_pkg;
 
-    typedef enum  logic[2:0] {
-        R_TYPE, I_TYPE, S_TYPE, B_TYPE, U_TYPE, J_TYPE
+    typedef enum  logic[5:0] {
+        R_TYPE = 6'b000001, 
+        I_TYPE = 6'b000010, 
+        S_TYPE = 6'b000100, 
+        B_TYPE = 6'b001000, 
+        U_TYPE = 6'b010000, 
+        J_TYPE = 6'b100000
     } formatType_e;
 
     typedef enum  logic[2:0] {
