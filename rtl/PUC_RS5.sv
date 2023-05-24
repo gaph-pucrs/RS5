@@ -71,6 +71,11 @@ module PUC_RS5
 
     logic           predict_branch_taken;
     logic   [31:0]  predict_branch_pc;
+    logic   [31:0]  predict_branch_pc_next;
+
+    logic           predict_jump_taken;
+    logic   [31:0]  predict_jump_pc;
+    logic   [31:0]  predict_jump_pc_next;
 
 //////////////////////////////////////////////////////////////////////////////
 // Decoder signals
@@ -146,6 +151,10 @@ module PUC_RS5
         .jump_target_i(jump_target),
         .predict_branch_taken_i(predict_branch_taken),
         .predict_branch_pc_i(predict_branch_pc),
+        .predict_branch_pc_next_i(predict_branch_pc_next),
+        .predict_jump_taken_i(predict_jump_taken),
+        .predict_jump_pc_i(predict_jump_pc),
+        .predict_jump_pc_next_i(predict_jump_pc_next),
         .instruction_address_o(instruction_address_o), 
         .pc_o(pc_decode), 
         .tag_o(tag_decode),
@@ -192,6 +201,12 @@ module PUC_RS5
         .predicted_branch_o(predicted_branch_execute),
         .predict_branch_taken_o(predict_branch_taken),
         .predict_branch_pc_o(predict_branch_pc),
+        .predict_branch_pc_next_o(predict_branch_pc_next),
+
+        .predict_jump_taken_o(predict_jump_taken),
+        .predict_jump_pc_o(predict_jump_pc),
+        .predict_jump_pc_next_o(predict_jump_pc_next),
+
         .killed_i(killed)
 
     );

@@ -31,6 +31,11 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
 
     input   logic           predict_branch_taken_i,
     input   logic [31:0]    predict_branch_pc_i,
+    input   logic [31:0]    predict_branch_pc_next_i,
+    input   logic           predict_jump_taken_i,
+    input   logic [31:0]    predict_jump_pc_i,
+    input   logic [31:0]    predict_jump_pc_next_i,
+
     
     output  logic [31:0]    instruction_address_o,
     output  logic [31:0]    pc_o,
@@ -55,12 +60,13 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
             pc <= start_address;
         end
         else begin
-            unique case ({machine_return_i, (exception_raised_i | interrupt_ack_i), jump_i, predict_branch_taken_i, ~(hazard_i | stall)})
-                5'b10000:   pc <= mepc_i;
-                5'b01000:   pc <= mtvec_i;
-                5'b00100:   pc <= jump_target_i;
-                5'b00010:   pc <= predict_branch_pc_i + 4;
-                5'b00001:   pc <= pc_plus4;
+            unique case ({machine_return_i, (exception_raised_i | interrupt_ack_i), jump_i, predict_branch_taken_i, predict_jump_taken_i, ~(hazard_i | stall)})
+                6'b100000:   pc <= mepc_i;
+                6'b010000:   pc <= mtvec_i;
+                6'b001000:   pc <= jump_target_i;
+                6'b000100:   pc <= predict_branch_pc_next_i;
+                6'b000010:   pc <= predict_jump_pc_next_i;
+                6'b000001:   pc <= pc_plus4;
             endcase
         end
     end
@@ -73,19 +79,25 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
 
     always_ff @(posedge clk) begin
         if (!hazard_i && !stall) begin
-            pc_o <= (predict_branch_taken_i)
-                    ? predict_branch_pc_i
-                    : pc;
+            case({predict_branch_taken_i, predict_jump_taken_i})
+                2'b10:      pc_o <= predict_branch_pc_i;
+                2'b01:      pc_o <= predict_jump_pc_i;
+                default:    pc_o <= pc;
+            endcase
         end
     end
 
 //////////////////////////////////////////////////////////////////////////////
 // Non-Sensitive Outputs 
 //////////////////////////////////////////////////////////////////////////////
+    always_comb begin
+        case({predict_branch_taken_i, predict_jump_taken_i})
+            2'b10:      instruction_address_o <= predict_branch_pc_i;
+            2'b01:      instruction_address_o <= predict_jump_pc_i;
+            default:    instruction_address_o <= pc;
+        endcase
+    end
 
-    assign instruction_address_o =  (predict_branch_taken_i) 
-                                    ? predict_branch_pc_i 
-                                    : pc;
     assign tag_o = current_tag;
 
 //////////////////////////////////////////////////////////////////////////////

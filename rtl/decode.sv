@@ -39,6 +39,10 @@ module decode
     output  logic           predicted_branch_o,
     output  logic           predict_branch_taken_o,
     output  logic [31:0]    predict_branch_pc_o,
+    output  logic [31:0]    predict_branch_pc_next_o,
+    output  logic           predict_jump_taken_o,
+    output  logic [31:0]    predict_jump_pc_o,
+    output  logic [31:0]    predict_jump_pc_next_o,
 
     output  logic [4:0]     rs1_o,                  // Address of the 1st register, conected directly in the register bank
     output  logic [4:0]     rs2_o,                  // Address of the 2nd register, conected directly in the register bank
@@ -343,9 +347,13 @@ module decode
  * branches it will predict taken if the PC offset is negative.
  */
 
-    assign predict_branch_taken_o   = (opcode == 5'b11011) ? 1'b1 : 1'b0;
+    assign predict_branch_taken_o   = (opcode[6:2] == 5'b11000 && imm_b[31] && !killed_i) ? 1'b1 : 1'b0;
+    assign predict_jump_taken_o     = (opcode[6:2] == 5'b11011 && !killed_i) ? 1'b1 : 1'b0;
 
-    assign predict_branch_pc_o      = pc_i + imm_j;
+    assign predict_branch_pc_o      = pc_i + imm_b;
+    assign predict_branch_pc_next_o = pc_i + imm_b + 4;
+    assign predict_jump_pc_o        = pc_i + imm_j;
+    assign predict_jump_pc_next_o   = pc_i + imm_j + 4;
 
 //////////////////////////////////////////////////////////////////////////////
 // Control of the exits based on format
@@ -412,7 +420,7 @@ module decode
             instruction_operation_o <= instruction_operation;
             tag_o                   <= tag_i;
             exception_o             <= (instruction_operation==INVALID) ? 1 : 0;
-            predicted_branch_o      <= predict_branch_taken_o;
+            predicted_branch_o      <= predict_branch_taken_o | predict_jump_taken_o;
         end
     end
 
