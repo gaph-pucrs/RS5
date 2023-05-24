@@ -273,20 +273,13 @@ module decode
     always_comb begin
         if (!hazard_o) begin
             target_register = instruction_int[11:7];
-            ///////////////////////////////////
-            if (opcode[6:2] == 5'b01000) begin
-                is_store = 1;
-            end
-            else begin
-                is_store = 0;
-            end
+            is_store = (opcode[6:2] == 5'b01000) ? 1'b1 : 1'b0;
         end
         else begin
             target_register = '0;
-            is_store        = 0;
+            is_store        = 1'b0;
         end
     end
-
 //////////////////////////////////////////////////////////////////////////////
 // Registe Lock Queue (RLQ)
 //////////////////////////////////////////////////////////////////////////////
@@ -308,20 +301,49 @@ module decode
 // Hazard signal generation
 //////////////////////////////////////////////////////////////////////////////
 
+    logic use_mem;
+    logic use_rs1;
+    logic use_rs2;
+
+    assign use_mem = ({opcode[6], opcode[4:2]} == '0) ? 1'b1 : 1'b0;
+
     always_comb begin
-        if (locked_memory == 1'b1 && opcode[6] == 1'b0 && opcode[4:2] == 3'b000) begin
-            hazard_o = 1;
-        end
-        else if (locked_register == rs1_o && rs1_o != '0 && !(instruction_format inside {U_TYPE, J_TYPE})) begin
-            hazard_o = 1;
-        end
-        else if (locked_register == rs2_o && rs2_o != '0 && !(instruction_format inside {I_TYPE, U_TYPE, J_TYPE})) begin
-            hazard_o = 1;
-        end
-        else begin
-            hazard_o = 0;
-        end
+        case (instruction_format)
+            R_TYPE, B_TYPE, S_TYPE: begin
+            /**
+             * This does NOT account for SYSTEM (R_TYPE) CSRR_I instructions
+             * where funct3[2] is 1, and therefore WILL generate a hazard
+             * but this is rare to occur
+             */
+                                        use_rs1         = 1'b1;
+                                        use_rs2         = 1'b1;
+                                    end
+            I_TYPE:                 begin
+                                        use_rs1         = 1'b1;
+                                        use_rs2         = 1'b0;
+                                    end
+            default:                begin /* U_TYPE and J_TYPE */
+                                        use_rs1         = 1'b0;
+                                        use_rs2         = 1'b0;
+                                    end
+        endcase
     end
+
+    logic locked_rs1;
+    logic locked_rs2;
+
+    assign locked_rs1 = (locked_register == rs1_o && rs1_o != '0) ? 1'b1 : 1'b0;
+    assign locked_rs2 = (locked_register == rs2_o && rs2_o != '0) ? 1'b1 : 1'b0;
+
+    logic hazard_mem;
+    logic hazard_rs1;
+    logic hazard_rs2;
+
+    assign hazard_mem = locked_memory & use_mem;
+    assign hazard_rs1 = locked_rs1    & use_rs1;
+    assign hazard_rs2 = locked_rs2    & use_rs2;
+
+    assign hazard_o   = hazard_mem | hazard_rs1 | hazard_rs2;
 
 //////////////////////////////////////////////////////////////////////////////
 // Control of the exits based on format
@@ -336,7 +358,7 @@ module decode
                             end
             R_TYPE, B_TYPE: begin
                                 first_operand_int   = rs1_data_read_i;
-                                second_operand_int    = rs2_data_read_i;
+                                second_operand_int  = rs2_data_read_i;
                                 third_operand_int   = immediate;
                             end
             S_TYPE:         begin
@@ -358,44 +380,34 @@ module decode
 
     always_ff @(posedge clk) begin
         if (reset) begin
-            first_operand_o  <= '0;
-            second_operand_o <= '0;
-            third_operand_o  <= '0;
-            pc_o             <= '0;
-            instruction_o    <= '0;
+            first_operand_o         <= '0;
+            second_operand_o        <= '0;
+            third_operand_o         <= '0;
+            pc_o                    <= '0;
+            instruction_o           <= '0;
             instruction_operation_o <= NOP;
-            tag_o            <= '0;
-            exception_o      <= 0;
-        end 
-        else if (stall) begin
-            first_operand_o   <= first_operand_o;
-            second_operand_o  <= second_operand_o;
-            third_operand_o   <= third_operand_o;
-            pc_o              <= pc_o;
-            instruction_o     <= instruction_o;
-            instruction_operation_o <= instruction_operation_o;
-            tag_o             <= tag_o;
-            exception_o       <= exception_o;
+            tag_o                   <= '0;
+            exception_o             <= 1'b0;
         end 
         else if (hazard_o) begin
-            first_operand_o  <= '0;
-            second_operand_o <= '0;
-            third_operand_o  <= '0;
-            pc_o             <= '0;
-            instruction_o    <= '0;
+            first_operand_o         <= '0;
+            second_operand_o        <= '0;
+            third_operand_o         <= '0;
+            pc_o                    <= '0;
+            instruction_o           <= '0;
             instruction_operation_o <= NOP;
-            tag_o            <= tag_i;
-            exception_o      <= 0;
+            tag_o                   <= tag_i;
+            exception_o             <= 0;
         end 
         else if (!stall) begin
-            first_operand_o  <= first_operand_int;
-            second_operand_o <= second_operand_int;
-            third_operand_o  <= third_operand_int;
-            pc_o             <= pc_i;
-            instruction_o    <= instruction_int;
+            first_operand_o         <= first_operand_int;
+            second_operand_o        <= second_operand_int;
+            third_operand_o         <= third_operand_int;
+            pc_o                    <= pc_i;
+            instruction_o           <= instruction_int;
             instruction_operation_o <= instruction_operation;
-            tag_o            <= tag_i;
-            exception_o      <= (instruction_operation==INVALID) ? 1 : 0;
+            tag_o                   <= tag_i;
+            exception_o             <= (instruction_operation==INVALID) ? 1 : 0;
         end
     end
 
