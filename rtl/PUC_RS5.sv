@@ -34,7 +34,7 @@
 `include "../rtl/CSRBank.sv"
 */
 
-// `define PROTO 1
+`define PROTO 1
 // `define DEBUG 1
 
 
@@ -69,6 +69,9 @@ module PUC_RS5
     logic   [31:0]  mem_write_address_int;
     /* verilator lint_on UNUSEDSIGNAL */
 
+    logic           predict_branch_taken;
+    logic   [31:0]  predict_branch_pc;
+
 //////////////////////////////////////////////////////////////////////////////
 // Decoder signals
 //////////////////////////////////////////////////////////////////////////////
@@ -96,6 +99,7 @@ module PUC_RS5
     logic   [31:0]  pc_execute;
     logic   [2:0]   tag_execute;
     logic           exception_execute;
+    logic           predicted_branch_execute;
 
 //////////////////////////////////////////////////////////////////////////////
 // Retire signals
@@ -113,6 +117,7 @@ module PUC_RS5
     logic           exception_retire;
     logic           killed;
     /* verilator lint_on UNUSEDSIGNAL */
+    logic           predicted_branch_retire;
 
 //////////////////////////////////////////////////////////////////////////////
 // CSR Bank signals
@@ -139,6 +144,8 @@ module PUC_RS5
         .hazard_i(hazard), 
         .jump_i(jump), 
         .jump_target_i(jump_target),
+        .predict_branch_taken_i(predict_branch_taken),
+        .predict_branch_pc_i(predict_branch_pc),
         .instruction_address_o(instruction_address_o), 
         .pc_o(pc_decode), 
         .tag_o(tag_decode),
@@ -180,7 +187,13 @@ module PUC_RS5
         .tag_o(tag_execute), 
         .instruction_operation_o(instruction_operation_execute), 
         .hazard_o(hazard), 
-        .exception_o(exception_execute)
+        .exception_o(exception_execute),
+
+        .predicted_branch_o(predicted_branch_execute),
+        .predict_branch_taken_o(predict_branch_taken),
+        .predict_branch_pc_o(predict_branch_pc),
+        .killed_i(killed)
+
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -254,7 +267,10 @@ module PUC_RS5
         .csr_data_o(csr_data_to_write), 
         .csr_data_read_i(csr_data_read),
         .exception_i(exception_execute),
-        .exception_o(exception_retire)
+        .exception_o(exception_retire),
+
+        .predicted_branch_i(predicted_branch_execute),
+        .predicted_branch_o(predicted_branch_retire)
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -286,7 +302,9 @@ module PUC_RS5
         .raise_exception_o(RAISE_EXCEPTION), 
         .machine_return_o(MACHINE_RETURN),
         .interrupt_ack_o(interrupt_ack_o),
-        .interrupt_pending_i(Interrupt_pending)
+        .interrupt_pending_i(Interrupt_pending),
+
+        .predicted_branch_i(predicted_branch_retire)
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -36,6 +36,9 @@ module execute
     input   iType_e        instruction_operation_i,
     input   logic [2:0]    tag_i,              // Instruction tag
 
+    input   logic          predicted_branch_i,
+    output  logic          predicted_branch_o,
+
     output  iType_e        instruction_operation_o,
     output  logic [31:0]   instruction_o,
     output  logic [31:0]   pc_o,
@@ -224,6 +227,7 @@ module execute
             instruction_o           <= instruction_i;
             pc_o                    <= pc_i;
             exception_o             <= exception_i | csr_exception;
+            predicted_branch_o      <= predicted_branch_i;
         end
     end
 

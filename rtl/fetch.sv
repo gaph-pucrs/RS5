@@ -28,6 +28,9 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
     input   logic           hazard_i,
     input   logic           jump_i,
     input   logic [31:0]    jump_target_i,
+
+    input   logic           predict_branch_taken_i,
+    input   logic [31:0]    predict_branch_pc_i,
     
     output  logic [31:0]    instruction_address_o,
     output  logic [31:0]    pc_o,
@@ -51,17 +54,14 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
         if (reset) begin
             pc <= start_address;
         end
-        else if (machine_return_i) begin                              
-            pc <= mepc_i;
-        end
-        else if (exception_raised_i || interrupt_ack_i) begin                               
-            pc <= mtvec_i;
-        end
-        else if (jump_i) begin
-            pc <= jump_target_i;
-        end
-        else if (!hazard_i && !stall) begin
-            pc <= pc_plus4;
+        else begin
+            unique case ({machine_return_i, (exception_raised_i | interrupt_ack_i), jump_i, predict_branch_taken_i, ~(hazard_i | stall)})
+                5'b10000:   pc <= mepc_i;
+                5'b01000:   pc <= mtvec_i;
+                5'b00100:   pc <= jump_target_i;
+                5'b00010:   pc <= predict_branch_pc_i + 4;
+                5'b00001:   pc <= pc_plus4;
+            endcase
         end
     end
 
@@ -73,7 +73,9 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
 
     always_ff @(posedge clk) begin
         if (!hazard_i && !stall) begin
-            pc_o <= pc;
+            pc_o <= (predict_branch_taken_i)
+                    ? predict_branch_pc_i
+                    : pc;
         end
     end
 
@@ -81,7 +83,9 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
 // Non-Sensitive Outputs 
 //////////////////////////////////////////////////////////////////////////////
 
-    assign instruction_address_o = pc;
+    assign instruction_address_o =  (predict_branch_taken_i) 
+                                    ? predict_branch_pc_i 
+                                    : pc;
     assign tag_o = current_tag;
 
 //////////////////////////////////////////////////////////////////////////////
