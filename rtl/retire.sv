@@ -82,15 +82,21 @@ module retire
 //////////////////////////////////////////////////////////////////////////////
 // Killed signal generation
 //////////////////////////////////////////////////////////////////////////////
+    logic jump_r;
+    
     assign killed_o = killed;
     
     always_comb begin
-        if (curr_tag != tag_i) begin
+        if (curr_tag != tag_i || jump_r) begin
             killed = 1;
         end
         else begin
             killed = 0;
         end
+    end
+
+    always_ff @(posedge clk) begin
+        jump_r <= jump_o;
     end
 
 //////////////////////////////////////////////////////////////////////////////

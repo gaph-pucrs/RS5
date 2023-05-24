@@ -38,19 +38,19 @@ module branchPredict
 
     always_comb begin
         if (instruction_opcode_i == 7'h6f) begin
-            immediate               <= immediate_j_type_i;
-            inconditional_branch    <= 1'b1;
-            conditional_branch      <= 1'b0;
+            immediate               = immediate_j_type_i;
+            inconditional_branch    = 1'b1;
+            conditional_branch      = 1'b0;
         end
         else if (instruction_opcode_i == 7'h63) begin
-            immediate               <= immediate_b_type_i;
-            inconditional_branch    <= 1'b0;
-            conditional_branch      <= 1'b1;
+            immediate               = immediate_b_type_i;
+            inconditional_branch    = 1'b0;
+            conditional_branch      = 1'b1;
         end
         else begin
-            immediate               <= '0;
-            inconditional_branch    <= 1'b0;
-            conditional_branch      <= 1'b0;
+            immediate               = '0;
+            inconditional_branch    = 1'b0;
+            conditional_branch      = 1'b0;
         end
     end
 
