@@ -58,7 +58,7 @@ module decode
     output  iType_e         instruction_operation_o,// Instruction operation
     output  logic           hazard_o,               // Bubble issue indicator (0 active)
     output  logic           exception_o
-    );
+);
 
     logic [31:0] immediate, first_operand_int, second_operand_int, third_operand_int, instruction_int, last_instruction;
     logic last_hazard;
@@ -109,7 +109,7 @@ module decode
     assign funct7 = instruction_int[31:25];
 
     always_comb begin
-        case (funct3)
+        unique case (funct3)
             3'b000:     decode_branch = BEQ;
             3'b001:     decode_branch = BNE;
             3'b100:     decode_branch = BLT;
@@ -121,7 +121,7 @@ module decode
     end
 
     always_comb begin
-        case (funct3)
+        unique case (funct3)
             3'b000:     decode_load = LB;
             3'b001:     decode_load = LH;
             3'b010:     decode_load = LW;
@@ -132,7 +132,7 @@ module decode
     end
 
     always_comb begin
-        case (funct3)
+        unique case (funct3)
             3'b000:     decode_store = SB;
             3'b001:     decode_store = SH;
             3'b010:     decode_store = SW;
@@ -141,7 +141,7 @@ module decode
     end
 
     always_comb begin
-        case ({funct7, funct3}) inside
+        unique case ({funct7, funct3}) inside
             10'b???????000:     decode_op_imm = ADD;    /* ADDI */
             10'b0000000001:     decode_op_imm = SLL;    /* SLLI */
             10'b???????010:     decode_op_imm = SLT;    /* SLTI */
@@ -156,7 +156,7 @@ module decode
     end
 
     always_comb begin
-        case ({funct7, funct3})
+        unique case ({funct7, funct3})
             10'b0000000000:     decode_op = ADD;
             10'b0100000000:     decode_op = SUB;
             10'b0000000001:     decode_op = SLL;
@@ -172,14 +172,14 @@ module decode
     end
 
     always_comb begin
-        case (funct3)
+        unique case (funct3)
             3'b000:     decode_misc_mem = NOP;  /* FENCE */
             default:    decode_misc_mem = INVALID;
         endcase
     end
 
     always_comb begin
-        case (instruction_int[31:7]) inside
+        unique case (instruction_int[31:7]) inside
             25'b0000000000000000000000000:  decode_system = ECALL;
             25'b0000000000010000000000000:  decode_system = EBREAK;
             25'b0001000000100000000000000:  decode_system = SRET;
@@ -196,7 +196,7 @@ module decode
     end
 
     always_comb begin 
-        case (opcode)
+        unique case (opcode)
             7'b0110111: instruction_operation = LUI;
             7'b0010111: instruction_operation = ADD;                /* AUIPC */
             7'b1101111: instruction_operation = JAL;
@@ -217,7 +217,7 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        case (opcode[6:2])
+        unique case (opcode[6:2])
             5'b11001, 5'b00000, 5'b00100:   instruction_format = I_TYPE;    /* JALR, LOAD, OP-IMM */
             5'b01000:                       instruction_format = S_TYPE;    /* STORE */
             5'b11000:                       instruction_format = B_TYPE;    /* BRANCH */
@@ -246,12 +246,12 @@ module decode
 
     always_comb begin
         unique case (instruction_format)
-            I_TYPE: immediate = imm_i;
-            S_TYPE: immediate = imm_s;
-            B_TYPE: immediate = imm_b;
-            U_TYPE: immediate = imm_u;
-            J_TYPE: immediate = imm_j;
-            R_TYPE: immediate = imm_r;
+            I_TYPE:     immediate = imm_i;
+            S_TYPE:     immediate = imm_s;
+            B_TYPE:     immediate = imm_b;
+            U_TYPE:     immediate = imm_u;
+            J_TYPE:     immediate = imm_j;
+            default:    immediate = imm_r;  /* R_TYPE */
         endcase
     end
 
@@ -304,7 +304,7 @@ module decode
     assign use_mem = ({opcode[6], opcode[4:2]} == '0) ? 1'b1 : 1'b0;
 
     always_comb begin
-        case (instruction_format)
+        unique case (instruction_format)
             R_TYPE, B_TYPE, S_TYPE: begin
             /**
              * This does NOT account for SYSTEM (R_TYPE) CSRR_I instructions
@@ -364,7 +364,7 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        case (instruction_format)
+        unique case (instruction_format)
             U_TYPE, J_TYPE: begin
                                 first_operand_int   = pc_i;
                                 second_operand_int  = immediate;
@@ -403,7 +403,7 @@ module decode
             tag_o                   <= '0;
             exception_o             <= 1'b0;
         `ifdef BRANCH_PREDICTION
-            predicted_branch_o      <= 0;
+            predicted_branch_o      <= 1'b0;
         `endif
         end 
         else if (hazard_o) begin
@@ -414,9 +414,9 @@ module decode
             instruction_o           <= '0;
             instruction_operation_o <= NOP;
             tag_o                   <= tag_i;
-            exception_o             <= 0;
+            exception_o             <= 1'b0;
         `ifdef BRANCH_PREDICTION
-            predicted_branch_o      <= 0;
+            predicted_branch_o      <= 1'b0;
         `endif
         end 
         else if (!stall) begin
@@ -427,7 +427,7 @@ module decode
             instruction_o           <= instruction_int;
             instruction_operation_o <= instruction_operation;
             tag_o                   <= tag_i;
-            exception_o             <= (instruction_operation==INVALID) ? 1 : 0;
+            exception_o             <= (instruction_operation == INVALID) ? 1'b1 :1'b0;
         `ifdef BRANCH_PREDICTION
             predicted_branch_o      <= predict_branch_taken_o | predict_jump_taken_o;
         `endif
