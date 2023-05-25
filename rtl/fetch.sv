@@ -40,7 +40,7 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
 
     output  logic [31:0]    instruction_address_o,
     output  logic [31:0]    pc_o,
-    output  logic [2:0]     tag_o,
+    output  logic  [2:0]    tag_o,
 
     input   logic [31:0]    mtvec_i,
     input   logic [31:0]    mepc_i,
@@ -51,7 +51,7 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
 
     logic [31:0] pc;
     logic  [2:0] next_tag, current_tag;
-    logic not_cotinuing;
+    logic        not_cotinuing;
 
     assign not_cotinuing = (hazard_i | stall);
 

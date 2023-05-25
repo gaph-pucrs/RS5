@@ -31,7 +31,7 @@ module decode
 
     input   logic [31:0]    instruction_i,          // Object code of the instruction_int to extract the immediate operand
     input   logic [31:0]    pc_i,                   // Bypassed to execute unit as an operand
-    input   logic [2:0]     tag_i,                  // Instruction tag_o
+    input   logic  [2:0]    tag_i,                  // Instruction tag_o
     input   logic [31:0]    rs1_data_read_i,        // Data read from register bank
     input   logic [31:0]    rs2_data_read_i,        // Data read from register bank
 
@@ -46,29 +46,30 @@ module decode
     output  logic [31:0]    predict_jump_pc_next_o,
 `endif
 
-    output  logic [4:0]     rs1_o,                  // Address of the 1st register, conected directly in the register bank
-    output  logic [4:0]     rs2_o,                  // Address of the 2nd register, conected directly in the register bank
-    output  logic [4:0]     rd_o,                   // Write Address to register bank
+    output  logic  [4:0]    rs1_o,                  // Address of the 1st register, conected directly in the register bank
+    output  logic  [4:0]    rs2_o,                  // Address of the 2nd register, conected directly in the register bank
+    output  logic  [4:0]    rd_o,                   // Write Address to register bank
     output  logic [31:0]    first_operand_o,        // First operand output register
     output  logic [31:0]    second_operand_o,       // Second operand output register
     output  logic [31:0]    third_operand_o,        // Third operand output register
     output  logic [31:0]    pc_o,                   // PC operand output register
     output  logic [31:0]    instruction_o,          // Instruction Used in exception_os and CSR operations
-    output  logic [2:0]     tag_o,                  // Instruction tag_o
+    output  logic  [2:0]    tag_o,                  // Instruction tag_o
     output  iType_e         instruction_operation_o,// Instruction operation
     output  logic           hazard_o,               // Bubble issue indicator (0 active)
-    output  logic           exception_o
+    output  logic           exc_ilegal_inst_o,
+    output  logic           exc_misaligned_fetch_o
 );
 
-    logic [31:0] immediate, first_operand_int, second_operand_int, third_operand_int, instruction_int, last_instruction;
-    logic last_hazard;
-    logic [4:0] locked_register;
-    logic [4:0] target_register;
-    logic is_store;
-    logic locked_memory;
+    logic [31:0]    immediate, first_operand_int, second_operand_int, third_operand_int, instruction_int, last_instruction;
+    logic           last_hazard;
+    logic  [4:0]    locked_register;
+    logic  [4:0]    target_register;
+    logic           is_store;
+    logic           locked_memory;
 
-    formatType_e instruction_format;
-    iType_e instruction_operation;
+    formatType_e    instruction_format;
+    iType_e         instruction_operation;
 
 //////////////////////////////////////////////////////////////////////////////
 // Re-Decode isntruction on hazard
@@ -92,13 +93,13 @@ module decode
 // Find out the type of the instruction
 //////////////////////////////////////////////////////////////////////////////
 
-    iType_e decode_branch;
-    iType_e decode_load;
-    iType_e decode_store;
-    iType_e decode_op_imm;
-    iType_e decode_op;
-    iType_e decode_misc_mem;
-    iType_e decode_system;
+    iType_e     decode_branch;
+    iType_e     decode_load;
+    iType_e     decode_store;
+    iType_e     decode_op_imm;
+    iType_e     decode_op;
+    iType_e     decode_misc_mem;
+    iType_e     decode_system;
 
     logic [2:0] funct3;
     logic [6:0] funct7;
@@ -328,8 +329,13 @@ module decode
     logic locked_rs1;
     logic locked_rs2;
 
-    assign locked_rs1 = (locked_register == rs1_o && rs1_o != '0) ? 1'b1 : 1'b0;
-    assign locked_rs2 = (locked_register == rs2_o && rs2_o != '0) ? 1'b1 : 1'b0;
+    assign locked_rs1 = (locked_register == rs1_o && rs1_o != '0) 
+                        ? 1'b1 
+                        : 1'b0;
+
+    assign locked_rs2 = (locked_register == rs2_o && rs2_o != '0)
+                        ? 1'b1 
+                        : 1'b0;
 
     logic hazard_mem;
     logic hazard_rs1;
@@ -340,6 +346,16 @@ module decode
     assign hazard_rs2 = locked_rs2    & use_rs2;
 
     assign hazard_o   = hazard_mem | hazard_rs1 | hazard_rs2;
+
+//////////////////////////////////////////////////////////////////////////////
+// Exceptions Generation 
+//////////////////////////////////////////////////////////////////////////////
+    
+    logic invalid_inst;
+    logic misaligned_fetch;
+
+    assign invalid_inst     = instruction_operation == INVALID;
+    assign misaligned_fetch = pc_i[1:0] != 2'b00;
 
 /////////////////////////////////////////////////////////////////////////////
 // Branch Prediction
@@ -406,7 +422,8 @@ module decode
             instruction_o           <= '0;
             instruction_operation_o <= NOP;
             tag_o                   <= '0;
-            exception_o             <= 1'b0;
+            exc_ilegal_inst_o       <= 1'b0;
+            exc_misaligned_fetch_o  <= 1'b0;
         `ifdef BRANCH_PREDICTION
             predicted_branch_o      <= 1'b0;
         `endif
@@ -419,7 +436,8 @@ module decode
             instruction_o           <= '0;
             instruction_operation_o <= NOP;
             tag_o                   <= tag_i;
-            exception_o             <= 1'b0;
+            exc_ilegal_inst_o       <= 1'b0;
+            exc_misaligned_fetch_o  <= 1'b0;
         `ifdef BRANCH_PREDICTION
             predicted_branch_o      <= 1'b0;
         `endif
@@ -432,7 +450,8 @@ module decode
             instruction_o           <= instruction_int;
             instruction_operation_o <= instruction_operation;
             tag_o                   <= tag_i;
-            exception_o             <= (instruction_operation == INVALID) ? 1'b1 :1'b0;
+            exc_ilegal_inst_o       <= invalid_inst;
+            exc_misaligned_fetch_o  <= misaligned_fetch;
         `ifdef BRANCH_PREDICTION
             predicted_branch_o      <= predict_branch_taken_o | predict_jump_taken_o;
         `endif

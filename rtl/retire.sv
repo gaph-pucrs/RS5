@@ -32,12 +32,15 @@ module retire
     input   logic [31:0]    instruction_i,
     input   logic [31:0]    pc_i,
     input   logic [31:0]    results_i [1:0],            // Results array
-    input   logic [2:0]     tag_i,                      // Instruction tag to be compared with retire tag
-    input   logic [3:0]     mem_write_enable_i,         // Write enable memory
+    input   logic  [2:0]    tag_i,                      // Instruction tag to be compared with retire tag
+    input   logic  [3:0]    mem_write_enable_i,         // Write enable memory
     input   logic           write_enable_i,             // Write enable from Execute(based on instruction_i type)
     input   logic           jump_i,                     // Jump signal from branch unit 
     input   iType_e         instruction_operation_i,
-    input   logic           exception_i,
+    
+    input   logic           exc_ilegal_inst_i,
+    input   logic           exc_misaligned_fetch_i,
+    input   logic           exc_inst_access_fault_i,
 
 `ifdef BRANCH_PREDICTION
     input   logic           predicted_branch_i,
@@ -50,11 +53,11 @@ module retire
     output  logic           killed_o,
 
     output  logic [31:0]    mem_write_address_o,        // Memory mem_write_enable_o address
-    output  logic [3:0]     mem_write_enable_o,         // Memory mem_write_enable_o enable
+    output  logic  [3:0]    mem_write_enable_o,         // Memory mem_write_enable_o enable
     output  logic [31:0]    mem_data_o,                 // Memory data to be written
     input   logic [31:0]    mem_data_i,                 // Data from memory
 
-    output  logic [2:0]     current_retire_tag_o,
+    output  logic  [2:0]    current_retire_tag_o,
     output  exceptionCode_e exception_code_o,
     output  logic           raise_exception_o,
     output  logic           machine_return_o,
@@ -62,9 +65,8 @@ module retire
     input   logic           interrupt_pending_i
 );
 
-    logic [31:0] memory_data;
-    logic [2:0] curr_tag;
-    logic killed;
+    logic [31:0]    memory_data;
+    logic  [2:0]    curr_tag;
     executionUnit_e execution_unit_selection;
 
     assign current_retire_tag_o = curr_tag;
@@ -81,14 +83,13 @@ module retire
 //////////////////////////////////////////////////////////////////////////////
 // Killed signal generation
 //////////////////////////////////////////////////////////////////////////////
-    assign killed_o = killed;
-    
+
     always_comb begin
         if (curr_tag != tag_i) begin
-            killed = 1;
+            killed_o = 1;
         end
         else begin
-            killed = 0;
+            killed_o = 0;
         end
     end
 
@@ -100,7 +101,7 @@ module retire
         if (reset) begin
             curr_tag <= 0;
         end
-        else if (!killed && (jump_o | raise_exception_o | machine_return_o | interrupt_ack_o)) begin
+        else if (!killed_o && (jump_o | raise_exception_o | machine_return_o | interrupt_ack_o)) begin
             curr_tag <= curr_tag + 1;
         end
     end
@@ -110,7 +111,7 @@ module retire
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        if (killed) begin
+        if (killed_o) begin
             regbank_write_enable_o = 0;
         end 
         else begin
@@ -124,12 +125,12 @@ module retire
 `ifdef BRANCH_PREDICTION
     always_comb begin
         // If should have jumped and predicted not jump then jump
-        if (jump_i && !predicted_branch_i && !killed) begin
+        if (jump_i && !predicted_branch_i && !killed_o) begin
             jump_o          = 1;
             jump_target_o   = results_i[1];
         end
         // If should not have jumped and predicted jump then return
-        else if (!jump_i && predicted_branch_i && !killed) begin
+        else if (!jump_i && predicted_branch_i && !killed_o) begin
             jump_o          = 1;
             jump_target_o   = pc_i;
         end
@@ -141,7 +142,7 @@ module retire
     end
 `else
     always_comb begin
-        if (jump_i && !killed) begin
+        if (jump_i && !killed_o) begin
             jump_target_o = results_i[1];
             jump_o        = 1;
         end 
@@ -212,7 +213,7 @@ module retire
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        if (mem_write_enable_i != '0 && !killed) begin
+        if (mem_write_enable_i != '0 && !killed_o) begin
             mem_write_enable_o  = mem_write_enable_i;
             mem_write_address_o = results_i[1];
             mem_data_o          = results_i[0];
@@ -227,15 +228,28 @@ module retire
 //////////////////////////////////////////////////////////////////////////////
 // Privileged Architecture Control
 //////////////////////////////////////////////////////////////////////////////
+    logic exception;
+
+    assign exception = exc_ilegal_inst_i | exc_misaligned_fetch_i | exc_inst_access_fault_i;
 
     always_comb begin
-        if (!killed) begin
-            if (exception_i) begin
+        if (!killed_o) begin
+            if (exception) begin
                 raise_exception_o = 1;
-                exception_code_o  = ILLEGAL_INSTRUCTION;
                 machine_return_o  = 0;
                 interrupt_ack_o   = 0;
-                $write("[%0d] EXCEPTION - ILLEGAL INSTRUCTION: %8h %8h\n", $time, pc_i, instruction_i);
+                if (exc_inst_access_fault_i) begin
+                    exception_code_o  = INSTRUCTION_ACCESS_FAULT;
+                    $write("[%0d] EXCEPTION - INSTRUCTION ACESS FAULT: %8h %8h\n", $time, pc_i, instruction_i);
+                end
+                else if (exc_misaligned_fetch_i) begin
+                    exception_code_o  = INSTRUCTION_ADDRESS_MISALIGNED;
+                    $write("[%0d] EXCEPTION - INSTRUCTION ADDRESS MISALIGNED: %8h %8h\n", $time, pc_i, instruction_i);
+                end
+                else begin
+                    exception_code_o  = ILLEGAL_INSTRUCTION;
+                    $write("[%0d] EXCEPTION - ILLEGAL INSTRUCTION: %8h %8h\n", $time, pc_i, instruction_i);
+                end
             end 
             else if (instruction_operation_i == ECALL) begin
                 raise_exception_o = 1;
