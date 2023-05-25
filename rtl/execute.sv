@@ -36,8 +36,10 @@ module execute
     input   iType_e        instruction_operation_i,
     input   logic [2:0]    tag_i,              // Instruction tag
 
+`ifdef BRANCH_PREDICTION
     input   logic          predicted_branch_i,
     output  logic          predicted_branch_o,
+`endif
 
     output  iType_e        instruction_operation_o,
     output  logic [31:0]   instruction_o,
@@ -227,7 +229,9 @@ module execute
             instruction_o           <= instruction_i;
             pc_o                    <= pc_i;
             exception_o             <= exception_i | csr_exception;
+        `ifdef BRANCH_PREDICTION
             predicted_branch_o      <= predicted_branch_i;
+        `endif
         end
     end
 

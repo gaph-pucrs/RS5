@@ -29,14 +29,15 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
     input   logic           jump_i,
     input   logic [31:0]    jump_target_i,
 
+`ifdef BRANCH_PREDICTION
     input   logic           predict_branch_taken_i,
     input   logic [31:0]    predict_branch_pc_i,
     input   logic [31:0]    predict_branch_pc_next_i,
     input   logic           predict_jump_taken_i,
     input   logic [31:0]    predict_jump_pc_i,
     input   logic [31:0]    predict_jump_pc_next_i,
+`endif
 
-    
     output  logic [31:0]    instruction_address_o,
     output  logic [31:0]    pc_o,
     output  logic [2:0]     tag_o,
@@ -68,12 +69,14 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
         else if (jump_i) begin
             pc <= jump_target_i;
         end
+    `ifdef BRANCH_PREDICTION
         else if (predict_branch_taken_i) begin
             pc <= predict_branch_pc_i + 4;
         end
         else if (predict_jump_taken_i) begin
             pc <= predict_jump_pc_i + 4;
         end
+    `endif
         else if (~(hazard_i | stall)) begin
             pc <= pc + 4;
         end
@@ -82,7 +85,7 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
 //////////////////////////////////////////////////////////////////////////////
 // Sensitive Outputs 
 //////////////////////////////////////////////////////////////////////////////
-
+`ifdef BRANCH_PREDICTION
     always_ff @(posedge clk) begin
         if (~(hazard_i | stall)) begin
             case({predict_branch_taken_i, predict_jump_taken_i})
@@ -92,10 +95,18 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
             endcase
         end
     end
+`else
+    always_ff @(posedge clk) begin
+        if (!hazard_i && !stall) begin
+            pc_o <= pc;
+        end
+    end
+`endif
 
 //////////////////////////////////////////////////////////////////////////////
 // Non-Sensitive Outputs 
 //////////////////////////////////////////////////////////////////////////////
+`ifdef BRANCH_PREDICTION
     always_comb begin
         case({predict_branch_taken_i, predict_jump_taken_i})
             2'b10:      instruction_address_o <= predict_branch_pc_i;
@@ -103,6 +114,9 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
             default:    instruction_address_o <= pc;
         endcase
     end
+`else
+    assign instruction_address_o = pc;
+`endif
 
     assign tag_o = current_tag;
 

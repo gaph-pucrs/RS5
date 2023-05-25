@@ -35,6 +35,7 @@ module decode
     input   logic [31:0]    rs1_data_read_i,        // Data read from register bank
     input   logic [31:0]    rs2_data_read_i,        // Data read from register bank
 
+`ifdef BRANCH_PREDICTION
     input   logic           killed_i,
     output  logic           predicted_branch_o,
     output  logic           predict_branch_taken_o,
@@ -43,6 +44,7 @@ module decode
     output  logic           predict_jump_taken_o,
     output  logic [31:0]    predict_jump_pc_o,
     output  logic [31:0]    predict_jump_pc_next_o,
+`endif
 
     output  logic [4:0]     rs1_o,                  // Address of the 1st register, conected directly in the register bank
     output  logic [4:0]     rs2_o,                  // Address of the 2nd register, conected directly in the register bank
@@ -347,7 +349,7 @@ module decode
  * it's a branch or a jump and calculates its target. For jumps it will always predict taken. For
  * branches it will predict taken if the PC offset is negative.
  */
-
+`ifdef BRANCH_PREDICTION
     assign predict_branch_taken_o   = (opcode[6:2] == 5'b11000 && imm_b[31] && !killed_i) ? 1'b1 : 1'b0;
     assign predict_jump_taken_o     = (opcode[6:2] == 5'b11011 && !killed_i) ? 1'b1 : 1'b0;
 
@@ -355,6 +357,7 @@ module decode
     assign predict_branch_pc_next_o = pc_i + imm_b + 4;
     assign predict_jump_pc_o        = pc_i + imm_j;
     assign predict_jump_pc_next_o   = pc_i + imm_j + 4;
+`endif
 
 //////////////////////////////////////////////////////////////////////////////
 // Control of the exits based on format
@@ -399,7 +402,9 @@ module decode
             instruction_operation_o <= NOP;
             tag_o                   <= '0;
             exception_o             <= 1'b0;
+        `ifdef BRANCH_PREDICTION
             predicted_branch_o      <= 0;
+        `endif
         end 
         else if (hazard_o) begin
             first_operand_o         <= '0;
@@ -410,7 +415,9 @@ module decode
             instruction_operation_o <= NOP;
             tag_o                   <= tag_i;
             exception_o             <= 0;
+        `ifdef BRANCH_PREDICTION
             predicted_branch_o      <= 0;
+        `endif
         end 
         else if (!stall) begin
             first_operand_o         <= first_operand_int;
@@ -421,7 +428,9 @@ module decode
             instruction_operation_o <= instruction_operation;
             tag_o                   <= tag_i;
             exception_o             <= (instruction_operation==INVALID) ? 1 : 0;
+        `ifdef BRANCH_PREDICTION
             predicted_branch_o      <= predict_branch_taken_o | predict_jump_taken_o;
+        `endif
         end
     end
 

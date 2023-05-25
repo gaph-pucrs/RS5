@@ -39,7 +39,9 @@ module retire
     input   iType_e         instruction_operation_i,
     input   logic           exception_i,
 
+`ifdef BRANCH_PREDICTION
     input   logic           predicted_branch_i,
+`endif
 
     output  logic           regbank_write_enable_o,     // Write Enable to Register Bank
     output  logic [31:0]    regbank_data_o,             // WriteBack data to Register Bank
@@ -119,7 +121,7 @@ module retire
 //////////////////////////////////////////////////////////////////////////////
 // PC Flow control signal generation
 //////////////////////////////////////////////////////////////////////////////
-
+`ifdef BRANCH_PREDICTION
     always_comb begin
         // If should have jumped and predicted not jump then jump
         if (jump_i && !predicted_branch_i && !killed) begin
@@ -137,6 +139,18 @@ module retire
             jump_target_o   = '0;
         end
     end
+`else
+    always_comb begin
+        if (jump_i && !killed) begin
+            jump_target_o = results_i[1];
+            jump_o        = 1;
+        end 
+        else begin
+            jump_target_o = '0;
+            jump_o        = '0;
+        end
+    end
+`endif
 
 //////////////////////////////////////////////////////////////////////////////
 // Memory Signal Generation
