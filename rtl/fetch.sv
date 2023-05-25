@@ -51,6 +51,9 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
 
     logic [31:0] pc;
     logic  [2:0] next_tag, current_tag;
+    logic not_cotinuing;
+
+    assign not_cotinuing = (hazard_i | stall);
 
 //////////////////////////////////////////////////////////////////////////////
 // PC Control
@@ -63,7 +66,7 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
         else if (machine_return_i) begin                              
             pc <= mepc_i;
         end
-        else if (exception_raised_i | interrupt_ack_i) begin                               
+        else if ((exception_raised_i | interrupt_ack_i)) begin
             pc <= mtvec_i;
         end
         else if (jump_i) begin
@@ -71,13 +74,13 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
         end
     `ifdef BRANCH_PREDICTION
         else if (predict_branch_taken_i) begin
-            pc <= predict_branch_pc_i + 4;
+            pc <= predict_branch_pc_next_i;
         end
         else if (predict_jump_taken_i) begin
-            pc <= predict_jump_pc_i + 4;
+            pc <= predict_jump_pc_next_i;
         end
     `endif
-        else if (~(hazard_i | stall)) begin
+        else if (!not_cotinuing) begin
             pc <= pc + 4;
         end
     end
@@ -87,8 +90,8 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
 //////////////////////////////////////////////////////////////////////////////
 `ifdef BRANCH_PREDICTION
     always_ff @(posedge clk) begin
-        if (~(hazard_i | stall)) begin
-            case({predict_branch_taken_i, predict_jump_taken_i})
+        if (!not_cotinuing) begin
+            unique case ({predict_branch_taken_i, predict_jump_taken_i})
                 2'b10:      pc_o <= predict_branch_pc_i;
                 2'b01:      pc_o <= predict_jump_pc_i;
                 default:    pc_o <= pc;
@@ -97,7 +100,7 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
     end
 `else
     always_ff @(posedge clk) begin
-        if (!hazard_i && !stall) begin
+        if (!not_cotinuing) begin
             pc_o <= pc;
         end
     end
@@ -108,10 +111,10 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
 //////////////////////////////////////////////////////////////////////////////
 `ifdef BRANCH_PREDICTION
     always_comb begin
-        case({predict_branch_taken_i, predict_jump_taken_i})
-            2'b10:      instruction_address_o <= predict_branch_pc_i;
-            2'b01:      instruction_address_o <= predict_jump_pc_i;
-            default:    instruction_address_o <= pc;
+        unique case ({predict_branch_taken_i, predict_jump_taken_i})
+            2'b10:      instruction_address_o = predict_branch_pc_i;
+            2'b01:      instruction_address_o = predict_jump_pc_i;
+            default:    instruction_address_o = pc;
         endcase
     end
 `else
@@ -126,14 +129,15 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
 
     always_ff @(posedge clk) begin
         if (reset) begin
-            current_tag <= 0;
-            next_tag <= 0;
+            current_tag <= '0;
+            next_tag    <= '0;
         end
-        else if (jump_i | exception_raised_i | machine_return_i | interrupt_ack_i) begin
-            next_tag <= current_tag + 1;
+        else if ((jump_i | exception_raised_i | machine_return_i | interrupt_ack_i)) begin
+            next_tag <= current_tag + 1'b1;
         end
-        else if (~(hazard_i | stall)) begin
+        else if (!not_cotinuing) begin
             current_tag <= next_tag;
         end
     end
+    
 endmodule
