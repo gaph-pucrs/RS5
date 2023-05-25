@@ -231,6 +231,7 @@ module decode
     logic [31:0] imm_i;
     logic [31:0] imm_s;
     logic [31:0] imm_b;
+    logic [31:0] imm_u;
     logic [31:0] imm_j;
     logic [31:0] imm_r;
 

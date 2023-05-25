@@ -17,7 +17,7 @@
  * and is responsible for the instantiation of the lower level modules
  * ans also defines the interface ports (inputs and outputs) os the processor.
  */
- 
+
 /*
 `include "../rtl/my_pkg.sv"
 `include "../rtl/xus/adderUnit.sv"
@@ -51,7 +51,7 @@ module PUC_RS5
 
     output logic [31:0] instruction_address_o,
     output logic        mem_operation_enable_o,
-    output logic [3:0]  mem_write_enable_o,
+    output logic  [3:0] mem_write_enable_o,
     output logic [31:0] mem_address_o,
     output logic [31:0] mem_data_o,
     output logic        interrupt_ack_o
