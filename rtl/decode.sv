@@ -35,6 +35,17 @@ module decode
     input   logic [31:0]    rs1_data_read_i,        // Data read from register bank
     input   logic [31:0]    rs2_data_read_i,        // Data read from register bank
 
+`ifdef BRANCH_PREDICTION
+    input   logic           killed_i,
+    output  logic           predicted_branch_o,
+    output  logic           predict_branch_taken_o,
+    output  logic [31:0]    predict_branch_pc_o,
+    output  logic [31:0]    predict_branch_pc_next_o,
+    output  logic           predict_jump_taken_o,
+    output  logic [31:0]    predict_jump_pc_o,
+    output  logic [31:0]    predict_jump_pc_next_o,
+`endif
+
     output  logic [4:0]     rs1_o,                  // Address of the 1st register, conected directly in the register bank
     output  logic [4:0]     rs2_o,                  // Address of the 2nd register, conected directly in the register bank
     output  logic [4:0]     rd_o,                   // Write Address to register bank
@@ -47,7 +58,7 @@ module decode
     output  iType_e         instruction_operation_o,// Instruction operation
     output  logic           hazard_o,               // Bubble issue indicator (0 active)
     output  logic           exception_o
-    );
+);
 
     logic [31:0] immediate, first_operand_int, second_operand_int, third_operand_int, instruction_int, last_instruction;
     logic last_hazard;
@@ -98,7 +109,7 @@ module decode
     assign funct7 = instruction_int[31:25];
 
     always_comb begin
-        case (funct3)
+        unique case (funct3)
             3'b000:     decode_branch = BEQ;
             3'b001:     decode_branch = BNE;
             3'b100:     decode_branch = BLT;
@@ -110,7 +121,7 @@ module decode
     end
 
     always_comb begin
-        case (funct3)
+        unique case (funct3)
             3'b000:     decode_load = LB;
             3'b001:     decode_load = LH;
             3'b010:     decode_load = LW;
@@ -121,7 +132,7 @@ module decode
     end
 
     always_comb begin
-        case (funct3)
+        unique case (funct3)
             3'b000:     decode_store = SB;
             3'b001:     decode_store = SH;
             3'b010:     decode_store = SW;
@@ -130,7 +141,7 @@ module decode
     end
 
     always_comb begin
-        case ({funct7, funct3}) inside
+        unique case ({funct7, funct3}) inside
             10'b???????000:     decode_op_imm = ADD;    /* ADDI */
             10'b0000000001:     decode_op_imm = SLL;    /* SLLI */
             10'b???????010:     decode_op_imm = SLT;    /* SLTI */
@@ -145,7 +156,7 @@ module decode
     end
 
     always_comb begin
-        case ({funct7, funct3})
+        unique case ({funct7, funct3})
             10'b0000000000:     decode_op = ADD;
             10'b0100000000:     decode_op = SUB;
             10'b0000000001:     decode_op = SLL;
@@ -161,14 +172,14 @@ module decode
     end
 
     always_comb begin
-        case (funct3)
+        unique case (funct3)
             3'b000:     decode_misc_mem = NOP;  /* FENCE */
             default:    decode_misc_mem = INVALID;
         endcase
     end
 
     always_comb begin
-        case (instruction_int[31:7]) inside
+        unique case (instruction_int[31:7]) inside
             25'b0000000000000000000000000:  decode_system = ECALL;
             25'b0000000000010000000000000:  decode_system = EBREAK;
             25'b0001000000100000000000000:  decode_system = SRET;
@@ -185,7 +196,7 @@ module decode
     end
 
     always_comb begin 
-        case (opcode)
+        unique case (opcode)
             7'b0110111: instruction_operation = LUI;
             7'b0010111: instruction_operation = ADD;                /* AUIPC */
             7'b1101111: instruction_operation = JAL;
@@ -206,7 +217,7 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        case (opcode[6:2])
+        unique case (opcode[6:2])
             5'b11001, 5'b00000, 5'b00100:   instruction_format = I_TYPE;    /* JALR, LOAD, OP-IMM */
             5'b01000:                       instruction_format = S_TYPE;    /* STORE */
             5'b11000:                       instruction_format = B_TYPE;    /* BRANCH */
@@ -219,43 +230,28 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 // Extract the immediate based on instruction format
 //////////////////////////////////////////////////////////////////////////////
+    logic [31:0] imm_i;
+    logic [31:0] imm_s;
+    logic [31:0] imm_b;
+    logic [31:0] imm_u;
+    logic [31:0] imm_j;
+    logic [31:0] imm_r;
+
+    assign imm_i = {{21{instruction_int[31]}}, instruction_int[30:20]};
+    assign imm_s = {{21{instruction_int[31]}}, instruction_int[30:25], instruction_int[11:7]};
+    assign imm_b = {{20{instruction_int[31]}}, instruction_int[7], instruction_int[30:25], instruction_int[11:8], 1'b0};
+    assign imm_u = {instruction_int[31:12], 12'b0};
+    assign imm_j = {{12{instruction_int[31]}}, instruction_int[19:12], instruction_int[20], instruction_int[30:25], instruction_int[24:21], 1'b0};
+    assign imm_r = '0;
 
     always_comb begin
-        case (instruction_format)
-            I_TYPE: begin
-                        immediate[31:11] = {21{instruction_int[31]}};
-                        immediate[10:0]  = instruction_int[30:20];
-                    end
-
-            S_TYPE: begin
-                        immediate[31:11] = {21{instruction_int[31]}};
-                        immediate[10:5]  = instruction_int[30:25];
-                        immediate[4:0]   = instruction_int[11:7];
-                    end
-
-            B_TYPE: begin
-                        immediate[31:12] = {20{instruction_int[31]}};
-                        immediate[11]    = instruction_int[7];
-                        immediate[10:5]  = instruction_int[30:25];
-                        immediate[4:1]   = instruction_int[11:8];
-                        immediate[0]     = 0;
-                    end
-
-            U_TYPE: begin
-                        immediate[31:12] = instruction_int[31:12];
-                        immediate[11:0]  = '0;
-                    end
-
-            J_TYPE: begin
-                        immediate[31:20] = {12{instruction_int[31]}};
-                        immediate[19:12] = instruction_int[19:12];
-                        immediate[11]    = instruction_int[20];
-                        immediate[10:5]  = instruction_int[30:25];
-                        immediate[4:1]   = instruction_int[24:21];
-                        immediate[0]     = 0;
-                    end
-
-            default:    immediate        = '0;
+        unique case (instruction_format)
+            I_TYPE:     immediate = imm_i;
+            S_TYPE:     immediate = imm_s;
+            B_TYPE:     immediate = imm_b;
+            U_TYPE:     immediate = imm_u;
+            J_TYPE:     immediate = imm_j;
+            default:    immediate = imm_r;  /* R_TYPE */
         endcase
     end
 
@@ -273,20 +269,13 @@ module decode
     always_comb begin
         if (!hazard_o) begin
             target_register = instruction_int[11:7];
-            ///////////////////////////////////
-            if (opcode[6:2] == 5'b01000) begin
-                is_store = 1;
-            end
-            else begin
-                is_store = 0;
-            end
+            is_store = (opcode[6:2] == 5'b01000) ? 1'b1 : 1'b0;
         end
         else begin
             target_register = '0;
-            is_store        = 0;
+            is_store        = 1'b0;
         end
     end
-
 //////////////////////////////////////////////////////////////////////////////
 // Registe Lock Queue (RLQ)
 //////////////////////////////////////////////////////////////////////////////
@@ -308,27 +297,79 @@ module decode
 // Hazard signal generation
 //////////////////////////////////////////////////////////////////////////////
 
+    logic use_mem;
+    logic use_rs1;
+    logic use_rs2;
+
+    assign use_mem = ({opcode[6], opcode[4:2]} == '0) ? 1'b1 : 1'b0;
+
     always_comb begin
-        if (locked_memory == 1'b1 && opcode[6] == 1'b0 && opcode[4:2] == 3'b000) begin
-            hazard_o = 1;
-        end
-        else if (locked_register == rs1_o && rs1_o != '0 && !(instruction_format inside {U_TYPE, J_TYPE})) begin
-            hazard_o = 1;
-        end
-        else if (locked_register == rs2_o && rs2_o != '0 && !(instruction_format inside {I_TYPE, U_TYPE, J_TYPE})) begin
-            hazard_o = 1;
-        end
-        else begin
-            hazard_o = 0;
-        end
+        unique case (instruction_format)
+            R_TYPE, B_TYPE, S_TYPE: begin
+            /**
+             * This does NOT account for SYSTEM (R_TYPE) CSRR_I instructions
+             * where funct3[2] is 1, and therefore WILL generate a hazard
+             * but this is rare to occur
+             */
+                                        use_rs1         = 1'b1;
+                                        use_rs2         = 1'b1;
+                                    end
+            I_TYPE:                 begin
+                                        use_rs1         = 1'b1;
+                                        use_rs2         = 1'b0;
+                                    end
+            default:                begin /* U_TYPE and J_TYPE */
+                                        use_rs1         = 1'b0;
+                                        use_rs2         = 1'b0;
+                                    end
+        endcase
     end
+
+    logic locked_rs1;
+    logic locked_rs2;
+
+    assign locked_rs1 = (locked_register == rs1_o && rs1_o != '0) ? 1'b1 : 1'b0;
+    assign locked_rs2 = (locked_register == rs2_o && rs2_o != '0) ? 1'b1 : 1'b0;
+
+    logic hazard_mem;
+    logic hazard_rs1;
+    logic hazard_rs2;
+
+    assign hazard_mem = locked_memory & use_mem;
+    assign hazard_rs1 = locked_rs1    & use_rs1;
+    assign hazard_rs2 = locked_rs2    & use_rs2;
+
+    assign hazard_o   = hazard_mem | hazard_rs1 | hazard_rs2;
+
+/////////////////////////////////////////////////////////////////////////////
+// Branch Prediction
+//////////////////////////////////////////////////////////////////////////////
+/*
+ * This implements static branch prediction. It takes an instruction and its PC and determines if
+ * it's a branch or a jump and calculates its target. For jumps it will always predict taken. For
+ * branches it will predict taken if the PC offset is negative.
+ */
+`ifdef BRANCH_PREDICTION
+    assign predict_branch_taken_o   = (opcode[6:2] == 5'b11000 && imm_b[31] && !killed_i) ? 1'b1 : 1'b0;
+    assign predict_jump_taken_o     = (opcode[6:2] == 5'b11011 && !killed_i) ? 1'b1 : 1'b0;
+
+    assign predict_branch_pc_o      = pc_i + imm_b;
+    assign predict_jump_pc_o        = pc_i + imm_j;
+
+    /**
+     * This seems bad and poorly implemented, but it is NEEDED to avoid timing
+     * violations
+     */
+    assign predict_branch_pc_next_o = pc_i + imm_b + 4;
+    assign predict_jump_pc_next_o   = pc_i + imm_j + 4;
+`endif
 
 //////////////////////////////////////////////////////////////////////////////
 // Control of the exits based on format
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        case (instruction_format)
+        unique case (instruction_format)
             U_TYPE, J_TYPE: begin
                                 first_operand_int   = pc_i;
                                 second_operand_int  = immediate;
@@ -336,7 +377,7 @@ module decode
                             end
             R_TYPE, B_TYPE: begin
                                 first_operand_int   = rs1_data_read_i;
-                                second_operand_int    = rs2_data_read_i;
+                                second_operand_int  = rs2_data_read_i;
                                 third_operand_int   = immediate;
                             end
             S_TYPE:         begin
@@ -358,44 +399,43 @@ module decode
 
     always_ff @(posedge clk) begin
         if (reset) begin
-            first_operand_o  <= '0;
-            second_operand_o <= '0;
-            third_operand_o  <= '0;
-            pc_o             <= '0;
-            instruction_o    <= '0;
+            first_operand_o         <= '0;
+            second_operand_o        <= '0;
+            third_operand_o         <= '0;
+            pc_o                    <= '0;
+            instruction_o           <= '0;
             instruction_operation_o <= NOP;
-            tag_o            <= '0;
-            exception_o      <= 0;
-        end 
-        else if (stall) begin
-            first_operand_o   <= first_operand_o;
-            second_operand_o  <= second_operand_o;
-            third_operand_o   <= third_operand_o;
-            pc_o              <= pc_o;
-            instruction_o     <= instruction_o;
-            instruction_operation_o <= instruction_operation_o;
-            tag_o             <= tag_o;
-            exception_o       <= exception_o;
+            tag_o                   <= '0;
+            exception_o             <= 1'b0;
+        `ifdef BRANCH_PREDICTION
+            predicted_branch_o      <= 1'b0;
+        `endif
         end 
         else if (hazard_o) begin
-            first_operand_o  <= '0;
-            second_operand_o <= '0;
-            third_operand_o  <= '0;
-            pc_o             <= '0;
-            instruction_o    <= '0;
+            first_operand_o         <= '0;
+            second_operand_o        <= '0;
+            third_operand_o         <= '0;
+            pc_o                    <= '0;
+            instruction_o           <= '0;
             instruction_operation_o <= NOP;
-            tag_o            <= tag_i;
-            exception_o      <= 0;
+            tag_o                   <= tag_i;
+            exception_o             <= 1'b0;
+        `ifdef BRANCH_PREDICTION
+            predicted_branch_o      <= 1'b0;
+        `endif
         end 
         else if (!stall) begin
-            first_operand_o  <= first_operand_int;
-            second_operand_o <= second_operand_int;
-            third_operand_o  <= third_operand_int;
-            pc_o             <= pc_i;
-            instruction_o    <= instruction_int;
+            first_operand_o         <= first_operand_int;
+            second_operand_o        <= second_operand_int;
+            third_operand_o         <= third_operand_int;
+            pc_o                    <= pc_i;
+            instruction_o           <= instruction_int;
             instruction_operation_o <= instruction_operation;
-            tag_o            <= tag_i;
-            exception_o      <= (instruction_operation==INVALID) ? 1 : 0;
+            tag_o                   <= tag_i;
+            exception_o             <= (instruction_operation == INVALID) ? 1'b1 :1'b0;
+        `ifdef BRANCH_PREDICTION
+            predicted_branch_o      <= predict_branch_taken_o | predict_jump_taken_o;
+        `endif
         end
     end
 
