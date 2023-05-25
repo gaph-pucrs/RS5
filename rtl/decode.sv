@@ -354,8 +354,13 @@ module decode
     assign predict_jump_taken_o     = (opcode[6:2] == 5'b11011 && !killed_i) ? 1'b1 : 1'b0;
 
     assign predict_branch_pc_o      = pc_i + imm_b;
-    assign predict_branch_pc_next_o = pc_i + imm_b + 4;
     assign predict_jump_pc_o        = pc_i + imm_j;
+
+    /**
+     * This seems bad and poorly implemented, but it is NEEDED to avoid timing
+     * violations
+     */
+    assign predict_branch_pc_next_o = pc_i + imm_b + 4;
     assign predict_jump_pc_next_o   = pc_i + imm_j + 4;
 `endif
 
