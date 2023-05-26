@@ -233,7 +233,7 @@ module execute
             pc_o                    <= pc_i;
             exc_ilegal_inst_o       <= exc_ilegal_inst_i;
             exc_misaligned_fetch_o  <= exc_misaligned_fetch_i;
-            exc_inst_access_fault_o <= csr_exception;
+            exc_inst_access_fault_o <= csr_exception == 1 && execution_unit_selector == CSR_UNIT;
         `ifdef BRANCH_PREDICTION
             predicted_branch_o      <= predicted_branch_i;
         `endif
