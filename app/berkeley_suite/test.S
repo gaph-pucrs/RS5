@@ -29,10 +29,16 @@ boot:
     li t1, 60000	            # Coloca o endereço do buffer para salvar
     csrw mscratch, t1           # registradores em mscratch
 
-    # Muda para o Modo de usuário
+    # Seta o MPP com o priv Usuario
+    # csrr t1, mstatus            # Seta os bits 11 e 12 (MPP)
+    # li t2, ~0x1800              # do registrador mstatus
+    # and t1, t1, t2              # com o valor 00
+    # csrw mstatus, t1
+
+	# Seta o MPP com privilegio Maquina
     csrr t1, mstatus            # Seta os bits 11 e 12 (MPP)
-    li t2, ~0x1800              # do registrador mstatus
-    and t1, t1, t2              # com o valor 00
+    li t2, 0x1800               # do registrador mstatus
+    or t1, t1, t2               # com o valor 11
     csrw mstatus, t1
 
     la t0, main                 # Grava o endereço do rótulo main

@@ -25,44 +25,47 @@
 module execute
     import my_pkg::*;
 (
-    input   logic             clk,
-    input   logic             stall,
+    input   logic               clk,
+    input   logic               stall,
 
-    input   logic [31:0]   instruction_i,
-    input   logic [31:0]   pc_i,               // Operand from Operand Fetch stage
-    input   logic [31:0]   first_operand_i,    //              ||
-    input   logic [31:0]   second_operand_i,   //              ||
-    input   logic [31:0]   third_operand_i,    //              ||
-    input   iType_e        instruction_operation_i,
-    input   logic  [2:0]   tag_i,              // Instruction tag
+    input   logic [31:0]        instruction_i,
+    input   logic [31:0]        pc_i,
+    input   logic [31:0]        first_operand_i,
+    input   logic [31:0]        second_operand_i,
+    input   logic [31:0]        third_operand_i,
+    input   iType_e             instruction_operation_i,
+    input   logic  [2:0]        tag_i,
 
 `ifdef BRANCH_PREDICTION
-    input   logic          predicted_branch_i,
-    output  logic          predicted_branch_o,
+    input   logic               predicted_branch_i,
+    output  logic               predicted_branch_o,
 `endif
 
-    output  iType_e        instruction_operation_o,
-    output  logic [31:0]   instruction_o,
-    output  logic [31:0]   pc_o,
-    output  logic [31:0]   result_o [1:0],     // Results array
-    output  logic  [2:0]   tag_o,              // Instruction tag
-    output  logic          jump_o,             // Signal that indicates a branch taken
-    output  logic          write_enable_o,     // Write enable to regbank
+    output  iType_e             instruction_operation_o,
+    output  logic [31:0]        instruction_o,
+    output  logic [31:0]        pc_o,
+    output  logic [31:0]        result_o [1:0],
+    output  logic  [2:0]        tag_o,
+    output  logic               jump_o,
+    output  logic               write_enable_o,
+    output  logic [31:0]        mem_read_address_o,
+    output  logic  [3:0]        mem_write_enable_o,
+    output  logic               mem_read_o,
 
-    output  logic             csr_read_enable_o,
-    output  logic             csr_write_enable_o,
-    output  csrOperation_e    csr_operation_o,
-    output  logic [11:0]      csr_address_o,
-    output  logic [31:0]      csr_data_o,
-    input   logic [31:0]      csr_data_read_i,
+    output  logic               csr_read_enable_o,
+    output  logic               csr_write_enable_o,
+    output  csrOperation_e      csr_operation_o,
+    output  logic [11:0]        csr_address_o,
+    output  logic [31:0]        csr_data_o,
+    input   logic [31:0]        csr_data_read_i,
 
-    input   privilegeLevel_e  privilege_i,
+    input   privilegeLevel_e    privilege_i,
 
-    input   logic          exc_ilegal_inst_i,
-    input   logic          exc_misaligned_fetch_i,
-    output  logic          exc_ilegal_inst_o,
-    output  logic          exc_misaligned_fetch_o,
-    output  logic          exc_inst_access_fault_o
+    input   logic               exc_ilegal_inst_i,
+    input   logic               exc_misaligned_fetch_i,
+    output  logic               exc_ilegal_inst_o,
+    output  logic               exc_misaligned_fetch_o,
+    output  logic               exc_inst_access_fault_o
 );
     
     logic        jump_int;

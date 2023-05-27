@@ -165,7 +165,7 @@ module CSRBank
         
             if (machine_return_i) begin
                 mstatus[3] <= mstatus[7];          // MIE = MPIE
-                privilege  <= mstatus[12:11];      // priv = MPP
+                privilege  <= privilegeLevel_e'(mstatus[12:11]);      // priv = MPP
             end
             else if (raise_exception_i) begin
                 mcause[31]      <= '0;
@@ -174,7 +174,7 @@ module CSRBank
                 privilege       <= privilegeLevel_e'(2'b11);
                 mstatus[7]      <= mstatus[3];          // MPIE = MIE
                 mstatus[3]      <= 0;                   // MIE = 0
-                mepc_r          <= (exception_code_i == ECALL_FROM_MMODE) 
+                mepc_r          <= (exception_code_i == ECALL_FROM_MMODE || exception_code_i == BREAKPOINT) 
                                     ? pc_i 
                                     : pc_i+4;             // Return address
                 mtval           <= (exception_code_i == ILLEGAL_INSTRUCTION) 

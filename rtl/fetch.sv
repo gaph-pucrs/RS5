@@ -133,7 +133,7 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
             next_tag    <= '0;
         end
         else if ((jump_i | exception_raised_i | machine_return_i | interrupt_ack_i)) begin
-            next_tag <= current_tag + 1'b1;
+            next_tag    <= current_tag + 1'b1;
         end
         else if (!not_cotinuing) begin
             current_tag <= next_tag;

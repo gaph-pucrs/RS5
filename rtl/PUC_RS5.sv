@@ -17,7 +17,6 @@
  * and is responsible for the instantiation of the lower level modules
  * ans also defines the interface ports (inputs and outputs) os the processor.
  */
-
 /*
 `include "../rtl/my_pkg.sv"
 `include "../rtl/xus/adderUnit.sv"
@@ -81,8 +80,6 @@ module PUC_RS5
     logic   [31:0]   instruction_address;
     logic   [31:0]   mem_address;
 
-    assign mmu_en = privilege != privilegeLevel_e'(2'b11) && mvmctl;
-
 //////////////////////////////////////////////////////////////////////////////
 // Decoder signals
 //////////////////////////////////////////////////////////////////////////////
@@ -141,7 +138,7 @@ module PUC_RS5
 //////////////////////////////////////////////////////////////////////////////
 // CSR Bank signals
 //////////////////////////////////////////////////////////////////////////////
-    
+
     logic           csr_read_enable, csr_write_enable;
     csrOperation_e  csr_operation;
     logic   [11:0]  csr_addr;
@@ -153,10 +150,32 @@ module PUC_RS5
     logic   [31:0]  mvmdb, mvmib, mvmdl, mvmil;
     logic           mvmctl;
 
+
+//////////////////////////////////////////////////////////////////////////////
+// Assigns
+//////////////////////////////////////////////////////////////////////////////
+
+    assign mmu_en = privilege != privilegeLevel_e'(2'b11) && mvmctl;
+
+    assign rs1_data_read =  (rs1 == rd && rd != '0 && regbank_write_enable) 
+                            ? regbank_data_writeback 
+                            : regbank_data1;
+
+    assign rs2_data_read =  (rs2 == rd && rd != '0 && regbank_write_enable) 
+                            ? regbank_data_writeback 
+                            : regbank_data2;
+
+    assign regbank_write_enable =   (rd == '0) 
+                                    ? 0 
+                                    : write_enable_regbank_int;
+                            
+    assign kill_execute = tag_execute != curr_retire_tag;
+
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////// FETCH //////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    
+
     fetch fetch1 (
         .clk                        (clk), 
         .reset                      (reset), 
@@ -183,24 +202,17 @@ module PUC_RS5
     );
 
     mmu i_mmu (
-        .en_i(mmu_en),
-        .base_i(mvmib),
-        .limit_i(mvmil),
-        .address_i(instruction_address),
-        .exception_o(mmu_inst_fault),
-        .address_o(instruction_address_o)
+        .en_i           (mmu_en),
+        .base_i         (mvmib),
+        .limit_i        (mvmil),
+        .address_i      (instruction_address),
+        .exception_o    (mmu_inst_fault),
+        .address_o      (instruction_address_o)
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// DECODER /////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    assign rs1_data_read = (rs1 == rd && rd != '0 && regbank_write_enable) 
-                            ? regbank_data_writeback 
-                            : regbank_data1;
-
-    assign rs2_data_read = (rs2 == rd && rd != '0 && regbank_write_enable) 
-                            ? regbank_data_writeback 
-                            : regbank_data2;
 
     decode decoder1 (
         .clk                        (clk), 
@@ -239,9 +251,6 @@ module PUC_RS5
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// REGISTER BANK ///////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    assign regbank_write_enable = (rd == '0) 
-                                ? 0 
-                                : write_enable_regbank_int; 
 
 `ifndef PROTO
     regbank regbank1 (
@@ -258,28 +267,27 @@ module PUC_RS5
 
 `else
     regBankA RegBankA (
-        .clk    (clk),
-        .we     (regbank_write_enable),
-        .a      (rd),
-        .d      (regbank_data_writeback),
-        .dpra   (rs1),
-        .dpo    (regbank_data1)
+        .clk        (clk),
+        .we         (regbank_write_enable),
+        .a          (rd),
+        .d          (regbank_data_writeback),
+        .dpra       (rs1),
+        .dpo        (regbank_data1)
     );
 
     regBankB RegBankB (
-        .clk    (clk),
-        .we     (regbank_write_enable),
-        .a      (rd),
-        .d      (regbank_data_writeback),
-        .dpra   (rs2),
-        .dpo    (regbank_data2)
+        .clk        (clk),
+        .we         (regbank_write_enable),
+        .a          (rd),
+        .d          (regbank_data_writeback),
+        .dpra       (rs2),
+        .dpo        (regbank_data2)
     );
 `endif
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// EXECUTE /////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    assign kill_execute = tag_execute != curr_retire_tag;
 
     execute execute1 (
         .clk                    (clk), 
@@ -311,7 +319,7 @@ module PUC_RS5
         .csr_address_o          (csr_addr), 
         .csr_data_o             (csr_data_to_write), 
         .csr_data_read_i        (csr_data_read),
-        .privilege_i(privilege),
+        .privilege_i            (privilege),
         .exc_ilegal_inst_i      (exc_ilegal_inst_execute),
         .exc_misaligned_fetch_i (exc_misaligned_fetch_execute),
         .exc_ilegal_inst_o      (exc_ilegal_inst_retire),
@@ -372,7 +380,6 @@ module PUC_RS5
         .raise_exception_i  (RAISE_EXCEPTION), 
         .machine_return_i   (MACHINE_RETURN),
         .exception_code_i   (Exception_Code), 
-        .privilege_i        (privilegeLevel_e'(2'b11)), 
         .pc_i               (pc_retire), 
         .instruction_i      (instruction_retire),
         .jump_i             (jump),
@@ -380,14 +387,14 @@ module PUC_RS5
         .IRQ_i              (IRQ_i), 
         .interrupt_ack_i    (interrupt_ack_o),
         .interrupt_pending_o(Interrupt_pending), 
-        .privilege_o(privilege), 
+        .privilege_o        (privilege), 
         .mepc               (mepc), 
         .mtvec              (mtvec),
-        .mvmctl_o(mvmctl),
-        .mvmdb_o(mvmdb),
-        .mvmdl_o(mvmdl),
-        .mvmib_o(mvmib),
-        .mvmil_o(mvmil)
+        .mvmctl_o           (mvmctl),
+        .mvmdb_o            (mvmdb),
+        .mvmdl_o            (mvmdl),
+        .mvmib_o            (mvmib),
+        .mvmil_o            (mvmil)
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -413,12 +420,12 @@ module PUC_RS5
     end
 
     mmu d_mmu (
-        .en_i(mmu_en),
-        .base_i(mvmdb),
-        .limit_i(mvmdl),
-        .address_i(mem_address),
-        .exception_o(mmu_data_fault),
-        .address_o(mem_address_o)
+        .en_i           (mmu_en),
+        .base_i         (mvmdb),
+        .limit_i        (mvmdl),
+        .address_i      (mem_address),
+        .exception_o    (mmu_data_fault),
+        .address_o      (mem_address_o)
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

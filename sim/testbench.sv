@@ -25,6 +25,7 @@
 `include "../rtl/xus/logicUnit.sv"
 `include "../rtl/xus/LSUnit.sv"
 `include "../rtl/xus/shiftUnit.sv"
+`include "../rtl/mmu.sv"
 `include "../rtl/fetch.sv"
 `include "../rtl/decode.sv"
 `include "../rtl/execute.sv"
