@@ -82,7 +82,7 @@ module csrUnit
             exception_o = 1;
         end
         // Check Level privileges
-        else if (address_o[9:8] < privilege_i && (csr_rd_en_int || csr_wr_en_int)) begin
+        else if (address_o[9:8] > privilege_i && (csr_rd_en_int || csr_wr_en_int)) begin
             exception_o = 1;
         end
         // No exception is raised
