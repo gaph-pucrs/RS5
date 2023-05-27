@@ -109,6 +109,7 @@ module PUC_RS5
     logic           kill_execute;
     logic           exc_ilegal_inst_execute;
     logic           exc_misaligned_fetch_execute;
+    logic           exc_inst_page_fault_execute;
 
 `ifdef BRANCH_PREDICTION
     logic           predicted_branch_execute;
@@ -128,7 +129,7 @@ module PUC_RS5
     logic   [31:0]  pc_retire;
     logic           exc_ilegal_inst_retire;
     logic           exc_misaligned_fetch_retire;
-    logic           exc_inst_access_fault_retire;
+    logic           exc_inst_page_fault_retire;
     logic           killed;
 
 `ifdef BRANCH_PREDICTION
@@ -243,9 +244,11 @@ module PUC_RS5
         .instruction_o              (instruction_execute), 
         .tag_o                      (tag_execute), 
         .instruction_operation_o    (instruction_operation_execute), 
-        .hazard_o                   (hazard), 
+        .hazard_o                   (hazard),
+        .exc_inst_page_fault_i      (mmu_inst_fault),
         .exc_ilegal_inst_o          (exc_ilegal_inst_execute),
-        .exc_misaligned_fetch_o     (exc_misaligned_fetch_execute)
+        .exc_misaligned_fetch_o     (exc_misaligned_fetch_execute),
+        .exc_inst_page_fault_o      (exc_inst_page_fault_execute)
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -322,9 +325,10 @@ module PUC_RS5
         .privilege_i            (privilege),
         .exc_ilegal_inst_i      (exc_ilegal_inst_execute),
         .exc_misaligned_fetch_i (exc_misaligned_fetch_execute),
+        .exc_inst_page_fault_i  (exc_inst_page_fault_execute),
         .exc_ilegal_inst_o      (exc_ilegal_inst_retire),
         .exc_misaligned_fetch_o (exc_misaligned_fetch_retire),
-        .exc_inst_access_fault_o(exc_inst_access_fault_retire)
+        .exc_inst_page_fault_o  (exc_inst_page_fault_retire)
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -343,7 +347,8 @@ module PUC_RS5
         .instruction_operation_i(instruction_operation_retire),
         .exc_ilegal_inst_i      (exc_ilegal_inst_retire),
         .exc_misaligned_fetch_i (exc_misaligned_fetch_retire),
-        .exc_inst_access_fault_i(exc_inst_access_fault_retire),
+        .exc_inst_page_fault_i  (exc_inst_page_fault_retire),
+        .exc_load_access_fault_i(mmu_data_fault),
     `ifdef BRANCH_PREDICTION
         .predicted_branch_i     (predicted_branch_retire),
     `endif
@@ -384,6 +389,7 @@ module PUC_RS5
         .instruction_i      (instruction_retire),
         .jump_i             (jump),
         .jump_target_i      (jump_target),
+        .mtime_i            (mtime_i),
         .IRQ_i              (IRQ_i), 
         .interrupt_ack_i    (interrupt_ack_o),
         .interrupt_pending_o(Interrupt_pending), 

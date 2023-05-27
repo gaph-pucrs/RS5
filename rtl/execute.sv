@@ -61,11 +61,12 @@ module execute
 
     input   privilegeLevel_e    privilege_i,
 
+    input   logic               exc_inst_page_fault_i,
     input   logic               exc_ilegal_inst_i,
     input   logic               exc_misaligned_fetch_i,
     output  logic               exc_ilegal_inst_o,
     output  logic               exc_misaligned_fetch_o,
-    output  logic               exc_inst_access_fault_o
+    output  logic               exc_inst_page_fault_o
 );
     
     logic        jump_int;
@@ -224,7 +225,10 @@ module execute
                 write_enable_o <= 1;
             end
         end
-    end  
+    end 
+
+    logic exc_ilegal_csr_inst;
+    assign  exc_ilegal_csr_inst = csr_exception == 1 && execution_unit_selector == CSR_UNIT;
 
     always_ff @(posedge clk) begin
         if (!stall) begin
@@ -232,9 +236,9 @@ module execute
             instruction_operation_o <= instruction_operation_i;
             instruction_o           <= instruction_i;
             pc_o                    <= pc_i;
-            exc_ilegal_inst_o       <= exc_ilegal_inst_i;
+            exc_ilegal_inst_o       <= exc_ilegal_inst_i | exc_ilegal_csr_inst;
             exc_misaligned_fetch_o  <= exc_misaligned_fetch_i;
-            exc_inst_access_fault_o <= csr_exception == 1 && execution_unit_selector == CSR_UNIT;
+            exc_inst_page_fault_o   <= exc_inst_page_fault_i;
         `ifdef BRANCH_PREDICTION
             predicted_branch_o      <= predicted_branch_i;
         `endif

@@ -40,7 +40,8 @@ module retire
     
     input   logic           exc_ilegal_inst_i,
     input   logic           exc_misaligned_fetch_i,
-    input   logic           exc_inst_access_fault_i,
+    input   logic           exc_inst_page_fault_i,
+    input   logic           exc_load_access_fault_i,
 
 `ifdef BRANCH_PREDICTION
     input   logic           predicted_branch_i,
@@ -228,28 +229,29 @@ module retire
 //////////////////////////////////////////////////////////////////////////////
 // Privileged Architecture Control
 //////////////////////////////////////////////////////////////////////////////
-    logic exception;
-
-    assign exception = exc_ilegal_inst_i | exc_misaligned_fetch_i | exc_inst_access_fault_i;
 
     always_comb begin
         if (!killed_o) begin
-            if (exception) begin
+            if (exc_inst_page_fault_i) begin
                 raise_exception_o = 1;
                 machine_return_o  = 0;
                 interrupt_ack_o   = 0;
-                if (exc_inst_access_fault_i) begin
-                    exception_code_o  = INSTRUCTION_ACCESS_FAULT;
-                    $write("[%0d] EXCEPTION - INSTRUCTION ACESS FAULT: %8h %8h\n", $time, pc_i, instruction_i);
-                end
-                else if (exc_misaligned_fetch_i) begin
-                    exception_code_o  = INSTRUCTION_ADDRESS_MISALIGNED;
-                    $write("[%0d] EXCEPTION - INSTRUCTION ADDRESS MISALIGNED: %8h %8h\n", $time, pc_i, instruction_i);
-                end
-                else begin
-                    exception_code_o  = ILLEGAL_INSTRUCTION;
-                    $write("[%0d] EXCEPTION - ILLEGAL INSTRUCTION: %8h %8h\n", $time, pc_i, instruction_i);
-                end
+                exception_code_o  = INSTRUCTION_PAGE_FAULT;
+                $write("[%0d] EXCEPTION - INSTRUCTION PAGE FAULT: %8h %8h\n", $time, pc_i, instruction_i);
+            end 
+            else if (exc_ilegal_inst_i) begin
+                raise_exception_o = 1;
+                machine_return_o  = 0;
+                interrupt_ack_o   = 0;
+                exception_code_o  = ILLEGAL_INSTRUCTION;
+                $write("[%0d] EXCEPTION - ILLEGAL INSTRUCTION: %8h %8h\n", $time, pc_i, instruction_i);
+            end
+            else if (exc_misaligned_fetch_i) begin
+                raise_exception_o = 1;
+                machine_return_o  = 0;
+                interrupt_ack_o   = 0;
+                exception_code_o  = INSTRUCTION_ADDRESS_MISALIGNED;
+                $write("[%0d] EXCEPTION - INSTRUCTION ADDRESS MISALIGNED: %8h %8h\n", $time, pc_i, instruction_i);
             end 
             else if (instruction_operation_i == ECALL) begin
                 raise_exception_o = 1;
@@ -264,6 +266,13 @@ module retire
                 machine_return_o  = 0;
                 interrupt_ack_o   = 0;
                 $write("[%0d] EXCEPTION - EBREAK: %8h %8h\n", $time, pc_i, instruction_i);
+            end
+            else if (exc_load_access_fault_i) begin
+                raise_exception_o = 1;
+                machine_return_o  = 0;
+                interrupt_ack_o   = 0;
+                exception_code_o  = LOAD_ACCESS_FAULT;
+                $write("[%0d] EXCEPTION - LOAD ACCESS FAULT: %8h %8h\n", $time, pc_i, instruction_i);
             end 
             else if (instruction_operation_i == MRET) begin
                 raise_exception_o = 0;

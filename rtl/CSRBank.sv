@@ -111,7 +111,7 @@ module CSRBank
             MVMDL:      begin current_val = mvmdl;           wmask = 32'hFFFFFFFC; end
             MVMIB:      begin current_val = mvmib;           wmask = 32'hFFFFFFFC; end
             MVMIL:      begin current_val = mvmil;           wmask = 32'hFFFFFFFC; end
-            MVMCTL:     begin current_val = mvmctl;          wmask = 32'h00000001; end
+            MVMCTL:     begin current_val = {31'b0, mvmctl}; wmask = 32'h00000001; end
 
             default:    begin current_val = '0;              wmask = 32'h00000000; end
         endcase
@@ -158,14 +158,14 @@ module CSRBank
             mvmil       <= '0;
         end 
         else begin
-            mcycle  <= mcycle + 1;
-            minstret <= (killed) 
-                        ? minstret 
-                        : minstret + 1;
+            mcycle      <= mcycle + 1;
+            minstret    <= (killed) 
+                            ? minstret 
+                            : minstret + 1;
         
             if (machine_return_i) begin
-                mstatus[3] <= mstatus[7];          // MIE = MPIE
-                privilege  <= privilegeLevel_e'(mstatus[12:11]);      // priv = MPP
+                mstatus[3]      <= mstatus[7];          // MIE = MPIE
+                privilege       <= privilegeLevel_e'(mstatus[12:11]);      // priv = MPP
             end
             else if (raise_exception_i) begin
                 mcause[31]      <= '0;
@@ -191,9 +191,9 @@ module CSRBank
                 mstatus[3]      <= 0;                   // MIE = 0
 
                 if(jump_i)
-                    mepc_r          <= jump_target_i;
+                    mepc_r      <= jump_target_i;
                 else
-                    mepc_r          <= pc_i;            // Return address
+                    mepc_r      <= pc_i;                // Return address
             
             end 
             else if (write_enable_i && !killed) begin
@@ -215,7 +215,7 @@ module CSRBank
                     MCYCLEH:      mcycle[63:32]   <= wr_data;
                     MINSTRET:     minstret[31:0]  <= wr_data;
                     MINSTRETH:    minstret[63:32] <= wr_data;
-                    MVMCTL:       mvmctl          <= wr_data;
+                    MVMCTL:       mvmctl          <= wr_data[0];
                     MVMDB:        mvmdb           <= wr_data;
                     MVMDL:        mvmdl           <= wr_data;
                     MVMIB:        mvmib           <= wr_data;
@@ -269,7 +269,7 @@ module CSRBank
                 MVMIB:       out = mvmib[31:0];
                 MVMIL:       out = mvmil[31:0];
 
-                default:    out = '0;
+                default:     out = '0;
             endcase
         end
         else begin
