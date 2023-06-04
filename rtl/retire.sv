@@ -158,7 +158,7 @@ module retire
 
     always_comb begin
         if (instruction_operation_i == LB || instruction_operation_i == LBU) begin
-            case (results_i[1][1:0])
+            case (results_i[0][1:0])
                 2'b11:   begin 
                             memory_data[7:0]  = mem_data_i[31:24]; 
                             memory_data[31:8] = (mem_data_i[31] && instruction_operation_i == LB) 
@@ -186,7 +186,7 @@ module retire
             endcase
         end
         else if (instruction_operation_i == LH || instruction_operation_i == LHU) begin
-            case (results_i[1][1])
+            case (results_i[0][1])
                 1'b1:    begin 
                             memory_data[15:0]  = mem_data_i[31:16]; 
                             memory_data[31:16] = (mem_data_i[31] && instruction_operation_i == LH) 
@@ -200,7 +200,6 @@ module retire
                                                 : '0; 
                         end
             endcase
-
         end 
         else begin
             memory_data = mem_data_i;
@@ -208,21 +207,14 @@ module retire
     end
 
 //////////////////////////////////////////////////////////////////////////////
-// Memory mem_write_enable_o control
+// Memory Write Enable control
 //////////////////////////////////////////////////////////////////////////////
 
-    always_comb begin
-        if (mem_write_enable_i != '0 && !killed) begin
-            mem_write_enable_o  = mem_write_enable_i;
-            mem_write_address_o = results_i[1];
-            mem_data_o          = results_i[0];
-        end 
-        else begin
-            mem_write_enable_o  = '0;
-            mem_write_address_o = '0;
-            mem_data_o          = '0;
-        end
-    end
+    assign mem_write_address_o = results_i[0];
+    assign mem_data_o          = results_i[1];
+    assign mem_write_enable_o  = (!killed)
+                                ? mem_write_enable_i:
+                                '0;
 
 //////////////////////////////////////////////////////////////////////////////
 // Privileged Architecture Control

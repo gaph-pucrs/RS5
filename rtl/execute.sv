@@ -48,9 +48,9 @@ module execute
     output  logic [2:0]    tag_o,              // Instruction tag
     output  logic          jump_o,             // Signal that indicates a branch taken
     output  logic          write_enable_o,     // Write enable to regbank
+    output  logic [3:0]    mem_write_enable_o, // Signal that indicates the write memory operation to retire
 
     output  logic [31:0]   mem_read_address_o, // Memory Read Address
-    output  logic [3:0]    mem_write_enable_o, // Signal that indicates the write memory operation to retire
     output  logic          mem_read_o,         // Allows memory read
 
     output  logic          csr_read_enable_o,
@@ -64,11 +64,11 @@ module execute
     output  logic          exception_o
 );
     
-    logic jump_int;
-    logic write_enable_regbank_branch_unit, write_enable_regbank_memory_unit;
-    logic csr_exception;
-    logic [3:0] mem_write_enable_int;
-    logic [31:0] results_int [7:0];
+    logic           jump;
+    logic           csr_exception;
+    logic  [3:0]    mem_write_enable;
+    logic [31:0]    mem_write_data;
+    logic [31:0]    result_alu;
 
     operationType_e execution_unit_operation;
     executionUnit_e execution_unit_selector;
@@ -80,53 +80,15 @@ module execute
 // Instantiation of execution units
 //////////////////////////////////////////////////////////////////////////////
 
-    adderUnit adder1 (
-        .first_operand_i(first_operand_i),
-        .second_operand_i(second_operand_i),
-        .operation_i(execution_unit_operation),
-        .result_o(results_int[0])
+    ALU alu1 (
+        .opA_i(first_operand_i),
+        .opB_i(second_operand_i),
+        .opC_i(third_operand_i),
+        .opD_i(pc_i),
+        .result_o(result_alu),
+        .jump_o(jump)
     );
 
-    logicUnit logical1 (
-        .first_operand_i(first_operand_i),
-        .second_operand_i(second_operand_i),
-        .operation_i(execution_unit_operation),
-        .result_o(results_int[1])
-    );
-    
-    shiftUnit shift1 (
-        .first_operand_i(first_operand_i),
-        .second_operand_i(second_operand_i[4:0]),
-        .operation_i(execution_unit_operation),
-        .result_o(results_int[2])
-    );
-    
-    branchUnit branch1 (
-        .first_operand_i(first_operand_i),
-        .second_operand_i(second_operand_i),
-        .offset_i(third_operand_i),
-        .pc_i(pc_i),
-        .operation_i(execution_unit_operation),
-        .result_o(results_int[4]),
-        .result_jal_o(results_int[3]),
-        .jump_o(jump_int),
-        .write_enable_o(write_enable_regbank_branch_unit)
-    );
-
-    LSUnit memory1 (
-        .first_operand_i(first_operand_i),
-        .second_operand_i(second_operand_i),
-        .data_i(third_operand_i),
-        .operation_i(execution_unit_operation),
-        .enable_i(execution_unit_selector == MEMORY_UNIT),
-        .read_address_o(mem_read_address_o),
-        .read_o(mem_read_o),
-        .write_address_o(results_int[7]),
-        .write_data_o(results_int[6]),
-        .write_enable_o(mem_write_enable_int),
-        .write_enable_regBank(write_enable_regbank_memory_unit)
-    );
-    
     csrUnit CSRaccess (
         .first_operand_i(first_operand_i),
         .instruction_i(instruction_i),
@@ -139,8 +101,50 @@ module execute
         .data_o(csr_data_o),
         .exception_o(csr_exception)
     );
-    
-    assign results_int[5] = second_operand_i; // BYPASS
+
+//////////////////////////////////////////////////////////////////////////////
+// Load/Store signals
+//////////////////////////////////////////////////////////////////////////////
+
+    assign mem_read_address_o = result_alu;
+    assign mem_read_o         = instruction_operation_i inside {LB, LBU, LH, LHU, LW};
+
+    always_comb begin
+        if (instruction_operation_i == SB) begin
+            mem_write_data = {4{third_operand_i[7:0]}};
+        end
+        else if (instruction_operation_i == SH) begin
+            mem_write_data = {2{third_operand_i[15:0]}};
+        end
+        else if (instruction_operation_i == SW) begin
+            mem_write_data = third_operand_i;
+        end
+        else begin
+            mem_write_data = '0;
+        end
+    end
+
+    always_comb begin
+        if (instruction_operation_i == SB) begin
+            unique case (result_alu[1:0])
+                2'b11:   mem_write_enable = 4'b1000;
+                2'b10:   mem_write_enable = 4'b0100;
+                2'b01:   mem_write_enable = 4'b0010;
+                default: mem_write_enable = 4'b0001;
+            endcase
+        end
+        else if (instruction_operation_i == SH) begin
+            mem_write_enable    = (result_alu[1]) 
+                                ? 4'b1100 
+                                : 4'b0011;
+        end 
+        else if (instruction_operation_i == SW) begin // SW
+            mem_write_enable    = 4'b1111;
+        end
+        else begin
+            mem_write_enable    = 4'b0;
+        end
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 // Demux
@@ -148,76 +152,39 @@ module execute
 
     always_ff @(posedge clk) begin 
         if (!stall) begin
-            if (execution_unit_selector == ADDER_UNIT) begin
-                result_o[0] <= results_int[0];
-            end
-            else if (execution_unit_selector == LOGICAL_UNIT) begin
-                result_o[0] <= results_int[1];
-            end
-            else if (execution_unit_selector == SHIFTER_UNIT) begin
-                result_o[0] <= results_int[2];
+            if (execution_unit_selector inside {ADDER_UNIT, LOGICAL_UNIT, SHIFTER_UNIT, MEMORY_UNIT}) begin
+                result_o[0] <= result_alu;
             end
             else if (execution_unit_selector == BRANCH_UNIT) begin
-                result_o[0] <= results_int[3];
-            end
-            else if (execution_unit_selector == MEMORY_UNIT) begin
-                result_o[0] <= results_int[6];
+                result_o[0] <= pc_i + 4;
             end
             else if (execution_unit_selector == CSR_UNIT) begin
                 result_o[0] <= csr_data_read_i;
             end
             else begin
-                result_o[0] <= results_int[5];
+                result_o[0] <= second_operand_i;
             end
         end
     end
 
     always_ff @(posedge clk) begin
         if (!stall) begin
-            if (execution_unit_selector == BRANCH_UNIT) begin
-                result_o[1] <= results_int[4];
-            end
-            else if (execution_unit_selector == MEMORY_UNIT) begin
-                result_o[1] <= results_int[7];
-            end
-            else begin 
-                result_o[1] <= '0;
-            end
-        end
-    end  
-    
-    always_ff @(posedge clk) begin
-        if (!stall) begin
-            if (execution_unit_selector == BRANCH_UNIT) begin
-                jump_o <= jump_int;
-            end
-            else begin
-                jump_o <= '0;
-            end
-        end
-    end  
-
-    always_ff @(posedge clk) begin
-        if (!stall) begin
             if (execution_unit_selector == MEMORY_UNIT) begin
-                mem_write_enable_o <= mem_write_enable_int;
+                result_o[1] <= mem_write_data;
             end
             else begin
-                mem_write_enable_o <= '0;
+                result_o[1] <= result_alu;
             end
         end
-    end  
+    end 
 
     always_ff @(posedge clk) begin
         if (!stall) begin
-            if (execution_unit_selector == BRANCH_UNIT) begin
-                write_enable_o <= write_enable_regbank_branch_unit;
-            end
-            else if (execution_unit_selector == MEMORY_UNIT) begin
-                write_enable_o <= write_enable_regbank_memory_unit;
+            if (instruction_operation_i inside {SB, SH, SW, BEQ, BNE, BLT, BLTU, BGE, BGEU}) begin
+                write_enable_o <= 1'b0;
             end
             else begin
-                write_enable_o <= 1;
+                write_enable_o <= 1'b1;
             end
         end
     end  
@@ -227,6 +194,8 @@ module execute
             tag_o                   <= tag_i;
             instruction_operation_o <= instruction_operation_i;
             instruction_o           <= instruction_i;
+            jump_o                  <= jump;
+            mem_write_enable_o      <= mem_write_enable;
             pc_o                    <= pc_i;
             exception_o             <= exception_i | csr_exception;
         `ifdef BRANCH_PREDICTION
