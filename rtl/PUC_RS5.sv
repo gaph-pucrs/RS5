@@ -20,14 +20,9 @@
 
 /*
 `include "../rtl/my_pkg.sv"
-`include "../rtl/xus/adderUnit.sv"
-`include "../rtl/xus/csrUnit.sv"
-`include "../rtl/xus/branchUnit.sv"
-`include "../rtl/xus/logicUnit.sv"
-`include "../rtl/xus/LSUnit.sv"
-`include "../rtl/xus/shiftUnit.sv"
 `include "../rtl/fetch.sv"
 `include "../rtl/decode.sv"
+`include "../rtl/ALU.sv"
 `include "../rtl/execute.sv"
 `include "../rtl/retire.sv"
 `include "../rtl/regbank.sv"
