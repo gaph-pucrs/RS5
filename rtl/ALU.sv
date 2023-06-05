@@ -8,6 +8,7 @@ module ALU
     input   iType_e             operation_i,
 
     output  logic [31:0]        result_o,
+    output  logic [31:0]        sum_o,
     output  logic               jump_o
 );
 
@@ -87,5 +88,7 @@ module ALU
             default:        jump_o = 0;
         endcase
     end
+
+    assign sum_o = sum;
 
 endmodule
