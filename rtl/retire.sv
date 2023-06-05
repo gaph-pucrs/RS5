@@ -65,16 +65,14 @@ module retire
     logic [31:0] memory_data;
     logic [2:0] curr_tag;
     logic killed;
-    executionUnit_e execution_unit_selection;
 
     assign current_retire_tag_o = curr_tag;
-    assign execution_unit_selection = executionUnit_e'(instruction_operation_i[5:3]);
 
 //////////////////////////////////////////////////////////////////////////////
 // Assign to Register Bank Write Back
 //////////////////////////////////////////////////////////////////////////////
 
-    assign regbank_data_o = (execution_unit_selection == MEMORY_UNIT) 
+    assign regbank_data_o = (instruction_operation_i inside {LB,LBU,LH,LHU,LW}) 
                             ? memory_data 
                             : results_i[0];
 

@@ -30,7 +30,7 @@ module ALU
     logic greater_equal_unsigned;
 
     logic is_cond_branch;
-    assign is_cond_branch = executionUnit_e'(operation_i[5:3]) == BRANCH_UNIT && !(operation_i inside{JAL,JALR});
+    assign is_cond_branch = operation_i inside{BEQ,BNE,BLT,BLTU,BGE,BGEU};
 
     assign opB_int = operation_i == SUB
                     ? -opB_i
@@ -72,6 +72,7 @@ module ALU
             SRL:            result_o = srl;
             SRA:            result_o = sra;
             JALR:           result_o = {sum[31:1], 1'b0};
+            LUI:            result_o = opB_i;
             default:        result_o = sum;
         endcase
     end

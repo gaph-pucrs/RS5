@@ -73,10 +73,6 @@ module execute
     logic [31:0]    result_alu;
     logic [31:0]    sum_alu;
 
-    executionUnit_e execution_unit_selector;
-
-    assign execution_unit_selector  = executionUnit_e'(instruction_operation_i[5:3]);
-
 //////////////////////////////////////////////////////////////////////////////
 // Instantiation of ALU
 //////////////////////////////////////////////////////////////////////////////
@@ -200,24 +196,21 @@ module execute
 
     always_ff @(posedge clk) begin 
         if (!stall) begin
-            if (execution_unit_selector inside {ADDER_UNIT, LOGICAL_UNIT, SHIFTER_UNIT, MEMORY_UNIT}) begin
-                result_o[0] <= result_alu;
-            end
-            else if (execution_unit_selector == BRANCH_UNIT) begin
+            if (instruction_operation_i inside{JAL,JALR}) begin
                 result_o[0] <= pc_i + 4;
             end
-            else if (execution_unit_selector == CSR_UNIT) begin
+            else if (instruction_operation_i inside{CSRRW,CSRRS,CSRRC,CSRRWI,CSRRSI,CSRRCI}) begin
                 result_o[0] <= csr_data_read_i;
             end
             else begin
-                result_o[0] <= second_operand_i;
+                result_o[0] <= result_alu;
             end
         end
     end
 
     always_ff @(posedge clk) begin
         if (!stall) begin
-            if (execution_unit_selector == MEMORY_UNIT) begin
+            if (instruction_operation_i inside{SB,SH,SW}) begin
                 result_o[1] <= mem_write_data;
             end
             else begin
