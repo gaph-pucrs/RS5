@@ -281,6 +281,7 @@ module PUC_RS5
         .csr_address_o(csr_addr), 
         .csr_data_o(csr_data_to_write), 
         .csr_data_read_i(csr_data_read),
+        .privilege_i(privilegeLevel_e'(2'b11)),
         .exception_i(exception_execute),
         .exception_o(exception_retire)
     );

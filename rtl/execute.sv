@@ -72,11 +72,9 @@ module execute
     logic [31:0]    mem_write_data;
     logic [31:0]    result_alu;
 
-    operationType_e execution_unit_operation;
     executionUnit_e execution_unit_selector;
 
     assign execution_unit_selector  = executionUnit_e'(instruction_operation_i[5:3]);
-    assign execution_unit_operation = operationType_e'(instruction_operation_i[2:0]);
 
 //////////////////////////////////////////////////////////////////////////////
 // Instantiation of ALU
@@ -87,6 +85,7 @@ module execute
         .opB_i      (second_operand_i),
         .opC_i      (third_operand_i),
         .opD_i      (pc_i),
+        .operation_i(instruction_operation_i),
         .result_o   (result_alu),
         .jump_o     (jump)
     );
