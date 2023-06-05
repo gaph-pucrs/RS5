@@ -71,6 +71,7 @@ module execute
     logic  [3:0]    mem_write_enable;
     logic [31:0]    mem_write_data;
     logic [31:0]    result_alu;
+    logic [31:0]    sum_alu;
 
     executionUnit_e execution_unit_selector;
 
@@ -87,6 +88,7 @@ module execute
         .opD_i      (pc_i),
         .operation_i(instruction_operation_i),
         .result_o   (result_alu),
+        .sum_o      (sum_alu),
         .jump_o     (jump)
     );
 
@@ -94,7 +96,7 @@ module execute
 // Load/Store signals
 //////////////////////////////////////////////////////////////////////////////
 
-    assign mem_read_address_o = result_alu;
+    assign mem_read_address_o = sum_alu;
     assign mem_read_o         = instruction_operation_i inside {LB, LBU, LH, LHU, LW};
 
     always_comb begin
@@ -108,7 +110,7 @@ module execute
 
     always_comb begin
         if (instruction_operation_i == SB) begin
-            unique case (result_alu[1:0])
+            unique case (sum_alu[1:0])
                 2'b11:   mem_write_enable = 4'b1000;
                 2'b10:   mem_write_enable = 4'b0100;
                 2'b01:   mem_write_enable = 4'b0010;
@@ -116,7 +118,7 @@ module execute
             endcase
         end
         else if (instruction_operation_i == SH) begin
-            mem_write_enable = (result_alu[1]) 
+            mem_write_enable = (sum_alu[1]) 
                                 ? 4'b1100 
                                 : 4'b0011;
         end 
