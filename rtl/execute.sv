@@ -66,33 +66,77 @@ module execute
     output  logic               exception_o
 );
     
-    logic           jump;
     logic           csr_exception;
     logic  [3:0]    mem_write_enable;
     logic [31:0]    mem_write_data;
-    logic [31:0]    result_alu;
-    logic [31:0]    sum_alu;
 
 //////////////////////////////////////////////////////////////////////////////
-// Instantiation of ALU
+// ALU
 //////////////////////////////////////////////////////////////////////////////
 
-    ALU alu1 (
-        .opA_i      (first_operand_i),
-        .opB_i      (second_operand_i),
-        .opC_i      (third_operand_i),
-        .opD_i      (pc_i),
-        .operation_i(instruction_operation_i),
-        .result_o   (result_alu),
-        .sum_o      (sum_alu),
-        .jump_o     (jump)
-    );
+    logic [31:0]    adderB;
+    logic [31:0]    sum_result;
+    logic [31:0]    sum2_result;
+    logic [31:0]    and_result;
+    logic [31:0]    or_result;
+    logic [31:0]    xor_result;
+    logic [31:0]    sll_result;
+    logic [31:0]    srl_result;
+    logic [31:0]    sra_result;
+
+    logic           equal;
+    logic           less_than;
+    logic           less_than_unsigned;
+    logic           greater_equal;
+    logic           greater_equal_unsigned;
+    logic           jump;
+
+    assign adderB = instruction_operation_i == SUB
+                    ? -second_operand_i
+                    :  second_operand_i;
+
+    always_comb begin
+        unique case (instruction_operation_i)
+            JAL, JALR:  sum2_result = pc_i + 4;
+            SUB:        sum2_result = first_operand_i + adderB;
+            default:    sum2_result = pc_i + third_operand_i;
+        endcase
+    end
+
+    always_comb begin
+        sum_result              = first_operand_i + second_operand_i;
+        and_result              = first_operand_i & second_operand_i;
+        or_result               = first_operand_i | second_operand_i;
+        xor_result              = first_operand_i ^ second_operand_i;
+        sll_result              = first_operand_i << second_operand_i[4:0];
+        srl_result              = first_operand_i >> second_operand_i[4:0];
+        sra_result              = $signed(first_operand_i) >>> second_operand_i[4:0];
+
+        equal                   = first_operand_i == second_operand_i;
+        less_than               = $signed(first_operand_i) < $signed(second_operand_i);
+        less_than_unsigned      = $unsigned(first_operand_i) < $unsigned(second_operand_i);
+        greater_equal           = $signed(first_operand_i) >= $signed(second_operand_i);
+        greater_equal_unsigned  = $unsigned(first_operand_i) >= $unsigned(second_operand_i);
+    end
+
+    always_comb begin
+        unique case (instruction_operation_i)
+            BEQ:            jump = equal;
+            BNE:            jump = ~equal;
+            BLT:            jump = less_than;
+            BLTU:           jump = less_than_unsigned;
+            BGE:            jump = greater_equal;
+            BGEU:           jump = greater_equal_unsigned;
+            JAL, JALR:      jump = 1'b1;
+            default:        jump = 1'b0;
+        endcase
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 // Load/Store signals
 //////////////////////////////////////////////////////////////////////////////
 
-    assign mem_read_address_o = sum_alu;
+    assign mem_read_address_o = sum_result;
     assign mem_read_o         = instruction_operation_i inside {LB, LBU, LH, LHU, LW};
 
     always_comb begin
@@ -105,26 +149,20 @@ module execute
     end
 
     always_comb begin
-        if (instruction_operation_i == SB) begin
-            unique case (sum_alu[1:0])
-                2'b11:   mem_write_enable = 4'b1000;
-                2'b10:   mem_write_enable = 4'b0100;
-                2'b01:   mem_write_enable = 4'b0010;
-                default: mem_write_enable = 4'b0001;
-            endcase
-        end
-        else if (instruction_operation_i == SH) begin
-            mem_write_enable = (sum_alu[1]) 
-                                ? 4'b1100 
-                                : 4'b0011;
-        end 
-        else if (instruction_operation_i == SW) begin
-            mem_write_enable = 4'b1111;
-        end
-        else begin
-            mem_write_enable = 4'b0;
-        end
-    end
+        unique case (instruction_operation_i)
+            SB: unique case (sum_result[1:0])
+                    2'b11:   mem_write_enable = 4'b1000;
+                    2'b10:   mem_write_enable = 4'b0100;
+                    2'b01:   mem_write_enable = 4'b0010;
+                    default: mem_write_enable = 4'b0001;
+                endcase
+            SH:              mem_write_enable = (sum_result[1]) 
+                                                ? 4'b1100 
+                                                : 4'b0011;
+            SW:              mem_write_enable = 4'b1111;
+            default:         mem_write_enable = 4'b0000;
+        endcase
+end
 
 //////////////////////////////////////////////////////////////////////////////
 // CSR access signals
@@ -196,37 +234,44 @@ module execute
 
     always_ff @(posedge clk) begin 
         if (!stall) begin
-            if (instruction_operation_i inside{JAL,JALR}) begin
-                result_o[0] <= pc_i + 4;
-            end
-            else if (instruction_operation_i inside{CSRRW,CSRRS,CSRRC,CSRRWI,CSRRSI,CSRRCI}) begin
-                result_o[0] <= csr_data_read_i;
-            end
-            else begin
-                result_o[0] <= result_alu;
-            end
+            unique case (instruction_operation_i)
+                CSRRW, CSRRS, CSRRC,
+                CSRRWI,CSRRSI,CSRRCI:   result_o[0] <= csr_data_read_i;
+                JAL,JALR,SUB:           result_o[0] <= sum2_result;
+                SLT:                    result_o[0] <= {31'b0, less_than};
+                SLTU:                   result_o[0] <= {31'b0, less_than_unsigned};
+                XOR:                    result_o[0] <= xor_result;
+                OR:                     result_o[0] <= or_result;
+                AND:                    result_o[0] <= and_result;
+                SLL:                    result_o[0] <= sll_result;
+                SRL:                    result_o[0] <= srl_result;
+                SRA:                    result_o[0] <= sra_result;
+                LUI:                    result_o[0] <= second_operand_i;
+                default:                result_o[0] <= sum_result;
+            endcase
         end
     end
 
     always_ff @(posedge clk) begin
         if (!stall) begin
-            if (instruction_operation_i inside{SB,SH,SW}) begin
-                result_o[1] <= mem_write_data;
-            end
-            else begin
-                result_o[1] <= result_alu;
-            end
+            unique case (instruction_operation_i)
+                SB,SH,SW:   result_o[1] <= mem_write_data;
+                JALR:       result_o[1] <= {sum_result[31:1], 1'b0};
+                JAL:        result_o[1] <= sum_result;
+                default:    result_o[1] <= sum2_result;
+            endcase
         end
-    end 
+    end
 
     always_ff @(posedge clk) begin
         if (!stall) begin
-            if (instruction_operation_i inside {SB, SH, SW, BEQ, BNE, BLT, BLTU, BGE, BGEU}) begin
-                write_enable_o <= 1'b0;
-            end
-            else begin
-                write_enable_o <= 1'b1;
-            end
+            unique case (instruction_operation_i)
+                SB,SH,SW,
+                BEQ,BNE,
+                BLT,BLTU,
+                BGE,BGEU:  write_enable_o <= 1'b0;
+                default:   write_enable_o <= 1'b1;
+            endcase
         end
     end  
 

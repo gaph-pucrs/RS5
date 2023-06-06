@@ -21,7 +21,6 @@
 `include "../rtl/my_pkg.sv"
 `include "../rtl/fetch.sv"
 `include "../rtl/decode.sv"
-`include "../rtl/ALU.sv"
 `include "../rtl/execute.sv"
 `include "../rtl/retire.sv"
 `include "../rtl/regbank.sv"
