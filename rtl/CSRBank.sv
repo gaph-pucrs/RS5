@@ -58,17 +58,17 @@ module CSRBank
     output  logic [31:0]        mepc,
 
     output  logic               mvmctl_o,
-    output  logic [31:0]        mvmdb_o, 
-    output  logic [31:0]        mvmib_o, 
-    output  logic [31:0]        mvmdl_o, 
-    output  logic [31:0]        mvmil_o     
+    output  logic [31:0]        mvmdo_o, 
+    output  logic [31:0]        mvmio_o, 
+    output  logic [31:0]        mvmds_o, 
+    output  logic [31:0]        mvmis_o     
 );
 
     CSRs CSR;
     privilegeLevel_e privilege;
 
     logic [31:0] mstatus, misa, mie, mtvec_r, mscratch, mepc_r, mcause, mtval, mip;
-    logic [31:0] mvmdb, mvmib, mvmdl, mvmil;
+    logic [31:0] mvmdo, mvmio, mvmds, mvmis;
     logic        mvmctl;
     logic [63:0] mcycle, minstret;
     
@@ -80,10 +80,10 @@ module CSRBank
     assign mtvec       = mtvec_r;
     assign mepc        = mepc_r;
     assign mvmctl_o    = mvmctl;
-    assign mvmdb_o     = mvmdb;
-    assign mvmdl_o     = mvmdl;
-    assign mvmib_o     = mvmib;
-    assign mvmil_o     = mvmil;
+    assign mvmdo_o     = mvmdo;
+    assign mvmds_o     = mvmds;
+    assign mvmio_o     = mvmio;
+    assign mvmis_o     = mvmis;
 
     assign CSR = CSRs'(address_i);
 
@@ -107,10 +107,10 @@ module CSRBank
             MCYCLEH:    begin current_val = mcycle[63:32];   wmask = 32'hFFFFFFFF; end
             MINSTRET:   begin current_val = minstret[31:0];  wmask = 32'hFFFFFFFF; end
             MINSTRETH:  begin current_val = minstret[63:32]; wmask = 32'hFFFFFFFF; end
-            MVMDB:      begin current_val = mvmdb;           wmask = 32'hFFFFFFFC; end
-            MVMDL:      begin current_val = mvmdl;           wmask = 32'hFFFFFFFC; end
-            MVMIB:      begin current_val = mvmib;           wmask = 32'hFFFFFFFC; end
-            MVMIL:      begin current_val = mvmil;           wmask = 32'hFFFFFFFC; end
+            MVMDO:      begin current_val = mvmdo;           wmask = 32'hFFFFFFFC; end
+            MVMDS:      begin current_val = mvmds;           wmask = 32'hFFFFFFFC; end
+            MVMIO:      begin current_val = mvmio;           wmask = 32'hFFFFFFFC; end
+            MVMIS:      begin current_val = mvmis;           wmask = 32'hFFFFFFFC; end
             MVMCTL:     begin current_val = {31'b0, mvmctl}; wmask = 32'h00000001; end
 
             default:    begin current_val = '0;              wmask = 32'h00000000; end
@@ -152,10 +152,10 @@ module CSRBank
             mcycle      <= '0;
             minstret    <= '0;
             mvmctl      <= '0;
-            mvmdb       <= '0;
-            mvmdl       <= '0;
-            mvmib       <= '0;
-            mvmil       <= '0;
+            mvmdo       <= '0;
+            mvmds       <= '0;
+            mvmio       <= '0;
+            mvmis       <= '0;
         end 
         else begin
             mcycle      <= mcycle + 1;
@@ -216,10 +216,10 @@ module CSRBank
                     MINSTRET:     minstret[31:0]  <= wr_data;
                     MINSTRETH:    minstret[63:32] <= wr_data;
                     MVMCTL:       mvmctl          <= wr_data[0];
-                    MVMDB:        mvmdb           <= wr_data;
-                    MVMDL:        mvmdl           <= wr_data;
-                    MVMIB:        mvmib           <= wr_data;
-                    MVMIL:        mvmil           <= wr_data;
+                    MVMDO:        mvmdo           <= wr_data;
+                    MVMDS:        mvmds           <= wr_data;
+                    MVMIO:        mvmio           <= wr_data;
+                    MVMIS:        mvmis           <= wr_data;
                     default:    ; // no op
                 endcase
             end
@@ -264,10 +264,10 @@ module CSRBank
                 INSTRETH:    out = minstret[63:32];
 
                 MVMCTL:      out = {31'b0,mvmctl};
-                MVMDB:       out = mvmdb[31:0];
-                MVMDL:       out = mvmdl[31:0];
-                MVMIB:       out = mvmib[31:0];
-                MVMIL:       out = mvmil[31:0];
+                MVMDO:       out = mvmdo[31:0];
+                MVMDS:       out = mvmds[31:0];
+                MVMIO:       out = mvmio[31:0];
+                MVMIS:       out = mvmis[31:0];
 
                 default:     out = '0;
             endcase
