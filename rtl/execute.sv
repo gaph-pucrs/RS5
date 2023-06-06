@@ -66,15 +66,18 @@ module execute
     output  logic               exception_o
 );
     
-    logic           csr_exception;
+    logic [31:0]    result [1:0];
+    logic           write_enable;
     logic  [3:0]    mem_write_enable;
     logic [31:0]    mem_write_data;
+    logic           csr_exception;
 
 //////////////////////////////////////////////////////////////////////////////
 // ALU
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [31:0]    adderB;
+    logic [31:0]    sum2_opA;
+    logic [31:0]    sum2_opB;
     logic [31:0]    sum_result;
     logic [31:0]    sum2_result;
     logic [31:0]    and_result;
@@ -91,20 +94,24 @@ module execute
     logic           greater_equal_unsigned;
     logic           jump;
 
-    assign adderB = instruction_operation_i == SUB
-                    ? -second_operand_i
-                    :  second_operand_i;
+    always_comb begin
+        unique case (instruction_operation_i)
+            SUB:      sum2_opA = first_operand_i;
+            default:  sum2_opA = pc_i;
+        endcase
+    end
 
     always_comb begin
         unique case (instruction_operation_i)
-            JAL, JALR:  sum2_result = pc_i + 4;
-            SUB:        sum2_result = first_operand_i + adderB;
-            default:    sum2_result = pc_i + third_operand_i;
+            JAL, JALR:  sum2_opB = 4;
+            SUB:        sum2_opB = -second_operand_i;
+            default:    sum2_opB = third_operand_i;
         endcase
     end
 
     always_comb begin
         sum_result              = first_operand_i + second_operand_i;
+        sum2_result             = sum2_opA + sum2_opB;
         and_result              = first_operand_i & second_operand_i;
         or_result               = first_operand_i | second_operand_i;
         xor_result              = first_operand_i ^ second_operand_i;
@@ -229,60 +236,60 @@ end
     end
 
 //////////////////////////////////////////////////////////////////////////////
-// Demux and Outputs
+// Demux
 //////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk) begin 
-        if (!stall) begin
-            unique case (instruction_operation_i)
-                CSRRW, CSRRS, CSRRC,
-                CSRRWI,CSRRSI,CSRRCI:   result_o[0] <= csr_data_read_i;
-                JAL,JALR,SUB:           result_o[0] <= sum2_result;
-                SLT:                    result_o[0] <= {31'b0, less_than};
-                SLTU:                   result_o[0] <= {31'b0, less_than_unsigned};
-                XOR:                    result_o[0] <= xor_result;
-                OR:                     result_o[0] <= or_result;
-                AND:                    result_o[0] <= and_result;
-                SLL:                    result_o[0] <= sll_result;
-                SRL:                    result_o[0] <= srl_result;
-                SRA:                    result_o[0] <= sra_result;
-                LUI:                    result_o[0] <= second_operand_i;
-                default:                result_o[0] <= sum_result;
-            endcase
-        end
+    always_comb begin 
+        unique case (instruction_operation_i)
+            CSRRW, CSRRS, CSRRC,
+            CSRRWI,CSRRSI,CSRRCI:   result[0] = csr_data_read_i;
+            JAL,JALR,SUB:           result[0] = sum2_result;
+            SLT:                    result[0] = {31'b0, less_than};
+            SLTU:                   result[0] = {31'b0, less_than_unsigned};
+            XOR:                    result[0] = xor_result;
+            OR:                     result[0] = or_result;
+            AND:                    result[0] = and_result;
+            SLL:                    result[0] = sll_result;
+            SRL:                    result[0] = srl_result;
+            SRA:                    result[0] = sra_result;
+            LUI:                    result[0] = second_operand_i;
+            default:                result[0] = sum_result;
+        endcase
     end
 
-    always_ff @(posedge clk) begin
-        if (!stall) begin
-            unique case (instruction_operation_i)
-                SB,SH,SW:   result_o[1] <= mem_write_data;
-                JALR:       result_o[1] <= {sum_result[31:1], 1'b0};
-                JAL:        result_o[1] <= sum_result;
-                default:    result_o[1] <= sum2_result;
-            endcase
-        end
+    always_comb begin
+        unique case (instruction_operation_i)
+            SB,SH,SW:   result[1] = mem_write_data;
+            JALR:       result[1] = {sum_result[31:1], 1'b0};
+            JAL:        result[1] = sum_result;
+            default:    result[1] = sum2_result;
+        endcase
     end
 
-    always_ff @(posedge clk) begin
-        if (!stall) begin
-            unique case (instruction_operation_i)
-                SB,SH,SW,
-                BEQ,BNE,
-                BLT,BLTU,
-                BGE,BGEU:  write_enable_o <= 1'b0;
-                default:   write_enable_o <= 1'b1;
-            endcase
-        end
-    end  
+    always_comb begin
+        unique case (instruction_operation_i)
+            SB,SH,SW,
+            BEQ,BNE,
+            BLT,BLTU,
+            BGE,BGEU:  write_enable = 1'b0;
+            default:   write_enable = 1'b1;
+        endcase
+    end 
+
+//////////////////////////////////////////////////////////////////////////////
+// Output Registers
+//////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk) begin
         if (!stall) begin
-            tag_o                   <= tag_i;
-            instruction_operation_o <= instruction_operation_i;
-            instruction_o           <= instruction_i;
-            jump_o                  <= jump;
-            mem_write_enable_o      <= mem_write_enable;
             pc_o                    <= pc_i;
+            instruction_o           <= instruction_i;
+            instruction_operation_o <= instruction_operation_i;
+            result_o                <= result;             
+            jump_o                  <= jump;
+            write_enable_o          <= write_enable;
+            mem_write_enable_o      <= mem_write_enable;
+            tag_o                   <= tag_i;
             exception_o             <= exception_i | csr_exception;
         `ifdef BRANCH_PREDICTION
             predicted_branch_o      <= predicted_branch_i;
