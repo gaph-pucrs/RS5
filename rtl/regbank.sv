@@ -61,7 +61,7 @@ module regbank(
 
     always_ff @(posedge clk ) begin
         $fwrite(fd,"[%0d] %02d - %8h \t %02d - %8h\n", $time, rs1, data1_o, rs2, data2_o);
-        if (rd != '0) begin
+        if (rd != '0 && enable == 1'b1) begin
             $fwrite(fd,"[%0d] --------------------------------- %02d - %8h\n", $time, rd, data_i);
         end
     end
