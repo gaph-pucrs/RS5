@@ -148,7 +148,7 @@ module PUC_RS5
     logic           RAISE_EXCEPTION, MACHINE_RETURN;
     exceptionCode_e Exception_Code;
     logic           Interrupt_pending;
-    logic   [31:0]  mvmdb, mvmib, mvmdl, mvmil;
+    logic   [31:0]  mvmdo, mvmio, mvmds, mvmis;
     logic           mvmctl;
 
 
@@ -204,8 +204,8 @@ module PUC_RS5
 
     mmu i_mmu (
         .en_i           (mmu_en),
-        .base_i         (mvmib),
-        .limit_i        (mvmil),
+        .offset_i       (mvmio),
+        .size_i         (mvmis),
         .address_i      (instruction_address),
         .exception_o    (mmu_inst_fault),
         .address_o      (instruction_address_o)
@@ -397,10 +397,10 @@ module PUC_RS5
         .mepc               (mepc), 
         .mtvec              (mtvec),
         .mvmctl_o           (mvmctl),
-        .mvmdb_o            (mvmdb),
-        .mvmdl_o            (mvmdl),
-        .mvmib_o            (mvmib),
-        .mvmil_o            (mvmil)
+        .mvmdo_o            (mvmdo),
+        .mvmds_o            (mvmds),
+        .mvmio_o            (mvmio),
+        .mvmis_o            (mvmis)
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -427,8 +427,8 @@ module PUC_RS5
 
     mmu d_mmu (
         .en_i           (mmu_en),
-        .base_i         (mvmdb),
-        .limit_i        (mvmdl),
+        .offset_i       (mvmdo),
+        .size_i         (mvmds),
         .address_i      (mem_address),
         .exception_o    (mmu_data_fault),
         .address_o      (mem_address_o)
