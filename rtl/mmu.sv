@@ -20,21 +20,18 @@ module mmu
 (
     input  logic        en_i,
 
-    input  logic [31:0] base_i,
-    input  logic [31:0] limit_i,
+    input  logic [31:0] offset_i,
+    input  logic [31:0] size_i,
     input  logic [31:0] address_i,
 
     output logic        exception_o,
     output logic [31:0] address_o
 );
-    logic [31:0] phy_addr;
-
-    assign phy_addr = address_i + base_i;
 
     always_comb begin
         if (en_i) begin
-            address_o = phy_addr;
-            if (phy_addr >= limit_i) begin
+            address_o = (address_i & size_i) | offset_i;
+            if ((address_i & ~size_i) != '0) begin
                 exception_o = 1'b1;
             end
             else begin
