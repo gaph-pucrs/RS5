@@ -22,6 +22,7 @@ package my_pkg;
     // `define PROTO 1
     // `define DEBUG 1
     `define BRANCH_PREDICTION 1
+    // `define XOSVM 1
 
     typedef enum  logic[5:0] {
         R_TYPE = 6'b000001, 
@@ -65,7 +66,9 @@ package my_pkg;
         MVENDORID = 12'hF11, MARCHID, MIMPID, MHARTID, MCONFIGPTR, 
         MSTATUS = 12'h300, MISA, MEDELEG, MIDELEG, MIE, MTVEC, MCOUNTEREN, MSTATUSH = 12'h310, 
         MSCRATCH = 12'h340, MEPC, MCAUSE, MTVAL, MIP, MTINST = 12'h34A, MTVAL2,
+    `ifdef XOSVM
         MVMDO = 12'h7C0, MVMDS, MVMIO, MVMIS, MVMCTL,
+    `endif
         MCYCLE = 12'hB00, MINSTRET = 12'hB02, MCYCLEH = 12'hB80, MINSTRETH = 12'hB82,
         CYCLE = 12'hC00, TIME, INSTRET, CYCLEH=12'hC80, TIMEH, INSTRETH
     } CSRs;

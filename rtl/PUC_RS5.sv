@@ -30,6 +30,7 @@
 `include "../rtl/execute.sv"
 `include "../rtl/retire.sv"
 `include "../rtl/regbank.sv"
+`include "../rtl/mmu.sv"
 `include "../rtl/CSRBank.sv"
 */
 
@@ -59,7 +60,6 @@ module PUC_RS5
     logic            read;
     logic            jump;
     logic            hazard;
-    logic            mmu_en;
     logic            mmu_inst_fault;
     logic            mmu_data_fault;
     privilegeLevel_e privilege;
@@ -148,15 +148,18 @@ module PUC_RS5
     logic           RAISE_EXCEPTION, MACHINE_RETURN;
     exceptionCode_e Exception_Code;
     logic           Interrupt_pending;
+`ifdef XOSVM
     logic   [31:0]  mvmdo, mvmio, mvmds, mvmis;
     logic           mvmctl;
-
+    logic           mmu_en;
+`endif
 
 //////////////////////////////////////////////////////////////////////////////
 // Assigns
 //////////////////////////////////////////////////////////////////////////////
-
+`ifdef XOSVM
     assign mmu_en = privilege != privilegeLevel_e'(2'b11) && mvmctl;
+`endif
 
     assign rs1_data_read =  (rs1 == rd && rd != '0 && regbank_write_enable) 
                             ? regbank_data_writeback 
@@ -202,6 +205,7 @@ module PUC_RS5
         .interrupt_ack_i            (interrupt_ack_o)
     );
 
+`ifdef XOSVM
     mmu i_mmu (
         .en_i           (mmu_en),
         .offset_i       (mvmio),
@@ -210,6 +214,10 @@ module PUC_RS5
         .exception_o    (mmu_inst_fault),
         .address_o      (instruction_address_o)
     );
+`else
+    assign instruction_address_o = instruction_address;
+    assign mmu_inst_fault = 1'b0;
+`endif
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// DECODER /////////////////////////////////////////////////////////////////////////////////
@@ -395,12 +403,14 @@ module PUC_RS5
         .interrupt_pending_o(Interrupt_pending), 
         .privilege_o        (privilege), 
         .mepc               (mepc), 
-        .mtvec              (mtvec),
+    `ifdef XOSVM
         .mvmctl_o           (mvmctl),
         .mvmdo_o            (mvmdo),
         .mvmds_o            (mvmds),
         .mvmio_o            (mvmio),
-        .mvmis_o            (mvmis)
+        .mvmis_o            (mvmis),
+    `endif
+        .mtvec              (mtvec)
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -425,6 +435,7 @@ module PUC_RS5
         end
     end
 
+`ifdef XOSVM
     mmu d_mmu (
         .en_i           (mmu_en),
         .offset_i       (mvmdo),
@@ -433,6 +444,10 @@ module PUC_RS5
         .exception_o    (mmu_data_fault),
         .address_o      (mem_address_o)
     );
+`else
+    assign mem_address_o = mem_address;
+    assign mmu_data_fault = 1'b0;
+`endif
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// DEBUG ///////////////////////////////////////////////////////////////////////////////////

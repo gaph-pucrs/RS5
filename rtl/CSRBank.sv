@@ -55,21 +55,26 @@ module CSRBank
     output  privilegeLevel_e    privilege_o,
 
     output  logic [31:0]        mtvec,
-    output  logic [31:0]        mepc,
 
+`ifdef XOSVM
     output  logic               mvmctl_o,
     output  logic [31:0]        mvmdo_o, 
     output  logic [31:0]        mvmio_o, 
     output  logic [31:0]        mvmds_o, 
-    output  logic [31:0]        mvmis_o     
+    output  logic [31:0]        mvmis_o,
+`endif
+
+    output  logic [31:0]        mepc
 );
 
     CSRs CSR;
     privilegeLevel_e privilege;
 
     logic [31:0] mstatus, misa, mie, mtvec_r, mscratch, mepc_r, mcause, mtval, mip;
+`ifdef XOSVM
     logic [31:0] mvmdo, mvmio, mvmds, mvmis;
     logic        mvmctl;
+`endif
     logic [63:0] mcycle, minstret;
     
     logic [31:0] wr_data, wmask, current_val;
@@ -79,11 +84,13 @@ module CSRBank
     assign privilege_o = privilege;
     assign mtvec       = mtvec_r;
     assign mepc        = mepc_r;
+`ifdef XOSVM
     assign mvmctl_o    = mvmctl;
     assign mvmdo_o     = mvmdo;
     assign mvmds_o     = mvmds;
     assign mvmio_o     = mvmio;
     assign mvmis_o     = mvmis;
+`endif
 
     assign CSR = CSRs'(address_i);
 
@@ -107,12 +114,13 @@ module CSRBank
             MCYCLEH:    begin current_val = mcycle[63:32];   wmask = 32'hFFFFFFFF; end
             MINSTRET:   begin current_val = minstret[31:0];  wmask = 32'hFFFFFFFF; end
             MINSTRETH:  begin current_val = minstret[63:32]; wmask = 32'hFFFFFFFF; end
+        `ifdef XOSVM
             MVMDO:      begin current_val = mvmdo;           wmask = 32'hFFFFFFFC; end
             MVMDS:      begin current_val = mvmds;           wmask = 32'hFFFFFFFC; end
             MVMIO:      begin current_val = mvmio;           wmask = 32'hFFFFFFFC; end
             MVMIS:      begin current_val = mvmis;           wmask = 32'hFFFFFFFC; end
             MVMCTL:     begin current_val = {31'b0, mvmctl}; wmask = 32'h00000001; end
-
+        `endif
             default:    begin current_val = '0;              wmask = 32'h00000000; end
         endcase
     end
@@ -151,11 +159,13 @@ module CSRBank
             //mip       <= '0;
             mcycle      <= '0;
             minstret    <= '0;
+        `ifdef XOSVM
             mvmctl      <= '0;
             mvmdo       <= '0;
             mvmds       <= '0;
             mvmio       <= '0;
             mvmis       <= '0;
+        `endif
         end 
         else begin
             mcycle      <= mcycle + 1;
@@ -215,11 +225,13 @@ module CSRBank
                     MCYCLEH:      mcycle[63:32]   <= wr_data;
                     MINSTRET:     minstret[31:0]  <= wr_data;
                     MINSTRETH:    minstret[63:32] <= wr_data;
+                `ifdef XOSVM
                     MVMCTL:       mvmctl          <= wr_data[0];
                     MVMDO:        mvmdo           <= wr_data;
                     MVMDS:        mvmds           <= wr_data;
                     MVMIO:        mvmio           <= wr_data;
                     MVMIS:        mvmis           <= wr_data;
+                `endif
                     default:    ; // no op
                 endcase
             end
@@ -262,13 +274,13 @@ module CSRBank
                 CYCLEH:      out = mcycle[63:32];
                 TIMEH:       out = mtime_i[63:32];
                 INSTRETH:    out = minstret[63:32];
-
+            `ifdef XOSVM
                 MVMCTL:      out = {31'b0,mvmctl};
                 MVMDO:       out = mvmdo[31:0];
                 MVMDS:       out = mvmds[31:0];
                 MVMIO:       out = mvmio[31:0];
                 MVMIS:       out = mvmis[31:0];
-
+            `endif
                 default:     out = '0;
             endcase
         end
