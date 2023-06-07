@@ -29,12 +29,12 @@ module execute
     input   logic               stall,
 
     input   logic [31:0]        instruction_i,
-    input   logic [31:0]        pc_i,               // Operand from Operand Fetch stage
-    input   logic [31:0]        first_operand_i,    //              ||
-    input   logic [31:0]        second_operand_i,   //              ||
-    input   logic [31:0]        third_operand_i,    //              ||
+    input   logic [31:0]        pc_i,
+    input   logic [31:0]        first_operand_i,
+    input   logic [31:0]        second_operand_i,
+    input   logic [31:0]        third_operand_i,
     input   iType_e             instruction_operation_i,
-    input   logic [2:0]         tag_i,              // Instruction tag
+    input   logic  [2:0]        tag_i,
 
 `ifdef BRANCH_PREDICTION
     input   logic               predicted_branch_i,
@@ -44,14 +44,13 @@ module execute
     output  iType_e             instruction_operation_o,
     output  logic [31:0]        instruction_o,
     output  logic [31:0]        pc_o,
-    output  logic [31:0]        result_o [1:0],     // Results array
-    output  logic [2:0]         tag_o,              // Instruction tag
-    output  logic               jump_o,             // Signal that indicates a branch taken
-    output  logic               write_enable_o,     // Write enable to regbank
-    output  logic [3:0]         mem_write_enable_o, // Signal that indicates the write memory operation to retire
-
-    output  logic [31:0]        mem_read_address_o, // Memory Read Address
-    output  logic               mem_read_o,         // Allows memory read
+    output  logic [31:0]        result_o [1:0],
+    output  logic  [2:0]        tag_o,
+    output  logic               jump_o,
+    output  logic               write_enable_o,
+    output  logic [31:0]        mem_read_address_o,
+    output  logic  [3:0]        mem_write_enable_o,
+    output  logic               mem_read_o,
 
     output  logic               csr_read_enable_o,
     output  logic               csr_write_enable_o,
@@ -62,8 +61,14 @@ module execute
 
     input   privilegeLevel_e    privilege_i,
 
-    input   logic               exception_i,
-    output  logic               exception_o
+`ifdef XOSVM
+    input   logic               exc_inst_access_fault_i,
+    output  logic               exc_inst_access_fault_o,
+`endif
+    input   logic               exc_ilegal_inst_i,
+    input   logic               exc_misaligned_fetch_i,
+    output  logic               exc_ilegal_inst_o,
+    output  logic               exc_misaligned_fetch_o
 );
     
     logic [31:0]    result [1:0];
@@ -290,7 +295,11 @@ end
             write_enable_o          <= write_enable;
             mem_write_enable_o      <= mem_write_enable;
             tag_o                   <= tag_i;
-            exception_o             <= exception_i | csr_exception;
+            exc_ilegal_inst_o       <= exc_ilegal_inst_i | exc_ilegal_csr_inst;
+            exc_misaligned_fetch_o  <= exc_misaligned_fetch_i;
+        `ifdef XOSVM
+            exc_inst_access_fault_o <= exc_inst_access_fault_i;
+        `endif
         `ifdef BRANCH_PREDICTION
             predicted_branch_o      <= predicted_branch_i;
         `endif

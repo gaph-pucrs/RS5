@@ -75,6 +75,7 @@ module PUC_RS5_With_BRAMs
         .instruction_i(CPU_instruction), 
         .mem_data_i(CPU_data_in), 
         .IRQ_i(IRQ),
+        .mtime_i(mtime),
         .instruction_address_o(CPU_instruction_address), 
         .mem_operation_enable_o(CPU_operation_enable), 
         .mem_write_enable_o(CPU_write_enable),

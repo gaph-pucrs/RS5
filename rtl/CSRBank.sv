@@ -40,52 +40,88 @@ module CSRBank
     input   logic               raise_exception_i,
     input   logic               machine_return_i,
     input   exceptionCode_e     exception_code_i,
-    input   privilegeLevel_e    privilege_i,
     input   logic [31:0]        pc_i,
     input   logic [31:0]        instruction_i,
 
     input   logic               jump_i,
     input   logic [31:0]        jump_target_i,
 
+    input   logic [63:0]        mtime_i,
+
     input   logic [31:0]        IRQ_i,
     input   logic               interrupt_ack_i,
     output  logic               interrupt_pending_o,
 
+    output  privilegeLevel_e    privilege_o,
+
     output  logic [31:0]        mtvec,
+
+`ifdef XOSVM
+    output  logic               mvmctl_o,
+    output  logic [31:0]        mvmdo_o, 
+    output  logic [31:0]        mvmio_o, 
+    output  logic [31:0]        mvmds_o, 
+    output  logic [31:0]        mvmis_o,
+`endif
+
     output  logic [31:0]        mepc
 );
 
     CSRs CSR;
+    privilegeLevel_e privilege;
+
     logic [31:0] mstatus, misa, mie, mtvec_r, mscratch, mepc_r, mcause, mtval, mip;
-    logic [63:0] cycle, instret;
+`ifdef XOSVM
+    logic [31:0] mvmdo, mvmio, mvmds, mvmis;
+    logic        mvmctl;
+`endif
+    logic [63:0] mcycle, minstret;
     
     logic [31:0] wr_data, wmask, current_val;
     //logic [31:0] medeleg, mideleg; // NOT IMPLEMENTED YET (REQUIRED ONLY WHEN SYSTEM HAVE S-MODE)
     interruptionCode_e Interruption_Code;
 
-    assign mtvec = mtvec_r;
-    assign mepc  = mepc_r;
+    assign privilege_o = privilege;
+    assign mtvec       = mtvec_r;
+    assign mepc        = mepc_r;
+`ifdef XOSVM
+    assign mvmctl_o    = mvmctl;
+    assign mvmdo_o     = mvmdo;
+    assign mvmds_o     = mvmds;
+    assign mvmio_o     = mvmio;
+    assign mvmis_o     = mvmis;
+`endif
 
     assign CSR = CSRs'(address_i);
 
     always_comb begin
         wmask = '1;
         case (CSR)
-            MSTATUS:    begin current_val = mstatus;   wmask = 32'h007E19AA; end
-            MISA:       begin current_val = misa;      wmask = 32'h3C000000; end
-            //MEDELEG:    begin current_val = medeleg;   wmask = '1; end
-            //MIDELEG:    begin current_val = mideleg;   wmask = '1; end
-            MIE:        begin current_val = mie;       wmask = 32'h00000888; end
-            MTVEC:      begin current_val = mtvec_r;   wmask = 32'hFFFFFFFC; end
-            //MCOUNTEREN: begin current_val = mcounteren;wmask = '1; end
-            //MSTATUSH:   begin current_val = mstatush;  wmask = '1; end
-            MSCRATCH:   begin current_val = mscratch;  wmask = 32'hFFFFFFFF; end
-            MEPC:       begin current_val = mepc_r;    wmask = 32'hFFFFFFFC; end
-            MCAUSE:     begin current_val = mcause;    wmask = 32'hFFFFFFFF; end
-            MTVAL:      begin current_val = mtval;     wmask = 32'hFFFFFFFF; end
-            //MIP:        begin current_val = mip;     wmask = 32'h00000000; end
-
-            default:    begin current_val = '0;        wmask = 32'h00000000; end
+            MSTATUS:    begin current_val = mstatus;         wmask = 32'h007E19AA; end
+            MISA:       begin current_val = misa;            wmask = 32'h3C000000; end
+            // MEDELEG:    begin current_val = medeleg;         wmask = '1; end
+            // MIDELEG:    begin current_val = mideleg;         wmask = '1; end
+            MIE:        begin current_val = mie;             wmask = 32'h00000888; end
+            MTVEC:      begin current_val = mtvec_r;         wmask = 32'hFFFFFFFC; end
+            // MCOUNTEREN: begin current_val = mcounteren;      wmask = '1; end
+            // MSTATUSH:   begin current_val = mstatush;        wmask = '1; end
+            MSCRATCH:   begin current_val = mscratch;        wmask = 32'hFFFFFFFF; end
+            MEPC:       begin current_val = mepc_r;          wmask = 32'hFFFFFFFC; end
+            MCAUSE:     begin current_val = mcause;          wmask = 32'hFFFFFFFF; end
+            MTVAL:      begin current_val = mtval;           wmask = 32'hFFFFFFFF; end
+            // MIP:        begin current_val = mip;             wmask = 32'h00000000; end
+            MCYCLE:     begin current_val = mcycle[31:0];    wmask = 32'hFFFFFFFF; end
+            MCYCLEH:    begin current_val = mcycle[63:32];   wmask = 32'hFFFFFFFF; end
+            MINSTRET:   begin current_val = minstret[31:0];  wmask = 32'hFFFFFFFF; end
+            MINSTRETH:  begin current_val = minstret[63:32]; wmask = 32'hFFFFFFFF; end
+        `ifdef XOSVM
+            MVMDO:      begin current_val = mvmdo;           wmask = 32'hFFFFFFFC; end
+            MVMDS:      begin current_val = mvmds;           wmask = 32'hFFFFFFFC; end
+            MVMIO:      begin current_val = mvmio;           wmask = 32'hFFFFFFFC; end
+            MVMIS:      begin current_val = mvmis;           wmask = 32'hFFFFFFFC; end
+            MVMCTL:     begin current_val = {31'b0, mvmctl}; wmask = 32'h00000001; end
+        `endif
+            default:    begin current_val = '0;              wmask = 32'h00000000; end
         endcase
     end
 
@@ -121,59 +157,84 @@ module CSRBank
             mcause      <= '0;
             mtval       <= '0;
             //mip       <= '0;
-
+            mcycle      <= '0;
+            minstret    <= '0;
+        `ifdef XOSVM
+            mvmctl      <= '0;
+            mvmdo       <= '0;
+            mvmds       <= '0;
+            mvmio       <= '0;
+            mvmis       <= '0;
+        `endif
         end 
-        else if (machine_return_i) begin
-            mstatus[3]  <= mstatus[7];          // MIE = MPIE
-            //privilege <= mstatus[12:11]       // priv = MPP
-
-        end
-        else if (raise_exception_i) begin
-            mcause[31]      <= '0;
-            mcause[30:0]    <= {26'b0, exception_code_i};
-            mstatus[12:11]  <= privilege_i;         // MPP previous privilege
-            // privilege    <= MACHINE
-            mstatus[7]      <= mstatus[3];          // MPIE = MIE
-            mstatus[3]      <= 0;                   // MIE = 0
-            mepc_r          <= (exception_code_i == ECALL_FROM_MMODE || exception_code_i == BREAKPOINT) 
-                                ? pc_i 
-                                : pc_i+4;           // Return address
-            mtval           <= (exception_code_i == ILLEGAL_INSTRUCTION) 
-                                ? instruction_i 
-                                : pc_i;
-
-        end 
-        else if (interrupt_ack_i) begin
-            mcause[31]      <= '1;
-            mcause[30:0]    <=  {26'b0, Interruption_Code};
-            mstatus[12:11]  <= privilege_i;         // MPP = previous privilege
-            // privilege    <= MACHINE
-            mstatus[7]      <= mstatus[3];          // MPIE = MIE
-            mstatus[3]      <= 0;                   // MIE = 0
-
-            if(jump_i)
-                mepc_r          <= jump_target_i;
-            else
-                mepc_r          <= pc_i;            // Return address
+        else begin
+            mcycle      <= mcycle + 1;
+            minstret    <= (killed) 
+                            ? minstret 
+                            : minstret + 1;
         
-        end 
-        else if (write_enable_i && !killed) begin
-            case(CSR)
-                MSTATUS:      mstatus     <= wr_data;
-                MISA:         misa        <= wr_data;
-                //MEDELEG:    medeleg     <= wr_data;
-                //MIDELEG:    mideleg     <= wr_data;
-                MIE:          mie         <= wr_data;
-                MTVEC:        mtvec_r     <= wr_data;
-                //MCOUNTEREN: mcounteren  <= wr_data;
-                //MSTATUSH:   mstatush    <= wr_data;
-                MSCRATCH:     mscratch    <= wr_data;
-                MEPC:         mepc_r      <= wr_data;
-                MCAUSE:       mcause      <= wr_data;
-                MTVAL:        mtval       <= wr_data;
-                //MIP:        mip         <= wr_data;
-                default:    ; // no op
-            endcase
+            if (machine_return_i) begin
+                mstatus[3]      <= mstatus[7];          // MIE = MPIE
+                privilege       <= privilegeLevel_e'(mstatus[12:11]);      // priv = MPP
+            end
+            else if (raise_exception_i) begin
+                mcause[31]      <= '0;
+                mcause[30:0]    <= {26'b0, exception_code_i};
+                mstatus[12:11]  <= privilege;           // MPP = previous privilege
+                privilege       <= privilegeLevel_e'(2'b11);
+                mstatus[7]      <= mstatus[3];          // MPIE = MIE
+                mstatus[3]      <= 0;                   // MIE = 0
+                mepc_r          <= (exception_code_i == ECALL_FROM_MMODE || exception_code_i == BREAKPOINT) 
+                                    ? pc_i 
+                                    : pc_i+4;             // Return address
+                mtval           <= (exception_code_i == ILLEGAL_INSTRUCTION) 
+                                    ? instruction_i 
+                                    : pc_i;
+
+            end 
+            else if (interrupt_ack_i) begin
+                mcause[31]      <= '1;
+                mcause[30:0]    <=  {26'b0, Interruption_Code};
+                mstatus[12:11]  <= privilege;           // MPP = previous privilege
+                privilege       <= privilegeLevel_e'(2'b11);
+                mstatus[7]      <= mstatus[3];          // MPIE = MIE
+                mstatus[3]      <= 0;                   // MIE = 0
+
+                if(jump_i)
+                    mepc_r      <= jump_target_i;
+                else
+                    mepc_r      <= pc_i;                // Return address
+            
+            end 
+            else if (write_enable_i && !killed) begin
+                case(CSR)
+                    MSTATUS:      mstatus         <= wr_data;
+                    MISA:         misa            <= wr_data;
+                    // MEDELEG:      medeleg         <= wr_data;
+                    // MIDELEG:      mideleg         <= wr_data;
+                    MIE:          mie             <= wr_data;
+                    MTVEC:        mtvec_r         <= wr_data;
+                    // MCOUNTEREN:   mcounteren      <= wr_data;
+                    // MSTATUSH:     mstatush        <= wr_data;
+                    MSCRATCH:     mscratch        <= wr_data;
+                    MEPC:         mepc_r          <= wr_data;
+                    MCAUSE:       mcause          <= wr_data;
+                    MTVAL:        mtval           <= wr_data;
+                    // MIP:          mip             <= wr_data;
+                    MCYCLE:       mcycle[31:0]    <= wr_data;
+                    MCYCLEH:      mcycle[63:32]   <= wr_data;
+                    MINSTRET:     minstret[31:0]  <= wr_data;
+                    MINSTRETH:    minstret[63:32] <= wr_data;
+                `ifdef XOSVM
+                    MVMCTL:       mvmctl          <= wr_data[0];
+                    MVMDO:        mvmdo           <= wr_data;
+                    MVMDS:        mvmds           <= wr_data;
+                    MVMIO:        mvmio           <= wr_data;
+                    MVMIS:        mvmis           <= wr_data;
+                `endif
+                    default:    ; // no op
+                endcase
+            end
         end
     end
 
@@ -181,33 +242,46 @@ module CSRBank
         if (read_enable_i && !killed) begin
             case(CSR)
                 //RO
-                MVENDORID:  out = '0;
-                MARCHID:    out = '0;
-                MIMPID:     out = '0;
-                MHARTID:    out = '0;
-                MCONFIGPTR: out = '0;
+                MVENDORID:   out = '0;
+                MARCHID:     out = '0;
+                MIMPID:      out = '0;
+                MHARTID:     out = '0;
+                MCONFIGPTR:  out = '0;
 
                 //RW
-                MSTATUS:    out = mstatus;
-                MISA:       out = misa;
-                //MEDELEG:    out = medeleg;
-                //MIDELEG:    out = mideleg;
-                MIE:        out = mie;
-                MTVEC:      out = mtvec_r;
-                //MCOUNTEREN: out = mcounteren;
-                //MSTATUSH:   out = mstatush;
-                MSCRATCH:   out = mscratch;
-                MEPC:       out = mepc_r;
-                MCAUSE:     out = mcause;
-                MTVAL:      out = mtval;
-                MIP:        out = mip;
+                MSTATUS:     out = mstatus;
+                MISA:        out = misa;
+                // MEDELEG:    out = medeleg;
+                // MIDELEG:    out = mideleg;
+                MIE:         out = mie;
+                MTVEC:       out = mtvec_r;
+                // MCOUNTEREN: out = mcounteren;
+                // MSTATUSH:   out = mstatush;
+                MSCRATCH:    out = mscratch;
+                MEPC:        out = mepc_r;
+                MCAUSE:      out = mcause;
+                MTVAL:       out = mtval;
+                MIP:         out = mip;
+                MCYCLE:      out = mcycle[31:0];
+                MCYCLEH:     out = mcycle[63:32];
+                MINSTRET:    out = minstret[31:0];
+                MINSTRETH:   out = minstret[63:32];
 
                 //RO
-                CYCLE:      out = cycle[31:0];
-                CYCLEH:     out = cycle[63:32];
-                INSTRET:    out = instret[31:0];
-                INSTRETH:   out = instret[63:32];
-                default:    out = '0;
+                CYCLE:       out = mcycle[31:0];
+                TIME:        out = mtime_i[31:0];
+                INSTRET:     out = minstret[31:0];
+                CYCLEH:      out = mcycle[63:32];
+                TIMEH:       out = mtime_i[63:32];
+                INSTRETH:    out = minstret[63:32];
+            `ifdef XOSVM
+                MVMCTL:      out = {31'b0,mvmctl};
+                MVMDO:       out = mvmdo[31:0];
+                MVMDS:       out = mvmds[31:0];
+                MVMIO:       out = mvmio[31:0];
+                MVMIS:       out = mvmis[31:0];
+            `endif
+                default:     out = '0;
             endcase
         end
         else begin
@@ -237,21 +311,6 @@ module CSRBank
         end 
         else begin
             interrupt_pending_o <= 0;
-        end
-    end
-
-//##################################################################################
-    // PERFORMANCE MONITORS
-    always_ff @(posedge clk) begin
-        if (reset) begin
-            cycle   <= '0;
-            instret <= '0;
-        end 
-        else begin
-            cycle  <= cycle + 1;
-            instret <= (killed) 
-                        ? instret 
-                        : instret + 1;
         end
     end
 

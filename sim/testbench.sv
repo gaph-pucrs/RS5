@@ -19,6 +19,7 @@
 `timescale 1ns/1ps
 
 `include "../rtl/my_pkg.sv"
+`include "../rtl/mmu.sv"
 `include "../rtl/fetch.sv"
 `include "../rtl/decode.sv"
 `include "../rtl/execute.sv"
@@ -69,6 +70,7 @@ assign IRQ = {24'h0, mti, 7'h0};
         .instruction_i(instruction), 
         .mem_data_i(mem_data_read), 
         .IRQ_i(IRQ),
+        .mtime_i(mtime),
         .instruction_address_o(instruction_address), 
         .mem_operation_enable_o(mem_operation_enable), 
         .mem_write_enable_o(mem_write_enable),

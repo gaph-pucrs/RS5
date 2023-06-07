@@ -29,11 +29,11 @@ module decode
     input   logic           reset,
     input   logic           stall,
 
-    input   logic [31:0]    instruction_i,          // Object code of the instruction_int to extract the immediate operand
-    input   logic [31:0]    pc_i,                   // Bypassed to execute unit as an operand
-    input   logic [2:0]     tag_i,                  // Instruction tag_o
-    input   logic [31:0]    rs1_data_read_i,        // Data read from register bank
-    input   logic [31:0]    rs2_data_read_i,        // Data read from register bank
+    input   logic [31:0]    instruction_i,
+    input   logic [31:0]    pc_i,
+    input   logic  [2:0]    tag_i,
+    input   logic [31:0]    rs1_data_read_i,
+    input   logic [31:0]    rs2_data_read_i,
 
 `ifdef BRANCH_PREDICTION
     input   logic           killed_i,
@@ -46,18 +46,24 @@ module decode
     output  logic [31:0]    predict_jump_pc_next_o,
 `endif
 
-    output  logic [4:0]     rs1_o,                  // Address of the 1st register, conected directly in the register bank
-    output  logic [4:0]     rs2_o,                  // Address of the 2nd register, conected directly in the register bank
-    output  logic [4:0]     rd_o,                   // Write Address to register bank
-    output  logic [31:0]    first_operand_o,        // First operand output register
-    output  logic [31:0]    second_operand_o,       // Second operand output register
-    output  logic [31:0]    third_operand_o,        // Third operand output register
-    output  logic [31:0]    pc_o,                   // PC operand output register
-    output  logic [31:0]    instruction_o,          // Instruction Used in exception_os and CSR operations
-    output  logic [2:0]     tag_o,                  // Instruction tag_o
-    output  iType_e         instruction_operation_o,// Instruction operation
-    output  logic           hazard_o,               // Bubble issue indicator (0 active)
-    output  logic           exception_o
+    output  logic  [4:0]    rs1_o,
+    output  logic  [4:0]    rs2_o,
+    output  logic  [4:0]    rd_o,
+    output  logic [31:0]    first_operand_o,
+    output  logic [31:0]    second_operand_o,
+    output  logic [31:0]    third_operand_o,
+    output  logic [31:0]    pc_o,
+    output  logic [31:0]    instruction_o,
+    output  logic  [2:0]    tag_o,
+    output  iType_e         instruction_operation_o,
+    output  logic           hazard_o,
+
+`ifdef XOSVM
+    input   logic           exc_inst_access_fault_i,
+    output  logic           exc_inst_access_fault_o,
+`endif
+    output  logic           exc_ilegal_inst_o,
+    output  logic           exc_misaligned_fetch_o
 );
 
     logic [31:0] immediate, first_operand_int, second_operand_int, third_operand_int, instruction_int, last_instruction;
@@ -406,7 +412,11 @@ module decode
             instruction_o           <= '0;
             instruction_operation_o <= NOP;
             tag_o                   <= '0;
-            exception_o             <= 1'b0;
+            exc_ilegal_inst_o       <= 1'b0;
+            exc_misaligned_fetch_o  <= 1'b0;
+        `ifdef XOSVM
+            exc_inst_access_fault_o <= 1'b0;
+        `endif
         `ifdef BRANCH_PREDICTION
             predicted_branch_o      <= 1'b0;
         `endif
@@ -419,7 +429,11 @@ module decode
             instruction_o           <= '0;
             instruction_operation_o <= NOP;
             tag_o                   <= tag_i;
-            exception_o             <= 1'b0;
+            exc_ilegal_inst_o       <= 1'b0;
+            exc_misaligned_fetch_o  <= 1'b0;
+        `ifdef XOSVM
+            exc_inst_access_fault_o <= 1'b0;
+        `endif
         `ifdef BRANCH_PREDICTION
             predicted_branch_o      <= 1'b0;
         `endif
@@ -432,7 +446,11 @@ module decode
             instruction_o           <= instruction_int;
             instruction_operation_o <= instruction_operation;
             tag_o                   <= tag_i;
-            exception_o             <= (instruction_operation == INVALID) ? 1'b1 :1'b0;
+            exc_ilegal_inst_o       <= invalid_inst;
+            exc_misaligned_fetch_o  <= misaligned_fetch;
+        `ifdef XOSVM
+            exc_inst_access_fault_o <= exc_inst_access_fault_i;
+        `endif
         `ifdef BRANCH_PREDICTION
             predicted_branch_o      <= predict_branch_taken_o | predict_jump_taken_o;
         `endif
