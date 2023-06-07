@@ -30,7 +30,7 @@ When Xosvm is enabled (see mvmctl), the virtual memory address is OR-ed with the
 
 ### Machine Virtual Memory Instruction/Data Size (mvmis and mvmbs)
 
-The mvmis anbd mvmbs are 32-bit read/write registers containing the size limit of a physical memory page of the Xosvm.
+The mvmis and mvmbs are 32-bit read/write registers containing the size limit of a physical memory page of the Xosvm.
 Note that the CSR should be configured to the actual size of a page minus 1.
 When Xosvm is enabled (see mvmctl), the virtual memory address is first masked (AND operation) with this CSR content, and only then the offset is applied (see mvmio and mvmbo).
 If the virtual memory address has any bit set besides the configured size mask, it will raise an instruction or load/store access fault.
