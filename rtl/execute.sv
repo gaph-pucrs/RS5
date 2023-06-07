@@ -75,7 +75,7 @@ module execute
     logic           write_enable;
     logic  [3:0]    mem_write_enable;
     logic [31:0]    mem_write_data;
-    logic           csr_exception;
+    logic           exc_ilegal_csr_inst;
 
 //////////////////////////////////////////////////////////////////////////////
 // ALU
@@ -188,8 +188,8 @@ end
 
     assign csr_address_o = instruction_i[31:20];
 
-    assign csr_read_enable_o = csr_read_enable & !csr_exception;
-    assign csr_write_enable_o = csr_write_enable & !csr_exception;
+    assign csr_read_enable_o = csr_read_enable & !exc_ilegal_csr_inst;
+    assign csr_write_enable_o = csr_write_enable & !exc_ilegal_csr_inst;
 
     always_comb begin
         unique case (instruction_operation_i)
@@ -228,15 +228,15 @@ end
     always_comb begin
         // Raise exeption if CSR is read only and write enable is true
         if (csr_address_o[11:10] == 2'b11 && csr_write_enable) begin
-            csr_exception = 1;
+            exc_ilegal_csr_inst = 1;
         end
         // Check Level privileges
-        else if (csr_address_o[9:8] < privilege_i && (csr_read_enable || csr_write_enable)) begin
-            csr_exception = 1;
+        else if (csr_address_o[9:8] > privilege_i && (csr_read_enable || csr_write_enable)) begin
+            exc_ilegal_csr_inst = 1;
         end
         // No exception is raised
         else begin
-            csr_exception = 0;
+            exc_ilegal_csr_inst = 0;
         end
     end
 
