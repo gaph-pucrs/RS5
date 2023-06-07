@@ -61,12 +61,14 @@ module execute
 
     input   privilegeLevel_e    privilege_i,
 
+`ifdef XOSVM
     input   logic               exc_inst_page_fault_i,
+    output  logic               exc_inst_page_fault_o,
+`endif
     input   logic               exc_ilegal_inst_i,
     input   logic               exc_misaligned_fetch_i,
     output  logic               exc_ilegal_inst_o,
-    output  logic               exc_misaligned_fetch_o,
-    output  logic               exc_inst_page_fault_o
+    output  logic               exc_misaligned_fetch_o
 );
     
     logic        jump_int;
@@ -238,7 +240,9 @@ module execute
             pc_o                    <= pc_i;
             exc_ilegal_inst_o       <= exc_ilegal_inst_i | exc_ilegal_csr_inst;
             exc_misaligned_fetch_o  <= exc_misaligned_fetch_i;
+        `ifdef XOSVM
             exc_inst_page_fault_o   <= exc_inst_page_fault_i;
+        `endif
         `ifdef BRANCH_PREDICTION
             predicted_branch_o      <= predicted_branch_i;
         `endif

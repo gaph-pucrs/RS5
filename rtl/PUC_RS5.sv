@@ -60,8 +60,10 @@ module PUC_RS5
     logic            read;
     logic            jump;
     logic            hazard;
+`ifdef XOSVM
     logic            mmu_inst_fault;
     logic            mmu_data_fault;
+`endif
     privilegeLevel_e privilege;
     logic   [31:0]   jump_target;
     /* verilator lint_off UNUSEDSIGNAL */
@@ -109,8 +111,9 @@ module PUC_RS5
     logic           kill_execute;
     logic           exc_ilegal_inst_execute;
     logic           exc_misaligned_fetch_execute;
+`ifdef XOSVM
     logic           exc_inst_page_fault_execute;
-
+`endif
 `ifdef BRANCH_PREDICTION
     logic           predicted_branch_execute;
 `endif
@@ -129,9 +132,10 @@ module PUC_RS5
     logic   [31:0]  pc_retire;
     logic           exc_ilegal_inst_retire;
     logic           exc_misaligned_fetch_retire;
-    logic           exc_inst_page_fault_retire;
     logic           killed;
-
+`ifdef XOSVM
+    logic           exc_inst_page_fault_retire;
+`endif
 `ifdef BRANCH_PREDICTION
     logic           predicted_branch_retire;
 `endif
@@ -216,7 +220,6 @@ module PUC_RS5
     );
 `else
     assign instruction_address_o = instruction_address;
-    assign mmu_inst_fault = 1'b0;
 `endif
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -253,10 +256,12 @@ module PUC_RS5
         .tag_o                      (tag_execute), 
         .instruction_operation_o    (instruction_operation_execute), 
         .hazard_o                   (hazard),
+    `ifdef XOSVM
         .exc_inst_page_fault_i      (mmu_inst_fault),
+        .exc_inst_page_fault_o      (exc_inst_page_fault_execute),
+    `endif
         .exc_ilegal_inst_o          (exc_ilegal_inst_execute),
-        .exc_misaligned_fetch_o     (exc_misaligned_fetch_execute),
-        .exc_inst_page_fault_o      (exc_inst_page_fault_execute)
+        .exc_misaligned_fetch_o     (exc_misaligned_fetch_execute)
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -333,10 +338,12 @@ module PUC_RS5
         .privilege_i            (privilege),
         .exc_ilegal_inst_i      (exc_ilegal_inst_execute),
         .exc_misaligned_fetch_i (exc_misaligned_fetch_execute),
+    `ifdef XOSVM
         .exc_inst_page_fault_i  (exc_inst_page_fault_execute),
+        .exc_inst_page_fault_o  (exc_inst_page_fault_retire),
+    `endif
         .exc_ilegal_inst_o      (exc_ilegal_inst_retire),
-        .exc_misaligned_fetch_o (exc_misaligned_fetch_retire),
-        .exc_inst_page_fault_o  (exc_inst_page_fault_retire)
+        .exc_misaligned_fetch_o (exc_misaligned_fetch_retire)
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -355,8 +362,10 @@ module PUC_RS5
         .instruction_operation_i(instruction_operation_retire),
         .exc_ilegal_inst_i      (exc_ilegal_inst_retire),
         .exc_misaligned_fetch_i (exc_misaligned_fetch_retire),
+    `ifdef XOSVM
         .exc_inst_page_fault_i  (exc_inst_page_fault_retire),
         .exc_load_access_fault_i(mmu_data_fault),
+    `endif
     `ifdef BRANCH_PREDICTION
         .predicted_branch_i     (predicted_branch_retire),
     `endif
@@ -427,7 +436,12 @@ module PUC_RS5
     end
 
     always_comb begin
-        if ((mem_write_enable_o != '0 || read) && !mmu_data_fault) begin
+        if (
+            (mem_write_enable_o != '0 || read) 
+        `ifdef XOSVM
+            && !mmu_data_fault
+        `endif
+        ) begin
             mem_operation_enable_o = 1;
         end
         else begin
@@ -446,7 +460,6 @@ module PUC_RS5
     );
 `else
     assign mem_address_o = mem_address;
-    assign mmu_data_fault = 1'b0;
 `endif
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
