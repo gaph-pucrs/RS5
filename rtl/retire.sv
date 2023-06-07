@@ -41,7 +41,7 @@ module retire
     input   logic           exc_ilegal_inst_i,
     input   logic           exc_misaligned_fetch_i,
 `ifdef XOSVM
-    input   logic           exc_inst_page_fault_i,
+    input   logic           exc_inst_access_fault_i,
     input   logic           exc_load_access_fault_i,
 `endif
 
@@ -234,29 +234,23 @@ module retire
 
     always_comb begin
         if (!killed_o) begin
+        `ifdef XOSVM
+            if (exc_inst_access_fault_i) begin
+                raise_exception_o = 1;
+                machine_return_o  = 0;
+                interrupt_ack_o   = 0;
+                exception_code_o  = INSTRUCTION_ACCESS_FAULT;
+                $write("[%0d] EXCEPTION - INSTRUCTION ACCESS FAULT: %8h %8h\n", $time, pc_i, instruction_i);
+            end
+            else
+        `endif
             if (exc_ilegal_inst_i) begin
                 raise_exception_o = 1;
                 machine_return_o  = 0;
                 interrupt_ack_o   = 0;
                 exception_code_o  = ILLEGAL_INSTRUCTION;
                 $write("[%0d] EXCEPTION - ILLEGAL INSTRUCTION: %8h %8h\n", $time, pc_i, instruction_i);
-            end
-        `ifdef XOSVM
-            else if (exc_inst_page_fault_i) begin
-                raise_exception_o = 1;
-                machine_return_o  = 0;
-                interrupt_ack_o   = 0;
-                exception_code_o  = INSTRUCTION_PAGE_FAULT;
-                $write("[%0d] EXCEPTION - INSTRUCTION PAGE FAULT: %8h %8h\n", $time, pc_i, instruction_i);
             end 
-            else if (exc_load_access_fault_i) begin
-                raise_exception_o = 1;
-                machine_return_o  = 0;
-                interrupt_ack_o   = 0;
-                exception_code_o  = LOAD_ACCESS_FAULT;
-                $write("[%0d] EXCEPTION - LOAD ACCESS FAULT: %8h %8h\n", $time, pc_i, instruction_i);
-            end 
-        `endif
             else if (exc_misaligned_fetch_i) begin
                 raise_exception_o = 1;
                 machine_return_o  = 0;
@@ -278,6 +272,15 @@ module retire
                 interrupt_ack_o   = 0;
                 $write("[%0d] EXCEPTION - EBREAK: %8h %8h\n", $time, pc_i, instruction_i);
             end
+        `ifdef XOSVM
+            else if (exc_load_access_fault_i) begin
+                raise_exception_o = 1;
+                machine_return_o  = 0;
+                interrupt_ack_o   = 0;
+                exception_code_o  = LOAD_ACCESS_FAULT;
+                $write("[%0d] EXCEPTION - LOAD ACCESS FAULT: %8h %8h\n", $time, pc_i, instruction_i);
+            end 
+        `endif
             else if (instruction_operation_i == MRET) begin
                 raise_exception_o = 0;
                 exception_code_o  = NE;

@@ -112,7 +112,7 @@ module PUC_RS5
     logic           exc_ilegal_inst_execute;
     logic           exc_misaligned_fetch_execute;
 `ifdef XOSVM
-    logic           exc_inst_page_fault_execute;
+    logic           exc_inst_access_fault_execute;
 `endif
 `ifdef BRANCH_PREDICTION
     logic           predicted_branch_execute;
@@ -134,7 +134,7 @@ module PUC_RS5
     logic           exc_misaligned_fetch_retire;
     logic           killed;
 `ifdef XOSVM
-    logic           exc_inst_page_fault_retire;
+    logic           exc_inst_access_fault_retire;
 `endif
 `ifdef BRANCH_PREDICTION
     logic           predicted_branch_retire;
@@ -257,8 +257,8 @@ module PUC_RS5
         .instruction_operation_o    (instruction_operation_execute), 
         .hazard_o                   (hazard),
     `ifdef XOSVM
-        .exc_inst_page_fault_i      (mmu_inst_fault),
-        .exc_inst_page_fault_o      (exc_inst_page_fault_execute),
+        .exc_inst_access_fault_i    (mmu_inst_fault),
+        .exc_inst_access_fault_o    (exc_inst_access_fault_execute),
     `endif
         .exc_ilegal_inst_o          (exc_ilegal_inst_execute),
         .exc_misaligned_fetch_o     (exc_misaligned_fetch_execute)
@@ -339,8 +339,8 @@ module PUC_RS5
         .exc_ilegal_inst_i      (exc_ilegal_inst_execute),
         .exc_misaligned_fetch_i (exc_misaligned_fetch_execute),
     `ifdef XOSVM
-        .exc_inst_page_fault_i  (exc_inst_page_fault_execute),
-        .exc_inst_page_fault_o  (exc_inst_page_fault_retire),
+        .exc_inst_access_fault_i(exc_inst_access_fault_execute),
+        .exc_inst_access_fault_o(exc_inst_access_fault_retire),
     `endif
         .exc_ilegal_inst_o      (exc_ilegal_inst_retire),
         .exc_misaligned_fetch_o (exc_misaligned_fetch_retire)
@@ -363,7 +363,7 @@ module PUC_RS5
         .exc_ilegal_inst_i      (exc_ilegal_inst_retire),
         .exc_misaligned_fetch_i (exc_misaligned_fetch_retire),
     `ifdef XOSVM
-        .exc_inst_page_fault_i  (exc_inst_page_fault_retire),
+        .exc_inst_access_fault_i(exc_inst_access_fault_retire),
         .exc_load_access_fault_i(mmu_data_fault),
     `endif
     `ifdef BRANCH_PREDICTION

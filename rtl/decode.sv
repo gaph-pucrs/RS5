@@ -59,8 +59,8 @@ module decode
     output  logic           hazard_o,
 
 `ifdef XOSVM
-    input   logic           exc_inst_page_fault_i,
-    output  logic           exc_inst_page_fault_o,
+    input   logic           exc_inst_access_fault_i,
+    output  logic           exc_inst_access_fault_o,
 `endif
     output  logic           exc_ilegal_inst_o,
     output  logic           exc_misaligned_fetch_o
@@ -430,7 +430,7 @@ module decode
             exc_ilegal_inst_o       <= 1'b0;
             exc_misaligned_fetch_o  <= 1'b0;
         `ifdef XOSVM
-            exc_inst_page_fault_o   <= 1'b0;
+            exc_inst_access_fault_o <= 1'b0;
         `endif
         `ifdef BRANCH_PREDICTION
             predicted_branch_o      <= 1'b0;
@@ -447,7 +447,7 @@ module decode
             exc_ilegal_inst_o       <= 1'b0;
             exc_misaligned_fetch_o  <= 1'b0;
         `ifdef XOSVM
-            exc_inst_page_fault_o   <= 1'b0;
+            exc_inst_access_fault_o <= 1'b0;
         `endif
         `ifdef BRANCH_PREDICTION
             predicted_branch_o      <= 1'b0;
@@ -464,7 +464,7 @@ module decode
             exc_ilegal_inst_o       <= invalid_inst;
             exc_misaligned_fetch_o  <= misaligned_fetch;
         `ifdef XOSVM
-            exc_inst_page_fault_o   <= exc_inst_page_fault_i;
+            exc_inst_access_fault_o <= exc_inst_access_fault_i;
         `endif
         `ifdef BRANCH_PREDICTION
             predicted_branch_o      <= predict_branch_taken_o | predict_jump_taken_o;
