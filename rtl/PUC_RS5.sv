@@ -20,12 +20,6 @@
 
 /*
 `include "../rtl/my_pkg.sv"
-`include "../rtl/xus/adderUnit.sv"
-`include "../rtl/xus/csrUnit.sv"
-`include "../rtl/xus/branchUnit.sv"
-`include "../rtl/xus/logicUnit.sv"
-`include "../rtl/xus/LSUnit.sv"
-`include "../rtl/xus/shiftUnit.sv"
 `include "../rtl/fetch.sv"
 `include "../rtl/decode.sv"
 `include "../rtl/execute.sv"
@@ -286,6 +280,7 @@ module PUC_RS5
         .csr_address_o(csr_addr), 
         .csr_data_o(csr_data_to_write), 
         .csr_data_read_i(csr_data_read),
+        .privilege_i(privilegeLevel_e'(2'b11)),
         .exception_i(exception_execute),
         .exception_o(exception_retire)
     );
@@ -382,7 +377,6 @@ module PUC_RS5
     int clock_counter, instuctions_retired_counter, instructions_killed_counter, jumps_counter;
     int interrupt_ack_counter, raise_exception_counter, context_switch_counter;
     int hazard_counter, stall_counter, hazard_stall_counter;
-    int bypass_counter, adder_counter, logical_counter, shifter_counter, branch_counter, memory_counter, csr_counter;
     int nop_counter, lui_counter, sret_counter, mret_counter, wfi_counter, ecall_counter, ebreak_counter, invalid_counter;
     int add_counter, sub_counter, sltu_counter, slt_counter;
     int xor_counter, or_counter, and_counter;
@@ -390,10 +384,6 @@ module PUC_RS5
     int beq_counter, bne_counter, blt_counter, bltu_counter, bge_counter, bgeu_counter, jal_counter, jalr_counter;
     int lb_counter, lbu_counter, lh_counter, lhu_counter, lw_counter, sb_counter, sh_counter, sw_counter;
     int csrrw_counter, csrrs_counter, csrrc_counter, csrrwi_counter, csrrsi_counter, csrrci_counter;
-
-    executionUnit_e execution_unit_selection_retire;
-
-    assign execution_unit_selection_retire = executionUnit_e'(instruction_operation_retire[5:3]);
 
     always_ff @(posedge clk) begin
         if (reset) begin
@@ -410,14 +400,6 @@ module PUC_RS5
             interrupt_ack_counter       <= 0;
             raise_exception_counter     <= 0;
             context_switch_counter      <= 0;
-
-            bypass_counter              <= 0;
-            adder_counter               <= 0;
-            logical_counter             <= 0;
-            shifter_counter             <= 0;
-            branch_counter              <= 0;
-            memory_counter              <= 0;
-            csr_counter                 <= 0;
 
             lui_counter                 <= 0;
             sret_counter                <= 0;
@@ -476,15 +458,6 @@ module PUC_RS5
             nop_counter             <= (instruction_operation_retire == NOP) ? nop_counter + 1 : nop_counter;
 
             if (!killed) begin
-
-                bypass_counter  <= (execution_unit_selection_retire == BYPASS_UNIT)  ? bypass_counter  + 1 : bypass_counter;
-                adder_counter   <= (execution_unit_selection_retire == ADDER_UNIT)   ? adder_counter   + 1 : adder_counter;
-                logical_counter <= (execution_unit_selection_retire == LOGICAL_UNIT) ? logical_counter + 1 : logical_counter;
-                shifter_counter <= (execution_unit_selection_retire == SHIFTER_UNIT) ? shifter_counter + 1 : shifter_counter;
-                branch_counter  <= (execution_unit_selection_retire == BRANCH_UNIT)  ? branch_counter  + 1 : branch_counter;
-                memory_counter  <= (execution_unit_selection_retire == MEMORY_UNIT)  ? memory_counter  + 1 : memory_counter;
-                csr_counter     <= (execution_unit_selection_retire == CSR_UNIT)     ? csr_counter     + 1 : csr_counter;
-
                 lui_counter     <= (instruction_operation_retire == LUI)     ? lui_counter       + 1 : lui_counter;
                 sret_counter    <= (instruction_operation_retire == SRET)    ? sret_counter      + 1 : sret_counter;
                 mret_counter    <= (instruction_operation_retire == MRET)    ? mret_counter      + 1 : mret_counter;
@@ -545,15 +518,6 @@ module PUC_RS5
             $fwrite(fd,"HAZARDS:                %d\n", hazard_counter);
             $fwrite(fd,"STALL:                  %d\n", stall_counter);
             $fwrite(fd,"HAZARDS AND STALL:      %d\n", hazard_stall_counter);
-
-            $fwrite(fd,"\nINSTRUCTIONS PER EXECUTE UNIT:\n");
-            $fwrite(fd,"BYPASS:                 %d\n", bypass_counter);
-            $fwrite(fd,"ADDER:                  %d\n", adder_counter);
-            $fwrite(fd,"LOGICAL:                %d\n", logical_counter);
-            $fwrite(fd,"SHIFTER:                %d\n", shifter_counter);
-            $fwrite(fd,"BRANCHES:               %d\n", branch_counter);
-            $fwrite(fd,"LOAD/STORE:             %d\n", memory_counter);
-            $fwrite(fd,"CSR:                    %d\n", csr_counter);
 
             $fwrite(fd,"\nINSTRUCTION COUNTERS:\n");
             $fwrite(fd,"NOP:                    %d\n", nop_counter);

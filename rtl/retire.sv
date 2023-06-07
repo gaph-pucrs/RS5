@@ -65,16 +65,14 @@ module retire
     logic [31:0] memory_data;
     logic [2:0] curr_tag;
     logic killed;
-    executionUnit_e execution_unit_selection;
 
     assign current_retire_tag_o = curr_tag;
-    assign execution_unit_selection = executionUnit_e'(instruction_operation_i[5:3]);
 
 //////////////////////////////////////////////////////////////////////////////
 // Assign to Register Bank Write Back
 //////////////////////////////////////////////////////////////////////////////
 
-    assign regbank_data_o = (execution_unit_selection == MEMORY_UNIT) 
+    assign regbank_data_o = (instruction_operation_i inside {LB,LBU,LH,LHU,LW}) 
                             ? memory_data 
                             : results_i[0];
 
@@ -158,7 +156,7 @@ module retire
 
     always_comb begin
         if (instruction_operation_i == LB || instruction_operation_i == LBU) begin
-            case (results_i[1][1:0])
+            case (results_i[0][1:0])
                 2'b11:   begin 
                             memory_data[7:0]  = mem_data_i[31:24]; 
                             memory_data[31:8] = (mem_data_i[31] && instruction_operation_i == LB) 
@@ -186,7 +184,7 @@ module retire
             endcase
         end
         else if (instruction_operation_i == LH || instruction_operation_i == LHU) begin
-            case (results_i[1][1])
+            case (results_i[0][1])
                 1'b1:    begin 
                             memory_data[15:0]  = mem_data_i[31:16]; 
                             memory_data[31:16] = (mem_data_i[31] && instruction_operation_i == LH) 
@@ -200,7 +198,6 @@ module retire
                                                 : '0; 
                         end
             endcase
-
         end 
         else begin
             memory_data = mem_data_i;
@@ -208,21 +205,14 @@ module retire
     end
 
 //////////////////////////////////////////////////////////////////////////////
-// Memory mem_write_enable_o control
+// Memory Write Enable control
 //////////////////////////////////////////////////////////////////////////////
 
-    always_comb begin
-        if (mem_write_enable_i != '0 && !killed) begin
-            mem_write_enable_o  = mem_write_enable_i;
-            mem_write_address_o = results_i[1];
-            mem_data_o          = results_i[0];
-        end 
-        else begin
-            mem_write_enable_o  = '0;
-            mem_write_address_o = '0;
-            mem_data_o          = '0;
-        end
-    end
+    assign mem_write_address_o = results_i[0];
+    assign mem_data_o          = results_i[1];
+    assign mem_write_enable_o  = (!killed)
+                                ? mem_write_enable_i:
+                                '0;
 
 //////////////////////////////////////////////////////////////////////////////
 // Privileged Architecture Control
