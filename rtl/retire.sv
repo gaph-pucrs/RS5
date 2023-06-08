@@ -26,17 +26,14 @@
 module retire
     import my_pkg::*;
 (
-    input   logic           clk,
-    input   logic           reset,
-    
     input   logic [31:0]    instruction_i,
     input   logic [31:0]    pc_i,
-    input   logic [31:0]    results_i [1:0],            // Results array
-    input   logic [2:0]     tag_i,                      // Instruction tag to be compared with retire tag
-    input   logic           write_enable_i,             // Write enable from Execute(based on instruction_i type)
-    input   logic           jump_i,                     // Jump signal from branch unit 
+    input   logic [31:0]    results_i [1:0],
+    input   logic           killed_i,
+    input   logic           write_enable_i,
+    input   logic           jump_i,
     input   iType_e         instruction_operation_i,
-    input   logic [31:0]    mem_data_i,                 // Data from memory
+    input   logic [31:0]    mem_data_i,
     
     input   logic           exc_ilegal_inst_i,
     input   logic           exc_misaligned_fetch_i,
@@ -53,9 +50,8 @@ module retire
     output  logic [31:0]    regbank_data_o,             // WriteBack data to Register Bank
     output  logic [31:0]    jump_target_o,              // Branch target to fetch Unit
     output  logic           jump_o,                     // Jump signal to Fetch Unit
-    output  logic           killed_o,
+    output  logic           jumped_o,
 
-    output  logic [2:0]     current_retire_tag_o,
     output  exceptionCode_e exception_code_o,
     output  logic           raise_exception_o,
     output  logic           machine_return_o,
@@ -64,10 +60,6 @@ module retire
 );
 
     logic [31:0]    memory_data;
-    logic  [2:0]    curr_tag;
-    logic           killed;
-
-    assign current_retire_tag_o = curr_tag;
 
 //////////////////////////////////////////////////////////////////////////////
 // Assign to Register Bank Write Back
@@ -78,38 +70,16 @@ module retire
                             : results_i[0];
 
 //////////////////////////////////////////////////////////////////////////////
-// Killed signal generation
+// Jumped signal generation
 //////////////////////////////////////////////////////////////////////////////
-    assign killed_o = killed;
-    
-    always_comb begin
-        if (curr_tag != tag_i) begin
-            killed = 1;
-        end
-        else begin
-            killed = 0;
-        end
-    end
-
-//////////////////////////////////////////////////////////////////////////////
-// TAG control based on signals Jump and Killed
-//////////////////////////////////////////////////////////////////////////////
-
-    always_ff @(posedge clk) begin
-        if (reset) begin
-            curr_tag <= 0;
-        end
-        else if (jump_o | raise_exception_o | machine_return_o | interrupt_ack_o) begin
-            curr_tag <= curr_tag + 1;
-        end
-    end
+    assign jumped_o = jump_o | machine_return_o | raise_exception_o | interrupt_ack_o;
 
 //////////////////////////////////////////////////////////////////////////////
 // RegBank Write Enable Generation
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        if (killed) begin
+        if (killed_i) begin
             regbank_write_enable_o = 0;
         end 
         else begin
@@ -123,14 +93,14 @@ module retire
 `ifdef BRANCH_PREDICTION
     always_comb begin
         // If should have jumped and predicted not jump then jump
-        if (jump_i && !predicted_branch_i && !killed) begin
+        if (jump_i && !predicted_branch_i && !killed_i) begin
             jump_o          = 1;
             jump_target_o   = results_i[1];
         end
         // If should not have jumped and predicted jump then return
-        else if (!jump_i && predicted_branch_i && !killed) begin
+        else if (!jump_i && predicted_branch_i && !killed_i) begin
             jump_o          = 1;
-            jump_target_o   = pc_i;
+            jump_target_o   = pc_i + 4;
         end
         // Predicted Right or not a Jump
         else begin
@@ -140,7 +110,7 @@ module retire
     end
 `else
     always_comb begin
-        if (jump_i && !killed) begin
+        if (jump_i && !killed_i) begin
             jump_target_o = results_i[1];
             jump_o        = 1;
         end 
@@ -210,7 +180,7 @@ module retire
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        if (!killed_o) begin
+        if (!killed_i) begin
         `ifdef XOSVM
             if (exc_inst_access_fault_i) begin
                 raise_exception_o = 1;

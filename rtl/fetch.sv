@@ -26,6 +26,7 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
     input   logic           stall,
 
     input   logic           hazard_i,
+    input   logic           jumped_i,
     input   logic           jump_i,
     input   logic [31:0]    jump_target_i,
 
@@ -40,7 +41,7 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
 
     output  logic [31:0]    instruction_address_o,
     output  logic [31:0]    pc_o,
-    output  logic [2:0]     tag_o,
+    output  logic           killed_o,
 
     input   logic [31:0]    mtvec_i,
     input   logic [31:0]    mepc_i,
@@ -50,7 +51,6 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
 );
 
     logic [31:0] pc;
-    logic  [2:0] next_tag, current_tag;
     logic not_cotinuing;
 
     assign not_cotinuing = (hazard_i | stall);
@@ -106,6 +106,10 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
     end
 `endif
 
+    always_ff @(posedge clk) begin
+        killed_o <= jumped_i;
+    end
+
 //////////////////////////////////////////////////////////////////////////////
 // Non-Sensitive Outputs 
 //////////////////////////////////////////////////////////////////////////////
@@ -121,23 +125,4 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
     assign instruction_address_o = pc;
 `endif
 
-    assign tag_o = current_tag;
-
-//////////////////////////////////////////////////////////////////////////////
-// TAG Calculator 
-//////////////////////////////////////////////////////////////////////////////
-
-    always_ff @(posedge clk) begin
-        if (reset) begin
-            current_tag <= '0;
-            next_tag    <= '0;
-        end
-        else if ((jump_i | exception_raised_i | machine_return_i | interrupt_ack_i)) begin
-            next_tag    <= current_tag + 1'b1;
-        end
-        else if (!not_cotinuing) begin
-            current_tag <= next_tag;
-        end
-    end
-    
 endmodule

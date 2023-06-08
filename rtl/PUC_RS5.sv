@@ -52,6 +52,7 @@ module PUC_RS5
 // Global signals
 //////////////////////////////////////////////////////////////////////////////
     logic            jump;
+    logic            jumped;
     logic            hazard;
 `ifdef XOSVM
     logic            mmu_inst_fault;
@@ -59,7 +60,6 @@ module PUC_RS5
 `endif
     privilegeLevel_e privilege;
     logic   [31:0]   jump_target;
-    
 
 `ifdef BRANCH_PREDICTION
     logic           predict_branch_taken;
@@ -81,7 +81,7 @@ module PUC_RS5
 //////////////////////////////////////////////////////////////////////////////
 
     logic   [31:0]  pc_decode;
-    logic   [2:0]   tag_decode;
+    logic           killed_decoder;
 
 //////////////////////////////////////////////////////////////////////////////
 // RegBank signals
@@ -101,7 +101,7 @@ module PUC_RS5
     logic   [31:0]  first_operand_execute, second_operand_execute, third_operand_execute;
     logic   [31:0]  instruction_execute;
     logic   [31:0]  pc_execute;
-    logic    [2:0]  tag_execute;
+    logic           killed_execute;
     logic           kill_execute;
     logic           exc_ilegal_inst_execute;
     logic           exc_misaligned_fetch_execute;
@@ -117,15 +117,14 @@ module PUC_RS5
 //////////////////////////////////////////////////////////////////////////////
 
     logic           jump_retire, we_retire;
+    logic           killed_retire;
     iType_e         instruction_operation_retire;
     logic   [31:0]  instruction_retire;
     logic   [31:0]  result_retire [1:0];
-    logic   [2:0]   tag_retire;
-    logic   [2:0]   curr_retire_tag;
     logic   [31:0]  pc_retire;
     logic           exc_ilegal_inst_retire;
     logic           exc_misaligned_fetch_retire;
-    logic           killed;
+
 `ifdef XOSVM
     logic           exc_inst_access_fault_retire;
 `endif
@@ -169,11 +168,8 @@ module PUC_RS5
     assign regbank_write_enable =   (rd == '0) 
                                     ? 0 
                                     : write_enable_regbank_int;
-                            
-    logic jumped;
-    assign jumped =  jump | interrupt_ack_o | MACHINE_RETURN | RAISE_EXCEPTION;
-    assign kill_execute = (tag_execute != curr_retire_tag) || jumped;
 
+    assign kill_execute = killed_execute | jumped;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////// FETCH //////////////////////////////////////////////////////////////////////////////////
@@ -183,7 +179,8 @@ module PUC_RS5
         .clk(clk), 
         .reset(reset), 
         .stall(stall),
-        .hazard_i(hazard), 
+        .hazard_i(hazard),
+        .jumped_i(jumped),
         .jump_i(jump), 
         .jump_target_i(jump_target),
     `ifdef BRANCH_PREDICTION
@@ -194,9 +191,9 @@ module PUC_RS5
         .predict_jump_pc_i(predict_jump_pc),
         .predict_jump_pc_next_i(predict_jump_pc_next),
     `endif
+        .killed_o                   (killed_decoder),
         .instruction_address_o      (instruction_address), 
         .pc_o                       (pc_decode), 
-        .tag_o                      (tag_decode),
         .mepc_i                     (mepc), 
         .mtvec_i                    (mtvec),
         .exception_raised_i         (RAISE_EXCEPTION), 
@@ -225,13 +222,13 @@ module PUC_RS5
         .clk(clk), 
         .reset(reset),
         .stall(stall),
+        .killed_i(killed_decoder),
+        .jumped_i(jumped),
         .instruction_i(instruction_i), 
         .pc_i(pc_decode), 
-        .tag_i(tag_decode), 
         .rs1_data_read_i(rs1_data_read), 
         .rs2_data_read_i(rs2_data_read), 
     `ifdef BRANCH_PREDICTION
-        .killed_i(killed),
         .predicted_branch_o(predicted_branch_execute),
         .predict_branch_taken_o(predict_branch_taken),
         .predict_branch_pc_o(predict_branch_pc),
@@ -248,9 +245,9 @@ module PUC_RS5
         .third_operand_o            (third_operand_execute), 
         .pc_o                       (pc_execute), 
         .instruction_o              (instruction_execute), 
-        .tag_o                      (tag_execute), 
         .instruction_operation_o    (instruction_operation_execute), 
         .hazard_o                   (hazard),
+        .killed_o                   (killed_execute),
     `ifdef XOSVM
         .exc_inst_access_fault_i    (mmu_inst_fault),
         .exc_inst_access_fault_o    (exc_inst_access_fault_execute),
@@ -303,6 +300,8 @@ module PUC_RS5
     execute execute1 (
         .clk(clk), 
         .stall(stall),
+        .killed_i(killed_execute),
+        .jumped_i(jumped),
         .instruction_i(instruction_execute), 
         .pc_i(pc_execute), 
         .first_operand_i(first_operand_execute), 
@@ -310,15 +309,14 @@ module PUC_RS5
         .third_operand_i(third_operand_execute),
         .instruction_operation_i(instruction_operation_execute), 
         .instruction_o(instruction_retire), 
-        .tag_i(tag_execute), 
     `ifdef BRANCH_PREDICTION
         .predicted_branch_i(predicted_branch_execute),
         .predicted_branch_o(predicted_branch_retire),
     `endif
+        .killed_o               (killed_retire),
         .instruction_operation_o(instruction_operation_retire), 
         .pc_o                   (pc_retire), 
         .result_o               (result_retire), 
-        .tag_o                  (tag_retire), 
         .jump_o                 (jump_retire), 
         .write_enable_o         (we_retire),
         .mem_read_enable_o      (mem_read_enable), 
@@ -346,12 +344,10 @@ module PUC_RS5
 /////////////////////////////////////////////////////////// RETIRE //////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     retire retire1 (
-        .clk(clk), 
-        .reset(reset), 
+        .killed_i(killed_retire),
         .instruction_i(instruction_retire), 
         .pc_i(pc_retire),
         .results_i(result_retire), 
-        .tag_i(tag_retire), 
         .write_enable_i(we_retire),
         .jump_i(jump_retire), 
         .instruction_operation_i(instruction_operation_retire),
@@ -369,8 +365,7 @@ module PUC_RS5
         .regbank_data_o(regbank_data_writeback),
         .jump_target_o(jump_target), 
         .jump_o(jump),
-        .killed_o(killed),
-        .current_retire_tag_o(curr_retire_tag),
+        .jumped_o(jumped),
         .exception_code_o(Exception_Code),
         .raise_exception_o(RAISE_EXCEPTION), 
         .machine_return_o(MACHINE_RETURN),
@@ -450,8 +445,8 @@ module PUC_RS5
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// DEBUG ///////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 `ifdef DEBUG
+logic killed;
     int fd;
     int clock_counter, instuctions_retired_counter, instructions_killed_counter, jumps_counter;
     int interrupt_ack_counter, raise_exception_counter, context_switch_counter;
