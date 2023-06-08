@@ -171,7 +171,9 @@ module PUC_RS5
                                     ? 0 
                                     : write_enable_regbank_int;
                             
-    assign kill_execute = tag_execute != curr_retire_tag && !killed;
+    logic jumped;
+    assign jumped =  jump | interrupt_ack_o | MACHINE_RETURN | RAISE_EXCEPTION;
+    assign kill_execute = (tag_execute != curr_retire_tag) || jumped;
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -298,6 +300,7 @@ module PUC_RS5
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// EXECUTE /////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    logic [31:0] mem_write_data;
 
     execute execute1 (
         .clk(clk), 
@@ -320,9 +323,10 @@ module PUC_RS5
         .tag_o                  (tag_retire), 
         .jump_o                 (jump_retire), 
         .write_enable_o         (we_retire),
+        .mem_read_o             (read), 
         .mem_read_address_o     (mem_read_address_int), 
         .mem_write_enable_o     (mem_write_enable_retire),
-        .mem_read_o             (read), 
+        .mem_write_data_o       (mem_data_o),
         .csr_read_enable_o      (csr_read_enable), 
         .csr_write_enable_o     (csr_write_enable), 
         .csr_operation_o        (csr_operation), 
@@ -447,6 +451,8 @@ module PUC_RS5
 `else
     assign mem_address_o = mem_address;
 `endif
+
+    assign mem_write_enable_o = mem_write_enable_retire;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// DEBUG ///////////////////////////////////////////////////////////////////////////////////
