@@ -37,6 +37,7 @@ module retire
     input   logic           write_enable_i,             // Write enable from Execute(based on instruction_i type)
     input   logic           jump_i,                     // Jump signal from branch unit 
     input   iType_e         instruction_operation_i,
+    input   logic [31:0]    mem_data_i,                 // Data from memory
     
     input   logic           exc_ilegal_inst_i,
     input   logic           exc_misaligned_fetch_i,
@@ -54,11 +55,6 @@ module retire
     output  logic [31:0]    jump_target_o,              // Branch target to fetch Unit
     output  logic           jump_o,                     // Jump signal to Fetch Unit
     output  logic           killed_o,
-
-    output  logic [31:0]    mem_write_address_o,        // Memory mem_write_enable_o address
-    output  logic [3:0]     mem_write_enable_o,         // Memory mem_write_enable_o enable
-    output  logic [31:0]    mem_data_o,                 // Memory data to be written
-    input   logic [31:0]    mem_data_i,                 // Data from memory
 
     output  logic [2:0]     current_retire_tag_o,
     output  exceptionCode_e exception_code_o,
@@ -209,16 +205,6 @@ module retire
             memory_data = mem_data_i;
         end
     end
-
-//////////////////////////////////////////////////////////////////////////////
-// Memory Write Enable control
-//////////////////////////////////////////////////////////////////////////////
-
-    assign mem_write_address_o = results_i[0];
-    assign mem_data_o          = results_i[1];
-    assign mem_write_enable_o  = (!killed)
-                                ? mem_write_enable_i:
-                                '0;
 
 //////////////////////////////////////////////////////////////////////////////
 // Privileged Architecture Control

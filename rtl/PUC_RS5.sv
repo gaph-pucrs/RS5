@@ -171,7 +171,7 @@ module PUC_RS5
                                     ? 0 
                                     : write_enable_regbank_int;
                             
-    assign kill_execute = tag_execute != curr_retire_tag;
+    assign kill_execute = tag_execute != curr_retire_tag && !killed;
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -354,6 +354,7 @@ module PUC_RS5
         .write_enable_i(we_retire),
         .jump_i(jump_retire), 
         .instruction_operation_i(instruction_operation_retire),
+        .mem_data_i(mem_data_i), 
         .exc_ilegal_inst_i      (exc_ilegal_inst_retire),
         .exc_misaligned_fetch_i (exc_misaligned_fetch_retire),
     `ifdef XOSVM
@@ -368,10 +369,6 @@ module PUC_RS5
         .jump_target_o(jump_target), 
         .jump_o(jump),
         .killed_o(killed),
-        .mem_write_enable_o(mem_write_enable_o), 
-        .mem_write_address_o(mem_write_address_int), 
-        .mem_data_o(mem_data_o),
-        .mem_data_i(mem_data_i), 
         .current_retire_tag_o(curr_retire_tag),
         .exception_code_o(Exception_Code),
         .raise_exception_o(RAISE_EXCEPTION), 
@@ -420,18 +417,13 @@ module PUC_RS5
 /////////////////////////////////////////////////////////// MEMORY SIGNALS //////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     always_comb begin
-        if (mem_write_enable_o != '0) begin
-            mem_address[31:2] = mem_write_address_int[31:2];
-        end
-        else begin
-            mem_address[31:2] = mem_read_address_int[31:2];
-        end
+        mem_address[31:2] = mem_read_address_int[31:2];
         mem_address[1:0] = '0;
     end
 
     always_comb begin
         if (
-            (mem_write_enable_o != '0 || read) 
+            (!kill_execute && (mem_write_enable_retire != '0 || read))
         `ifdef XOSVM
             && !mmu_data_fault
         `endif

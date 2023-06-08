@@ -73,8 +73,6 @@ module execute
     
     logic [31:0]    result [1:0];
     logic           write_enable;
-    logic  [3:0]    mem_write_enable;
-    logic [31:0]    mem_write_data;
     logic           exc_ilegal_csr_inst;
 
 //////////////////////////////////////////////////////////////////////////////
@@ -153,26 +151,25 @@ module execute
 
     always_comb begin
         unique case (instruction_operation_i)
-            SB:         mem_write_data = {4{third_operand_i[7:0]}};
-            SH:         mem_write_data = {2{third_operand_i[15:0]}};
-            SW:         mem_write_data = third_operand_i;
-            default:    mem_write_data = '0;
+            SB:         mem_write_data_o = {4{third_operand_i[7:0]}};
+            SH:         mem_write_data_o = {2{third_operand_i[15:0]}};
+            default:    mem_write_data_o = third_operand_i;
         endcase
     end
 
     always_comb begin
         unique case (instruction_operation_i)
             SB: unique case (sum_result[1:0])
-                    2'b11:   mem_write_enable = 4'b1000;
-                    2'b10:   mem_write_enable = 4'b0100;
-                    2'b01:   mem_write_enable = 4'b0010;
-                    default: mem_write_enable = 4'b0001;
+                    2'b11:   mem_write_enable_o = 4'b1000;
+                    2'b10:   mem_write_enable_o = 4'b0100;
+                    2'b01:   mem_write_enable_o = 4'b0010;
+                    default: mem_write_enable_o = 4'b0001;
                 endcase
-            SH:              mem_write_enable = (sum_result[1]) 
+            SH:              mem_write_enable_o = (sum_result[1]) 
                                                 ? 4'b1100 
                                                 : 4'b0011;
-            SW:              mem_write_enable = 4'b1111;
-            default:         mem_write_enable = 4'b0000;
+            SW:              mem_write_enable_o = 4'b1111;
+            default:         mem_write_enable_o = 4'b0000;
         endcase
 end
 
@@ -264,7 +261,6 @@ end
 
     always_comb begin
         unique case (instruction_operation_i)
-            SB,SH,SW:   result[1] = mem_write_data;
             JALR:       result[1] = {sum_result[31:1], 1'b0};
             JAL:        result[1] = sum_result;
             default:    result[1] = sum2_result;
@@ -293,7 +289,6 @@ end
             result_o                <= result;             
             jump_o                  <= jump;
             write_enable_o          <= write_enable;
-            mem_write_enable_o      <= mem_write_enable;
             tag_o                   <= tag_i;
             exc_ilegal_inst_o       <= exc_ilegal_inst_i | exc_ilegal_csr_inst;
             exc_misaligned_fetch_o  <= exc_misaligned_fetch_i;
