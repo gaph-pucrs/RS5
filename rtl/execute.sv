@@ -48,9 +48,9 @@ module execute
     output  logic  [2:0]        tag_o,
     output  logic               jump_o,
     output  logic               write_enable_o,
-    output  logic               mem_read_o,
-    output  logic [31:0]        mem_read_address_o,
+    output  logic               mem_read_enable_o,
     output  logic  [3:0]        mem_write_enable_o,
+    output  logic [31:0]        mem_address_o,
     output  logic [31:0]        mem_write_data_o,
 
     output  logic               csr_read_enable_o,
@@ -147,8 +147,9 @@ module execute
 // Load/Store signals
 //////////////////////////////////////////////////////////////////////////////
 
-    assign mem_read_address_o = sum_result;
-    assign mem_read_o         = instruction_operation_i inside {LB, LBU, LH, LHU, LW};
+    assign mem_address_o[31:2]  = sum_result[31:2];
+    assign mem_address_o [1:0]  = '0;
+    assign mem_read_enable_o    = instruction_operation_i inside {LB, LBU, LH, LHU, LW};
 
     always_comb begin
         unique case (instruction_operation_i)

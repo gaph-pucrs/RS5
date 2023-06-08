@@ -33,7 +33,6 @@ module retire
     input   logic [31:0]    pc_i,
     input   logic [31:0]    results_i [1:0],            // Results array
     input   logic [2:0]     tag_i,                      // Instruction tag to be compared with retire tag
-    input   logic [3:0]     mem_write_enable_i,         // Write enable memory
     input   logic           write_enable_i,             // Write enable from Execute(based on instruction_i type)
     input   logic           jump_i,                     // Jump signal from branch unit 
     input   iType_e         instruction_operation_i,
@@ -64,9 +63,9 @@ module retire
     input   logic           interrupt_pending_i
 );
 
-    logic [31:0] memory_data;
-    logic [2:0] curr_tag;
-    logic killed;
+    logic [31:0]    memory_data;
+    logic  [2:0]    curr_tag;
+    logic           killed;
 
     assign current_retire_tag_o = curr_tag;
 

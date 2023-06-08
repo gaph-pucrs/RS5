@@ -51,7 +51,6 @@ module PUC_RS5
 //////////////////////////////////////////////////////////////////////////////
 // Global signals
 //////////////////////////////////////////////////////////////////////////////
-    logic            read;
     logic            jump;
     logic            hazard;
 `ifdef XOSVM
@@ -60,10 +59,7 @@ module PUC_RS5
 `endif
     privilegeLevel_e privilege;
     logic   [31:0]   jump_target;
-    /* verilator lint_off UNUSEDSIGNAL */
-    logic   [31:0]   mem_read_address_int;
-    logic   [31:0]   mem_write_address_int;
-    /* verilator lint_on UNUSEDSIGNAL */
+    
 
 `ifdef BRANCH_PREDICTION
     logic           predict_branch_taken;
@@ -73,8 +69,12 @@ module PUC_RS5
     logic   [31:0]  predict_jump_pc;
     logic   [31:0]  predict_jump_pc_next;
 `endif
-    logic   [31:0]   instruction_address;
+    logic            mem_read_enable;
+    logic    [3:0]   mem_write_enable;
+    /* verilator lint_off UNUSEDSIGNAL */
     logic   [31:0]   mem_address;
+    /* verilator lint_on UNUSEDSIGNAL */
+    logic   [31:0]   instruction_address;
 
 //////////////////////////////////////////////////////////////////////////////
 // Decoder signals
@@ -117,7 +117,6 @@ module PUC_RS5
 //////////////////////////////////////////////////////////////////////////////
 
     logic           jump_retire, we_retire;
-    logic   [3:0]   mem_write_enable_retire;
     iType_e         instruction_operation_retire;
     logic   [31:0]  instruction_retire;
     logic   [31:0]  result_retire [1:0];
@@ -300,7 +299,6 @@ module PUC_RS5
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// EXECUTE /////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    logic [31:0] mem_write_data;
 
     execute execute1 (
         .clk(clk), 
@@ -323,9 +321,9 @@ module PUC_RS5
         .tag_o                  (tag_retire), 
         .jump_o                 (jump_retire), 
         .write_enable_o         (we_retire),
-        .mem_read_o             (read), 
-        .mem_read_address_o     (mem_read_address_int), 
-        .mem_write_enable_o     (mem_write_enable_retire),
+        .mem_read_enable_o      (mem_read_enable), 
+        .mem_address_o          (mem_address), 
+        .mem_write_enable_o     (mem_write_enable),
         .mem_write_data_o       (mem_data_o),
         .csr_read_enable_o      (csr_read_enable), 
         .csr_write_enable_o     (csr_write_enable), 
@@ -354,7 +352,6 @@ module PUC_RS5
         .pc_i(pc_retire),
         .results_i(result_retire), 
         .tag_i(tag_retire), 
-        .mem_write_enable_i(mem_write_enable_retire),
         .write_enable_i(we_retire),
         .jump_i(jump_retire), 
         .instruction_operation_i(instruction_operation_retire),
@@ -420,14 +417,10 @@ module PUC_RS5
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// MEMORY SIGNALS //////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    always_comb begin
-        mem_address[31:2] = mem_read_address_int[31:2];
-        mem_address[1:0] = '0;
-    end
 
     always_comb begin
         if (
-            (!kill_execute && (mem_write_enable_retire != '0 || read))
+            (!kill_execute && (mem_write_enable != '0 || mem_read_enable))
         `ifdef XOSVM
             && !mmu_data_fault
         `endif
@@ -452,7 +445,7 @@ module PUC_RS5
     assign mem_address_o = mem_address;
 `endif
 
-    assign mem_write_enable_o = mem_write_enable_retire;
+    assign mem_write_enable_o = mem_write_enable;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// DEBUG ///////////////////////////////////////////////////////////////////////////////////
@@ -591,7 +584,7 @@ module PUC_RS5
         fd = $fopen ("./debug/Report.txt", "w");
 
     always_comb begin
-        if (mem_write_address_int == 32'h80000000 && mem_write_enable_o != '0) begin
+        if (mem_address == 32'h80000000 && mem_write_enable_o != '0) begin
             $fwrite(fd,"Clock Cycles:           %d\n", clock_counter);
             $fwrite(fd,"Instructions Retired:   %d\n", instuctions_retired_counter);
             $fwrite(fd,"Instructions Killed:    %d\n", instructions_killed_counter);
