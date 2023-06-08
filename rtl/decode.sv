@@ -71,7 +71,6 @@ module decode
     logic [4:0] locked_register;
     logic [4:0] target_register;
     logic is_store;
-    logic locked_memory;
 
     formatType_e instruction_format;
     iType_e instruction_operation;
@@ -290,12 +289,10 @@ module decode
         if (reset) begin
             rd_o                <= '0;
             locked_register     <= '0;
-            locked_memory       <= '0;
         end 
         else if (!stall) begin
             rd_o                <= locked_register;
             locked_register     <= target_register;
-            locked_memory       <= is_store;
         end
     end
 
@@ -303,11 +300,8 @@ module decode
 // Hazard signal generation
 //////////////////////////////////////////////////////////////////////////////
 
-    logic use_mem;
     logic use_rs1;
     logic use_rs2;
-
-    assign use_mem = ({opcode[6], opcode[4:2]} == '0) ? 1'b1 : 1'b0;
 
     always_comb begin
         unique case (instruction_format)
@@ -337,15 +331,13 @@ module decode
     assign locked_rs1 = (locked_register == rs1_o && rs1_o != '0) ? 1'b1 : 1'b0;
     assign locked_rs2 = (locked_register == rs2_o && rs2_o != '0) ? 1'b1 : 1'b0;
 
-    logic hazard_mem;
     logic hazard_rs1;
     logic hazard_rs2;
 
-    assign hazard_mem = locked_memory & use_mem;
     assign hazard_rs1 = locked_rs1    & use_rs1;
     assign hazard_rs2 = locked_rs2    & use_rs2;
 
-    assign hazard_o   = hazard_mem | hazard_rs1 | hazard_rs2;
+    assign hazard_o   = hazard_rs1 | hazard_rs2;
 
 //////////////////////////////////////////////////////////////////////////////
 // Exceptions Generation 

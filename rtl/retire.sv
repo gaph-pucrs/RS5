@@ -100,7 +100,7 @@ module retire
         if (reset) begin
             curr_tag <= 0;
         end
-        else if (!killed && (jump_o | raise_exception_o | machine_return_o | interrupt_ack_o)) begin
+        else if (jump_o | raise_exception_o | machine_return_o | interrupt_ack_o) begin
             curr_tag <= curr_tag + 1;
         end
     end
