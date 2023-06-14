@@ -36,11 +36,6 @@ module execute
     input   iType_e             instruction_operation_i,
     input   logic  [2:0]        tag_i,
 
-`ifdef BRANCH_PREDICTION
-    input   logic               predicted_branch_i,
-    output  logic               predicted_branch_o,
-`endif
-
     output  iType_e             instruction_operation_o,
     output  logic [31:0]        instruction_o,
     output  logic [31:0]        pc_o,
@@ -296,9 +291,6 @@ end
             exc_misaligned_fetch_o  <= exc_misaligned_fetch_i;
         `ifdef XOSVM
             exc_inst_access_fault_o <= exc_inst_access_fault_i;
-        `endif
-        `ifdef BRANCH_PREDICTION
-            predicted_branch_o      <= predicted_branch_i;
         `endif
         end
     end

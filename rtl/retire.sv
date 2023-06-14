@@ -45,10 +45,6 @@ module retire
     input   logic           exc_load_access_fault_i,
 `endif
 
-`ifdef BRANCH_PREDICTION
-    input   logic           predicted_branch_i,
-`endif
-
     output  logic           regbank_write_enable_o,     // Write Enable to Register Bank
     output  logic [31:0]    regbank_data_o,             // WriteBack data to Register Bank
     output  logic [31:0]    jump_target_o,              // Branch target to fetch Unit
@@ -120,25 +116,6 @@ module retire
 //////////////////////////////////////////////////////////////////////////////
 // PC Flow control signal generation
 //////////////////////////////////////////////////////////////////////////////
-`ifdef BRANCH_PREDICTION
-    always_comb begin
-        // If should have jumped and predicted not jump then jump
-        if (jump_i && !predicted_branch_i && !killed) begin
-            jump_o          = 1;
-            jump_target_o   = results_i[1];
-        end
-        // If should not have jumped and predicted jump then return
-        else if (!jump_i && predicted_branch_i && !killed) begin
-            jump_o          = 1;
-            jump_target_o   = pc_i;
-        end
-        // Predicted Right or not a Jump
-        else begin
-            jump_o          = 0;
-            jump_target_o   = '0;
-        end
-    end
-`else
     always_comb begin
         if (jump_i && !killed) begin
             jump_target_o = results_i[1];
@@ -149,7 +126,6 @@ module retire
             jump_o        = '0;
         end
     end
-`endif
 
 //////////////////////////////////////////////////////////////////////////////
 // Memory Signal Generation

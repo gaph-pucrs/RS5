@@ -59,16 +59,7 @@ module PUC_RS5
 `endif
     privilegeLevel_e privilege;
     logic   [31:0]   jump_target;
-    
 
-`ifdef BRANCH_PREDICTION
-    logic           predict_branch_taken;
-    logic   [31:0]  predict_branch_pc;
-    logic   [31:0]  predict_branch_pc_next;
-    logic           predict_jump_taken;
-    logic   [31:0]  predict_jump_pc;
-    logic   [31:0]  predict_jump_pc_next;
-`endif
     logic            mem_read_enable;
     logic    [3:0]   mem_write_enable;
     /* verilator lint_off UNUSEDSIGNAL */
@@ -108,9 +99,6 @@ module PUC_RS5
 `ifdef XOSVM
     logic           exc_inst_access_fault_execute;
 `endif
-`ifdef BRANCH_PREDICTION
-    logic           predicted_branch_execute;
-`endif
 
 //////////////////////////////////////////////////////////////////////////////
 // Retire signals
@@ -128,9 +116,6 @@ module PUC_RS5
     logic           killed;
 `ifdef XOSVM
     logic           exc_inst_access_fault_retire;
-`endif
-`ifdef BRANCH_PREDICTION
-    logic           predicted_branch_retire;
 `endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -186,14 +171,6 @@ module PUC_RS5
         .hazard_i(hazard), 
         .jump_i(jump), 
         .jump_target_i(jump_target),
-    `ifdef BRANCH_PREDICTION
-        .predict_branch_taken_i(predict_branch_taken),
-        .predict_branch_pc_i(predict_branch_pc),
-        .predict_branch_pc_next_i(predict_branch_pc_next),
-        .predict_jump_taken_i(predict_jump_taken),
-        .predict_jump_pc_i(predict_jump_pc),
-        .predict_jump_pc_next_i(predict_jump_pc_next),
-    `endif
         .instruction_address_o      (instruction_address), 
         .pc_o                       (pc_decode), 
         .tag_o                      (tag_decode),
@@ -230,16 +207,6 @@ module PUC_RS5
         .tag_i(tag_decode), 
         .rs1_data_read_i(rs1_data_read), 
         .rs2_data_read_i(rs2_data_read), 
-    `ifdef BRANCH_PREDICTION
-        .killed_i(killed),
-        .predicted_branch_o(predicted_branch_execute),
-        .predict_branch_taken_o(predict_branch_taken),
-        .predict_branch_pc_o(predict_branch_pc),
-        .predict_branch_pc_next_o(predict_branch_pc_next),
-        .predict_jump_taken_o(predict_jump_taken),
-        .predict_jump_pc_o(predict_jump_pc),
-        .predict_jump_pc_next_o(predict_jump_pc_next),
-    `endif
         .rs1_o                      (rs1), 
         .rs2_o                      (rs2), 
         .rd_o                       (rd), 
@@ -311,10 +278,6 @@ module PUC_RS5
         .instruction_operation_i(instruction_operation_execute), 
         .instruction_o(instruction_retire), 
         .tag_i(tag_execute), 
-    `ifdef BRANCH_PREDICTION
-        .predicted_branch_i(predicted_branch_execute),
-        .predicted_branch_o(predicted_branch_retire),
-    `endif
         .instruction_operation_o(instruction_operation_retire), 
         .pc_o                   (pc_retire), 
         .result_o               (result_retire), 
@@ -361,9 +324,6 @@ module PUC_RS5
     `ifdef XOSVM
         .exc_inst_access_fault_i(exc_inst_access_fault_retire),
         .exc_load_access_fault_i(mmu_data_fault),
-    `endif
-    `ifdef BRANCH_PREDICTION
-        .predicted_branch_i(predicted_branch_retire),
     `endif
         .regbank_write_enable_o(write_enable_regbank_int), 
         .regbank_data_o(regbank_data_writeback),
