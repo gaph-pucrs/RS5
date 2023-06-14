@@ -28,15 +28,15 @@ module decode
     input   logic           clk,
     input   logic           reset,
     input   logic           stall,
-    input   logic           killed_i,
-    input   logic           jumped_i,
 
     input   logic [31:0]    instruction_i,
     input   logic [31:0]    pc_i,
+    input   logic  [2:0]    tag_i,
     input   logic [31:0]    rs1_data_read_i,
     input   logic [31:0]    rs2_data_read_i,
 
 `ifdef BRANCH_PREDICTION
+    input   logic           killed_i,
     output  logic           predicted_branch_o,
     output  logic           predict_branch_taken_o,
     output  logic [31:0]    predict_branch_pc_o,
@@ -54,7 +54,7 @@ module decode
     output  logic [31:0]    third_operand_o,
     output  logic [31:0]    pc_o,
     output  logic [31:0]    instruction_o,
-    output  logic           killed_o,
+    output  logic  [2:0]    tag_o,
     output  iType_e         instruction_operation_o,
     output  logic           hazard_o,
 
@@ -70,12 +70,10 @@ module decode
     logic last_hazard;
     logic [4:0] locked_register;
     logic [4:0] target_register;
+    logic is_store;
 
     formatType_e instruction_format;
     iType_e instruction_operation;
-
-    logic killed;
-    assign killed = killed_i | jumped_i;
 
 //////////////////////////////////////////////////////////////////////////////
 // Re-Decode isntruction on hazard
@@ -276,9 +274,11 @@ module decode
     always_comb begin
         if (!hazard_o) begin
             target_register = instruction_int[11:7];
+            is_store = (opcode[6:2] == 5'b01000) ? 1'b1 : 1'b0;
         end
         else begin
             target_register = '0;
+            is_store        = 1'b0;
         end
     end
 //////////////////////////////////////////////////////////////////////////////
@@ -358,8 +358,8 @@ module decode
  * branches it will predict taken if the PC offset is negative.
  */
 `ifdef BRANCH_PREDICTION
-    assign predict_branch_taken_o   = (opcode[6:2] == 5'b11000 && imm_b[31] && !killed) ? 1'b1 : 1'b0;
-    assign predict_jump_taken_o     = (opcode[6:2] == 5'b11011 && !killed) ? 1'b1 : 1'b0;
+    assign predict_branch_taken_o   = (opcode[6:2] == 5'b11000 && imm_b[31] && !killed_i) ? 1'b1 : 1'b0;
+    assign predict_jump_taken_o     = (opcode[6:2] == 5'b11011 && !killed_i) ? 1'b1 : 1'b0;
 
     assign predict_branch_pc_o      = pc_i + imm_b;
     assign predict_jump_pc_o        = pc_i + imm_j;
@@ -413,7 +413,7 @@ module decode
             pc_o                    <= '0;
             instruction_o           <= '0;
             instruction_operation_o <= NOP;
-            killed_o                <= '0;
+            tag_o                   <= '0;
             exc_ilegal_inst_o       <= 1'b0;
             exc_misaligned_fetch_o  <= 1'b0;
         `ifdef XOSVM
@@ -430,7 +430,7 @@ module decode
             pc_o                    <= '0;
             instruction_o           <= '0;
             instruction_operation_o <= NOP;
-            killed_o                <= 1'b0;
+            tag_o                   <= tag_i;
             exc_ilegal_inst_o       <= 1'b0;
             exc_misaligned_fetch_o  <= 1'b0;
         `ifdef XOSVM
@@ -447,7 +447,7 @@ module decode
             pc_o                    <= pc_i;
             instruction_o           <= instruction_int;
             instruction_operation_o <= instruction_operation;
-            killed_o                <= killed;
+            tag_o                   <= tag_i;
             exc_ilegal_inst_o       <= invalid_inst;
             exc_misaligned_fetch_o  <= misaligned_fetch;
         `ifdef XOSVM

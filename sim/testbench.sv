@@ -19,9 +19,7 @@
 `timescale 1ns/1ps
 
 `include "../rtl/my_pkg.sv"
-`ifdef XOSVM
-    `include "../rtl/mmu.sv"
-`endif
+`include "../rtl/mmu.sv"
 `include "../rtl/fetch.sv"
 `include "../rtl/decode.sv"
 `include "../rtl/execute.sv"

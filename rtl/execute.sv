@@ -34,8 +34,7 @@ module execute
     input   logic [31:0]        second_operand_i,
     input   logic [31:0]        third_operand_i,
     input   iType_e             instruction_operation_i,
-    input   logic               killed_i,
-    input   logic               jumped_i,
+    input   logic  [2:0]        tag_i,
 
 `ifdef BRANCH_PREDICTION
     input   logic               predicted_branch_i,
@@ -46,7 +45,7 @@ module execute
     output  logic [31:0]        instruction_o,
     output  logic [31:0]        pc_o,
     output  logic [31:0]        result_o [1:0],
-    output  logic               killed_o,
+    output  logic  [2:0]        tag_o,
     output  logic               jump_o,
     output  logic               write_enable_o,
     output  logic               mem_read_enable_o,
@@ -292,7 +291,7 @@ end
             result_o                <= result;             
             jump_o                  <= jump;
             write_enable_o          <= write_enable;
-            killed_o                <= killed_i | jumped_i;
+            tag_o                   <= tag_i;
             exc_ilegal_inst_o       <= exc_ilegal_inst_i | exc_ilegal_csr_inst;
             exc_misaligned_fetch_o  <= exc_misaligned_fetch_i;
         `ifdef XOSVM
