@@ -36,28 +36,28 @@
 
 module testbench
     import my_pkg::*;
-(
-    input logic clk_i,
-    input logic rst_i
-);
+    (
+        input logic clk_i,
+        input logic rst_i
+    );
 
-/* verilator lint_off UNUSEDSIGNAL */
-logic [31:0]  instruction_address;
-logic         interrupt_ack;
-logic [63:0]  mtime;
-logic [63:0]  data_rtc;
-/* verilator lint_on UNUSEDSIGNAL */
-logic [31:0]  instruction;
-logic         enable_ram, enable_tb, enable_rtc, mem_operation_enable;
-logic [31:0]  mem_address, mem_data_read, mem_data_write;
-logic [3:0]   mem_write_enable;
-byte          char;
-logic [31:0]  data_ram, data_tb;
-logic         enable_tb_r, enable_rtc_r;
-logic [31:0]  IRQ;
-logic         mti;
+    /* verilator lint_off UNUSEDSIGNAL */
+    logic [31:0]  instruction_address;
+    logic         interrupt_ack;
+    logic [63:0]  mtime;
+    logic [63:0]  data_rtc;
+    /* verilator lint_on UNUSEDSIGNAL */
+    logic [31:0]  instruction;
+    logic         enable_ram, enable_tb, enable_rtc, mem_operation_enable;
+    logic [31:0]  mem_address, mem_data_read, mem_data_write;
+    logic [3:0]   mem_write_enable;
+    byte          char;
+    logic [31:0]  data_ram, data_tb;
+    logic         enable_tb_r, enable_rtc_r;
+    logic [31:0]  IRQ;
+    logic         mti;
 
-assign IRQ = {24'h0, mti, 7'h0};
+    assign IRQ = {24'h0, mti, 7'h0};
 
 //////////////////////////////////////////////////////////////////////////////
 // CPU INSTANTIATION

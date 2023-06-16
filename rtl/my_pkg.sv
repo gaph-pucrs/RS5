@@ -19,9 +19,9 @@
 
 package my_pkg;
 
-    // `define PROTO 1
+    `define PROTO 1
     // `define DEBUG 1
-    // `define XOSVM 1
+    `define XOSVM 1
 
     typedef enum  logic[5:0] {
         R_TYPE = 6'b000001, 

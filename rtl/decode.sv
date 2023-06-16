@@ -55,14 +55,13 @@ module decode
     output  logic           exc_misaligned_fetch_o
 );
 
-    logic [31:0] immediate, first_operand_int, second_operand_int, third_operand_int, instruction_int, last_instruction;
-    logic last_hazard;
-    logic [4:0] locked_register;
-    logic [4:0] target_register;
-    logic is_store;
+    logic [31:0]    immediate, first_operand_int, second_operand_int, third_operand_int, instruction_int, last_instruction;
+    logic           last_hazard;
+    logic  [4:0]    locked_register;
+    logic  [4:0]    target_register;
 
-    formatType_e instruction_format;
-    iType_e instruction_operation;
+    formatType_e    instruction_format;
+    iType_e         instruction_operation;
 
 //////////////////////////////////////////////////////////////////////////////
 // Re-Decode isntruction on hazard
@@ -263,11 +262,9 @@ module decode
     always_comb begin
         if (!hazard_o) begin
             target_register = instruction_int[11:7];
-            is_store = (opcode[6:2] == 5'b01000) ? 1'b1 : 1'b0;
         end
         else begin
             target_register = '0;
-            is_store        = 1'b0;
         end
     end
 //////////////////////////////////////////////////////////////////////////////
