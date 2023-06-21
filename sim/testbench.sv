@@ -64,19 +64,19 @@ assign IRQ = {24'h0, mti, 7'h0};
 //////////////////////////////////////////////////////////////////////////////
 
     PUC_RS5 dut (
-        .clk(clk_i), 
-        .reset(rst_i), 
-        .stall(1'b0),
-        .instruction_i(instruction), 
-        .mem_data_i(mem_data_read), 
-        .IRQ_i(IRQ),
-        .mtime_i(mtime),
-        .instruction_address_o(instruction_address), 
-        .mem_operation_enable_o(mem_operation_enable), 
-        .mem_write_enable_o(mem_write_enable),
-        .mem_address_o(mem_address),
-        .mem_data_o(mem_data_write),
-        .interrupt_ack_o(interrupt_ack)
+        .clk                    (clk_i), 
+        .reset                  (rst_i), 
+        .stall                  (1'b0),
+        .instruction_i          (instruction), 
+        .mem_data_i             (mem_data_read), 
+        .IRQ_i                  (IRQ),
+        .mtime_i                (mtime),
+        .instruction_address_o  (instruction_address), 
+        .mem_operation_enable_o (mem_operation_enable), 
+        .mem_write_enable_o     (mem_write_enable),
+        .mem_address_o          (mem_address),
+        .mem_data_o             (mem_data_write),
+        .interrupt_ack_o        (interrupt_ack)
     );
 
 //////////////////////////////////////////////////////////////////////////////
@@ -84,25 +84,26 @@ assign IRQ = {24'h0, mti, 7'h0};
 //////////////////////////////////////////////////////////////////////////////
 
     RAM_mem RAM_MEM(
-        .clk(clk_i), 
-        .instruction_address_i(instruction_address[15:0]), 
-        .instruction_o(instruction),
-        .operation_enable_i(enable_ram), 
-        .write_enable_i(mem_write_enable), 
-        .data_address_i(mem_address[15:0]), 
-        .data_i(mem_data_write), 
-        .data_o(data_ram)
+        .clk                    (clk_i), 
+        .instruction_address_i  (instruction_address[15:0]), 
+        .instruction_o          (instruction),
+        .operation_enable_i     (enable_ram), 
+        .write_enable_i         (mem_write_enable), 
+        .data_address_i         (mem_address[15:0]), 
+        .data_i                 (mem_data_write), 
+        .data_o                 (data_ram)
     );
 
     rtc rtc(
-        .clk(clk_i),
-        .en_i(enable_rtc),
-        .addr_i(mem_address[3:0]),
-        .we_i({4'h0, mem_write_enable}),
-        .data_i({32'h0, mem_data_write}),
-        .data_o(data_rtc),     
-        .mti_o(mti),
-        .mtime_o(mtime)
+        .clk        (clk_i),
+        .reset      (rst_i),
+        .en_i       (enable_rtc),
+        .addr_i     (mem_address[3:0]),
+        .we_i       ({4'h0, mem_write_enable}),
+        .data_i     ({32'h0, mem_data_write}),
+        .data_o     (data_rtc),     
+        .mti_o      (mti),
+        .mtime_o    (mtime)
     );
 
     always_comb begin
