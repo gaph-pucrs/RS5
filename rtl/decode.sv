@@ -66,14 +66,16 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 // Re-Decode isntruction on hazard
 //////////////////////////////////////////////////////////////////////////////
+    logic last_stall;
 
     always_ff @(posedge clk) begin
         last_instruction <= instruction_int;
         last_hazard      <= hazard_o;
+        last_stall       <= stall;
     end
 
     always_comb begin
-        if (last_hazard) begin
+        if (last_hazard | last_stall) begin
             instruction_int = last_instruction;
         end
         else begin
@@ -273,13 +275,15 @@ module decode
 
     always_ff @(posedge clk) begin
         if (reset) begin
-            rd_o                <= '0;
             locked_register     <= '0;
         end 
         else if (!stall) begin
-            rd_o                <= locked_register;
             locked_register     <= target_register;
         end
+    end
+
+    always_ff @(posedge clk) begin
+        rd_o <= locked_register;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -323,7 +327,7 @@ module decode
     assign hazard_rs1 = locked_rs1    & use_rs1;
     assign hazard_rs2 = locked_rs2    & use_rs2;
 
-    assign hazard_o   = hazard_rs1 | hazard_rs2;
+    assign hazard_o   = (hazard_rs1 | hazard_rs2) & !stall;
 
 //////////////////////////////////////////////////////////////////////////////
 // Exceptions Generation 
