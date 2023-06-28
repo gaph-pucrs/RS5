@@ -67,13 +67,13 @@
     <Option Name="WTVcsLaunchSim" Val="0"/>
     <Option Name="WTRivieraLaunchSim" Val="0"/>
     <Option Name="WTActivehdlLaunchSim" Val="0"/>
-    <Option Name="WTXSimExportSim" Val="36"/>
-    <Option Name="WTModelSimExportSim" Val="36"/>
-    <Option Name="WTQuestaExportSim" Val="36"/>
-    <Option Name="WTIesExportSim" Val="36"/>
-    <Option Name="WTVcsExportSim" Val="36"/>
-    <Option Name="WTRivieraExportSim" Val="36"/>
-    <Option Name="WTActivehdlExportSim" Val="36"/>
+    <Option Name="WTXSimExportSim" Val="38"/>
+    <Option Name="WTModelSimExportSim" Val="38"/>
+    <Option Name="WTQuestaExportSim" Val="38"/>
+    <Option Name="WTIesExportSim" Val="38"/>
+    <Option Name="WTVcsExportSim" Val="38"/>
+    <Option Name="WTRivieraExportSim" Val="38"/>
+    <Option Name="WTActivehdlExportSim" Val="38"/>
     <Option Name="GenerateIPUpgradeLog" Val="TRUE"/>
     <Option Name="XSimRadix" Val="hex"/>
     <Option Name="XSimTimeUnit" Val="ns"/>
@@ -99,22 +99,17 @@
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
+      <File Path="$PSRCDIR/sources_1/ip/BRAM.xcix">
+        <FileInfo>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
       <File Path="$PSRCDIR/sources_1/ip/BRAM/BRAM.xci">
         <FileInfo>
-          <Attr Name="UsedIn" Val="synthesis"/>
-          <Attr Name="UsedIn" Val="implementation"/>
-          <Attr Name="UsedIn" Val="simulation"/>
-        </FileInfo>
-      </File>
-      <File Path="$PSRCDIR/sources_1/ip/regBankB/regBankB.xci">
-        <FileInfo>
-          <Attr Name="UsedIn" Val="synthesis"/>
-          <Attr Name="UsedIn" Val="implementation"/>
-          <Attr Name="UsedIn" Val="simulation"/>
-        </FileInfo>
-      </File>
-      <File Path="$PSRCDIR/sources_1/ip/regBankA/regBankA.xci">
-        <FileInfo>
+          <Attr Name="ImportPath" Val="$PSRCDIR/sources_1/ip/BRAM/BRAM.xci"/>
+          <Attr Name="ImportTime" Val="1687976241"/>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
           <Attr Name="UsedIn" Val="simulation"/>
@@ -211,6 +206,22 @@
       </File>
       <File Path="$PPRDIR/../PUC_RS5_With_BRAMs.sv">
         <FileInfo>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PSRCDIR/sources_1/ip/regBankB/regBankB.xci">
+        <FileInfo>
+          <Attr Name="AutoDisabled" Val="1"/>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PSRCDIR/sources_1/ip/regBankA/regBankA.xci">
+        <FileInfo>
+          <Attr Name="AutoDisabled" Val="1"/>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
           <Attr Name="UsedIn" Val="simulation"/>
@@ -313,13 +324,13 @@
       <Strategy Version="1" Minor="2">
         <StratHandle Name="Flow_PerfOptimized_high" Flow="Vivado Synthesis 2021"/>
         <Step Id="synth_design">
-          <Option Id="NoCombineLuts">1</Option>
+          <Option Id="Directive">7</Option>
           <Option Id="ShregMinSize">5</Option>
           <Option Id="ReTiming">1</Option>
+          <Option Id="KeepEquivalentRegisters">1</Option>
+          <Option Id="NoCombineLuts">1</Option>
           <Option Id="ResourceSharing">2</Option>
           <Option Id="FsmExtraction">1</Option>
-          <Option Id="Directive">7</Option>
-          <Option Id="KeepEquivalentRegisters">1</Option>
         </Step>
       </Strategy>
       <GeneratedRun Dir="$PRUNDIR" File="gen_run.xml"/>
