@@ -96,6 +96,7 @@ module testbench
 
     rtc rtc(
         .clk(clk_i),
+        .reset(rst_i), 
         .en_i(enable_rtc),
         .addr_i(mem_address[3:0]),
         .we_i({4'h0, mem_write_enable}),
@@ -163,10 +164,6 @@ module testbench
             if (mem_address == 32'h80000000 && mem_write_enable != '0) begin
                 $display("# %t END OF SIMULATION",$time);
                 $finish;
-            end
-            // TIMER REG
-            if (mem_address == 32'h80006000 && mem_write_enable == '0) begin
-                data_tb <= 32'($time/1000);
             end
         end 
         else begin

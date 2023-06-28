@@ -57,8 +57,11 @@ module decode
 
     logic [31:0]    immediate, first_operand_int, second_operand_int, third_operand_int, instruction_int, last_instruction;
     logic           last_hazard;
+    logic           last_stall;
+    logic           locked_memory;
     logic  [4:0]    locked_register;
     logic  [4:0]    target_register;
+    logic           is_store;
 
     formatType_e    instruction_format;
     iType_e         instruction_operation;
@@ -66,7 +69,6 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 // Re-Decode isntruction on hazard
 //////////////////////////////////////////////////////////////////////////////
-    logic last_stall;
 
     always_ff @(posedge clk) begin
         last_instruction <= instruction_int;
@@ -264,9 +266,11 @@ module decode
     always_comb begin
         if (!hazard_o) begin
             target_register = instruction_int[11:7];
+            is_store        = (opcode[6:2] == 5'b01000);
         end
         else begin
             target_register = '0;
+            is_store        = 1'b0;
         end
     end
 //////////////////////////////////////////////////////////////////////////////
@@ -275,10 +279,12 @@ module decode
 
     always_ff @(posedge clk) begin
         if (reset) begin
-            locked_register     <= '0;
+            locked_memory   <= '0;
+            locked_register <= '0;
         end 
         else if (!stall) begin
-            locked_register     <= target_register;
+            locked_register <= target_register;
+            locked_memory   <= is_store;
         end
     end
 
@@ -290,8 +296,11 @@ module decode
 // Hazard signal generation
 //////////////////////////////////////////////////////////////////////////////
 
+    logic use_mem;
     logic use_rs1;
     logic use_rs2;
+
+    assign use_mem = ({opcode[6], opcode[4:2]} == '0) ? 1'b1 : 1'b0;
 
     always_comb begin
         unique case (instruction_format)
@@ -321,13 +330,16 @@ module decode
     assign locked_rs1 = (locked_register == rs1_o && rs1_o != '0) ? 1'b1 : 1'b0;
     assign locked_rs2 = (locked_register == rs2_o && rs2_o != '0) ? 1'b1 : 1'b0;
 
+    logic hazard_mem;
     logic hazard_rs1;
     logic hazard_rs2;
 
-    assign hazard_rs1 = locked_rs1    & use_rs1;
-    assign hazard_rs2 = locked_rs2    & use_rs2;
+    assign hazard_mem = locked_memory   & use_mem;
+    assign hazard_rs1 = locked_rs1      & use_rs1;
+    assign hazard_rs2 = locked_rs2      & use_rs2;
 
-    assign hazard_o   = (hazard_rs1 | hazard_rs2) & !stall;
+
+    assign hazard_o   = (hazard_mem | hazard_rs1 | hazard_rs2) & !stall;
 
 //////////////////////////////////////////////////////////////////////////////
 // Exceptions Generation 

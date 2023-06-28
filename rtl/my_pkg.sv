@@ -19,7 +19,7 @@
 
 package my_pkg;
 
-    `define PROTO 1
+    // `define PROTO 1
     // `define DEBUG 1
     `define XOSVM 1
 
