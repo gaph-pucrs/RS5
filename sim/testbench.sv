@@ -36,28 +36,28 @@
 
 module testbench
     import my_pkg::*;
-(
-    input logic clk_i,
-    input logic rst_i
-);
+    (
+        input logic clk_i,
+        input logic rst_i
+    );
 
-/* verilator lint_off UNUSEDSIGNAL */
-logic [31:0]  instruction_address;
-logic         interrupt_ack;
-logic [63:0]  mtime;
-logic [63:0]  data_rtc;
-/* verilator lint_on UNUSEDSIGNAL */
-logic [31:0]  instruction;
-logic         enable_ram, enable_tb, enable_rtc, mem_operation_enable;
-logic [31:0]  mem_address, mem_data_read, mem_data_write;
-logic [3:0]   mem_write_enable;
-byte          char;
-logic [31:0]  data_ram, data_tb;
-logic         enable_tb_r, enable_rtc_r;
-logic [31:0]  IRQ;
-logic         mti;
+    /* verilator lint_off UNUSEDSIGNAL */
+    logic [31:0]  instruction_address;
+    logic         interrupt_ack;
+    logic [63:0]  mtime;
+    logic [63:0]  data_rtc;
+    /* verilator lint_on UNUSEDSIGNAL */
+    logic [31:0]  instruction;
+    logic         enable_ram, enable_tb, enable_rtc, mem_operation_enable;
+    logic [31:0]  mem_address, mem_data_read, mem_data_write;
+    logic [3:0]   mem_write_enable;
+    byte          char;
+    logic [31:0]  data_ram, data_tb;
+    logic         enable_tb_r, enable_rtc_r;
+    logic [31:0]  IRQ;
+    logic         mti;
 
-assign IRQ = {24'h0, mti, 7'h0};
+    assign IRQ = {24'h0, mti, 7'h0};
 
 //////////////////////////////////////////////////////////////////////////////
 // CPU INSTANTIATION
@@ -95,15 +95,15 @@ assign IRQ = {24'h0, mti, 7'h0};
     );
 
     rtc rtc(
-        .clk        (clk_i),
-        .reset      (rst_i),
-        .en_i       (enable_rtc),
-        .addr_i     (mem_address[3:0]),
-        .we_i       ({4'h0, mem_write_enable}),
-        .data_i     ({32'h0, mem_data_write}),
-        .data_o     (data_rtc),     
-        .mti_o      (mti),
-        .mtime_o    (mtime)
+        .clk(clk_i),
+        .reset(rst_i), 
+        .en_i(enable_rtc),
+        .addr_i(mem_address[3:0]),
+        .we_i({4'h0, mem_write_enable}),
+        .data_i({32'h0, mem_data_write}),
+        .data_o(data_rtc),     
+        .mti_o(mti),
+        .mtime_o(mtime)
     );
 
     always_comb begin
@@ -164,10 +164,6 @@ assign IRQ = {24'h0, mti, 7'h0};
             if (mem_address == 32'h80000000 && mem_write_enable != '0) begin
                 $display("# %t END OF SIMULATION",$time);
                 $finish;
-            end
-            // TIMER REG
-            if (mem_address == 32'h80006000 && mem_write_enable == '0) begin
-                data_tb <= 32'($time/1000);
             end
         end 
         else begin

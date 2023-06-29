@@ -51,7 +51,6 @@ module PUC_RS5
 //////////////////////////////////////////////////////////////////////////////
 // Global signals
 //////////////////////////////////////////////////////////////////////////////
-    logic            read;
     logic            jump;
     logic            hazard;
 `ifdef XOSVM
@@ -60,21 +59,13 @@ module PUC_RS5
 `endif
     privilegeLevel_e privilege;
     logic   [31:0]   jump_target;
-    /* verilator lint_off UNUSEDSIGNAL */
-    logic   [31:0]   mem_read_address_int;
-    logic   [31:0]   mem_write_address_int;
-    /* verilator lint_on UNUSEDSIGNAL */
 
-`ifdef BRANCH_PREDICTION
-    logic           predict_branch_taken;
-    logic   [31:0]  predict_branch_pc;
-    logic   [31:0]  predict_branch_pc_next;
-    logic           predict_jump_taken;
-    logic   [31:0]  predict_jump_pc;
-    logic   [31:0]  predict_jump_pc_next;
-`endif
-    logic   [31:0]   instruction_address;
+    logic            mem_read_enable;
+    logic    [3:0]   mem_write_enable;
+    /* verilator lint_off UNUSEDSIGNAL */
     logic   [31:0]   mem_address;
+    /* verilator lint_on UNUSEDSIGNAL */
+    logic   [31:0]   instruction_address;
 
 //////////////////////////////////////////////////////////////////////////////
 // Decoder signals
@@ -102,37 +93,20 @@ module PUC_RS5
     logic   [31:0]  instruction_execute;
     logic   [31:0]  pc_execute;
     logic    [2:0]  tag_execute;
-    logic           kill_execute;
     logic           exc_ilegal_inst_execute;
     logic           exc_misaligned_fetch_execute;
 `ifdef XOSVM
     logic           exc_inst_access_fault_execute;
-`endif
-`ifdef BRANCH_PREDICTION
-    logic           predicted_branch_execute;
 `endif
 
 //////////////////////////////////////////////////////////////////////////////
 // Retire signals
 //////////////////////////////////////////////////////////////////////////////
 
-    logic           jump_retire, we_retire;
-    logic   [3:0]   mem_write_enable_retire;
+    logic           we_retire;
     iType_e         instruction_operation_retire;
-    logic   [31:0]  instruction_retire;
-    logic   [31:0]  result_retire [1:0];
-    logic   [2:0]   tag_retire;
-    logic   [2:0]   curr_retire_tag;
-    logic   [31:0]  pc_retire;
-    logic           exc_ilegal_inst_retire;
-    logic           exc_misaligned_fetch_retire;
+    logic   [31:0]  result_retire;
     logic           killed;
-`ifdef XOSVM
-    logic           exc_inst_access_fault_retire;
-`endif
-`ifdef BRANCH_PREDICTION
-    logic           predicted_branch_retire;
-`endif
 
 //////////////////////////////////////////////////////////////////////////////
 // CSR Bank signals
@@ -170,37 +144,26 @@ module PUC_RS5
     assign regbank_write_enable =   (rd == '0) 
                                     ? 0 
                                     : write_enable_regbank_int;
-                            
-    assign kill_execute = tag_execute != curr_retire_tag;
-
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////// FETCH //////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     fetch fetch1 (
-        .clk(clk), 
-        .reset(reset), 
-        .stall(stall),
-        .hazard_i(hazard), 
-        .jump_i(jump), 
-        .jump_target_i(jump_target),
-    `ifdef BRANCH_PREDICTION
-        .predict_branch_taken_i(predict_branch_taken),
-        .predict_branch_pc_i(predict_branch_pc),
-        .predict_branch_pc_next_i(predict_branch_pc_next),
-        .predict_jump_taken_i(predict_jump_taken),
-        .predict_jump_pc_i(predict_jump_pc),
-        .predict_jump_pc_next_i(predict_jump_pc_next),
-    `endif
-        .instruction_address_o      (instruction_address), 
-        .pc_o                       (pc_decode), 
-        .tag_o                      (tag_decode),
-        .mepc_i                     (mepc), 
-        .mtvec_i                    (mtvec),
-        .exception_raised_i         (RAISE_EXCEPTION), 
-        .machine_return_i           (MACHINE_RETURN), 
-        .interrupt_ack_i            (interrupt_ack_o)
+        .clk                    (clk), 
+        .reset                  (reset), 
+        .stall                  (stall),
+        .hazard_i               (hazard), 
+        .jump_i                 (jump), 
+        .jump_target_i          (jump_target),
+        .instruction_address_o  (instruction_address), 
+        .pc_o                   (pc_decode), 
+        .tag_o                  (tag_decode),
+        .mepc_i                 (mepc), 
+        .mtvec_i                (mtvec),
+        .exception_raised_i     (RAISE_EXCEPTION), 
+        .machine_return_i       (MACHINE_RETURN), 
+        .interrupt_ack_i        (interrupt_ack_o)
     );
 
 `ifdef XOSVM
@@ -221,24 +184,14 @@ module PUC_RS5
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     decode decoder1 (
-        .clk(clk), 
-        .reset(reset),
-        .stall(stall),
-        .instruction_i(instruction_i), 
-        .pc_i(pc_decode), 
-        .tag_i(tag_decode), 
-        .rs1_data_read_i(rs1_data_read), 
-        .rs2_data_read_i(rs2_data_read), 
-    `ifdef BRANCH_PREDICTION
-        .killed_i(killed),
-        .predicted_branch_o(predicted_branch_execute),
-        .predict_branch_taken_o(predict_branch_taken),
-        .predict_branch_pc_o(predict_branch_pc),
-        .predict_branch_pc_next_o(predict_branch_pc_next),
-        .predict_jump_taken_o(predict_jump_taken),
-        .predict_jump_pc_o(predict_jump_pc),
-        .predict_jump_pc_next_o(predict_jump_pc_next),
-    `endif
+        .clk                        (clk), 
+        .reset                      (reset),
+        .stall                      (stall),
+        .instruction_i              (instruction_i), 
+        .pc_i                       (pc_decode), 
+        .tag_i                      (tag_decode), 
+        .rs1_data_read_i            (rs1_data_read), 
+        .rs2_data_read_i            (rs2_data_read), 
         .rs1_o                      (rs1), 
         .rs2_o                      (rs2), 
         .rd_o                       (rd), 
@@ -300,84 +253,56 @@ module PUC_RS5
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     execute execute1 (
-        .clk(clk), 
-        .stall(stall),
-        .instruction_i(instruction_execute), 
-        .pc_i(pc_execute), 
-        .first_operand_i(first_operand_execute), 
-        .second_operand_i(second_operand_execute), 
-        .third_operand_i(third_operand_execute),
+        .clk                    (clk), 
+        .reset                  (reset), 
+        .stall                  (stall),
+        .instruction_i          (instruction_execute), 
+        .pc_i                   (pc_execute), 
+        .first_operand_i        (first_operand_execute), 
+        .second_operand_i       (second_operand_execute), 
+        .third_operand_i        (third_operand_execute),
         .instruction_operation_i(instruction_operation_execute), 
-        .instruction_o(instruction_retire), 
-        .tag_i(tag_execute), 
-    `ifdef BRANCH_PREDICTION
-        .predicted_branch_i(predicted_branch_execute),
-        .predicted_branch_o(predicted_branch_retire),
-    `endif
-        .instruction_operation_o(instruction_operation_retire), 
-        .pc_o                   (pc_retire), 
-        .result_o               (result_retire), 
-        .tag_o                  (tag_retire), 
-        .jump_o                 (jump_retire), 
-        .write_enable_o         (we_retire),
-        .mem_read_address_o     (mem_read_address_int), 
-        .mem_write_enable_o     (mem_write_enable_retire),
-        .mem_read_o             (read), 
-        .csr_read_enable_o      (csr_read_enable), 
-        .csr_write_enable_o     (csr_write_enable), 
-        .csr_operation_o        (csr_operation), 
-        .csr_address_o          (csr_addr), 
-        .csr_data_o             (csr_data_to_write), 
-        .csr_data_read_i        (csr_data_read),
+        .tag_i                  (tag_execute), 
         .privilege_i            (privilege),
         .exc_ilegal_inst_i      (exc_ilegal_inst_execute),
         .exc_misaligned_fetch_i (exc_misaligned_fetch_execute),
     `ifdef XOSVM
         .exc_inst_access_fault_i(exc_inst_access_fault_execute),
-        .exc_inst_access_fault_o(exc_inst_access_fault_retire),
+        .exc_load_access_fault_i(mmu_data_fault),
     `endif
-        .exc_ilegal_inst_o      (exc_ilegal_inst_retire),
-        .exc_misaligned_fetch_o (exc_misaligned_fetch_retire)
+        .killed_o               (killed),
+        .write_enable_o         (we_retire),
+        .instruction_operation_o(instruction_operation_retire), 
+        .result_o               (result_retire), 
+        .mem_address_o          (mem_address), 
+        .mem_read_enable_o      (mem_read_enable), 
+        .mem_write_enable_o     (mem_write_enable),
+        .mem_write_data_o       (mem_data_o),
+        .csr_address_o          (csr_addr), 
+        .csr_read_enable_o      (csr_read_enable), 
+        .csr_data_read_i        (csr_data_read),
+        .csr_write_enable_o     (csr_write_enable), 
+        .csr_operation_o        (csr_operation), 
+        .csr_data_o             (csr_data_to_write), 
+        .jump_o                 (jump),
+        .jump_target_o          (jump_target),
+        .interrupt_pending_i    (Interrupt_pending),
+        .interrupt_ack_o        (interrupt_ack_o),
+        .machine_return_o       (MACHINE_RETURN),
+        .raise_exception_o      (RAISE_EXCEPTION), 
+        .exception_code_o       (Exception_Code)
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// RETIRE //////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     retire retire1 (
-        .clk(clk), 
-        .reset(reset), 
-        .instruction_i(instruction_retire), 
-        .pc_i(pc_retire),
-        .results_i(result_retire), 
-        .tag_i(tag_retire), 
-        .mem_write_enable_i(mem_write_enable_retire),
-        .write_enable_i(we_retire),
-        .jump_i(jump_retire), 
+        .write_enable_i         (we_retire),
         .instruction_operation_i(instruction_operation_retire),
-        .exc_ilegal_inst_i      (exc_ilegal_inst_retire),
-        .exc_misaligned_fetch_i (exc_misaligned_fetch_retire),
-    `ifdef XOSVM
-        .exc_inst_access_fault_i(exc_inst_access_fault_retire),
-        .exc_load_access_fault_i(mmu_data_fault),
-    `endif
-    `ifdef BRANCH_PREDICTION
-        .predicted_branch_i(predicted_branch_retire),
-    `endif
-        .regbank_write_enable_o(write_enable_regbank_int), 
-        .regbank_data_o(regbank_data_writeback),
-        .jump_target_o(jump_target), 
-        .jump_o(jump),
-        .killed_o(killed),
-        .mem_write_enable_o(mem_write_enable_o), 
-        .mem_write_address_o(mem_write_address_int), 
-        .mem_data_o(mem_data_o),
-        .mem_data_i(mem_data_i), 
-        .current_retire_tag_o(curr_retire_tag),
-        .exception_code_o(Exception_Code),
-        .raise_exception_o(RAISE_EXCEPTION), 
-        .machine_return_o(MACHINE_RETURN),
-        .interrupt_ack_o(interrupt_ack_o),
-        .interrupt_pending_i(Interrupt_pending)
+        .result_i               (result_retire), 
+        .mem_data_i             (mem_data_i), 
+        .regbank_write_enable_o (write_enable_regbank_int), 
+        .regbank_data_o         (regbank_data_writeback)
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -391,13 +316,13 @@ module PUC_RS5
         .operation_i        (csr_operation), 
         .address_i          (csr_addr), 
         .data_i             (csr_data_to_write), 
-        .killed             (kill_execute),
+        .killed             (killed),
         .out                (csr_data_read),
         .raise_exception_i  (RAISE_EXCEPTION), 
         .machine_return_i   (MACHINE_RETURN),
         .exception_code_i   (Exception_Code), 
-        .pc_i               (pc_retire), 
-        .instruction_i      (instruction_retire),
+        .pc_i               (pc_execute), 
+        .instruction_i      (instruction_execute),
         .jump_i             (jump),
         .jump_target_i      (jump_target),
         .mtime_i            (mtime_i),
@@ -419,19 +344,10 @@ module PUC_RS5
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// MEMORY SIGNALS //////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    always_comb begin
-        if (mem_write_enable_o != '0) begin
-            mem_address[31:2] = mem_write_address_int[31:2];
-        end
-        else begin
-            mem_address[31:2] = mem_read_address_int[31:2];
-        end
-        mem_address[1:0] = '0;
-    end
 
     always_comb begin
         if (
-            (mem_write_enable_o != '0 || read) 
+            (!killed && (mem_write_enable != '0 || mem_read_enable))
         `ifdef XOSVM
             && !mmu_data_fault
         `endif
@@ -455,6 +371,8 @@ module PUC_RS5
 `else
     assign mem_address_o = mem_address;
 `endif
+
+    assign mem_write_enable_o = mem_write_enable;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// DEBUG ///////////////////////////////////////////////////////////////////////////////////
@@ -593,7 +511,7 @@ module PUC_RS5
         fd = $fopen ("./debug/Report.txt", "w");
 
     always_comb begin
-        if (mem_write_address_int == 32'h80000000 && mem_write_enable_o != '0) begin
+        if (mem_address == 32'h80000000 && mem_write_enable_o != '0) begin
             $fwrite(fd,"Clock Cycles:           %d\n", clock_counter);
             $fwrite(fd,"Instructions Retired:   %d\n", instuctions_retired_counter);
             $fwrite(fd,"Instructions Killed:    %d\n", instructions_killed_counter);

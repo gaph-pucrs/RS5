@@ -3,7 +3,7 @@
 
 #include "prototypes.h"
 
-#define TIMER_REG (*(volatile uint32_t*)0x80006000)
+#define TIMER_REG (*(volatile uint32_t*)0x20000000)
 #define UART_REG (*(volatile char*)0x80004000)
 
 // Stubs, need real implementation

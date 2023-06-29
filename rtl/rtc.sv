@@ -18,7 +18,12 @@ module rtc (
     assign mtime_o = memory[7:0];
 
     always_ff @(posedge clk) begin
-        mti_o <= intr;
+        if (reset) begin
+            mti_o <= 1'b0;
+        end
+        else begin
+            mti_o <= intr;
+        end
     end
 
     always_ff @(posedge clk) begin

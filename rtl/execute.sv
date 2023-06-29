@@ -26,6 +26,7 @@ module execute
     import my_pkg::*;
 (
     input   logic               clk,
+    input   logic               reset,
     input   logic               stall,
 
     input   logic [31:0]        instruction_i,
@@ -35,46 +36,46 @@ module execute
     input   logic [31:0]        third_operand_i,
     input   iType_e             instruction_operation_i,
     input   logic  [2:0]        tag_i,
-
-`ifdef BRANCH_PREDICTION
-    input   logic               predicted_branch_i,
-    output  logic               predicted_branch_o,
-`endif
-
-    output  iType_e             instruction_operation_o,
-    output  logic [31:0]        instruction_o,
-    output  logic [31:0]        pc_o,
-    output  logic [31:0]        result_o [1:0],
-    output  logic  [2:0]        tag_o,
-    output  logic               jump_o,
-    output  logic               write_enable_o,
-    output  logic [31:0]        mem_read_address_o,
-    output  logic  [3:0]        mem_write_enable_o,
-    output  logic               mem_read_o,
-
-    output  logic               csr_read_enable_o,
-    output  logic               csr_write_enable_o,
-    output  csrOperation_e      csr_operation_o,
-    output  logic [11:0]        csr_address_o,
-    output  logic [31:0]        csr_data_o,
-    input   logic [31:0]        csr_data_read_i,
-
     input   privilegeLevel_e    privilege_i,
 
-`ifdef XOSVM
-    input   logic               exc_inst_access_fault_i,
-    output  logic               exc_inst_access_fault_o,
-`endif
     input   logic               exc_ilegal_inst_i,
     input   logic               exc_misaligned_fetch_i,
-    output  logic               exc_ilegal_inst_o,
-    output  logic               exc_misaligned_fetch_o
+`ifdef XOSVM
+    input   logic               exc_inst_access_fault_i,
+    input   logic               exc_load_access_fault_i,
+`endif
+
+    output  logic               killed_o,
+    output  logic               write_enable_o,
+    output  iType_e             instruction_operation_o,
+    output  logic [31:0]        result_o,
+
+    output  logic [31:0]        mem_address_o,
+    output  logic               mem_read_enable_o,
+    output  logic  [3:0]        mem_write_enable_o,
+    output  logic [31:0]        mem_write_data_o,
+
+    output  logic [11:0]        csr_address_o,
+    output  logic               csr_read_enable_o,
+    input   logic [31:0]        csr_data_read_i,
+    output  logic               csr_write_enable_o,
+    output  csrOperation_e      csr_operation_o,
+    output  logic [31:0]        csr_data_o,
+
+    output  logic               jump_o,
+    output  logic [31:0]        jump_target_o,
+
+    input   logic               interrupt_pending_i,
+    output  logic               interrupt_ack_o,
+    output  logic               machine_return_o,
+    output  logic               raise_exception_o,
+    output  exceptionCode_e     exception_code_o
 );
-    
-    logic [31:0]    result [1:0];
+
+    logic  [2:0]    curr_tag;
+    logic [31:0]    result;
+    logic           killed;
     logic           write_enable;
-    logic  [3:0]    mem_write_enable;
-    logic [31:0]    mem_write_data;
     logic           exc_ilegal_csr_inst;
 
 //////////////////////////////////////////////////////////////////////////////
@@ -131,48 +132,35 @@ module execute
         greater_equal_unsigned  = $unsigned(first_operand_i) >= $unsigned(second_operand_i);
     end
 
-    always_comb begin
-        unique case (instruction_operation_i)
-            BEQ:            jump = equal;
-            BNE:            jump = ~equal;
-            BLT:            jump = less_than;
-            BLTU:           jump = less_than_unsigned;
-            BGE:            jump = greater_equal;
-            BGEU:           jump = greater_equal_unsigned;
-            JAL, JALR:      jump = 1'b1;
-            default:        jump = 1'b0;
-        endcase
-    end
-
 //////////////////////////////////////////////////////////////////////////////
 // Load/Store signals
 //////////////////////////////////////////////////////////////////////////////
 
-    assign mem_read_address_o = sum_result;
-    assign mem_read_o         = instruction_operation_i inside {LB, LBU, LH, LHU, LW};
+    assign mem_address_o[31:2]  = sum_result[31:2];
+    assign mem_address_o [1:0]  = '0;
+    assign mem_read_enable_o    = instruction_operation_i inside {LB, LBU, LH, LHU, LW};
 
     always_comb begin
         unique case (instruction_operation_i)
-            SB:         mem_write_data = {4{third_operand_i[7:0]}};
-            SH:         mem_write_data = {2{third_operand_i[15:0]}};
-            SW:         mem_write_data = third_operand_i;
-            default:    mem_write_data = '0;
+            SB:         mem_write_data_o = {4{third_operand_i[7:0]}};
+            SH:         mem_write_data_o = {2{third_operand_i[15:0]}};
+            default:    mem_write_data_o = third_operand_i;
         endcase
     end
 
     always_comb begin
         unique case (instruction_operation_i)
             SB: unique case (sum_result[1:0])
-                    2'b11:   mem_write_enable = 4'b1000;
-                    2'b10:   mem_write_enable = 4'b0100;
-                    2'b01:   mem_write_enable = 4'b0010;
-                    default: mem_write_enable = 4'b0001;
+                    2'b11:   mem_write_enable_o = 4'b1000;
+                    2'b10:   mem_write_enable_o = 4'b0100;
+                    2'b01:   mem_write_enable_o = 4'b0010;
+                    default: mem_write_enable_o = 4'b0001;
                 endcase
-            SH:              mem_write_enable = (sum_result[1]) 
+            SH:              mem_write_enable_o = (sum_result[1]) 
                                                 ? 4'b1100 
                                                 : 4'b0011;
-            SW:              mem_write_enable = 4'b1111;
-            default:         mem_write_enable = 4'b0000;
+            SW:              mem_write_enable_o = 4'b1111;
+            default:         mem_write_enable_o = 4'b0000;
         endcase
 end
 
@@ -247,27 +235,18 @@ end
     always_comb begin 
         unique case (instruction_operation_i)
             CSRRW, CSRRS, CSRRC,
-            CSRRWI,CSRRSI,CSRRCI:   result[0] = csr_data_read_i;
-            JAL,JALR,SUB:           result[0] = sum2_result;
-            SLT:                    result[0] = {31'b0, less_than};
-            SLTU:                   result[0] = {31'b0, less_than_unsigned};
-            XOR:                    result[0] = xor_result;
-            OR:                     result[0] = or_result;
-            AND:                    result[0] = and_result;
-            SLL:                    result[0] = sll_result;
-            SRL:                    result[0] = srl_result;
-            SRA:                    result[0] = sra_result;
-            LUI:                    result[0] = second_operand_i;
-            default:                result[0] = sum_result;
-        endcase
-    end
-
-    always_comb begin
-        unique case (instruction_operation_i)
-            SB,SH,SW:   result[1] = mem_write_data;
-            JALR:       result[1] = {sum_result[31:1], 1'b0};
-            JAL:        result[1] = sum_result;
-            default:    result[1] = sum2_result;
+            CSRRWI,CSRRSI,CSRRCI:   result = csr_data_read_i;
+            JAL,JALR,SUB:           result = sum2_result;
+            SLT:                    result = {31'b0, less_than};
+            SLTU:                   result = {31'b0, less_than_unsigned};
+            XOR:                    result = xor_result;
+            OR:                     result = or_result;
+            AND:                    result = and_result;
+            SLL:                    result = sll_result;
+            SRL:                    result = srl_result;
+            SRA:                    result = sra_result;
+            LUI:                    result = second_operand_i;
+            default:                result = sum_result;
         endcase
     end
 
@@ -277,7 +256,7 @@ end
             BEQ,BNE,
             BLT,BLTU,
             BGE,BGEU:  write_enable = 1'b0;
-            default:   write_enable = 1'b1;
+            default:   write_enable = !killed;
         endcase
     end 
 
@@ -287,22 +266,140 @@ end
 
     always_ff @(posedge clk) begin
         if (!stall) begin
-            pc_o                    <= pc_i;
-            instruction_o           <= instruction_i;
+            write_enable_o          <= write_enable;
             instruction_operation_o <= instruction_operation_i;
             result_o                <= result;             
-            jump_o                  <= jump;
-            write_enable_o          <= write_enable;
-            mem_write_enable_o      <= mem_write_enable;
-            tag_o                   <= tag_i;
-            exc_ilegal_inst_o       <= exc_ilegal_inst_i | exc_ilegal_csr_inst;
-            exc_misaligned_fetch_o  <= exc_misaligned_fetch_i;
+        end
+    end
+
+//////////////////////////////////////////////////////////////////////////////
+// Killed signal generation
+//////////////////////////////////////////////////////////////////////////////
+
+    assign killed   = (curr_tag != tag_i);
+
+    assign killed_o = killed;
+
+//////////////////////////////////////////////////////////////////////////////
+// BRANCH CONTROL
+//////////////////////////////////////////////////////////////////////////////
+
+    always_comb begin
+        unique case (instruction_operation_i)
+            JALR:       jump_target_o = {sum_result[31:1], 1'b0};
+            JAL:        jump_target_o = sum_result;
+            default:    jump_target_o = sum2_result;
+        endcase
+    end
+
+    always_comb begin
+        unique case (instruction_operation_i)
+            BEQ:        jump = equal;
+            BNE:        jump = ~equal;
+            BLT:        jump = less_than;
+            BLTU:       jump = less_than_unsigned;
+            BGE:        jump = greater_equal;
+            BGEU:       jump = greater_equal_unsigned;
+            JAL, JALR:  jump = 1'b1;
+            default:    jump = 1'b0;
+        endcase
+    end
+
+    assign jump_o = (jump && !killed);
+
+//////////////////////////////////////////////////////////////////////////////
+// TAG control based on signals Jump and Killed
+//////////////////////////////////////////////////////////////////////////////
+
+    always_ff @(posedge clk) begin
+        if (reset) begin
+            curr_tag <= 0;
+        end
+        else if (jump_o | raise_exception_o | machine_return_o | interrupt_ack_o) begin
+            curr_tag <= curr_tag + 1;
+        end
+    end
+
+//////////////////////////////////////////////////////////////////////////////
+// Privileged Architecture Control
+//////////////////////////////////////////////////////////////////////////////
+
+    always_comb begin
+        if (!killed & !reset) begin
         `ifdef XOSVM
-            exc_inst_access_fault_o <= exc_inst_access_fault_i;
+            if (exc_inst_access_fault_i) begin
+                raise_exception_o = 1;
+                exception_code_o  = ILLEGAL_INSTRUCTION;
+                machine_return_o  = 0;
+                interrupt_ack_o   = 0;
+                exception_code_o  = INSTRUCTION_ACCESS_FAULT;
+                $write("[%0d] EXCEPTION - INSTRUCTION ACCESS FAULT: %8h %8h\n", $time, pc_i, instruction_i);
+            end
+            else
         `endif
-        `ifdef BRANCH_PREDICTION
-            predicted_branch_o      <= predicted_branch_i;
+            if (exc_ilegal_inst_i | exc_ilegal_csr_inst) begin
+                raise_exception_o = 1;
+                machine_return_o  = 0;
+                interrupt_ack_o   = 0;
+                exception_code_o  = ILLEGAL_INSTRUCTION;
+                $write("[%0d] EXCEPTION - ILLEGAL INSTRUCTION: %8h %8h\n", $time, pc_i, instruction_i);
+            end 
+            else if (exc_misaligned_fetch_i) begin
+                raise_exception_o = 1;
+                machine_return_o  = 0;
+                interrupt_ack_o   = 0;
+                exception_code_o  = INSTRUCTION_ADDRESS_MISALIGNED;
+                $write("[%0d] EXCEPTION - INSTRUCTION ADDRESS MISALIGNED: %8h %8h\n", $time, pc_i, instruction_i);
+            end 
+            else if (instruction_operation_i == ECALL) begin
+                raise_exception_o = 1;
+                exception_code_o  = ECALL_FROM_MMODE;
+                machine_return_o  = 0;
+                interrupt_ack_o   = 0;
+                $write("[%0d] EXCEPTION - ECALL_FROM_MMODE: %8h %8h\n", $time, pc_i, instruction_i);
+            end 
+            else if (instruction_operation_i == EBREAK) begin
+                raise_exception_o = 1;
+                exception_code_o  = BREAKPOINT;
+                machine_return_o  = 0;
+                interrupt_ack_o   = 0;
+                $write("[%0d] EXCEPTION - EBREAK: %8h %8h\n", $time, pc_i, instruction_i);
+            end
+        `ifdef XOSVM
+            else if (exc_load_access_fault_i) begin
+                raise_exception_o = 1;
+                machine_return_o  = 0;
+                interrupt_ack_o   = 0;
+                exception_code_o  = LOAD_ACCESS_FAULT;
+                $write("[%0d] EXCEPTION - LOAD ACCESS FAULT: %8h %8h\n", $time, pc_i, instruction_i);
+            end 
         `endif
+            else if (instruction_operation_i == MRET) begin
+                raise_exception_o = 0;
+                exception_code_o  = NE;
+                machine_return_o  = 1;
+                interrupt_ack_o   = 0;
+                $write("[%0d] MRET: %8h %8h\n", $time, pc_i, instruction_i);
+            end 
+            else if (interrupt_pending_i) begin
+                raise_exception_o = 0;
+                exception_code_o  = NE;
+                machine_return_o  = 0;
+                interrupt_ack_o   = 1;
+                $write("[%0d] Interrupt Acked\n", $time);
+            end
+            else begin
+                raise_exception_o = 0;
+                exception_code_o  = NE;
+                machine_return_o  = 0;
+                interrupt_ack_o   = 0;
+            end
+        end
+        else begin
+            raise_exception_o = 0;
+            exception_code_o  = NE;
+            machine_return_o  = 0;
+            interrupt_ack_o   = 0;
         end
     end
 

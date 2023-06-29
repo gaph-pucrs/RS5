@@ -35,17 +35,6 @@ module decode
     input   logic [31:0]    rs1_data_read_i,
     input   logic [31:0]    rs2_data_read_i,
 
-`ifdef BRANCH_PREDICTION
-    input   logic           killed_i,
-    output  logic           predicted_branch_o,
-    output  logic           predict_branch_taken_o,
-    output  logic [31:0]    predict_branch_pc_o,
-    output  logic [31:0]    predict_branch_pc_next_o,
-    output  logic           predict_jump_taken_o,
-    output  logic [31:0]    predict_jump_pc_o,
-    output  logic [31:0]    predict_jump_pc_next_o,
-`endif
-
     output  logic  [4:0]    rs1_o,
     output  logic  [4:0]    rs2_o,
     output  logic  [4:0]    rd_o,
@@ -66,15 +55,16 @@ module decode
     output  logic           exc_misaligned_fetch_o
 );
 
-    logic [31:0] immediate, first_operand_int, second_operand_int, third_operand_int, instruction_int, last_instruction;
-    logic last_hazard;
-    logic [4:0] locked_register;
-    logic [4:0] target_register;
-    logic is_store;
-    logic locked_memory;
+    logic [31:0]    immediate, first_operand_int, second_operand_int, third_operand_int, instruction_int, last_instruction;
+    logic           last_hazard;
+    logic           last_stall;
+    logic           locked_memory;
+    logic  [4:0]    locked_register;
+    logic  [4:0]    target_register;
+    logic           is_store;
 
-    formatType_e instruction_format;
-    iType_e instruction_operation;
+    formatType_e    instruction_format;
+    iType_e         instruction_operation;
 
 //////////////////////////////////////////////////////////////////////////////
 // Re-Decode isntruction on hazard
@@ -84,6 +74,7 @@ logic last_stall;
         last_instruction <= instruction_int;
         last_stall       <= stall;
         last_hazard      <= hazard_o;
+        last_stall       <= stall;
     end
 
     always_comb begin
@@ -276,7 +267,7 @@ logic last_stall;
     always_comb begin
         if (!hazard_o) begin
             target_register = instruction_int[11:7];
-            is_store = (opcode[6:2] == 5'b01000) ? 1'b1 : 1'b0;
+            is_store        = (opcode[6:2] == 5'b01000);
         end
         else begin
             target_register = '0;
@@ -289,12 +280,12 @@ logic last_stall;
 
     always_ff @(posedge clk) begin
         if (reset) begin
-            locked_register     <= '0;
-            locked_memory       <= '0;
+            locked_memory   <= '0;
+            locked_register <= '0;
         end 
         else if (!stall) begin
-            locked_register     <= target_register;
-            locked_memory       <= is_store;
+            locked_register <= target_register;
+            locked_memory   <= is_store;
         end
     end
 
@@ -344,9 +335,10 @@ logic last_stall;
     logic hazard_rs1;
     logic hazard_rs2;
 
-    assign hazard_mem = locked_memory & use_mem;
-    assign hazard_rs1 = locked_rs1    & use_rs1;
-    assign hazard_rs2 = locked_rs2    & use_rs2;
+    assign hazard_mem = locked_memory   & use_mem;
+    assign hazard_rs1 = locked_rs1      & use_rs1;
+    assign hazard_rs2 = locked_rs2      & use_rs2;
+
 
     assign hazard_o   = (hazard_mem | hazard_rs1 | hazard_rs2) & !stall;
 
@@ -359,29 +351,6 @@ logic last_stall;
 
     assign invalid_inst     = instruction_operation == INVALID;
     assign misaligned_fetch = pc_i[1:0] != 2'b00;
-
-/////////////////////////////////////////////////////////////////////////////
-// Branch Prediction
-//////////////////////////////////////////////////////////////////////////////
-/*
- * This implements static branch prediction. It takes an instruction and its PC and determines if
- * it's a branch or a jump and calculates its target. For jumps it will always predict taken. For
- * branches it will predict taken if the PC offset is negative.
- */
-`ifdef BRANCH_PREDICTION
-    assign predict_branch_taken_o   = (opcode[6:2] == 5'b11000 && imm_b[31] && !killed_i) ? 1'b1 : 1'b0;
-    assign predict_jump_taken_o     = (opcode[6:2] == 5'b11011 && !killed_i) ? 1'b1 : 1'b0;
-
-    assign predict_branch_pc_o      = pc_i + imm_b;
-    assign predict_jump_pc_o        = pc_i + imm_j;
-
-    /**
-     * This seems bad and poorly implemented, but it is NEEDED to avoid timing
-     * violations
-     */
-    assign predict_branch_pc_next_o = pc_i + imm_b + 4;
-    assign predict_jump_pc_next_o   = pc_i + imm_j + 4;
-`endif
 
 //////////////////////////////////////////////////////////////////////////////
 // Control of the exits based on format
@@ -430,9 +399,6 @@ logic last_stall;
         `ifdef XOSVM
             exc_inst_access_fault_o <= 1'b0;
         `endif
-        `ifdef BRANCH_PREDICTION
-            predicted_branch_o      <= 1'b0;
-        `endif
         end 
         else if (hazard_o) begin
             first_operand_o         <= '0;
@@ -447,9 +413,6 @@ logic last_stall;
         `ifdef XOSVM
             exc_inst_access_fault_o <= 1'b0;
         `endif
-        `ifdef BRANCH_PREDICTION
-            predicted_branch_o      <= 1'b0;
-        `endif
         end 
         else if (!stall) begin
             first_operand_o         <= first_operand_int;
@@ -463,9 +426,6 @@ logic last_stall;
             exc_misaligned_fetch_o  <= misaligned_fetch;
         `ifdef XOSVM
             exc_inst_access_fault_o <= exc_inst_access_fault_i;
-        `endif
-        `ifdef BRANCH_PREDICTION
-            predicted_branch_o      <= predict_branch_taken_o | predict_jump_taken_o;
         `endif
         end
     end
