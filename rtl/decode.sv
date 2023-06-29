@@ -69,9 +69,10 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 // Re-Decode isntruction on hazard
 //////////////////////////////////////////////////////////////////////////////
-
+logic last_stall;
     always_ff @(posedge clk) begin
         last_instruction <= instruction_int;
+        last_stall       <= stall;
         last_hazard      <= hazard_o;
         last_stall       <= stall;
     end
