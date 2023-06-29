@@ -35,3 +35,5 @@ sim/obj_dir
 *.str
 *.tmp
 *.coe
+*.xcix
+**/.Xil
