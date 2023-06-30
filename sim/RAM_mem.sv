@@ -1,5 +1,5 @@
 /*!\file ram.sv
- * PUCRS-RV VERSION - 1.0 - Public Release
+ * RS5 VERSION - 1.0 - Public Release
  *
  * Distribution:  December 2021
  *
@@ -10,10 +10,10 @@
  * Research group: GAPH-PUCRS  <>
  *
  * \brief
- * RAM implementation for pucrs-rv simulation.
+ * RAM implementation for RS5 simulation.
  *
  * \detailed
- * RAM implementation for pucrs-rv simulation.
+ * RAM implementation for RS5 simulation.
  */
 
 //////////////////////////////////////////////////////////////////////////////
@@ -21,7 +21,7 @@
 //////////////////////////////////////////////////////////////////////////////
 
 module RAM_mem 
-    import my_pkg::*;
+    import RS5_pkg::*;
 (
     input  logic clk,
 

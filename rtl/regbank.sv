@@ -1,5 +1,5 @@
 /*!\file regbank.sv
- * PUCRS-RV VERSION - 1.0 - Public Release
+ * RS5 VERSION - 1.0 - Public Release
  *
  * Distribution:  September 2021
  *

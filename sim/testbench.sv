@@ -1,5 +1,5 @@
 /*!\file testbench.sv
- * PUCRS-RV VERSION - 1.0 - Public Release
+ * RS5 VERSION - 1.0 - Public Release
  *
  * Distribution:  December 2021
  *
@@ -10,15 +10,15 @@
  * Research group: GAPH-PUCRS  <>
  *
  * \brief
- * Testbench for pucrs-rv simulation.
+ * Testbench for RS5 simulation.
  *
  * \detailed
- * Testbench for pucrs-rv simulation.
+ * Testbench for RS5 simulation.
  */
 
 `timescale 1ns/1ps
 
-`include "../rtl/my_pkg.sv"
+`include "../rtl/RS5_pkg.sv"
 `include "../rtl/mmu.sv"
 `include "../rtl/fetch.sv"
 `include "../rtl/decode.sv"
@@ -26,7 +26,7 @@
 `include "../rtl/retire.sv"
 `include "../rtl/regbank.sv"
 `include "../rtl/CSRBank.sv"
-`include "../rtl/PUC_RS5.sv"
+`include "../rtl/RS5.sv"
 `include "../rtl/rtc.sv"
 `include "./RAM_mem.sv"
 
@@ -35,7 +35,7 @@
 //////////////////////////////////////////////////////////////////////////////
 
 module testbench
-    import my_pkg::*;
+    import RS5_pkg::*;
     (
         input logic clk_i,
         input logic rst_i
@@ -63,7 +63,7 @@ module testbench
 // CPU INSTANTIATION
 //////////////////////////////////////////////////////////////////////////////
 
-    PUC_RS5 dut (
+    RS5 dut (
         .clk                    (clk_i), 
         .reset                  (rst_i), 
         .stall                  (1'b0),

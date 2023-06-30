@@ -1,5 +1,5 @@
 /*!\file fetch.sv
- * PUC-RS5 VERSION - 1.0.0 - Public Release
+ * RS5 VERSION - 1.0.0 - Public Release
  *
  * Distribution:  March 2023
  *
@@ -13,7 +13,7 @@
  * Fetch Unit is the first stage of the processor core and fetch the instruction in memory.
  *
  * \detailed
- * Fetch Unit is the first stage of the PUC-RS5 processor core. It has an
+ * Fetch Unit is the first stage of the RS5 processor core. It has an
  * internal loop that contains the Program Counter(PC) that is increased by four 
  * on a new clock cycle or is replaced by a new address in case of a branch. 
  * It has a internal tag calculator that is increased in branchs and mantained

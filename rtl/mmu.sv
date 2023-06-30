@@ -1,5 +1,5 @@
 /*!\file mmu.sv
- * PUC-RS5 VERSION - 1.0.0 - Public Release
+ * RS5 VERSION - 1.0.0 - Public Release
  *
  * Distribution:  May 2023
  *
@@ -16,7 +16,7 @@
  */
 
 module mmu
-    import my_pkg::*;
+    import RS5_pkg::*;
 (
     input  logic        en_i,
 

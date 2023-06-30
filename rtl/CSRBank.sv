@@ -1,5 +1,5 @@
 /*!\file CSRBank.sv
- * PUC-RS5 VERSION - 1.0.0 - Public Release
+ * RS5 VERSION - 1.0.0 - Public Release
  *
  * Distribution:  March 2023
  *
@@ -24,7 +24,7 @@
  */
 
 module CSRBank 
-    import my_pkg::*;
+    import RS5_pkg::*;
 (
     input   logic               clk,
     input   logic               reset,

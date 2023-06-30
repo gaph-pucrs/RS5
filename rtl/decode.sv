@@ -1,5 +1,5 @@
 /*!\file decode.sv
- * PUC-RS5 VERSION - 1.0.0 - Public Release
+ * RS5 VERSION - 1.0.0 - Public Release
  *
  * Distribution:  March 2023
  *
@@ -10,10 +10,10 @@
  * Research group: GAPH-PUCRS  <>
  *
  * \brief
- * Decoder Unit is the second stage of PUC-RS5 processor core.
+ * Decoder Unit is the second stage of RS5 processor core.
  *
  * \detailed
- * The decoder unit is the second stage of the PUC-RS5 processor core and 
+ * The decoder unit is the second stage of the RS5 processor core and 
  * is responsible for identify the instruction operation and based on that 
  * extracts the execution unit for that kind of instruction and
  * also fetches the operands in the register bank, calculate the immediate
@@ -23,7 +23,7 @@
  */
 
 module decode 
-    import my_pkg::*;
+    import RS5_pkg::*;
 (
     input   logic           clk,
     input   logic           reset,

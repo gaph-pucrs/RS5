@@ -1,5 +1,5 @@
 /*!\file execute.sv
- * PUC-RS5 VERSION - 1.0.0 - Public Release
+ * RS5 VERSION - 1.0.0 - Public Release
  *
  * Distribution:  March 2023
  *
@@ -13,7 +13,7 @@
  * Execute Unit is the third stage of the processor core.
  *
  * \detailed
- * Execute Unit is the third stage of the PUC-RS5 processor core. At the
+ * Execute Unit is the third stage of the RS5 processor core. At the
  * entry it implements a dispatcher that assigns the operands to the
  * execution units that are: 
  * 1) Adder 2) Branch 3) Bypass 4) Logic 5) Memory 6) Shift 7) CSR access. 
@@ -23,7 +23,7 @@
  */
 
 module execute
-    import my_pkg::*;
+    import RS5_pkg::*;
 (
     input   logic               clk,
     input   logic               reset,

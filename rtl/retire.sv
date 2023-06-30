@@ -1,5 +1,5 @@
 /*!\file retire.sv
- * PUC-RS5 VERSION - 1.0.0 - Public Release
+ * RS5 VERSION - 1.0.0 - Public Release
  *
  * Distribution:  March 2023
  *
@@ -10,10 +10,10 @@
  * Research group: GAPH-PUCRS  <>
  *
  * \brief
- * Retire is the last stage of the PUC-RS5 processor core.
+ * Retire is the last stage of the RS5 processor core.
  *
  * \detailed
- * Retire is the last stage of the PUC-RS5 processor core and is reponsible for closing the loops.
+ * Retire is the last stage of the RS5 processor core and is reponsible for closing the loops.
  * First compares the instruction tag with the internal tag, if they do not match then the 
  * instruction is killed and no operation is performed, otherwise it sends the data received 
  * for the given output, they are: 
@@ -24,7 +24,7 @@
  */
 
 module retire
-    import my_pkg::*;
+    import RS5_pkg::*;
 (
     input   logic           write_enable_i,
     input   iType_e         instruction_operation_i,
