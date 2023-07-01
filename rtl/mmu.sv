@@ -1,7 +1,7 @@
 /*!\file mmu.sv
- * RS5 VERSION - 1.0.0 - Public Release
+ * RS5 VERSION - 1.1.0 - Pipeline Simplified and Core Renamed
  *
- * Distribution:  May 2023
+ * Distribution:  July 2023
  *
  * Willian Nunes     <willian.nunes@edu.pucrs.br>
  * Angelo Dal Zotto  <angelo.dalzotto@edu.pucrs.br>

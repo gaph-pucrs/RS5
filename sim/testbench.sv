@@ -95,15 +95,15 @@ module testbench
     );
 
     rtc rtc(
-        .clk(clk_i),
-        .reset(rst_i), 
-        .en_i(enable_rtc),
-        .addr_i(mem_address[3:0]),
-        .we_i({4'h0, mem_write_enable}),
-        .data_i({32'h0, mem_data_write}),
-        .data_o(data_rtc),     
-        .mti_o(mti),
-        .mtime_o(mtime)
+        .clk        (clk_i),
+        .reset      (rst_i), 
+        .en_i       (enable_rtc),
+        .addr_i     (mem_address[3:0]),
+        .we_i       ({4'h0, mem_write_enable}),
+        .data_i     ({32'h0, mem_data_write}),
+        .data_o     (data_rtc),     
+        .mti_o      (mti),
+        .mtime_o    (mtime)
     );
 
     always_comb begin

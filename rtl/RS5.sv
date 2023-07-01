@@ -1,7 +1,7 @@
 /*!\file RS5.sv
- * RS5 VERSION - 1.0.0 - Public Release
+ * RS5 VERSION - 1.1.0 - Pipeline Simplified and Core Renamed
  *
- * Distribution:  March 2023
+ * Distribution:  July 2023
  *
  * Willian Nunes   <willian.nunes@edu.pucrs.br>
  * Marcos Sartori  <marcos.sartori@acad.pucrs.br>
@@ -15,7 +15,7 @@
  * \detailed
  * This is the top Module of the RS5 processor core
  * and is responsible for the instantiation of the lower level modules
- * ans also defines the interface ports (inputs and outputs) os the processor.
+ * and also defines the interface ports (inputs and outputs) os the processor.
  */
 /*
 `include "../rtl/RS5_pkg.sv"
@@ -79,10 +79,11 @@ module RS5
 //////////////////////////////////////////////////////////////////////////////
 
     logic   [4:0]   rs1, rs2;
-    logic   [31:0]  regbank_data1, regbank_data2, rs1_data_read, rs2_data_read;
-    logic           write_enable_regbank_int, regbank_write_enable;
+    logic   [31:0]  regbank_data1, regbank_data2;
+    logic   [31:0]  rs1_data_read, rs2_data_read;
     logic   [4:0]   rd;
     logic   [31:0]  regbank_data_writeback;
+    logic           regbank_write_enable_int, regbank_write_enable;
 
 //////////////////////////////////////////////////////////////////////////////
 // Execute signals
@@ -103,7 +104,6 @@ module RS5
 // Retire signals
 //////////////////////////////////////////////////////////////////////////////
 
-    logic           we_retire;
     iType_e         instruction_operation_retire;
     logic   [31:0]  result_retire;
     logic           killed;
@@ -133,17 +133,17 @@ module RS5
     assign mmu_en = privilege != privilegeLevel_e'(2'b11) && mvmctl;
 `endif
 
-    assign rs1_data_read =  (rs1 == rd && rd != '0 && regbank_write_enable) 
+    assign regbank_write_enable =   (rd == '0) 
+                                    ? 0 
+                                    : regbank_write_enable_int;
+
+    assign rs1_data_read =  (rs1 == rd && regbank_write_enable) 
                             ? regbank_data_writeback 
                             : regbank_data1;
 
-    assign rs2_data_read =  (rs2 == rd && rd != '0 && regbank_write_enable) 
+    assign rs2_data_read =  (rs2 == rd && regbank_write_enable) 
                             ? regbank_data_writeback 
                             : regbank_data2;
-
-    assign regbank_write_enable =   (rd == '0) 
-                                    ? 0 
-                                    : write_enable_regbank_int;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////// FETCH //////////////////////////////////////////////////////////////////////////////////
@@ -271,7 +271,7 @@ module RS5
         .exc_load_access_fault_i(mmu_data_fault),
     `endif
         .killed_o               (killed),
-        .write_enable_o         (we_retire),
+        .write_enable_o         (regbank_write_enable_int),
         .instruction_operation_o(instruction_operation_retire), 
         .result_o               (result_retire), 
         .mem_address_o          (mem_address), 
@@ -297,11 +297,9 @@ module RS5
 /////////////////////////////////////////////////////////// RETIRE //////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     retire retire1 (
-        .write_enable_i         (we_retire),
         .instruction_operation_i(instruction_operation_retire),
         .result_i               (result_retire), 
         .mem_data_i             (mem_data_i), 
-        .regbank_write_enable_o (write_enable_regbank_int), 
         .regbank_data_o         (regbank_data_writeback)
     );
 

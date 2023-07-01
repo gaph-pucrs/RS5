@@ -1,7 +1,7 @@
 /*!\file CSRBank.sv
- * RS5 VERSION - 1.0.0 - Public Release
+ * RS5 VERSION - 1.1.0 - Pipeline Simplified and Core Renamed
  *
- * Distribution:  March 2023
+ * Distribution:  July 2023
  *
  * Willian Nunes   <willian.nunes@edu.pucrs.br>
  * Marcos Sartori  <marcos.sartori@acad.pucrs.br>

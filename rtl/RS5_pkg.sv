@@ -1,7 +1,7 @@
 /*!\file RS5_pkg.sv
- * RS5 VERSION - 1.0.0 - Public Release
+ * RS5 VERSION - 1.1.0 - Pipeline Simplified and Core Renamed
  *
- * Distribution:  March 2023
+ * Distribution:  July 2023
  *
  * Willian Nunes   <willian.nunes@edu.pucrs.br>
  * Marcos Sartori  <marcos.sartori@acad.pucrs.br>
@@ -10,11 +10,12 @@
  * Research group: GAPH-PUCRS  <>
  *
  * \brief
- * Package definition.
+ * RS5 Package definition.
  *
  * \detailed
  * Defines the package used in the processor units, it defines some types
- * for instruction formats, instruction types and execute units.
+ * for instruction formats, instruction types, operation, exceptions and
+ * interrupts causes and CSR addresses.
  */
 
 package RS5_pkg;
@@ -109,4 +110,3 @@ package RS5_pkg;
     } interruptionCode_e;
 
 endpackage
-
