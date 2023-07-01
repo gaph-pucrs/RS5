@@ -54,7 +54,7 @@ module decode
     output  logic           exc_misaligned_fetch_o
 );
 
-    logic [31:0]    first_operand, second_operand, third_operand, immediate, ;
+    logic [31:0]    first_operand, second_operand, third_operand, immediate;
     logic [31:0]    instruction; 
     logic [31:0]    last_instruction;
     logic           last_hazard;
