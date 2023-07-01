@@ -1,7 +1,7 @@
 /*!\file testbench.sv
- * PUCRS-RV VERSION - 1.0 - Public Release
+ * RS5 VERSION - 1.1.0 - Pipeline Simplified and Core Renamed
  *
- * Distribution:  December 2021
+ * Distribution:  July 2023
  *
  * Willian Nunes   <willian.nunes@edu.pucrs.br>
  * Marcos Sartori  <marcos.sartori@acad.pucrs.br>
@@ -10,10 +10,10 @@
  * Research group: GAPH-PUCRS  <>
  *
  * \brief
- * Testbench for pucrs-rv simulation.
+ * Testbench for RS5 simulation.
  *
  * \detailed
- * Testbench for pucrs-rv simulation.
+ * Testbench for RS5 simulation.
  */
 
 `timescale 1ns/1ps
@@ -23,7 +23,7 @@ import RS5_pkg::*;
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////// CPU TESTBENCH IMPLEMENTATION //////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-module Testbench_With_BRAMs ();
+module Testbench_FPGA_Platform ();
 
 logic         clk=1, rstCPU;
 logic [7:0]   gpioa_out, gpioa_addr;
