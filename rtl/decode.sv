@@ -61,8 +61,6 @@ module decode
     logic           last_stall;
     logic           locked_memory;
     logic  [4:0]    locked_register;
-    logic  [4:0]    target_register;
-    logic           is_store;
 
     formatType_e    instruction_format;
     iType_e         instruction_operation;
@@ -261,31 +259,21 @@ module decode
     assign rs2_o = instruction[24:20];
 
 //////////////////////////////////////////////////////////////////////////////
-// Target definitions
-//////////////////////////////////////////////////////////////////////////////
-
-    always_comb begin
-        if (!hazard_o) begin
-            target_register = instruction[11:7];
-            is_store        = (opcode[6:2] == 5'b01000);
-        end
-        else begin
-            target_register = '0;
-            is_store        = 1'b0;
-        end
-    end
-//////////////////////////////////////////////////////////////////////////////
 // Registe Lock Queue (RLQ)
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk) begin
         if (reset) begin
-            locked_memory   <= '0;
             locked_register <= '0;
+            locked_memory   <= '0;
         end 
+        else if (hazard_o) begin
+            locked_register <= '0;
+            locked_memory   <= '0;
+        end
         else if (!stall) begin
-            locked_register <= target_register;
-            locked_memory   <= is_store;
+            locked_register <= instruction[11:7];
+            locked_memory   <= (opcode[6:2] == 5'b01000);
         end
     end
 
