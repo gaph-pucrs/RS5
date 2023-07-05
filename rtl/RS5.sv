@@ -229,7 +229,7 @@ module RS5
     );
 
 `else
-    regBankA RegBankA (
+    DRAM_RegBank RegBankA (
         .clk        (clk),
         .we         (regbank_write_enable),
         .a          (rd),
@@ -238,7 +238,7 @@ module RS5
         .dpo        (regbank_data1)
     );
 
-    regBankB RegBankB (
+    DRAM_RegBank RegBankB (
         .clk        (clk),
         .we         (regbank_write_enable),
         .a          (rd),
