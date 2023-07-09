@@ -103,3 +103,25 @@ The Environment counts with a universal asynchronous receiver-transmitter (UART)
 
 <img src="imgs/RS5_TrapFlow.png" alt="Trap treatment flow Diagram">
 > RS5 Trap treatment flow Diagram.
+
+## How to Simulate
+
+The simulation is performed inside the [/Sim Folder](https://github.com/gaph-pucrs/RS5/blob/master/sim/). This folder contains the [testbench.sv](https://github.com/gaph-pucrs/RS5/blob/master/sim/testbench.sv) that instantiates the processor core and runs the simulation. It also has a wave configuration file and some scripts for simulating via the command line in different simulators.
+
+Initially it would be necessary to have the desired application compiled as a binary file, for that you should have the Risc-V Toolchain installed. The section "Requirements" describe how you can install the toolchain in your system. To compile the binary file you should run the makefile on the desired folder, there are several applications provided inside the [App Folder](https://github.com/gaph-pucrs/RS5/blob/master/app/) as described in the above "Applications" section.
+
+After the binary file is compiled, you should edit the binary file path on the [RAM_mem.sv](https://github.com/gaph-pucrs/RS5/blob/master/sim/RAM_mem.sv) file. This module initializes the RAM with the specified binary file contents. The repository file points to the Berkeley suite application that tests every instruction of the core using relative paths.
+
+On the [/Sim Folder](https://github.com/gaph-pucrs/RS5/blob/master/sim/) with the correct path specified on the RAM, you are now able to simulate the core on the following simulators:
+
+For Modelsim/Questa, the [sim.do](https://github.com/gaph-pucrs/RS5/blob/master/sim/RAM_mem.sv) script file is provided and simplifies the process of simulating using the command line. for that you can just run the command: `vsim -c -do sim.do`.
+
+For Xcelium simulator, the [sim.xrun](https://github.com/gaph-pucrs/RS5/blob/master/sim/RAM_mem.sv) script file is provided. To run via Xcelium you can run the command `xrun -f sim.xrun`.
+
+For Verilator you can run the commands: `verilator --cc testbench.sv --exe tb_top_verilator.cpp --build --Wall` followed by `./obj_dir/Vtestbench`. 
+
+## How to Prototype on FPGA
+
+The [Proto Folder](https://github.com/gaph-pucrs/RS5/blob/master/proto/) provides all the files needed for the FPGA prototype. To load the application on the Block RAM (BRAM) run you will need the application binary file as described in the previous section. The BRAM is loaded using a ".coe" file. To generate the coe file a python script is provided in the [init_mem.py](https://github.com/gaph-pucrs/RS5/blob/master/proto/init_mem.py) file. The script input file path should point to the application binary file, after running the script via the `python3 init_mem.py` command it will generate the ".coe" file for the given application, you can also edit the output ".coe" file name.
+
+A Vivado project is provided in the [RS5.xpr](https://github.com/gaph-pucrs/RS5/blob/master/proto/RS5/RS5.xpr) file that can be imported into VIVADO. This project already points to all the processor, environment and FPGA IP files. After opening the project the processor should be ready for synthesis and implementation in a Xilinx Nexys A7 FPGA board. The ".coe" file should be loaded to the BRAM by editing the BRAM IP. After running the synthesis you can generate the bitstream and then you should connect the FPGA board to your computer and then program the device, after these steps then the processor will be running in the FPGA board. To be able to capture the processor output you can either use VIVADO tools or use a serial port emulator such as Teraterm or PUTTY on Windows or running the `tio -b 115200 -d 8 -s 1 -p none /dev/ttyUSB0` command on Linux.  
