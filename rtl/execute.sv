@@ -1,7 +1,7 @@
 /*!\file execute.sv
- * PUC-RS5 VERSION - 1.0.0 - Public Release
+ * RS5 VERSION - 1.1.0 - Pipeline Simplified and Core Renamed
  *
- * Distribution:  March 2023
+ * Distribution:  July 2023
  *
  * Willian Nunes   <willian.nunes@edu.pucrs.br>
  * Marcos Sartori  <marcos.sartori@acad.pucrs.br>
@@ -10,20 +10,23 @@
  * Research group: GAPH-PUCRS  <>
  *
  * \brief
- * Execute Unit is the third stage of the processor core.
+ * Execute Unit is the third stage of the RS5 processor core.
  *
  * \detailed
- * Execute Unit is the third stage of the PUC-RS5 processor core. At the
- * entry it implements a dispatcher that assigns the operands to the
- * execution units that are: 
- * 1) Adder 2) Branch 3) Bypass 4) Logic 5) Memory 6) Shift 7) CSR access. 
- * Each module is defined in a separeted file. At the other end it has a 
- * demultiplexer that collects the result only from the given module and 
- * pass it to the retirement stage.
+ * Execute Unit is the third stage of the RS5 processor core. It implements
+ * an Arithmetic Logic Unit (ALU) responsible for calculations, it also have 
+ * a Branch Unit that makes the decision of branching based on instruction 
+ * operation and operands. Also implements the Memory Load and Store mechanism.
+ * Lastly it implements the CSR access logic.
+ * The operations are performed based on Tag comparisons between this unit's tag
+ * and the instruction tag, if they mismatch the instruction is killed and its 
+ * operation is not performed. A performed branch causes the internal tag to be
+ * increased, causing the tag mismatch on the following instructions until an 
+ * instruction fetched from the new flow arrives with the updated tag.
  */
 
 module execute
-    import my_pkg::*;
+    import RS5_pkg::*;
 (
     input   logic               clk,
     input   logic               reset,
