@@ -136,6 +136,24 @@ module decode
         endcase
     end
 
+`ifdef M_EXT
+    iType_e decode_muldiv;
+
+    always_comb begin
+        unique case (funct3)
+            3'b000:     decode_muldiv = MUL;
+            3'b001:     decode_muldiv = MULH;
+            3'b010:     decode_muldiv = MULHSU;
+            3'b011:     decode_muldiv = MULHU;
+            3'b100:     decode_muldiv = DIV;
+            3'b101:     decode_muldiv = DIVU;
+            3'b110:     decode_muldiv = REM;
+            3'b111:     decode_muldiv = REMU;
+            default:    decode_muldiv = INVALID;
+        endcase
+    end
+`endif
+
     always_comb begin
         unique case ({funct7, funct3}) inside
             10'b???????000:     decode_op_imm = ADD;    /* ADDI */
@@ -204,6 +222,9 @@ module decode
             7'b0110011: instruction_operation = decode_op;          /* OP */
             7'b0001111: instruction_operation = decode_misc_mem;    /* MISC-MEM */
             7'b1110011: instruction_operation = decode_system;      /* SYSTEM */
+        `ifdef M_EXT
+            7'b0000001: instruction_operation = decode_muldiv;      /* SYSTEM */
+        `endif
             default:    instruction_operation = INVALID;
         endcase
     end        

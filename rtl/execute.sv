@@ -232,6 +232,60 @@ end
     end
 
 //////////////////////////////////////////////////////////////////////////////
+// MulDiv Operations
+//////////////////////////////////////////////////////////////////////////////
+
+`ifdef M_EXT
+    logic           div_overflow;
+    logic [31:0]    mul_opA, mul_opB;
+    logic [31:0]    div_opA, div_opB;
+    logic [31:0]    rem_opA, rem_opB;
+    logic [63:0]    mul_result;
+    logic [31:0]    div_result;
+    logic [31:0]    rem_result;
+
+    always_comb begin
+        div_overflow = (first_operand_i == 32'h80000000 && second_operand_i == '1);
+
+        unique case (instruction_operation_i)
+            MULH, MULHSU:   mul_opA = $signed(first_operand_i);
+            default:        mul_opA = $unsigned(first_operand_i);
+        endcase
+
+        unique case (instruction_operation_i)
+            MULH:           mul_opB = $signed(second_operand_i);
+            default:        mul_opB = $unsigned(second_operand_i);
+        endcase
+
+        unique case (instruction_operation_i)
+            DIV:            div_opA = $signed(first_operand_i);
+            default:        div_opA = $unsigned(first_operand_i);
+        endcase
+
+        unique case (instruction_operation_i)
+            DIV:            div_opB = $signed(second_operand_i);
+            default:        div_opB = $unsigned(second_operand_i);
+        endcase
+
+        unique case (instruction_operation_i)
+            REM:            rem_opA = $signed(first_operand_i);
+            default:        rem_opA = $unsigned(first_operand_i);
+        endcase
+
+        unique case (instruction_operation_i)
+            REM:            rem_opB = $signed(second_operand_i);
+            default:        rem_opB = $unsigned(second_operand_i);
+        endcase
+    end
+
+    always_comb begin
+        mul_result  = mul_opA * mul_opB;
+        div_result  = div_opA / div_opB;
+        rem_result  = rem_opA % rem_opB;
+    end
+`endif
+
+//////////////////////////////////////////////////////////////////////////////
 // Demux
 //////////////////////////////////////////////////////////////////////////////
 
@@ -249,6 +303,14 @@ end
             SRL:                    result = srl_result;
             SRA:                    result = sra_result;
             LUI:                    result = second_operand_i;
+        `ifdef M_EXT
+            MUL:                    result = mul_result[31:0];
+            MULH, MULHSU, MULHU:    result = mul_result[63:32];
+            DIV:                    result = (second_operand_i == 0) ?              -1  : ((div_overflow) ? first_operand_i : div_result);
+            DIVU:                   result = (second_operand_i == 0) ?        2**32 -1  : div_result;
+            REM:                    result = (second_operand_i == 0) ? first_operand_i  : ((div_overflow) ? 0 : rem_result);
+            REMU:                   result = (second_operand_i == 0) ? first_operand_i  : rem_result;
+        `endif
             default:                result = sum_result;
         endcase
     end
