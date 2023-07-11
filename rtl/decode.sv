@@ -170,7 +170,7 @@ module decode
     end
 
     always_comb begin
-        unique case ({funct7, funct3})
+        unique case ({funct7, funct3}) inside
             10'b0000000000:     decode_op = ADD;
             10'b0100000000:     decode_op = SUB;
             10'b0000000001:     decode_op = SLL;
@@ -181,6 +181,9 @@ module decode
             10'b0100000101:     decode_op = SRA;
             10'b0000000110:     decode_op = OR;
             10'b0000000111:     decode_op = AND;
+        `ifdef M_EXT
+            10'b0000001???:     decode_op = decode_muldiv;
+        `endif
             default:            decode_op = INVALID;
         endcase
     end
@@ -222,9 +225,6 @@ module decode
             7'b0110011: instruction_operation = decode_op;          /* OP */
             7'b0001111: instruction_operation = decode_misc_mem;    /* MISC-MEM */
             7'b1110011: instruction_operation = decode_system;      /* SYSTEM */
-        `ifdef M_EXT
-            7'b0000001: instruction_operation = decode_muldiv;      /* SYSTEM */
-        `endif
             default:    instruction_operation = INVALID;
         endcase
     end        
