@@ -136,24 +136,6 @@ module decode
         endcase
     end
 
-`ifdef M_EXT
-    iType_e decode_muldiv;
-
-    always_comb begin
-        unique case (funct3)
-            3'b000:     decode_muldiv = MUL;
-            3'b001:     decode_muldiv = MULH;
-            3'b010:     decode_muldiv = MULHSU;
-            3'b011:     decode_muldiv = MULHU;
-            3'b100:     decode_muldiv = DIV;
-            3'b101:     decode_muldiv = DIVU;
-            3'b110:     decode_muldiv = REM;
-            3'b111:     decode_muldiv = REMU;
-            default:    decode_muldiv = INVALID;
-        endcase
-    end
-`endif
-
     always_comb begin
         unique case ({funct7, funct3}) inside
             10'b???????000:     decode_op_imm = ADD;    /* ADDI */
@@ -170,7 +152,7 @@ module decode
     end
 
     always_comb begin
-        unique case ({funct7, funct3}) inside
+        unique case ({funct7, funct3})
             10'b0000000000:     decode_op = ADD;
             10'b0100000000:     decode_op = SUB;
             10'b0000000001:     decode_op = SLL;
@@ -181,9 +163,14 @@ module decode
             10'b0100000101:     decode_op = SRA;
             10'b0000000110:     decode_op = OR;
             10'b0000000111:     decode_op = AND;
-        `ifdef M_EXT
-            10'b0000001???:     decode_op = decode_muldiv;
-        `endif
+            10'b0000001000:     decode_op = MUL;
+            10'b0000001001:     decode_op = MULH;
+            10'b0000001010:     decode_op = MULHSU;
+            10'b0000001011:     decode_op = MULHU;
+            10'b0000001100:     decode_op = DIV;
+            10'b0000001101:     decode_op = DIVU;
+            10'b0000001110:     decode_op = REM;
+            10'b0000001111:     decode_op = REMU;
             default:            decode_op = INVALID;
         endcase
     end

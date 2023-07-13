@@ -81,6 +81,12 @@ module execute
     logic           write_enable;
     logic           exc_ilegal_csr_inst;
 
+    logic signed [31:0]  first_operand_signed;
+    logic signed [31:0]  second_operand_signed;
+
+    assign first_operand_signed  = first_operand_i;
+    assign second_operand_signed = second_operand_i;
+
 //////////////////////////////////////////////////////////////////////////////
 // ALU
 //////////////////////////////////////////////////////////////////////////////
@@ -126,13 +132,13 @@ module execute
         xor_result              = first_operand_i ^ second_operand_i;
         sll_result              = first_operand_i << second_operand_i[4:0];
         srl_result              = first_operand_i >> second_operand_i[4:0];
-        sra_result              = $signed(first_operand_i) >>> second_operand_i[4:0];
+        sra_result              = first_operand_signed >>> second_operand_i[4:0];
 
         equal                   = first_operand_i == second_operand_i;
-        less_than               = $signed(first_operand_i) < $signed(second_operand_i);
-        less_than_unsigned      = $unsigned(first_operand_i) < $unsigned(second_operand_i);
-        greater_equal           = $signed(first_operand_i) >= $signed(second_operand_i);
-        greater_equal_unsigned  = $unsigned(first_operand_i) >= $unsigned(second_operand_i);
+        less_than               = first_operand_signed < second_operand_signed;
+        less_than_unsigned      = first_operand_i < second_operand_i;
+        greater_equal           = first_operand_signed >= second_operand_signed;
+        greater_equal_unsigned  = first_operand_i >= second_operand_i;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -234,27 +240,24 @@ end
 //////////////////////////////////////////////////////////////////////////////
 // MulDiv Operations
 //////////////////////////////////////////////////////////////////////////////
-
-`ifdef M_EXT
-    logic           div_overflow;
-    logic [31:0]    mul_opA, mul_opB;
-    logic [31:0]    div_opA, div_opB;
-    logic [31:0]    mul_result;
+    logic [63:0]    mul_result;
     logic [63:0]    mulh_result, mulhsu_result;
     logic [31:0]    div_result, divu_result;
     logic [31:0]    rem_result, remu_result;
+    
+`ifdef M_EXT
+    always_comb begin
+        mul_result      = first_operand_i       * second_operand_i;
+        mulh_result     = first_operand_signed  * second_operand_signed;
+        mulhsu_result   = first_operand_signed  * second_operand_i;
+        div_result      = first_operand_signed  / second_operand_signed;
+        divu_result     = first_operand_i       / second_operand_i;
+        rem_result      = first_operand_signed  % second_operand_signed;
+        remu_result     = first_operand_i       % second_operand_i;
+    end
 
     assign div_overflow = (first_operand_i == 32'h80000000 && second_operand_i == '1);
 
-    always_comb begin
-        mul_result      = mul_opA * mul_opB;
-        mulh_result     = $signed(first_operand_i) * $signed(second_operand_i);
-        mulhsu_result   = $signed(first_operand_i) * second_operand_i;
-        div_result      = $signed(first_operand_i) % $signed(second_operand_i);
-        divu_result     = div_opA / div_opB;
-        rem_result      = $signed(first_operand_i) % $signed(second_operand_i);
-        remu_result     = first_operand_i % second_operand_i;
-    end
 `endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -277,7 +280,9 @@ end
             LUI:                    result = second_operand_i;
         `ifdef M_EXT
             MUL:                    result = mul_result[31:0];
-            MULH, MULHSU, MULHU:    result = mul_result[63:32];
+            MULHU:                  result = mul_result[63:32];
+            MULH:                   result = mulh_result[63:32];
+            MULHSU:                 result = first_operand_i[31] ? $signed(mulhsu_result[63:32]) : mulhsu_result[63:32];
             DIV:                    result = (second_operand_i == 0) ?              -1  : ((div_overflow) ? first_operand_i : div_result);
             DIVU:                   result = (second_operand_i == 0) ?        2**32 -1  : divu_result;
             REM:                    result = (second_operand_i == 0) ? first_operand_i  : ((div_overflow) ? 0 : rem_result);
