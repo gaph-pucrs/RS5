@@ -240,16 +240,25 @@ end
 //////////////////////////////////////////////////////////////////////////////
 // MulDiv Operations
 //////////////////////////////////////////////////////////////////////////////
+    logic signed [63:0]    mul_opa_signed, mul_opb_signed;
+    logic [63:0]    mul_opa, mul_opb;
     logic [63:0]    mul_result;
-    logic [63:0]    mulh_result, mulhsu_result;
+    logic [63:0]    mulh_result; 
+    logic [31:0]    mulhsu_result;
     logic [31:0]    div_result, divu_result;
     logic [31:0]    rem_result, remu_result;
+
+    assign  mul_opa = first_operand_i,
+            mul_opb = second_operand_i;
+    
+    assign  mul_opa_signed = first_operand_signed,
+            mul_opb_signed = second_operand_signed;
     
 `ifdef M_EXT
     always_comb begin
-        mul_result      = first_operand_i       * second_operand_i;
-        mulh_result     = first_operand_signed  * second_operand_signed;
-        mulhsu_result   = first_operand_signed  * second_operand_i;
+        mul_result      = mul_opa               * mul_opb;
+        mulh_result     = mul_opa_signed        * mul_opb_signed;
+        mulhsu_result   = mul_opa_signed        * mul_opb;
         div_result      = first_operand_signed  / second_operand_signed;
         divu_result     = first_operand_i       / second_operand_i;
         rem_result      = first_operand_signed  % second_operand_signed;
@@ -282,7 +291,7 @@ end
             MUL:                    result = mul_result[31:0];
             MULHU:                  result = mul_result[63:32];
             MULH:                   result = mulh_result[63:32];
-            MULHSU:                 result = first_operand_i[31] ? $signed(mulhsu_result[63:32]) : mulhsu_result[63:32];
+            MULHSU:                 result = mulhsu_result[63:32];
             DIV:                    result = (second_operand_i == 0) ?              -1  : ((div_overflow) ? first_operand_i : div_result);
             DIVU:                   result = (second_operand_i == 0) ?        2**32 -1  : divu_result;
             REM:                    result = (second_operand_i == 0) ? first_operand_i  : ((div_overflow) ? 0 : rem_result);
