@@ -240,13 +240,14 @@ end
 //////////////////////////////////////////////////////////////////////////////
 // MulDiv Operations
 //////////////////////////////////////////////////////////////////////////////
+`ifdef M_EXT
     logic signed [63:0]    mul_opa_signed, mul_opb_signed;
-    logic [63:0]    mul_opa, mul_opb;
-    logic [63:0]    mul_result;
-    logic [63:0]    mulh_result; 
-    logic [31:0]    mulhsu_result;
-    logic [31:0]    div_result, divu_result;
-    logic [31:0]    rem_result, remu_result;
+    logic        [63:0]    mul_opa, mul_opb;
+    logic        [63:0]    mul_result;
+    logic        [63:0]    mulh_result; 
+    logic        [31:0]    mulhsu_result;
+    logic        [31:0]    div_result, divu_result;
+    logic        [31:0]    rem_result, remu_result;
 
     assign  mul_opa = first_operand_i,
             mul_opb = second_operand_i;
@@ -254,7 +255,8 @@ end
     assign  mul_opa_signed = first_operand_signed,
             mul_opb_signed = second_operand_signed;
     
-`ifdef M_EXT
+    assign div_overflow = (first_operand_i == 32'h80000000 && second_operand_i == '1);
+    
     always_comb begin
         mul_result      = mul_opa               * mul_opb;
         mulh_result     = mul_opa_signed        * mul_opb_signed;
@@ -264,8 +266,6 @@ end
         rem_result      = first_operand_signed  % second_operand_signed;
         remu_result     = first_operand_i       % second_operand_i;
     end
-
-    assign div_overflow = (first_operand_i == 32'h80000000 && second_operand_i == '1);
 
 `endif
 
