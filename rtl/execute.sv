@@ -508,7 +508,12 @@ end
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk) begin
-        if (!stall & !hold_o) begin
+        if (
+            !stall 
+        `ifdef M_EXT
+            & !hold_o
+        `endif
+        ) begin
             write_enable_o          <= write_enable;
             instruction_operation_o <= instruction_operation_i;
             result_o                <= result;             

@@ -73,11 +73,18 @@ module RS5
     logic   [31:0]   instruction_address;
 
 //////////////////////////////////////////////////////////////////////////////
+// Fetch signals
+//////////////////////////////////////////////////////////////////////////////
+
+    logic           stall_fetch;
+
+//////////////////////////////////////////////////////////////////////////////
 // Decoder signals
 //////////////////////////////////////////////////////////////////////////////
 
     logic   [31:0]  pc_decode;
-    logic   [2:0]   tag_decode;
+    logic    [2:0]  tag_decode;
+    logic           stall_decode;
 
 //////////////////////////////////////////////////////////////////////////////
 // RegBank signals
@@ -150,6 +157,19 @@ module RS5
                             ? regbank_data_writeback 
                             : regbank_data2;
 
+    assign stall_fetch = (stall
+                    `ifdef M_EXT
+                        | hold
+                    `endif
+                        );
+
+    assign stall_decode = (stall
+                    `ifdef M_EXT
+                        | hold
+                    `endif
+                        );
+
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////// FETCH //////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -157,7 +177,7 @@ module RS5
     fetch fetch1 (
         .clk                    (clk), 
         .reset                  (reset), 
-        .stall                  (stall | hold),
+        .stall                  (stall_fetch),
         .hazard_i               (hazard), 
         .jump_i                 (jump), 
         .jump_target_i          (jump_target),
@@ -191,7 +211,7 @@ module RS5
     decode decoder1 (
         .clk                        (clk), 
         .reset                      (reset),
-        .stall                      (stall | hold),
+        .stall                      (stall_decode),
         .instruction_i              (instruction_i), 
         .pc_i                       (pc_decode), 
         .tag_i                      (tag_decode), 
@@ -261,7 +281,9 @@ module RS5
         .clk                    (clk), 
         .reset                  (reset), 
         .stall                  (stall),
+    `ifdef M_EXT
         .hold_o                 (hold),
+    `endif
         .instruction_i          (instruction_execute), 
         .pc_i                   (pc_execute), 
         .first_operand_i        (first_operand_execute), 
