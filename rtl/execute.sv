@@ -250,7 +250,7 @@ end
 
     logic        [63:0]    mul_result;
     logic        [63:0]    mulh_result; 
-    logic        [31:0]    mulhsu_result;
+    logic        [63:0]    mulhsu_result;
 
     assign  mul_opa = first_operand_i,
             mul_opb = second_operand_i;
@@ -267,36 +267,46 @@ end
 //////////////////////////////////////////////////////////////////////////////
 // Div Operations
 //////////////////////////////////////////////////////////////////////////////
-    logic [31:0] div;                   // copy of divisor
-    logic [31:0] quo, quo_next;         // intermediate quotient
-    logic [32:0] acc, acc_next;         // accumulator (1 bit wider)
-    logic [$clog2(32)-1:0] i;           // iteration counter
+    logic           a_sig, b_sig, sig_diff; // signs of inputs and whether different
+    logic [30:0]    au, bu;                 // absolute version of inputs (unsigned)
+    logic [30:0]    quo, quo_next;          // intermediate quotient
+    logic [31:0]    acc, acc_next;          // accumulator (1 bit wider)
+    logic [4:0]     i;                      // iteration counter
 
     logic [31:0]    div_result, divu_result;
     logic [31:0]    rem_result, remu_result;
 
-    logic start, busy, dbz, done, valid;
+    localparam SMALLEST = {1'b1, {31{1'b0}}};  // smallest negative number
+    localparam ITER     = 31;
+
+    logic start, busy, dbz, overflow, done, valid;
 
     assign start  = instruction_operation_i inside {DIV, DIVU, REM, REMU} && busy == 0 && valid == 0;
 
     assign hold_o = start | busy; 
-    
-    assign div_overflow = (first_operand_i == 32'h80000000 && second_operand_i == '1);
+
+    // input signs
+    always_comb begin
+        a_sig = first_operand_i[31];
+        b_sig = second_operand_i[31];
+    end
 
     // division algorithm iteration
     always_comb begin
-        if (acc >= {1'b0, div}) begin
-            acc_next = acc - div;
-            {acc_next, quo_next} = {acc_next[31:0], quo, 1'b1};
+        if (acc >= {1'b0, bu}) begin
+            acc_next = acc - bu;
+            {acc_next, quo_next} = {acc_next[30:0], quo, 1'b1};
         end else begin
             {acc_next, quo_next} = {acc, quo} << 1;
         end
     end
 
+    enum {IDLE, INIT, CALC, ROUND, SIGN} state;
     // calculation control
     always_ff @(posedge clk) begin
         done <= 0;
         if (reset) begin
+            state   <= IDLE; 
             busy    <= 0;
             done    <= 0;
             valid   <= 0;
@@ -306,41 +316,94 @@ end
         end 
         else if (!(instruction_operation_i inside {DIV, DIVU, REM, REMU})) begin
             valid <= 0;
-        end 
-        else if (start) begin
-            valid   <= 0;
-            i       <= 0;
-            if (second_operand_i == 0) begin  // catch divide by zero
-                busy        <= 0;
-                done        <= 1;
-                dbz         <= 1;
-                valid       <= 1;
-            end else begin
-                busy        <= 1;
-                dbz         <= 0;
-                div         <= second_operand_i;
-                {acc, quo}  <= {{32{1'b0}}, first_operand_i, 1'b0};  // initialize calculation
-            end
-        end 
-        else if (busy) begin
-            if (i == 31) begin  // we're done
-                busy    <= 0;
-                done    <= 1;
-                valid   <= 1;
-            end 
-            else begin  // next iteration
-                i       <= i + 1;
-                acc     <= acc_next;
-                quo     <= quo_next;
-            end
+        end
+        else begin
+            case (state)
+
+                INIT: begin
+                    state       <= CALC;
+                    overflow    <= 0;
+                    i           <= 0;
+                    {acc, quo}  <= {{31{1'b0}}, au, 1'b0};
+                end
+
+                CALC: begin
+                    if (i == 30 && quo_next[30] != 0) begin // overflow
+                        state       <= IDLE;
+                        busy        <= 0;
+                        done        <= 1;
+                        overflow    <= 1;
+                    end
+                    else begin
+                        if (i == 30) begin
+                            state <= ROUND;
+                        end 
+                        i       <= i + 1;
+                        acc     <= acc_next;
+                        quo     <= quo_next;
+                    end
+                end
+
+                ROUND: begin  // Gaussian rounding
+                    state <= SIGN;
+                    if (quo_next[0] == 1'b1) begin  // next digit is 1, so consider rounding
+                        // round up if quotient is odd or remainder is non-zero
+                        if (quo[0] == 1'b1 || acc_next[31:1] != 0) quo <= quo + 1;
+                    end
+                end
+
+                SIGN: begin  // adjust quotient sign if non-zero and input signs differ
+                    state   <= IDLE;
+                    if (quo != 0) begin
+                        div_result <= (sig_diff) ? {1'b1, -quo} : {1'b0, quo};
+                    end
+                    else begin
+                        div_result <= '0;
+                    end
+                    divu_result <= quo_next;
+                    busy        <= 0;
+                    done        <= 1;
+                    valid       <= 1;
+                end
+
+                default: begin  // IDLE
+                    if (start) begin
+                        valid   <= 0;
+                        if (second_operand_i == 0) begin  // catch divide by zero
+                            state       <= IDLE;
+                            busy        <= 0;
+                            done        <= 1;
+                            dbz         <= 1;
+                            overflow    <= 0;
+                            valid       <= 1;
+                        end 
+                        else if (first_operand_i == SMALLEST || second_operand_i == SMALLEST) begin
+                            state       <= IDLE;
+                            busy        <= 0;
+                            done        <= 1;
+                            dbz         <= 0;
+                            overflow    <= 1;
+                            valid       <= 1;
+                        end 
+                        else begin
+                            state       <= INIT;
+                            busy        <= 1;
+                            dbz         <= 0;
+                            overflow    <= 1;
+                            sig_diff    <= (a_sig ^ b_sig);
+                            au          <= (a_sig) ? -first_operand_i[30:0] : first_operand_i[30:0];
+                            bu          <= (b_sig) ? -second_operand_i[30:0] : second_operand_i[30:0];
+                            {acc, quo}  <= {{32{1'b0}}, first_operand_i, 1'b0};  // initialize calculation
+                        end
+                    end
+                end
+            endcase
         end
     end
 
     always_comb begin
-        div_result      = quo_next;
-        divu_result     = quo_next;
-        rem_result      = acc_next[32:1];
-        remu_result     = acc_next[32:1];
+        rem_result      = (a_sig) ? {1'b1, -acc[31:1]} : {1'b0, acc[31:1]};
+        remu_result     = acc[31:1];
     end
 
 `endif
@@ -368,9 +431,9 @@ end
             MULHU:                  result = mul_result[63:32];
             MULH:                   result = mulh_result[63:32];
             MULHSU:                 result = mulhsu_result[63:32];
-            DIV:                    result = (second_operand_i == 0) ?              -1  : ((div_overflow) ? first_operand_i : div_result);
+            DIV:                    result = (second_operand_i == 0) ?              -1  : ((overflow) ? first_operand_i : div_result);
             DIVU:                   result = (second_operand_i == 0) ?        2**32 -1  : divu_result;
-            REM:                    result = (second_operand_i == 0) ? first_operand_i  : ((div_overflow) ? 0 : rem_result);
+            REM:                    result = (second_operand_i == 0) ? first_operand_i  : ((overflow) ? 0 : rem_result);
             REMU:                   result = (second_operand_i == 0) ? first_operand_i  : remu_result;
         `endif
             default:                result = sum_result;
