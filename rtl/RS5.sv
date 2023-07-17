@@ -53,6 +53,11 @@ module RS5
 //////////////////////////////////////////////////////////////////////////////
     logic            jump;
     logic            hazard;
+
+`ifdef M_EXT
+    logic            hold;
+`endif
+
 `ifdef XOSVM
     logic            mmu_inst_fault;
     logic            mmu_data_fault;
@@ -152,7 +157,7 @@ module RS5
     fetch fetch1 (
         .clk                    (clk), 
         .reset                  (reset), 
-        .stall                  (stall),
+        .stall                  (stall | hold),
         .hazard_i               (hazard), 
         .jump_i                 (jump), 
         .jump_target_i          (jump_target),
@@ -186,7 +191,7 @@ module RS5
     decode decoder1 (
         .clk                        (clk), 
         .reset                      (reset),
-        .stall                      (stall),
+        .stall                      (stall | hold),
         .instruction_i              (instruction_i), 
         .pc_i                       (pc_decode), 
         .tag_i                      (tag_decode), 
@@ -256,6 +261,7 @@ module RS5
         .clk                    (clk), 
         .reset                  (reset), 
         .stall                  (stall),
+        .hold_o                 (hold),
         .instruction_i          (instruction_execute), 
         .pc_i                   (pc_execute), 
         .first_operand_i        (first_operand_execute), 

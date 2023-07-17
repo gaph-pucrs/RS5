@@ -32,6 +32,10 @@ module execute
     input   logic               reset,
     input   logic               stall,
 
+`ifdef M_EXT
+    output  logic               hold_o,
+`endif
+
     input   logic [31:0]        instruction_i,
     input   logic [31:0]        pc_i,
     input   logic [31:0]        first_operand_i,
@@ -238,16 +242,15 @@ end
     end
 
 //////////////////////////////////////////////////////////////////////////////
-// MulDiv Operations
+// Mul Operations
 //////////////////////////////////////////////////////////////////////////////
 `ifdef M_EXT
     logic signed [63:0]    mul_opa_signed, mul_opb_signed;
     logic        [63:0]    mul_opa, mul_opb;
+
     logic        [63:0]    mul_result;
     logic        [63:0]    mulh_result; 
     logic        [31:0]    mulhsu_result;
-    logic        [31:0]    div_result, divu_result;
-    logic        [31:0]    rem_result, remu_result;
 
     assign  mul_opa = first_operand_i,
             mul_opb = second_operand_i;
@@ -255,16 +258,89 @@ end
     assign  mul_opa_signed = first_operand_signed,
             mul_opb_signed = second_operand_signed;
     
-    assign div_overflow = (first_operand_i == 32'h80000000 && second_operand_i == '1);
-    
     always_comb begin
         mul_result      = mul_opa               * mul_opb;
         mulh_result     = mul_opa_signed        * mul_opb_signed;
         mulhsu_result   = mul_opa_signed        * mul_opb;
-        div_result      = first_operand_signed  / second_operand_signed;
-        divu_result     = first_operand_i       / second_operand_i;
-        rem_result      = first_operand_signed  % second_operand_signed;
-        remu_result     = first_operand_i       % second_operand_i;
+    end
+
+//////////////////////////////////////////////////////////////////////////////
+// Div Operations
+//////////////////////////////////////////////////////////////////////////////
+    logic [31:0] div;                   // copy of divisor
+    logic [31:0] quo, quo_next;         // intermediate quotient
+    logic [32:0] acc, acc_next;         // accumulator (1 bit wider)
+    logic [$clog2(32)-1:0] i;           // iteration counter
+
+    logic [31:0]    div_result, divu_result;
+    logic [31:0]    rem_result, remu_result;
+
+    logic start, busy, dbz, done, valid;
+
+    assign start  = instruction_operation_i inside {DIV, DIVU, REM, REMU} && busy == 0 && valid == 0;
+
+    assign hold_o = start | busy; 
+    
+    assign div_overflow = (first_operand_i == 32'h80000000 && second_operand_i == '1);
+
+    // division algorithm iteration
+    always_comb begin
+        if (acc >= {1'b0, div}) begin
+            acc_next = acc - div;
+            {acc_next, quo_next} = {acc_next[31:0], quo, 1'b1};
+        end else begin
+            {acc_next, quo_next} = {acc, quo} << 1;
+        end
+    end
+
+    // calculation control
+    always_ff @(posedge clk) begin
+        done <= 0;
+        if (reset) begin
+            busy    <= 0;
+            done    <= 0;
+            valid   <= 0;
+            dbz     <= 0;
+            acc     <= '0;
+            quo     <= '0;
+        end 
+        else if (!(instruction_operation_i inside {DIV, DIVU, REM, REMU})) begin
+            valid <= 0;
+        end 
+        else if (start) begin
+            valid   <= 0;
+            i       <= 0;
+            if (second_operand_i == 0) begin  // catch divide by zero
+                busy        <= 0;
+                done        <= 1;
+                dbz         <= 1;
+                valid       <= 1;
+            end else begin
+                busy        <= 1;
+                dbz         <= 0;
+                div         <= second_operand_i;
+                {acc, quo}  <= {{32{1'b0}}, first_operand_i, 1'b0};  // initialize calculation
+            end
+        end 
+        else if (busy) begin
+            if (i == 31) begin  // we're done
+                busy    <= 0;
+                done    <= 1;
+                valid   <= 1;
+            end 
+            else begin  // next iteration
+                i       <= i + 1;
+                acc     <= acc_next;
+                quo     <= quo_next;
+            end
+        end
+    end
+
+    always_comb begin
+        div_result      = quo_next;
+        divu_result     = quo_next;
+        rem_result      = acc_next[32:1];
+        remu_result     = acc_next[32:1];
     end
 
 `endif
@@ -316,7 +392,7 @@ end
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk) begin
-        if (!stall) begin
+        if (!stall & !hold_o) begin
             write_enable_o          <= write_enable;
             instruction_operation_o <= instruction_operation_i;
             result_o                <= result;             
