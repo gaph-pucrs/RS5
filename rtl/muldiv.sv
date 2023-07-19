@@ -23,19 +23,10 @@ module muldiv
 // Mul Operations
 //////////////////////////////////////////////////////////////////////////////
 
-    logic signed [63:0]    mul_opa_signed, mul_opb_signed;
-    logic        [63:0]    mul_opa, mul_opb;
-
-    assign  mul_opa = first_operand_i,
-            mul_opb = second_operand_i;
-    
-    assign  mul_opa_signed = $signed(first_operand_i),
-            mul_opb_signed = $signed(second_operand_i);
-    
     always_comb begin
-        mul_result_o      = mul_opa               * mul_opb;
-        mulh_result_o     = mul_opa_signed        * mul_opb_signed;
-        mulhsu_result_o   = mul_opa_signed        * mul_opb;
+        mul_result_o    =         first_operand_i  *         second_operand_i;
+        mulh_result_o   = $signed(first_operand_i) * $signed(second_operand_i);
+        mulhsu_result_o = $signed(first_operand_i) *         second_operand_i;
     end
 
 //////////////////////////////////////////////////////////////////////////////
