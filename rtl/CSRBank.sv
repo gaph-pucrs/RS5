@@ -37,6 +37,12 @@ module CSRBank
     input   logic               killed,
     output  logic [31:0]        out,
 
+`ifdef DEBUG
+    input   iType_e             instruction_operation_i,
+    input   logic               hazard,
+    input   logic               stall,
+`endif
+
     input   logic               raise_exception_i,
     input   logic               machine_return_i,
     input   exceptionCode_e     exception_code_i,
@@ -78,6 +84,16 @@ module CSRBank
     logic [63:0] mcycle, minstret;
     
     logic [31:0] wr_data, wmask, current_val;
+
+`ifdef DEBUG
+    logic [31:0] instructions_killed_counter, hazard_counter, stall_counter, nop_counter;
+    logic [31:0] interrupt_ack_counter, raise_exception_counter, context_switch_counter;
+    logic [31:0] logic_counter, arithmetic_counter, shift_counter, branch_counter, jump_counter;
+    logic [31:0] load_counter, store_counter, sys_counter, csr_counter;
+`ifdef M_EXT
+    logic [31:0] mul_counter, div_counter;
+`endif
+`endif
     //logic [31:0] medeleg, mideleg; // NOT IMPLEMENTED YET (REQUIRED ONLY WHEN SYSTEM HAVE S-MODE)
     interruptionCode_e Interruption_Code;
 
@@ -242,46 +258,67 @@ module CSRBank
         if (read_enable_i && !killed) begin
             case(CSR)
                 //RO
-                MVENDORID:   out = '0;
-                MARCHID:     out = '0;
-                MIMPID:      out = '0;
-                MHARTID:     out = '0;
-                MCONFIGPTR:  out = '0;
+                MVENDORID:      out = '0;
+                MARCHID:        out = '0;
+                MIMPID:         out = '0;
+                MHARTID:        out = '0;
+                MCONFIGPTR:     out = '0;
 
                 //RW
-                MSTATUS:     out = mstatus;
-                MISA:        out = misa;
-                // MEDELEG:    out = medeleg;
-                // MIDELEG:    out = mideleg;
-                MIE:         out = mie;
-                MTVEC:       out = mtvec_r;
-                // MCOUNTEREN: out = mcounteren;
-                // MSTATUSH:   out = mstatush;
-                MSCRATCH:    out = mscratch;
-                MEPC:        out = mepc_r;
-                MCAUSE:      out = mcause;
-                MTVAL:       out = mtval;
-                MIP:         out = mip;
-                MCYCLE:      out = mcycle[31:0];
-                MCYCLEH:     out = mcycle[63:32];
-                MINSTRET:    out = minstret[31:0];
-                MINSTRETH:   out = minstret[63:32];
+                MSTATUS:        out = mstatus;
+                MISA:           out = misa;
+                // MEDELEG:     out = medeleg;
+                // MIDELEG:     out = mideleg;
+                MIE:            out = mie;
+                MTVEC:          out = mtvec_r;
+                // MCOUNTEREN:  out = mcounteren;
+                // MSTATUSH:    out = mstatush;
+                MSCRATCH:       out = mscratch;
+                MEPC:           out = mepc_r;
+                MCAUSE:         out = mcause;
+                MTVAL:          out = mtval;
+                MIP:            out = mip;
+                MCYCLE:         out = mcycle[31:0];
+                MCYCLEH:        out = mcycle[63:32];
+                MINSTRET:       out = minstret[31:0];
+                MINSTRETH:      out = minstret[63:32];
 
                 //RO
-                CYCLE:       out = mcycle[31:0];
-                TIME:        out = mtime_i[31:0];
-                INSTRET:     out = minstret[31:0];
-                CYCLEH:      out = mcycle[63:32];
-                TIMEH:       out = mtime_i[63:32];
-                INSTRETH:    out = minstret[63:32];
-            `ifdef XOSVM
-                MVMCTL:      out = {31'b0,mvmctl};
-                MVMDO:       out = mvmdo[31:0];
-                MVMDS:       out = mvmds[31:0];
-                MVMIO:       out = mvmio[31:0];
-                MVMIS:       out = mvmis[31:0];
+                CYCLE:          out = mcycle[31:0];
+                TIME:           out = mtime_i[31:0];
+                INSTRET:        out = minstret[31:0];
+
+            `ifdef DEBUG
+                MHPMCOUNTER3:   out = instructions_killed_counter;
+                MHPMCOUNTER4:   out = context_switch_counter;
+                MHPMCOUNTER5:   out = raise_exception_counter;
+                MHPMCOUNTER6:   out = interrupt_ack_counter;
+                MHPMCOUNTER7:   out = hazard_counter;
+                MHPMCOUNTER8:   out = stall_counter;
+                MHPMCOUNTER9:   out = nop_counter;
+                MHPMCOUNTER10:  out = logic_counter;
+                MHPMCOUNTER11:  out = arithmetic_counter;
+                MHPMCOUNTER12:  out = shift_counter;
+                MHPMCOUNTER13:  out = branch_counter;
+                MHPMCOUNTER14:  out = jump_counter;
+                MHPMCOUNTER15:  out = load_counter;
+                MHPMCOUNTER16:  out = store_counter;
+                MHPMCOUNTER17:  out = sys_counter;
+                MHPMCOUNTER18:  out = csr_counter;
             `endif
-                default:     out = '0;
+
+                CYCLEH:         out = mcycle[63:32];
+                TIMEH:          out = mtime_i[63:32];
+                INSTRETH:       out = minstret[63:32];
+                
+            `ifdef XOSVM
+                MVMCTL:         out = {31'b0,mvmctl};
+                MVMDO:          out = mvmdo[31:0];
+                MVMDS:          out = mvmds[31:0];
+                MVMIO:          out = mvmio[31:0];
+                MVMIS:          out = mvmis[31:0];
+            `endif
+                default:        out = '0;
             endcase
         end
         else begin
@@ -313,5 +350,100 @@ module CSRBank
             interrupt_pending_o <= 0;
         end
     end
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////// DEBUG ///////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+`ifdef DEBUG
+    int fd;
+
+    always_ff @(posedge clk) begin
+        if (reset) begin
+            instructions_killed_counter <= '0;
+            nop_counter                 <= '0;
+            logic_counter               <= '0;
+            arithmetic_counter          <= '0;
+            shift_counter               <= '0;
+            branch_counter              <= '0;
+            jump_counter                <= '0;
+            load_counter                <= '0;
+            store_counter               <= '0;
+            sys_counter                 <= '0;
+            csr_counter                 <= '0;
+        `ifdef M_EXT
+            mul_counter                 <= '0;
+            div_counter                 <= '0;
+        `endif
+
+            hazard_counter              <= '0;
+            stall_counter               <= '0;
+            interrupt_ack_counter       <= '0;
+            raise_exception_counter     <= '0;
+            context_switch_counter      <= '0;
+        end
+        else begin
+            instructions_killed_counter <= (killed)                                                             ? instructions_killed_counter  + 1 : instructions_killed_counter;
+
+            hazard_counter              <= (hazard)                                                             ? hazard_counter               + 1 : hazard_counter;
+            stall_counter               <= (stall)                                                              ? stall_counter                + 1 : stall_counter;
+
+            interrupt_ack_counter       <= (interrupt_ack_i)                                                    ? interrupt_ack_counter   + 1 : interrupt_ack_counter;
+            raise_exception_counter     <= (raise_exception_i)                                                  ? raise_exception_counter + 1 : raise_exception_counter;
+            context_switch_counter      <= (jump_i || raise_exception_i || machine_return_i || interrupt_ack_i) ? context_switch_counter + 1 : context_switch_counter;
+            nop_counter                 <= (instruction_operation_i == NOP)                                     ?   nop_counter + 1 : nop_counter;
+
+            if (!killed) begin
+                logic_counter           <= (instruction_operation_i inside {XOR, OR, AND})                                  ? logic_counter             + 1 : logic_counter;
+                arithmetic_counter      <= (instruction_operation_i inside {ADD, SUB, SLTU, SLT, LUI})                      ? arithmetic_counter        + 1 : arithmetic_counter;
+                shift_counter           <= (instruction_operation_i inside {SLL, SRL, SRA})                                 ? shift_counter             + 1 : shift_counter;
+                branch_counter          <= (instruction_operation_i inside {BEQ, BNE, BLT, BLTU, BGE, BGEU})                ? branch_counter            + 1 : branch_counter;
+                jump_counter            <= (instruction_operation_i inside {JAL, JALR})                                     ? jump_counter              + 1 : jump_counter;
+                load_counter            <= (instruction_operation_i inside {LB, LBU, LH, LHU, LW})                          ? load_counter              + 1 : load_counter;
+                store_counter           <= (instruction_operation_i inside {SB, SH, SW})                                    ? store_counter             + 1 : store_counter;
+                sys_counter             <= (instruction_operation_i inside {SRET, MRET, WFI, ECALL, EBREAK})                ? sys_counter               + 1 : sys_counter;
+                csr_counter             <= (instruction_operation_i inside {CSRRW, CSRRWI, CSRRS, CSRRSI, CSRRC, CSRRCI})   ? csr_counter               + 1 : csr_counter;
+            `ifdef M_EXT
+                mul_counter             <= (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU})                      ? mul_counter               + 1 : mul_counter;
+                div_counter             <= (instruction_operation_i inside {DIV, DIVU, REM, REMU})                          ? div_counter               + 1 : div_counter;
+            `endif
+            end
+        end
+    end
+
+    initial begin
+        fd = $fopen ("./debug/Report.txt", "w");
+    end
+
+    final begin
+        $fwrite(fd,"Clock Cycles:           %0d\n", mcycle);
+        $fwrite(fd,"Instructions Retired:   %0d\n", minstret);
+        $fwrite(fd,"Instructions Killed:    %0d\n", instructions_killed_counter);
+        $fwrite(fd,"Context Switches:       %0d\n", context_switch_counter);
+        $fwrite(fd,"Exceptions Raised:      %0d\n", raise_exception_counter);
+        $fwrite(fd,"Interrupts Acked:       %0d\n", interrupt_ack_counter);
+
+        $fwrite(fd,"\nCYCLES WITH::\n");
+        $fwrite(fd,"HAZARDS:                %0d\n", hazard_counter);
+        $fwrite(fd,"STALL:                  %0d\n", stall_counter);
+
+        $fwrite(fd,"\nINSTRUCTION COUNTERS:\n");
+        $fwrite(fd,"NOP:                    %0d\n", nop_counter);
+        $fwrite(fd,"LOGIC:                  %0d\n", logic_counter);
+        $fwrite(fd,"ARITH:                  %0d\n", arithmetic_counter);
+        $fwrite(fd,"SHIFT:                  %0d\n", shift_counter);
+        $fwrite(fd,"BRANCH:                 %0d\n", branch_counter);
+        $fwrite(fd,"JUMP:                   %0d\n", jump_counter);
+        $fwrite(fd,"LOAD:                   %0d\n", load_counter);
+        $fwrite(fd,"STORE:                  %0d\n", store_counter);
+        $fwrite(fd,"SYS:                    %0d\n", sys_counter);
+        $fwrite(fd,"CSR:                    %0d\n", csr_counter);
+    `ifdef M_EXT
+        $fwrite(fd,"MUL:                    %0d\n", mul_counter);
+        $fwrite(fd,"DIV:                    %0d\n", div_counter);
+    `endif
+        
+    end
+`endif
 
 endmodule
