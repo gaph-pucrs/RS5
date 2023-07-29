@@ -93,6 +93,14 @@ package RS5_pkg;
         NONE, WRITE, SET, CLEAR
     } csrOperation_e;
 
+    typedef enum logic [1:0] {
+        M_IDLE, M_CALC, M_DONE
+    } mult_states_e;
+
+    typedef enum logic [1:0] {
+        DIDLE, INIT, CALC, SIGN
+    } div_states_e;
+
     typedef enum  logic[1:0] {DIRECT, VECTORED} trapMode_e;
 
     typedef enum  logic[11:0] { 

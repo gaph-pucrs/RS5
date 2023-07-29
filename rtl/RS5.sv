@@ -241,20 +241,7 @@ module RS5
 /////////////////////////////////////////////////////////// REGISTER BANK ///////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-`ifndef PROTO
-    regbank regbank1 (
-        .clk(clk),
-        .reset(reset),
-        .rs1(rs1), 
-        .rs2(rs2),
-        .rd(rd), 
-        .enable(regbank_write_enable),
-        .data_i(regbank_data_writeback), 
-        .data1_o(regbank_data1), 
-        .data2_o(regbank_data2)
-    );
-
-`else
+`ifdef PROTO
     DRAM_RegBank RegBankA (
         .clk        (clk),
         .we         (regbank_write_enable),
@@ -271,6 +258,19 @@ module RS5
         .d          (regbank_data_writeback),
         .dpra       (rs2),
         .dpo        (regbank_data2)
+    );
+
+`else
+    regbank regbank1 (
+        .clk(clk),
+        .reset(reset),
+        .rs1(rs1), 
+        .rs2(rs2),
+        .rd(rd), 
+        .enable(regbank_write_enable),
+        .data_i(regbank_data_writeback), 
+        .data1_o(regbank_data1), 
+        .data2_o(regbank_data2)
     );
 `endif
 

@@ -19,10 +19,59 @@ module muldiv
     output  logic [31:0] remu_result_o
 );
 
+    logic hold_mul, hold_div;
+
+    assign hold_o = hold_mul | hold_div;
+
 //////////////////////////////////////////////////////////////////////////////
 // Mul Operations
 //////////////////////////////////////////////////////////////////////////////
 
+    mult_states_e   mul_state;
+    logic           start_mul;
+
+    assign start_mul = (mul_state == M_IDLE && instruction_operation_i inside {MUL, MULH, MULHU, MULHSU});
+
+    assign hold_mul = ((mul_state == M_IDLE && start_mul == 1'b1) || mul_state == M_CALC);
+
+    always_ff @(posedge clk ) begin
+        if (reset == 1'b1) begin
+            mul_state <= M_IDLE;
+        end
+        else if (start_mul == 1'b1) begin
+            mul_state <= M_CALC;
+        end
+        else if (mul_state == M_CALC) begin
+            mul_state <= M_DONE;
+        end
+        else begin
+            mul_state <= M_IDLE;
+        end
+    end
+
+`ifdef PROTO
+    mult_unsigned_unsigned mult_unsig_unsig (
+        .CLK(clk),              // input wire CLK
+        .A(first_operand_i),    // input wire [31 : 0] A
+        .B(second_operand_i),   // input wire [31 : 0] B
+        .P(mul_result_o)        // output wire [63 : 0] P
+    );
+
+    mult_signed_signed mult_sig_sig (
+        .CLK(clk),              // input wire CLK
+        .A(first_operand_i),    // input wire [31 : 0] A
+        .B(second_operand_i),   // input wire [31 : 0] B
+        .P(mulh_result_o)       // output wire [63 : 0] P
+    );
+
+    mult_signed_unsigned mult_sig_unsig (
+        .CLK(clk),              // input wire CLK
+        .A(first_operand_i),    // input wire [31 : 0] A
+        .B(second_operand_i),   // input wire [31 : 0] B
+        .P(mulhsu_result_o)     // output wire [63 : 0] P
+    );
+
+`else
     logic signed [63:0]    mul_opa_signed, mul_opb_signed;
     logic        [63:0]    mul_opa, mul_opb;
 
@@ -37,6 +86,7 @@ module muldiv
         mulh_result_o     = mul_opa_signed * mul_opb_signed;
         mulhsu_result_o   = mul_opa_signed * mul_opb;
     end
+`endif
 
 //////////////////////////////////////////////////////////////////////////////
 // Div Operations Control
@@ -58,7 +108,7 @@ module muldiv
     assign start_sig_div    = instruction_operation_i inside {DIV, REM}   && busy_sig_div   == 0 && valid_sig_div   == 0;
     assign start_unsig_div  = instruction_operation_i inside {DIVU, REMU} && busy_unsig_div == 0 && valid_unsig_div == 0;
 
-    assign hold_o = (start_unsig_div | busy_unsig_div) || (start_sig_div | busy_sig_div);
+    assign hold_div = (start_unsig_div | busy_unsig_div) || (start_sig_div | busy_sig_div);
 
     always_comb begin
         div_result_o    = (divide_by_zero) 
