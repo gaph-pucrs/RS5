@@ -22,8 +22,19 @@ package RS5_pkg;
 
     // `define PROTO 1
     // `define DEBUG 1
+    
     `define XOSVM 1
-    `define M_EXT 1
+    // `define M_EXT 1
+    // `define ZMMUL_EXT 1
+
+    `ifdef M_EXT
+        `define MULTICYCLE_INSTRUCTIONS 1
+        `define HARDWARE_MULTIPLICATION 1
+        `define HARDWARE_DIVISION 1
+    `elsif ZMMUL_EXT
+        `define MULTICYCLE_INSTRUCTIONS 1
+        `define HARDWARE_MULTIPLICATION 1
+    `endif
 
     typedef enum  logic[5:0] {
         R_TYPE = 6'b000001, 

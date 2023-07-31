@@ -55,7 +55,7 @@ module RS5
     logic            jump;
     logic            hazard;
 
-`ifdef M_EXT
+`ifdef MULTICYCLE_INSTRUCTIONS
     logic            hold;
 `endif
 
@@ -159,13 +159,13 @@ module RS5
                             : regbank_data2;
 
     assign stall_fetch = (stall
-                    `ifdef M_EXT
+                    `ifdef MULTICYCLE_INSTRUCTIONS
                         | hold
                     `endif
                         );
 
     assign stall_decode = (stall
-                    `ifdef M_EXT
+                    `ifdef MULTICYCLE_INSTRUCTIONS
                         | hold
                     `endif
                         );
@@ -282,7 +282,7 @@ module RS5
         .clk                    (clk), 
         .reset                  (reset), 
         .stall                  (stall),
-    `ifdef M_EXT
+    `ifdef MULTICYCLE_INSTRUCTIONS
         .hold_o                 (hold),
     `endif
         .instruction_i          (instruction_execute), 

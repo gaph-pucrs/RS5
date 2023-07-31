@@ -10,18 +10,25 @@ module muldiv
 
     output  logic        hold_o,
 
-    output  logic [63:0] mul_result_o, 
-    output  logic [63:0] mulh_result_o, 
-    output  logic [63:0] mulhsu_result_o, 
+`ifdef HARDWARE_DIVISION
     output  logic [31:0] div_result_o, 
     output  logic [31:0] divu_result_o, 
     output  logic [31:0] rem_result_o, 
-    output  logic [31:0] remu_result_o
+    output  logic [31:0] remu_result_o,
+`endif
+
+    output  logic [63:0] mul_result_o, 
+    output  logic [63:0] mulh_result_o, 
+    output  logic [63:0] mulhsu_result_o 
 );
 
     logic hold_mul, hold_div;
 
+`ifdef HARDWARE_DIVISION
     assign hold_o = hold_mul | hold_div;
+`else
+    assign hold_o = hold_mul;
+`endif
 
 //////////////////////////////////////////////////////////////////////////////
 // Mul Operations
@@ -92,6 +99,7 @@ module muldiv
 // Div Operations Control
 //////////////////////////////////////////////////////////////////////////////
 
+`ifdef HARDWARE_DIVISION
     logic           a_signal, b_signal, signal_diff;
     logic [30:0]    a_unsig, b_unsig;
     logic [31:0]    divisor;
@@ -306,5 +314,6 @@ module muldiv
             endcase
         end
     end
+`endif
 
 endmodule

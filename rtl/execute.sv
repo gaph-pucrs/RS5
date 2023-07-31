@@ -32,7 +32,7 @@ module execute
     input   logic               reset,
     input   logic               stall,
 
-`ifdef M_EXT
+`ifdef MULTICYCLE_INSTRUCTIONS
     output  logic               hold_o,
 `endif
 
@@ -244,16 +244,19 @@ end
 /////////////////////////////////////////////////////////////////////////////
 // Multiplication and Division Operations
 //////////////////////////////////////////////////////////////////////////////
-`ifdef M_EXT
+`ifdef HARDWARE_MULTIPLICATION
 
     logic [63:0] mul_result;
     logic [63:0] mulh_result;
     logic [63:0] mulhsu_result;
-    logic [31:0] div_result;
-    logic [31:0] divu_result;
-    logic [31:0] rem_result;
-    logic [31:0] remu_result;
-    
+
+    `ifdef HARDWARE_DIVISION
+        logic [31:0] div_result;
+        logic [31:0] divu_result;
+        logic [31:0] rem_result;
+        logic [31:0] remu_result;
+    `endif
+
     muldiv muldiv1 (
         .clk                        (clk),
         .reset                      (reset),
@@ -261,16 +264,16 @@ end
         .second_operand_i           (second_operand_i),
         .instruction_operation_i    (instruction_operation_i),
         .hold_o                     (hold_o),
-        .mul_result_o               (mul_result),
-        .mulh_result_o              (mulh_result),
-        .mulhsu_result_o            (mulhsu_result),
+    `ifdef HARDWARE_DIVISION
         .div_result_o               (div_result),
         .divu_result_o              (divu_result),
         .rem_result_o               (rem_result),
-        .remu_result_o              (remu_result)
+        .remu_result_o              (remu_result),
+    `endif
+        .mul_result_o               (mul_result),
+        .mulh_result_o              (mulh_result),
+        .mulhsu_result_o            (mulhsu_result)
     );
-
-
 `endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -291,11 +294,13 @@ end
             SRL:                    result = srl_result;
             SRA:                    result = sra_result;
             LUI:                    result = second_operand_i;
-        `ifdef M_EXT
+        `ifdef HARDWARE_MULTIPLICATION
             MUL:                    result = mul_result[31:0];
             MULHU:                  result = mul_result[63:32];
             MULH:                   result = mulh_result[63:32];
             MULHSU:                 result = mulhsu_result[63:32];
+        `endif
+        `ifdef HARDWARE_DIVISION
             DIV:                    result = div_result;
             DIVU:                   result = divu_result;
             REM:                    result = rem_result;
@@ -322,7 +327,7 @@ end
     always_ff @(posedge clk) begin
         if (
             !stall 
-        `ifdef M_EXT
+        `ifdef MULTICYCLE_INSTRUCTIONS
             & !hold_o
         `endif
         ) begin
