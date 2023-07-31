@@ -57,6 +57,12 @@ module execute
     output  iType_e             instruction_operation_o,
     output  logic [31:0]        result_o,
 
+`ifdef HARDWARE_MULTIPLICATION
+    output  logic [63:0]        mul_result_o, 
+    output  logic [63:0]        mulh_result_o, 
+    output  logic [63:0]        mulhsu_result_o,
+`endif
+
     output  logic [31:0]        mem_address_o,
     output  logic               mem_read_enable_o,
     output  logic  [3:0]        mem_write_enable_o,
@@ -246,10 +252,6 @@ end
 //////////////////////////////////////////////////////////////////////////////
 `ifdef HARDWARE_MULTIPLICATION
 
-    logic [63:0] mul_result;
-    logic [63:0] mulh_result;
-    logic [63:0] mulhsu_result;
-
     `ifdef HARDWARE_DIVISION
         logic [31:0] div_result;
         logic [31:0] divu_result;
@@ -270,9 +272,9 @@ end
         .rem_result_o               (rem_result),
         .remu_result_o              (remu_result),
     `endif
-        .mul_result_o               (mul_result),
-        .mulh_result_o              (mulh_result),
-        .mulhsu_result_o            (mulhsu_result)
+        .mul_result_o               (mul_result_o),
+        .mulh_result_o              (mulh_result_o),
+        .mulhsu_result_o            (mulhsu_result_o)
     );
 `endif
 
@@ -294,12 +296,6 @@ end
             SRL:                    result = srl_result;
             SRA:                    result = sra_result;
             LUI:                    result = second_operand_i;
-        `ifdef HARDWARE_MULTIPLICATION
-            MUL:                    result = mul_result[31:0];
-            MULHU:                  result = mul_result[63:32];
-            MULH:                   result = mulh_result[63:32];
-            MULHSU:                 result = mulhsu_result[63:32];
-        `endif
         `ifdef HARDWARE_DIVISION
             DIV:                    result = div_result;
             DIVU:                   result = divu_result;

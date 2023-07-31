@@ -24,7 +24,7 @@ package RS5_pkg;
     // `define DEBUG 1
     
     `define XOSVM 1
-    // `define M_EXT 1
+    `define M_EXT 1
     // `define ZMMUL_EXT 1
 
     `ifdef M_EXT
@@ -104,12 +104,12 @@ package RS5_pkg;
         NONE, WRITE, SET, CLEAR
     } csrOperation_e;
 
-    typedef enum logic [1:0] {
-        M_IDLE, M_CALC, M_DONE
+    typedef enum logic {
+        M_IDLE, M_CALC
     } mult_states_e;
 
     typedef enum logic [1:0] {
-        DIDLE, INIT, CALC, SIGN
+        D_IDLE, D_INIT, D_CALC, D_SIGN
     } div_states_e;
 
     typedef enum  logic[1:0] {DIRECT, VECTORED} trapMode_e;

@@ -39,7 +39,7 @@ module muldiv
 
     assign start_mul = (mul_state == M_IDLE && instruction_operation_i inside {MUL, MULH, MULHU, MULHSU});
 
-    assign hold_mul = ((mul_state == M_IDLE && start_mul == 1'b1) || mul_state == M_CALC);
+    assign hold_mul = (mul_state == M_IDLE && start_mul == 1'b1);
 
     always_ff @(posedge clk ) begin
         if (reset == 1'b1) begin
@@ -47,9 +47,6 @@ module muldiv
         end
         else if (start_mul == 1'b1) begin
             mul_state <= M_CALC;
-        end
-        else if (mul_state == M_CALC) begin
-            mul_state <= M_DONE;
         end
         else begin
             mul_state <= M_IDLE;
@@ -88,7 +85,7 @@ module muldiv
     assign  mul_opa_signed = $signed(first_operand_i),
             mul_opb_signed = $signed(second_operand_i);
 
-    always_comb begin
+    always @(posedge clk) begin
         mul_result_o      = mul_opa        * mul_opb;
         mulh_result_o     = mul_opa_signed * mul_opb_signed;
         mulhsu_result_o   = mul_opa_signed * mul_opb;
@@ -100,6 +97,7 @@ module muldiv
 //////////////////////////////////////////////////////////////////////////////
 
 `ifdef HARDWARE_DIVISION
+    div_states_e    div_state;
     logic           a_signal, b_signal, signal_diff;
     logic [30:0]    a_unsig, b_unsig;
     logic [31:0]    divisor;
@@ -170,6 +168,8 @@ module muldiv
             valid_unsig_div   <= 0;
             acc_unsig_div     <= '0;
             quo_unsig_div     <= '0;
+            divisor           <= second_operand_i;
+
         end 
         else if (!(instruction_operation_i inside {DIVU, REMU})) begin
             valid_unsig_div <= 0;
@@ -217,42 +217,46 @@ module muldiv
         end
     end
 
-    enum {IDLE, INIT, CALC, SIGN} state;
     always_ff @(posedge clk) begin
         logic [4:0] i;
 
         done_sig_div        <= 0;
         if (reset) begin
-            state           <= IDLE; 
+            div_state       <= D_IDLE; 
             busy_sig_div    <= 0;
             done_sig_div    <= 0;
             valid_sig_div   <= 0;
             acc_sig_div     <= '0;
             quo_sig_div     <= '0;
+            overflow        <= 0;
+            div_result      <= '0;
+            a_unsig         <= '0;
+            b_unsig         <= '0;
+            signal_diff     <= 0;
         end 
         else if (!(instruction_operation_i inside {DIV, REM})) begin
             valid_sig_div   <= 0;
         end
         else begin
-            case (state)
+            case (div_state)
 
-                INIT: begin
-                    state                       <= CALC;
+                D_INIT: begin
+                    div_state                   <= D_CALC;
                     overflow                    <= 0;
                     i                           <= 0;
                     {acc_sig_div, quo_sig_div}  <= {{31{1'b0}}, a_unsig, 1'b0};
                 end
 
-                CALC: begin
+                D_CALC: begin
                     if (i == 30 && quo_next_sig_div[30] != 0) begin
-                        state           <= IDLE;
+                        div_state       <= D_IDLE;
                         busy_sig_div    <= 0;
                         done_sig_div    <= 1;
                         overflow        <= 1;
                     end
                     else begin
                         if (i == 30) begin
-                            state   <= SIGN;
+                            div_state   <= D_SIGN;
                         end 
                         i           <= i + 1;
                         acc_sig_div <= acc_next_sig_div;
@@ -260,8 +264,8 @@ module muldiv
                     end
                 end
 
-                SIGN: begin
-                    state           <= IDLE;
+                D_SIGN: begin
+                    div_state       <= D_IDLE;
                     busy_sig_div    <= 0;
                     done_sig_div    <= 1;
                     valid_sig_div   <= 1;
@@ -283,21 +287,21 @@ module muldiv
                     if (start_sig_div) begin
                         valid_sig_div       <= 0;
                         if (divide_by_zero) begin
-                            state           <= IDLE;
+                            div_state       <= D_IDLE;
                             busy_sig_div    <= 0;
                             done_sig_div    <= 1;
                             overflow        <= 0;
                             valid_sig_div   <= 1;
                         end 
                         else if (second_operand_i == 32'h80000000) begin
-                            state           <= IDLE;
+                            div_state       <= D_IDLE;
                             busy_sig_div    <= 0;
                             done_sig_div    <= 1;
                             overflow        <= 1;
                             valid_sig_div   <= 1;
                         end 
                         else begin
-                            state                       <= INIT;
+                            div_state                   <= D_INIT;
                             busy_sig_div                <= 1;
                             overflow                    <= 0;
                             signal_diff                 <= (a_signal ^ b_signal);
