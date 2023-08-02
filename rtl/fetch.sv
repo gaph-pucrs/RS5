@@ -1,7 +1,7 @@
 /*!\file fetch.sv
- * PUC-RS5 VERSION - 1.0.0 - Public Release
+ * RS5 VERSION - 1.1.0 - Pipeline Simplified and Core Renamed
  *
- * Distribution:  March 2023
+ * Distribution:  July 2023
  *
  * Willian Nunes   <willian.nunes@edu.pucrs.br>
  * Marcos Sartori  <marcos.sartori@acad.pucrs.br>
@@ -13,14 +13,15 @@
  * Fetch Unit is the first stage of the processor core and fetch the instruction in memory.
  *
  * \detailed
- * Fetch Unit is the first stage of the PUC-RS5 processor core. It has an
+ * Fetch Unit is the first stage of the RS5 processor core. It has an
  * internal loop that contains the Program Counter(PC) that is increased by four 
  * on a new clock cycle or is replaced by a new address in case of a branch. 
- * It has a internal tag calculator that is increased in branchs and mantained
- * in regular flows, the tag leaves the unit with the instruction fetched.
+ * It has a internal tag calculator that is increased in branches and mantained
+ * in regular flows, the instruction fetched leaves arrives at next stage alongside
+ * its associated tag.
  */
 
-module fetch  #(parameter start_address = 32'b0)(  //Generic start address
+module fetch  #(parameter start_address = 32'b0)(
     input   logic           clk,
     input   logic           reset,
     input   logic           stall,
@@ -42,9 +43,9 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
 
     logic [31:0] pc;
     logic  [2:0] next_tag, current_tag;
-    logic not_cotinuing;
+    logic can_propagate;
 
-    assign not_cotinuing = (hazard_i | stall);
+    assign can_propagate = ~(hazard_i | stall);
 
 //////////////////////////////////////////////////////////////////////////////
 // PC Control
@@ -63,7 +64,7 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
         else if (jump_i) begin
             pc <= jump_target_i;
         end
-        else if (!not_cotinuing) begin
+        else if (can_propagate) begin
             pc <= pc + 4;
         end
     end
@@ -73,7 +74,7 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
 //////////////////////////////////////////////////////////////////////////////
     
     always_ff @(posedge clk) begin
-        if (!not_cotinuing) begin
+        if (can_propagate) begin
             pc_o <= pc;
         end
     end
@@ -94,10 +95,10 @@ module fetch  #(parameter start_address = 32'b0)(  //Generic start address
             current_tag <= '0;
             next_tag    <= '0;
         end
-        else if ((jump_i | exception_raised_i | machine_return_i | interrupt_ack_i)) begin
+        else if (jump_i | exception_raised_i | machine_return_i | interrupt_ack_i) begin
             next_tag    <= current_tag + 1'b1;
         end
-        else if (!not_cotinuing) begin
+        else if (can_propagate) begin
             current_tag <= next_tag;
         end
     end

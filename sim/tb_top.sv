@@ -3,7 +3,7 @@ timeunit 1ns; timeprecision 1ns;
 `include "./testbench.sv"
 
 module tb_top
-    import my_pkg::*;
+    import RS5_pkg::*;
 ;
 
     logic        clk=1, rstCPU;

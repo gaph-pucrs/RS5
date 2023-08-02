@@ -1,5 +1,5 @@
 module Peripherals
-    import my_pkg::*;
+    import RS5_pkg::*;
 (
     input  logic        clk,
     input  logic        reset,

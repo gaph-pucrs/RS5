@@ -1,7 +1,7 @@
 /*!\file decode.sv
- * PUC-RS5 VERSION - 1.0.0 - Public Release
+ * RS5 VERSION - 1.1.0 - Pipeline Simplified and Core Renamed
  *
- * Distribution:  March 2023
+ * Distribution:  July 2023
  *
  * Willian Nunes   <willian.nunes@edu.pucrs.br>
  * Marcos Sartori  <marcos.sartori@acad.pucrs.br>
@@ -10,20 +10,19 @@
  * Research group: GAPH-PUCRS  <>
  *
  * \brief
- * Decoder Unit is the second stage of PUC-RS5 processor core.
+ * Decoder Unit is the second stage of RS5 processor core.
  *
  * \detailed
- * The decoder unit is the second stage of the PUC-RS5 processor core and 
- * is responsible for identify the instruction operation and based on that 
- * extracts the execution unit for that kind of instruction and
- * also fetches the operands in the register bank, calculate the immediate
- * operand and contains the mechanism of hazard detection, if a hazard is
- * detected (e.g. write after read) a bubble is issued which
+ * The decoder unit is the second stage of the RS5 processor core and 
+ * is responsible for identifying the instruction format and operation, 
+ * fetching the operands in the register bank, and calculating the immediate
+ * operand. It contains the mechanism of hazard detection, if a hazard is
+ * detected (e.g. one operand is a locked register) a bubble is issued, which
  * consists in a NOP (NO Operation) instruction.
  */
 
 module decode 
-    import my_pkg::*;
+    import RS5_pkg::*;
 (
     input   logic           clk,
     input   logic           reset,
@@ -55,34 +54,33 @@ module decode
     output  logic           exc_misaligned_fetch_o
 );
 
-    logic [31:0]    immediate, first_operand_int, second_operand_int, third_operand_int, instruction_int, last_instruction;
+    logic [31:0]    first_operand, second_operand, third_operand, immediate;
+    logic [31:0]    instruction; 
+    logic [31:0]    last_instruction;
     logic           last_hazard;
     logic           last_stall;
     logic           locked_memory;
     logic  [4:0]    locked_register;
-    logic  [4:0]    target_register;
-    logic           is_store;
 
     formatType_e    instruction_format;
     iType_e         instruction_operation;
 
 //////////////////////////////////////////////////////////////////////////////
-// Re-Decode isntruction on hazard
+// Re-Decode isntruction on hazard or stall
 //////////////////////////////////////////////////////////////////////////////
-logic last_stall;
+
     always_ff @(posedge clk) begin
-        last_instruction <= instruction_int;
-        last_stall       <= stall;
+        last_instruction <= instruction;
         last_hazard      <= hazard_o;
         last_stall       <= stall;
     end
 
     always_comb begin
         if (last_hazard | last_stall) begin
-            instruction_int = last_instruction;
+            instruction = last_instruction;
         end
         else begin
-            instruction_int = instruction_i;
+            instruction = instruction_i;
         end
     end
 
@@ -102,9 +100,9 @@ logic last_stall;
     logic [6:0] funct7;
     logic [6:0] opcode;
 
-    assign opcode = instruction_int[6:0];
-    assign funct3 = instruction_int[14:12];
-    assign funct7 = instruction_int[31:25];
+    assign opcode = instruction[6:0];
+    assign funct3 = instruction[14:12];
+    assign funct7 = instruction[31:25];
 
     always_comb begin
         unique case (funct3)
@@ -165,6 +163,14 @@ logic last_stall;
             10'b0100000101:     decode_op = SRA;
             10'b0000000110:     decode_op = OR;
             10'b0000000111:     decode_op = AND;
+            10'b0000001000:     decode_op = MUL;
+            10'b0000001001:     decode_op = MULH;
+            10'b0000001010:     decode_op = MULHSU;
+            10'b0000001011:     decode_op = MULHU;
+            10'b0000001100:     decode_op = DIV;
+            10'b0000001101:     decode_op = DIVU;
+            10'b0000001110:     decode_op = REM;
+            10'b0000001111:     decode_op = REMU;
             default:            decode_op = INVALID;
         endcase
     end
@@ -177,7 +183,7 @@ logic last_stall;
     end
 
     always_comb begin
-        unique case (instruction_int[31:7]) inside
+        unique case (instruction[31:7]) inside
             25'b0000000000000000000000000:  decode_system = ECALL;
             25'b0000000000010000000000000:  decode_system = EBREAK;
             25'b0001000000100000000000000:  decode_system = SRET;
@@ -235,11 +241,11 @@ logic last_stall;
     logic [31:0] imm_j;
     logic [31:0] imm_r;
 
-    assign imm_i = {{21{instruction_int[31]}}, instruction_int[30:20]};
-    assign imm_s = {{21{instruction_int[31]}}, instruction_int[30:25], instruction_int[11:7]};
-    assign imm_b = {{20{instruction_int[31]}}, instruction_int[7], instruction_int[30:25], instruction_int[11:8], 1'b0};
-    assign imm_u = {instruction_int[31:12], 12'b0};
-    assign imm_j = {{12{instruction_int[31]}}, instruction_int[19:12], instruction_int[20], instruction_int[30:25], instruction_int[24:21], 1'b0};
+    assign imm_i = {{21{instruction[31]}}, instruction[30:20]};
+    assign imm_s = {{21{instruction[31]}}, instruction[30:25], instruction[11:7]};
+    assign imm_b = {{20{instruction[31]}}, instruction[7], instruction[30:25], instruction[11:8], 1'b0};
+    assign imm_u = {instruction[31:12], 12'b0};
+    assign imm_j = {{12{instruction[31]}}, instruction[19:12], instruction[20], instruction[30:25], instruction[24:21], 1'b0};
     assign imm_r = '0;
 
     always_comb begin
@@ -254,40 +260,30 @@ logic last_stall;
     end
 
 //////////////////////////////////////////////////////////////////////////////
-// Addresses to RegBank
-//////////////////////////////////////////////////////////////////////////////
-
-    assign rs1_o = instruction_int[19:15];
-    assign rs2_o = instruction_int[24:20];
-
-//////////////////////////////////////////////////////////////////////////////
-// Target definitions
-//////////////////////////////////////////////////////////////////////////////
-
-    always_comb begin
-        if (!hazard_o) begin
-            target_register = instruction_int[11:7];
-            is_store        = (opcode[6:2] == 5'b01000);
-        end
-        else begin
-            target_register = '0;
-            is_store        = 1'b0;
-        end
-    end
-//////////////////////////////////////////////////////////////////////////////
 // Registe Lock Queue (RLQ)
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk) begin
         if (reset) begin
-            locked_memory   <= '0;
             locked_register <= '0;
+            locked_memory   <= '0;
         end 
+        else if (hazard_o) begin
+            locked_register <= '0;
+            locked_memory   <= '0;
+        end
         else if (!stall) begin
-            locked_register <= target_register;
-            locked_memory   <= is_store;
+            locked_register <= instruction[11:7];
+            locked_memory   <= (opcode[6:2] == 5'b01000);
         end
     end
+
+//////////////////////////////////////////////////////////////////////////////
+// Addresses to RegBank
+//////////////////////////////////////////////////////////////////////////////
+
+    assign rs1_o = instruction[19:15];
+    assign rs2_o = instruction[24:20];
 
     always_ff @(posedge clk) begin
         rd_o <= locked_register;
@@ -301,49 +297,49 @@ logic last_stall;
     logic use_rs1;
     logic use_rs2;
 
-    assign use_mem = ({opcode[6], opcode[4:2]} == '0) ? 1'b1 : 1'b0;
-
-    always_comb begin
-        unique case (instruction_format)
-            R_TYPE, B_TYPE, S_TYPE: begin
-            /**
-             * This does NOT account for SYSTEM (R_TYPE) CSRR_I instructions
-             * where funct3[2] is 1, and therefore WILL generate a hazard
-             * but this is rare to occur
-             */
-                                        use_rs1         = 1'b1;
-                                        use_rs2         = 1'b1;
-                                    end
-            I_TYPE:                 begin
-                                        use_rs1         = 1'b1;
-                                        use_rs2         = 1'b0;
-                                    end
-            default:                begin /* U_TYPE and J_TYPE */
-                                        use_rs1         = 1'b0;
-                                        use_rs2         = 1'b0;
-                                    end
-        endcase
-    end
-
     logic locked_rs1;
     logic locked_rs2;
-
-    assign locked_rs1 = (locked_register == rs1_o && rs1_o != '0) ? 1'b1 : 1'b0;
-    assign locked_rs2 = (locked_register == rs2_o && rs2_o != '0) ? 1'b1 : 1'b0;
 
     logic hazard_mem;
     logic hazard_rs1;
     logic hazard_rs2;
 
+    assign use_mem = ({opcode[6], opcode[4:2]} == '0) ? 1'b1 : 1'b0;
+
+    always_comb begin
+        unique case (instruction_format)
+            R_TYPE, B_TYPE, S_TYPE: 
+            /**
+             * This does NOT account for SYSTEM (R_TYPE) CSRR_I instructions
+             * where funct3[2] is 1, and therefore WILL generate a hazard
+             * but this is rare to occur
+             */
+                        begin
+                            use_rs1         = 1'b1;
+                            use_rs2         = 1'b1;
+                        end
+            I_TYPE:     begin
+                            use_rs1         = 1'b1;
+                            use_rs2         = 1'b0;
+                        end
+            default:    begin /* U_TYPE and J_TYPE */
+                            use_rs1         = 1'b0;
+                            use_rs2         = 1'b0;
+                        end
+        endcase
+    end
+
+    assign locked_rs1 = (locked_register == rs1_o && rs1_o != '0) ? 1'b1 : 1'b0;
+    assign locked_rs2 = (locked_register == rs2_o && rs2_o != '0) ? 1'b1 : 1'b0;
+
     assign hazard_mem = locked_memory   & use_mem;
     assign hazard_rs1 = locked_rs1      & use_rs1;
     assign hazard_rs2 = locked_rs2      & use_rs2;
 
-
     assign hazard_o   = (hazard_mem | hazard_rs1 | hazard_rs2) & !stall;
 
 //////////////////////////////////////////////////////////////////////////////
-// Exceptions Generation 
+// Exception Detection 
 //////////////////////////////////////////////////////////////////////////////
 
     logic invalid_inst;
@@ -359,24 +355,24 @@ logic last_stall;
     always_comb begin
         unique case (instruction_format)
             U_TYPE, J_TYPE: begin
-                                first_operand_int   = pc_i;
-                                second_operand_int  = immediate;
-                                third_operand_int   = immediate;
+                                first_operand   = pc_i;
+                                second_operand  = immediate;
+                                third_operand   = immediate;
                             end
             R_TYPE, B_TYPE: begin
-                                first_operand_int   = rs1_data_read_i;
-                                second_operand_int  = rs2_data_read_i;
-                                third_operand_int   = immediate;
+                                first_operand   = rs1_data_read_i;
+                                second_operand  = rs2_data_read_i;
+                                third_operand   = immediate;
                             end
             S_TYPE:         begin
-                                first_operand_int   = rs1_data_read_i;
-                                second_operand_int  = immediate;
-                                third_operand_int   = rs2_data_read_i;
+                                first_operand   = rs1_data_read_i;
+                                second_operand  = immediate;
+                                third_operand   = rs2_data_read_i;
                             end
             default:        begin
-                                first_operand_int   = rs1_data_read_i;
-                                second_operand_int  = immediate;
-                                third_operand_int   = immediate;
+                                first_operand   = rs1_data_read_i;
+                                second_operand  = immediate;
+                                third_operand   = immediate;
                             end
         endcase
     end
@@ -415,11 +411,11 @@ logic last_stall;
         `endif
         end 
         else if (!stall) begin
-            first_operand_o         <= first_operand_int;
-            second_operand_o        <= second_operand_int;
-            third_operand_o         <= third_operand_int;
+            first_operand_o         <= first_operand;
+            second_operand_o        <= second_operand;
+            third_operand_o         <= third_operand;
             pc_o                    <= pc_i;
-            instruction_o           <= instruction_int;
+            instruction_o           <= instruction;
             instruction_operation_o <= instruction_operation;
             tag_o                   <= tag_i;
             exc_ilegal_inst_o       <= invalid_inst;
