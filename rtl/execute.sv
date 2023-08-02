@@ -32,6 +32,10 @@ module execute
     input   logic               reset,
     input   logic               stall,
 
+`ifdef MULTICYCLE_INSTRUCTIONS
+    output  logic               hold_o,
+`endif
+
     input   logic [31:0]        instruction_i,
     input   logic [31:0]        pc_i,
     input   logic [31:0]        first_operand_i,
@@ -52,6 +56,12 @@ module execute
     output  logic               write_enable_o,
     output  iType_e             instruction_operation_o,
     output  logic [31:0]        result_o,
+
+`ifdef HARDWARE_MULTIPLICATION
+    output  logic [63:0]        mul_result_o, 
+    output  logic [63:0]        mulh_result_o, 
+    output  logic [63:0]        mulhsu_result_o,
+`endif
 
     output  logic [31:0]        mem_address_o,
     output  logic               mem_read_enable_o,
@@ -80,6 +90,12 @@ module execute
     logic           killed;
     logic           write_enable;
     logic           exc_ilegal_csr_inst;
+
+    logic signed [31:0]  first_operand_signed;
+    logic signed [31:0]  second_operand_signed;
+
+    assign first_operand_signed  = first_operand_i;
+    assign second_operand_signed = second_operand_i;
 
 //////////////////////////////////////////////////////////////////////////////
 // ALU
@@ -126,13 +142,13 @@ module execute
         xor_result              = first_operand_i ^ second_operand_i;
         sll_result              = first_operand_i << second_operand_i[4:0];
         srl_result              = first_operand_i >> second_operand_i[4:0];
-        sra_result              = $signed(first_operand_i) >>> second_operand_i[4:0];
+        sra_result              = first_operand_signed >>> second_operand_i[4:0];
 
         equal                   = first_operand_i == second_operand_i;
-        less_than               = $signed(first_operand_i) < $signed(second_operand_i);
-        less_than_unsigned      = $unsigned(first_operand_i) < $unsigned(second_operand_i);
-        greater_equal           = $signed(first_operand_i) >= $signed(second_operand_i);
-        greater_equal_unsigned  = $unsigned(first_operand_i) >= $unsigned(second_operand_i);
+        less_than               = first_operand_signed < second_operand_signed;
+        less_than_unsigned      = first_operand_i < second_operand_i;
+        greater_equal           = first_operand_signed >= second_operand_signed;
+        greater_equal_unsigned  = first_operand_i >= second_operand_i;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -231,6 +247,37 @@ end
         end
     end
 
+/////////////////////////////////////////////////////////////////////////////
+// Multiplication and Division Operations
+//////////////////////////////////////////////////////////////////////////////
+`ifdef HARDWARE_MULTIPLICATION
+
+    `ifdef HARDWARE_DIVISION
+        logic [31:0] div_result;
+        logic [31:0] divu_result;
+        logic [31:0] rem_result;
+        logic [31:0] remu_result;
+    `endif
+
+    muldiv muldiv1 (
+        .clk                        (clk),
+        .reset                      (reset),
+        .first_operand_i            (first_operand_i),
+        .second_operand_i           (second_operand_i),
+        .instruction_operation_i    (instruction_operation_i),
+        .hold_o                     (hold_o),
+    `ifdef HARDWARE_DIVISION
+        .div_result_o               (div_result),
+        .divu_result_o              (divu_result),
+        .rem_result_o               (rem_result),
+        .remu_result_o              (remu_result),
+    `endif
+        .mul_result_o               (mul_result_o),
+        .mulh_result_o              (mulh_result_o),
+        .mulhsu_result_o            (mulhsu_result_o)
+    );
+`endif
+
 //////////////////////////////////////////////////////////////////////////////
 // Demux
 //////////////////////////////////////////////////////////////////////////////
@@ -249,6 +296,12 @@ end
             SRL:                    result = srl_result;
             SRA:                    result = sra_result;
             LUI:                    result = second_operand_i;
+        `ifdef HARDWARE_DIVISION
+            DIV:                    result = div_result;
+            DIVU:                   result = divu_result;
+            REM:                    result = rem_result;
+            REMU:                   result = remu_result;
+        `endif
             default:                result = sum_result;
         endcase
     end
@@ -268,7 +321,12 @@ end
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk) begin
-        if (!stall) begin
+        if (
+            !stall 
+        `ifdef MULTICYCLE_INSTRUCTIONS
+            & !hold_o
+        `endif
+        ) begin
             write_enable_o          <= write_enable;
             instruction_operation_o <= instruction_operation_i;
             result_o                <= result;             

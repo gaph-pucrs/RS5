@@ -163,6 +163,14 @@ module decode
             10'b0100000101:     decode_op = SRA;
             10'b0000000110:     decode_op = OR;
             10'b0000000111:     decode_op = AND;
+            10'b0000001000:     decode_op = MUL;
+            10'b0000001001:     decode_op = MULH;
+            10'b0000001010:     decode_op = MULHSU;
+            10'b0000001011:     decode_op = MULHU;
+            10'b0000001100:     decode_op = DIV;
+            10'b0000001101:     decode_op = DIVU;
+            10'b0000001110:     decode_op = REM;
+            10'b0000001111:     decode_op = REMU;
             default:            decode_op = INVALID;
         endcase
     end

@@ -21,6 +21,7 @@
 `include "../rtl/RS5_pkg.sv"
 `include "../rtl/fetch.sv"
 `include "../rtl/decode.sv"
+`include "../rtl/muldiv.sv"
 `include "../rtl/execute.sv"
 `include "../rtl/retire.sv"
 `include "../rtl/regbank.sv"
@@ -53,6 +54,11 @@ module RS5
 //////////////////////////////////////////////////////////////////////////////
     logic            jump;
     logic            hazard;
+
+`ifdef MULTICYCLE_INSTRUCTIONS
+    logic            hold;
+`endif
+
 `ifdef XOSVM
     logic            mmu_inst_fault;
     logic            mmu_data_fault;
@@ -68,11 +74,18 @@ module RS5
     logic   [31:0]   instruction_address;
 
 //////////////////////////////////////////////////////////////////////////////
+// Fetch signals
+//////////////////////////////////////////////////////////////////////////////
+
+    logic           stall_fetch;
+
+//////////////////////////////////////////////////////////////////////////////
 // Decoder signals
 //////////////////////////////////////////////////////////////////////////////
 
     logic   [31:0]  pc_decode;
-    logic   [2:0]   tag_decode;
+    logic    [2:0]  tag_decode;
+    logic           stall_decode;
 
 //////////////////////////////////////////////////////////////////////////////
 // RegBank signals
@@ -107,6 +120,12 @@ module RS5
     iType_e         instruction_operation_retire;
     logic   [31:0]  result_retire;
     logic           killed;
+
+`ifdef HARDWARE_MULTIPLICATION
+    logic [63:0]    mul_result;
+    logic [63:0]    mulh_result;
+    logic [63:0]    mulhsu_result;
+`endif
 
 //////////////////////////////////////////////////////////////////////////////
 // CSR Bank signals
@@ -145,6 +164,19 @@ module RS5
                             ? regbank_data_writeback 
                             : regbank_data2;
 
+    assign stall_fetch = (stall
+                    `ifdef MULTICYCLE_INSTRUCTIONS
+                        | hold
+                    `endif
+                        );
+
+    assign stall_decode = (stall
+                    `ifdef MULTICYCLE_INSTRUCTIONS
+                        | hold
+                    `endif
+                        );
+
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////// FETCH //////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -152,7 +184,7 @@ module RS5
     fetch fetch1 (
         .clk                    (clk), 
         .reset                  (reset), 
-        .stall                  (stall),
+        .stall                  (stall_fetch),
         .hazard_i               (hazard), 
         .jump_i                 (jump), 
         .jump_target_i          (jump_target),
@@ -186,7 +218,7 @@ module RS5
     decode decoder1 (
         .clk                        (clk), 
         .reset                      (reset),
-        .stall                      (stall),
+        .stall                      (stall_decode),
         .instruction_i              (instruction_i), 
         .pc_i                       (pc_decode), 
         .tag_i                      (tag_decode), 
@@ -215,20 +247,7 @@ module RS5
 /////////////////////////////////////////////////////////// REGISTER BANK ///////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-`ifndef PROTO
-    regbank regbank1 (
-        .clk(clk),
-        .reset(reset),
-        .rs1(rs1), 
-        .rs2(rs2),
-        .rd(rd), 
-        .enable(regbank_write_enable),
-        .data_i(regbank_data_writeback), 
-        .data1_o(regbank_data1), 
-        .data2_o(regbank_data2)
-    );
-
-`else
+`ifdef PROTO
     DRAM_RegBank RegBankA (
         .clk        (clk),
         .we         (regbank_write_enable),
@@ -246,6 +265,19 @@ module RS5
         .dpra       (rs2),
         .dpo        (regbank_data2)
     );
+
+`else
+    regbank regbank1 (
+        .clk(clk),
+        .reset(reset),
+        .rs1(rs1), 
+        .rs2(rs2),
+        .rd(rd), 
+        .enable(regbank_write_enable),
+        .data_i(regbank_data_writeback), 
+        .data1_o(regbank_data1), 
+        .data2_o(regbank_data2)
+    );
 `endif
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -256,6 +288,9 @@ module RS5
         .clk                    (clk), 
         .reset                  (reset), 
         .stall                  (stall),
+    `ifdef MULTICYCLE_INSTRUCTIONS
+        .hold_o                 (hold),
+    `endif
         .instruction_i          (instruction_execute), 
         .pc_i                   (pc_execute), 
         .first_operand_i        (first_operand_execute), 
@@ -273,7 +308,12 @@ module RS5
         .killed_o               (killed),
         .write_enable_o         (regbank_write_enable_int),
         .instruction_operation_o(instruction_operation_retire), 
-        .result_o               (result_retire), 
+        .result_o               (result_retire),
+    `ifdef HARDWARE_MULTIPLICATION
+        .mul_result_o           (mul_result),
+        .mulh_result_o          (mulh_result),
+        .mulhsu_result_o        (mulhsu_result),
+    `endif
         .mem_address_o          (mem_address), 
         .mem_read_enable_o      (mem_read_enable), 
         .mem_write_enable_o     (mem_write_enable),
@@ -298,7 +338,12 @@ module RS5
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     retire retire1 (
         .instruction_operation_i(instruction_operation_retire),
-        .result_i               (result_retire), 
+        .result_i               (result_retire),
+    `ifdef HARDWARE_MULTIPLICATION
+        .mul_result_i           (mul_result),
+        .mulh_result_i          (mulh_result),
+        .mulhsu_result_i        (mulhsu_result),
+    `endif
         .mem_data_i             (mem_data_i), 
         .regbank_data_o         (regbank_data_writeback)
     );
