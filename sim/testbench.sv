@@ -42,26 +42,31 @@ module testbench
         input logic rst_i
     );
 
-    /* verilator lint_off UNUSEDSIGNAL */
-    logic [31:0]  instruction_address;
-    logic         interrupt_ack;
-    logic [63:0]  mtime;
-    logic [63:0]  data_rtc;
-    /* verilator lint_on UNUSEDSIGNAL */
-    logic [31:0]  instruction;
-    logic         enable_ram, enable_tb, enable_rtc, mem_operation_enable;
-    logic [31:0]  mem_address, mem_data_read, mem_data_write;
-    logic [3:0]   mem_write_enable;
-    byte          char;
-    logic [31:0]  data_ram, data_tb;
-    logic         enable_tb_r, enable_rtc_r;
-    logic [31:0]  irq;
-    logic         mti;
+    parameter i_cnt = 0;
 
-    assign irq = {24'h0, mti, 7'h0};
+    /* verilator lint_off UNUSEDSIGNAL */
+    logic [31:0]            instruction_address;
+    logic                   interrupt_ack;
+    logic [63:0]            mtime;
+    logic [63:0]            data_rtc;
+    /* verilator lint_on UNUSEDSIGNAL */
+    logic [31:0]            instruction;
+    logic                   enable_ram, enable_rtc, enable_plic, enable_tb;
+    logic                   mem_operation_enable;
+    logic [31:0]            mem_address, mem_data_read, mem_data_write;
+    logic [3:0]             mem_write_enable;
+    byte                    char;
+    logic [31:0]            data_ram, data_plic, data_tb;
+    logic                   enable_tb_r, enable_rtc_r, enable_plic_r;
+    logic                   mti;
+    logic                   irq;
+    logic [i_cnt:1]         irq_int;
+    logic [$clog2(i_cnt):0] interrupt_id;
+
+    assign irq_int = {mti};
 
 //////////////////////////////////////////////////////////////////////////////
-// CPU INSTANTIATION
+// CPU
 //////////////////////////////////////////////////////////////////////////////
 
     RS5 dut (
@@ -72,6 +77,7 @@ module testbench
         .mem_data_i             (mem_data_read), 
         .mtime_i                (mtime),
         .irq_i                  (irq),
+        .interrupt_id_i         (interrupt_id),
         .instruction_address_o  (instruction_address), 
         .mem_operation_enable_o (mem_operation_enable), 
         .mem_write_enable_o     (mem_write_enable),
@@ -81,7 +87,7 @@ module testbench
     );
 
 //////////////////////////////////////////////////////////////////////////////
-// RAM INSTANTIATION
+// RAM
 //////////////////////////////////////////////////////////////////////////////
 
     RAM_mem RAM_MEM(
@@ -94,6 +100,32 @@ module testbench
         .data_i                 (mem_data_write), 
         .data_o                 (data_ram)
     );
+
+//////////////////////////////////////////////////////////////////////////////
+// PLIC
+//////////////////////////////////////////////////////////////////////////////
+    logic [31:0] plic_int_enable;
+
+    plic #(
+        .i_cnt(i_cnt)
+    ) plic1 (
+        .clk    (clk_i),
+        .reset  (rst_i),
+        .en_i   (enable_plic),
+        .we_i   (mem_write_enable),
+        .addr_i (mem_address[3:0]),
+        .data_i (mem_data_write),
+        .data_o (data_plic),     
+        .irq_i  (irq_int),
+        .iack_i (interrupt_ack),
+        .irq_o  (irq),
+        .id_o   (interrupt_id)
+    );
+
+
+//////////////////////////////////////////////////////////////////////////////
+// RTC
+//////////////////////////////////////////////////////////////////////////////
 
     rtc rtc(
         .clk        (clk_i),
@@ -114,6 +146,9 @@ module testbench
         else if (enable_rtc_r) begin
             mem_data_read = data_rtc[31:0];
         end
+        else if (enable_plic_r) begin
+            mem_data_read = data_plic;
+        end
         else begin
             mem_data_read = data_ram;
         end
@@ -122,33 +157,43 @@ module testbench
     always_comb begin
         if (mem_operation_enable) begin
             if (mem_address[31:28] < 4'h2) begin
-                enable_ram = 1'b1;
-                enable_tb  = 1'b0;
-                enable_rtc = 1'b0;
+                enable_ram  = 1'b1;
+                enable_rtc  = 1'b0;
+                enable_plic = 1'b0;
+                enable_tb   = 1'b0;
+            end
+            else if (mem_address[31:28] < 4'h4) begin
+                enable_ram  = 1'b0;
+                enable_rtc  = 1'b1;
+                enable_plic = 1'b0;
+                enable_tb   = 1'b0;
             end
             else if (mem_address[31:28] < 4'h8) begin
-                enable_ram = 1'b0;
-                enable_tb  = 1'b0;
-                enable_rtc = 1'b1;
+                enable_ram  = 1'b0;
+                enable_rtc  = 1'b0;
+                enable_plic = 1'b1;
+                enable_tb   = 1'b0;
             end
             else begin
-                enable_ram = 1'b0;
-                enable_tb  = 1'b1;
-                enable_rtc = 1'b0;
+                enable_ram  = 1'b0;
+                enable_rtc  = 1'b0;
+                enable_plic = 1'b0;
+                enable_tb   = 1'b1;
             end
         end
         else begin
-            enable_ram = 1'b0;
-            enable_tb  = 1'b0;
-            enable_rtc = 1'b0;
+            enable_ram  = 1'b0;
+            enable_rtc  = 1'b0;
+            enable_plic = 1'b0;
+            enable_tb   = 1'b0;
         end
     end
     
     always_ff @(posedge clk_i) begin
-        enable_tb_r  <= enable_tb;
-        enable_rtc_r <= enable_rtc;
+        enable_tb_r     <= enable_tb;
+        enable_rtc_r    <= enable_rtc;
+        enable_plic_r   <= enable_plic;
     end
-
 
 //////////////////////////////////////////////////////////////////////////////
 // Memory Mapped regs
