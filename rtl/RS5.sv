@@ -38,8 +38,8 @@ module RS5
 
     input  logic [31:0] instruction_i,
     input  logic [31:0] mem_data_i,
-    input  logic [31:0] IRQ_i,
     input  logic [63:0] mtime_i,
+    input  logic        irq_i,
 
     output logic [31:0] instruction_address_o,
     output logic        mem_operation_enable_o,
@@ -138,7 +138,6 @@ module RS5
     logic   [31:0]  mepc, mtvec;
     logic           RAISE_EXCEPTION, MACHINE_RETURN;
     exceptionCode_e Exception_Code;
-    logic           Interrupt_pending;
 `ifdef XOSVM
     logic   [31:0]  mvmdo, mvmio, mvmds, mvmis;
     logic           mvmctl;
@@ -326,7 +325,7 @@ module RS5
         .csr_data_o             (csr_data_to_write), 
         .jump_o                 (jump),
         .jump_target_o          (jump_target),
-        .interrupt_pending_i    (Interrupt_pending),
+        .irq_i                  (irq_i),
         .interrupt_ack_o        (interrupt_ack_o),
         .machine_return_o       (MACHINE_RETURN),
         .raise_exception_o      (RAISE_EXCEPTION), 
@@ -374,9 +373,7 @@ module RS5
         .jump_i                     (jump),
         .jump_target_i              (jump_target),
         .mtime_i                    (mtime_i),
-        .IRQ_i                      (IRQ_i), 
         .interrupt_ack_i            (interrupt_ack_o),
-        .interrupt_pending_o        (Interrupt_pending), 
         .privilege_o                (privilege), 
         .mepc                       (mepc), 
     `ifdef XOSVM

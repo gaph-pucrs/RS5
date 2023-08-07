@@ -55,10 +55,10 @@ module testbench
     byte          char;
     logic [31:0]  data_ram, data_tb;
     logic         enable_tb_r, enable_rtc_r;
-    logic [31:0]  IRQ;
+    logic [31:0]  irq;
     logic         mti;
 
-    assign IRQ = {24'h0, mti, 7'h0};
+    assign irq = {24'h0, mti, 7'h0};
 
 //////////////////////////////////////////////////////////////////////////////
 // CPU INSTANTIATION
@@ -70,8 +70,8 @@ module testbench
         .stall                  (1'b0),
         .instruction_i          (instruction), 
         .mem_data_i             (mem_data_read), 
-        .IRQ_i                  (IRQ),
         .mtime_i                (mtime),
+        .irq_i                  (irq),
         .instruction_address_o  (instruction_address), 
         .mem_operation_enable_o (mem_operation_enable), 
         .mem_write_enable_o     (mem_write_enable),
