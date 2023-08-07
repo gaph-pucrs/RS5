@@ -113,7 +113,7 @@ module testbench
         .reset  (rst_i),
         .en_i   (enable_plic),
         .we_i   (mem_write_enable),
-        .addr_i (mem_address[3:0]),
+        .addr_i (mem_address[23:0]),
         .data_i (mem_data_write),
         .data_o (data_plic),     
         .irq_i  (irq_int),

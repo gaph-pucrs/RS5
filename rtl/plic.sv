@@ -29,7 +29,7 @@ module plic
             ip <= '0;
         end
         else begin
-            ip <= ip | irq_i;
+            ip <= irq_i;
         end
     end
 
