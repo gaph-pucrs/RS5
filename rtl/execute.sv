@@ -78,7 +78,7 @@ module execute
     output  logic               jump_o,
     output  logic [31:0]        jump_target_o,
 
-    input   logic               irq_i,
+    input   logic               interrupt_pending_i,
     output  logic               interrupt_ack_o,
     output  logic               machine_return_o,
     output  logic               raise_exception_o,
@@ -442,7 +442,7 @@ end
                 interrupt_ack_o   = 0;
                 $write("[%0d] MRET: %8h %8h\n", $time, pc_i, instruction_i);
             end 
-            else if (irq_i) begin
+            else if (interrupt_pending_i) begin
                 raise_exception_o = 0;
                 exception_code_o  = NE;
                 machine_return_o  = 0;

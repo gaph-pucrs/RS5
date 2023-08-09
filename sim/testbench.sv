@@ -28,6 +28,7 @@
 `include "../rtl/regbank.sv"
 `include "../rtl/CSRBank.sv"
 `include "../rtl/RS5.sv"
+`include "../rtl/plic.sv"
 `include "../rtl/rtc.sv"
 `include "./RAM_mem.sv"
 
@@ -58,12 +59,12 @@ module testbench
     byte                    char;
     logic [31:0]            data_ram, data_plic, data_tb;
     logic                   enable_tb_r, enable_rtc_r, enable_plic_r;
-    logic                   mti;
-    logic                   irq;
+    logic                   mti, mei;
+    logic [31:0]            irq;
     logic [i_cnt:1]         irq_int;
     logic [$clog2(i_cnt):0] interrupt_id;
 
-    assign irq_int = {mti};
+    assign irq = {24'h0, mti, 7'h0};
 
 //////////////////////////////////////////////////////////////////////////////
 // CPU
@@ -116,9 +117,9 @@ module testbench
         .addr_i (mem_address[23:0]),
         .data_i (mem_data_write),
         .data_o (data_plic),     
-        .irq_i  (irq_int),
+        .irq_i  ('0),
         .iack_i (interrupt_ack),
-        .irq_o  (irq),
+        .irq_o  (mei),
         .id_o   (interrupt_id)
     );
 

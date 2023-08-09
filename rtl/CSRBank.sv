@@ -53,8 +53,10 @@ module CSRBank
     input   logic [31:0]        jump_target_i,
 
     input   logic [63:0]        mtime_i,
-
+    
+    input   logic [31:0]        irq_i,
     input   logic               interrupt_ack_i,
+    output  logic               interrupt_pending_o,
 
     output  privilegeLevel_e    privilege_o,
 
@@ -325,7 +327,36 @@ module CSRBank
     end
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////// DEBUG ///////////////////////////////////////////////////////////////////////////////////
+// Interrupt Control
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    always_ff @(posedge clk) begin
+        if (reset) begin
+            mip <= '0;
+        end
+        else begin
+            mip <= irq_i;
+        end
+    end
+
+    always_ff @(posedge clk) begin
+        if (mstatus[3] && (mie & mip) != '0 && !interrupt_ack_i) begin
+            interrupt_pending_o <= 1;
+            if (mip[11] & mie[11])                   // Machine External
+                Interruption_Code <= M_EXT_INT;
+            else if (mip[3] & mie[3])                // Machine Software
+                Interruption_Code <= M_SW_INT;
+            else if (mip[7] & mie[7])                // Machine Timer
+                Interruption_Code <= M_TIM_INT;
+
+        end 
+        else begin
+            interrupt_pending_o <= 0;
+        end
+    end
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DEBUG
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 `ifdef DEBUG
