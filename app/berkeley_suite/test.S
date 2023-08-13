@@ -1,4 +1,5 @@
-.equ MMR_BASE, 0x20000000
+.equ MMR_BASE,  0x20000000
+.equ PLIC_BASE, 0x30000000
 
 	.section .text.init
 	.global _entry
@@ -16,6 +17,14 @@ boot:
     # Habilita Interrupções Externas
     li t2, 0x888                # Seta os bits 11, 7 e 3 (MEIE, MTIE e MSIE)
     csrs mie, t2                # do registrador mie
+
+	# Habilita Interrupções no PLIC
+	li	t0, PLIC_BASE
+	li  t1, 0x2000
+	add t0, t0, t1
+	li	t1, -1
+	sw  t1, 0(t0)
+
 
 	# Configura timer
 	li	t0, MMR_BASE
