@@ -442,7 +442,7 @@ end
                 interrupt_ack_o   = 0;
                 $write("[%0d] MRET: %8h %8h\n", $time, pc_i, instruction_i);
             end 
-            else if (interrupt_pending_i) begin
+            else if (interrupt_pending_i == 1'b1 && instruction_operation_i != NOP) begin
                 raise_exception_o = 0;
                 exception_code_o  = NE;
                 machine_return_o  = 0;

@@ -64,7 +64,7 @@ module testbench
     logic [i_cnt:1]         irq_int;
     logic [$clog2(i_cnt):0] interrupt_id;
 
-    assign irq = {24'h0, mti, 7'h0};
+    assign irq = {20'h0, mei, 3'h0, mti, 7'h0};
 
 //////////////////////////////////////////////////////////////////////////////
 // CPU
@@ -105,7 +105,6 @@ module testbench
 //////////////////////////////////////////////////////////////////////////////
 // PLIC
 //////////////////////////////////////////////////////////////////////////////
-    logic [31:0] plic_int_enable;
 
     plic #(
         .i_cnt(i_cnt)
@@ -117,12 +116,19 @@ module testbench
         .addr_i (mem_address[23:0]),
         .data_i (mem_data_write),
         .data_o (data_plic),     
-        .irq_i  ('0),
+        .irq_i  (irq_int),
         .iack_i (interrupt_ack),
         .irq_o  (mei),
         .id_o   (interrupt_id)
     );
 
+    initial begin
+        irq_int = 1'b0;
+        #2000
+        irq_int = 1'b1;
+        #100;
+        irq_int = 1'b0;
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 // RTC
