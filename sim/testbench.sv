@@ -43,7 +43,7 @@ module testbench
         input logic rst_i
     );
 
-    parameter i_cnt = 0;
+    parameter i_cnt = 1;
 
     /* verilator lint_off UNUSEDSIGNAL */
     logic [31:0]            instruction_address;
@@ -67,10 +67,72 @@ module testbench
     assign irq = {20'h0, mei, 3'h0, mti, 7'h0};
 
 //////////////////////////////////////////////////////////////////////////////
+// Control
+//////////////////////////////////////////////////////////////////////////////
+
+    always_comb begin
+        if (mem_operation_enable) begin
+            if (mem_address[31:28] < 4'h2) begin
+                enable_ram  = 1'b1;
+                enable_rtc  = 1'b0;
+                enable_plic = 1'b0;
+                enable_tb   = 1'b0;
+            end
+            else if (mem_address[31:28] < 4'h3) begin
+                enable_ram  = 1'b0;
+                enable_rtc  = 1'b1;
+                enable_plic = 1'b0;
+                enable_tb   = 1'b0;
+            end
+            else if (mem_address[31:28] < 4'h8) begin
+                enable_ram  = 1'b0;
+                enable_rtc  = 1'b0;
+                enable_plic = 1'b1;
+                enable_tb   = 1'b0;
+            end
+            else begin
+                enable_ram  = 1'b0;
+                enable_rtc  = 1'b0;
+                enable_plic = 1'b0;
+                enable_tb   = 1'b1;
+            end
+        end
+        else begin
+            enable_ram  = 1'b0;
+            enable_rtc  = 1'b0;
+            enable_plic = 1'b0;
+            enable_tb   = 1'b0;
+        end
+    end
+    
+    always_ff @(posedge clk_i) begin
+        enable_tb_r     <= enable_tb;
+        enable_rtc_r    <= enable_rtc;
+        enable_plic_r   <= enable_plic;
+    end
+
+    always_comb begin
+        if (enable_tb_r) begin
+            mem_data_read = data_tb;
+        end
+        else if (enable_rtc_r) begin
+            mem_data_read = data_rtc[31:0];
+        end
+        else if (enable_plic_r) begin
+            mem_data_read = data_plic;
+        end
+        else begin
+            mem_data_read = data_ram;
+        end
+    end
+
+//////////////////////////////////////////////////////////////////////////////
 // CPU
 //////////////////////////////////////////////////////////////////////////////
 
-    RS5 dut (
+    RS5 #(
+        .i_cnt(i_cnt)
+    ) dut (
         .clk                    (clk_i), 
         .reset                  (rst_i), 
         .stall                  (1'b0),
@@ -118,6 +180,7 @@ module testbench
         .data_o (data_plic),     
         .irq_i  (irq_int),
         .iack_i (interrupt_ack),
+        .iack_o (iack),
         .irq_o  (mei),
         .id_o   (interrupt_id)
     );
@@ -145,62 +208,6 @@ module testbench
         .mti_o      (mti),
         .mtime_o    (mtime)
     );
-
-    always_comb begin
-        if (enable_tb_r) begin
-            mem_data_read = data_tb;
-        end
-        else if (enable_rtc_r) begin
-            mem_data_read = data_rtc[31:0];
-        end
-        else if (enable_plic_r) begin
-            mem_data_read = data_plic;
-        end
-        else begin
-            mem_data_read = data_ram;
-        end
-    end
-
-    always_comb begin
-        if (mem_operation_enable) begin
-            if (mem_address[31:28] < 4'h2) begin
-                enable_ram  = 1'b1;
-                enable_rtc  = 1'b0;
-                enable_plic = 1'b0;
-                enable_tb   = 1'b0;
-            end
-            else if (mem_address[31:28] < 4'h3) begin
-                enable_ram  = 1'b0;
-                enable_rtc  = 1'b1;
-                enable_plic = 1'b0;
-                enable_tb   = 1'b0;
-            end
-            else if (mem_address[31:28] < 4'h8) begin
-                enable_ram  = 1'b0;
-                enable_rtc  = 1'b0;
-                enable_plic = 1'b1;
-                enable_tb   = 1'b0;
-            end
-            else begin
-                enable_ram  = 1'b0;
-                enable_rtc  = 1'b0;
-                enable_plic = 1'b0;
-                enable_tb   = 1'b1;
-            end
-        end
-        else begin
-            enable_ram  = 1'b0;
-            enable_rtc  = 1'b0;
-            enable_plic = 1'b0;
-            enable_tb   = 1'b0;
-        end
-    end
-    
-    always_ff @(posedge clk_i) begin
-        enable_tb_r     <= enable_tb;
-        enable_rtc_r    <= enable_rtc;
-        enable_plic_r   <= enable_plic;
-    end
 
 //////////////////////////////////////////////////////////////////////////////
 // Memory Mapped regs

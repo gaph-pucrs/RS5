@@ -16,6 +16,7 @@ module plic
     input   logic [i_cnt:1]         irq_i,
     input   logic                   iack_i,
 
+    output  logic [i_cnt:1]         iack_o,
     output  logic                   irq_o,
     output  logic [$clog2(i_cnt):0] id_o
 );
@@ -45,7 +46,9 @@ module plic
 		end
 	end
 
-    assign irq_o = (|interrupt) & ~iack_i;
+    assign irq_o    = (|interrupt) & ~iack_i;
+
+    assign iack_o   = iack_i;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Memory Mapped Regs
