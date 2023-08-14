@@ -1,5 +1,8 @@
 module RS5_FPGA_Platform
     import RS5_pkg::*;
+#(
+    parameter i_cnt = 0
+)
 (
     input  logic       clk,
     input  logic       reset,
@@ -8,60 +11,81 @@ module RS5_FPGA_Platform
     input  logic       BTND,
     output logic       UART_TX
 );
-    logic [63:0]    mtime;
-    logic [63:0]    data_rtc;
-    logic [31:0]    CPU_instruction_address, CPU_instruction;
-    logic [31:0]    CPU_data_address, CPU_data_in, CPU_data_out;
-    logic [31:0]    BRAM_data_o, PERIPHERALS_data_o;
-    logic           CPU_operation_enable, BRAM_enable, PERIPHERALS_enable, enable_rtc, enable_r, enable_rtc_r;
-    logic [3:0]     CPU_write_enable;
-    logic           stall;
-    logic           mei, mti;
-    logic           Interrupt_ACK;
-    logic [31:0]    IRQ;
+    logic [31:0]            cpu_instruction_address, cpu_instruction;
+    logic [31:0]            cpu_data_address, cpu_data_in, cpu_data_out;
+    logic                   cpu_operation_enable, enable_ram, enable_peripherals, enable_rtc, enable_plic;
+    logic                   enable_rtc_r, enable_plic_r, enable_peripherals_r;
+    logic [63:0]            mtime;
+    logic [31:0]            data_bram, data_plic, data_peripherals;
+    logic [63:0]            data_rtc;
+    logic [3:0]             cpu_write_enable;
+    logic                   stall;
+    logic                   mei, mti;
+    logic                   interrupt_ack;
+    logic [31:0]            irq;
+    logic [i_cnt:1]         irq_peripherals, iack_peripherals;
+    logic [$clog2(i_cnt):0] interrupt_id;
 
-    assign IRQ = {20'h0, mei, 3'h0, mti, 7'h0};
+    assign irq = {20'h0, mei, 3'h0, mti, 7'h0};
 
-    always_comb begin
-        if (enable_r) begin
-            CPU_data_in = BRAM_data_o;
-        end
-        else if (enable_rtc_r) begin
-            CPU_data_in = data_rtc[31:0];
-        end
-        else begin
-            CPU_data_in = PERIPHERALS_data_o;
-        end
-    end
+//////////////////////////////////////////////////////////////////////////////
+// Control
+//////////////////////////////////////////////////////////////////////////////
     
     always_comb begin
-        if (CPU_operation_enable) begin
-            if (CPU_data_address[31:28] < 4'h2) begin
-                BRAM_enable = 1'b1;
-                PERIPHERALS_enable  = 1'b0;
-                enable_rtc = 1'b0;
+        if (cpu_operation_enable) begin
+            if (cpu_data_address[31:28] < 4'h2) begin
+                enable_ram          = 1'b1;
+                enable_rtc          = 1'b0;
+                enable_plic         = 1'b0;
+                enable_peripherals  = 1'b0;
             end
-            else if (CPU_data_address[31:28] < 4'h8) begin
-                BRAM_enable = 1'b0;
-                PERIPHERALS_enable  = 1'b0;
-                enable_rtc = 1'b1;
+            else if (cpu_data_address[31:28] < 4'h3) begin
+                enable_ram          = 1'b0;
+                enable_rtc          = 1'b1;
+                enable_plic         = 1'b0;
+                enable_peripherals  = 1'b0;
+            end
+            else if (cpu_data_address[31:28] < 4'h8) begin
+                enable_ram          = 1'b0;
+                enable_rtc          = 1'b0;
+                enable_plic         = 1'b1;
+                enable_peripherals  = 1'b0;
             end
             else begin
-                BRAM_enable = 1'b0;
-                PERIPHERALS_enable  = 1'b1;
-                enable_rtc = 1'b0;
+                enable_ram          = 1'b0;
+                enable_rtc          = 1'b0;
+                enable_plic         = 1'b0;
+                enable_peripherals  = 1'b1;
             end
         end
         else begin
-            BRAM_enable = 1'b0;
-            PERIPHERALS_enable  = 1'b0;
-            enable_rtc = 1'b0;
+            enable_ram          = 1'b0;
+            enable_rtc          = 1'b0;
+            enable_plic         = 1'b0;
+            enable_peripherals  = 1'b0;
         end
     end
 
     always_ff @(posedge clk) begin
-        enable_r <= BRAM_enable;
-        enable_rtc_r <= enable_rtc;
+        enable_rtc_r            <= enable_rtc;
+        enable_plic_r           <= enable_plic;
+        enable_peripherals_r    <= enable_peripherals;
+    end
+
+    always_comb begin
+        if (enable_rtc_r) begin
+            cpu_data_in = data_rtc[31:0];
+        end
+        else if (enable_plic_r) begin
+            cpu_data_in = data_plic;
+        end
+        else if (enable_peripherals_r) begin
+            cpu_data_in = data_peripherals;
+        end
+        else begin
+            cpu_data_in = data_bram;
+        end
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -72,16 +96,17 @@ module RS5_FPGA_Platform
         .clk                    (clk), 
         .reset                  (!reset),
         .stall                  (stall),
-        .instruction_i          (CPU_instruction), 
-        .mem_data_i             (CPU_data_in), 
-        .IRQ_i                  (IRQ),
+        .instruction_i          (cpu_instruction), 
+        .mem_data_i             (cpu_data_in), 
         .mtime_i                (mtime),
-        .instruction_address_o  (CPU_instruction_address), 
-        .mem_operation_enable_o (CPU_operation_enable), 
-        .mem_write_enable_o     (CPU_write_enable),
-        .mem_address_o          (CPU_data_address), 
-        .mem_data_o             (CPU_data_out), 
-        .interrupt_ack_o        (Interrupt_ACK)
+        .irq_i                  (irq),
+        .interrupt_id_i         (interrupt_id),
+        .instruction_address_o  (cpu_instruction_address), 
+        .mem_operation_enable_o (cpu_operation_enable), 
+        .mem_write_enable_o     (cpu_write_enable),
+        .mem_address_o          (cpu_data_address), 
+        .mem_data_o             (cpu_data_out), 
+        .interrupt_ack_o        (interrupt_ack)
     );
 
 //////////////////////////////////////////////////////////////////////////////
@@ -92,16 +117,16 @@ module RS5_FPGA_Platform
         .clka   (clk),                      // input wire clka
         .ena    (!stall),                   // input wire ena
         .wea    (4'h0),                     // input wire [3 : 0] wea
-        .addra  (CPU_instruction_address),  // input wire [31 : 0] addra
+        .addra  (cpu_instruction_address),  // input wire [31 : 0] addra
         .dina   (0),                        // input wire [31 : 0] dina
-        .douta  (CPU_instruction),          // output wire [31 : 0] douta
+        .douta  (cpu_instruction),          // output wire [31 : 0] douta
         //////////////////////////////////////////////////////
         .clkb   (clk),                      // input wire clkb
-        .enb    (BRAM_enable),              // input wire enb
-        .web    (CPU_write_enable),         // input wire [3 : 0] web
-        .addrb  (CPU_data_address),         // input wire [31 : 0] addrb
-        .dinb   (CPU_data_out),             // input wire [31 : 0] dinb
-        .doutb  (BRAM_data_o)               // output wire [31 : 0] doutb
+        .enb    (enable_ram),               // input wire enb
+        .web    (cpu_write_enable),         // input wire [3 : 0] web
+        .addrb  (cpu_data_address),         // input wire [31 : 0] addrb
+        .dinb   (cpu_data_out),             // input wire [31 : 0] dinb
+        .doutb  (data_bram)                 // output wire [31 : 0] doutb
     );
 
 //////////////////////////////////////////////////////////////////////////////
@@ -112,12 +137,33 @@ module RS5_FPGA_Platform
         .clk        (clk),
         .reset      (!reset),
         .en_i       (enable_rtc),
-        .addr_i     (CPU_data_address[3:0]),
-        .we_i       ({4'h0, CPU_write_enable}),
-        .data_i     ({32'h0, CPU_data_out}),
+        .addr_i     (cpu_data_address[3:0]),
+        .we_i       ({4'h0, cpu_write_enable}),
+        .data_i     ({32'h0, cpu_data_out}),
         .data_o     (data_rtc),     
         .mti_o      (mti),
         .mtime_o    (mtime)
+    );
+
+//////////////////////////////////////////////////////////////////////////////
+// PLIC
+//////////////////////////////////////////////////////////////////////////////
+
+    plic #(
+        .i_cnt(i_cnt)
+    ) plic1 (
+        .clk    (clk),
+        .reset  (!reset),
+        .en_i   (enable_plic),
+        .we_i   (cpu_write_enable),
+        .addr_i (cpu_data_address[23:0]),
+        .data_i (cpu_data_out),
+        .data_o (data_plic),     
+        .irq_i  (irq_peripherals),
+        .iack_i (interrupt_ack),
+        .irq_o  (mei),
+        .iack_o (iack_peripherals),
+        .id_o   (interrupt_id)
     );
 
 //////////////////////////////////////////////////////////////////////////////
@@ -128,17 +174,17 @@ module RS5_FPGA_Platform
         .clk            (clk), 
         .reset          (!reset), 
         .stall_o        (stall),
-        .enable_i       (PERIPHERALS_enable), 
-        .write_enable_i (CPU_write_enable),
-        .data_address_i (CPU_data_address), 
-        .data_i         (CPU_data_out), 
-        .data_o         (PERIPHERALS_data_o),
+        .enable_i       (enable_peripherals), 
+        .write_enable_i (cpu_write_enable),
+        .data_address_i (cpu_data_address), 
+        .data_i         (cpu_data_out), 
+        .data_o         (data_peripherals),
         .gpioa_out      (gpioa_out),
         .gpioa_addr     (gpioa_addr),
         .BTND           (BTND),
         .UART_TX        (UART_TX),
-        .mei_o          (mei),
-        .interrupt_ack_i(Interrupt_ACK)
+        .interrupt_req_o(irq_peripherals),
+        .interrupt_ack_i(iack_peripherals)
     );
 
 endmodule
