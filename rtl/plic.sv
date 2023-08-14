@@ -48,7 +48,14 @@ module plic
 
     assign irq_o    = (|interrupt) & ~iack_i;
 
-    assign iack_o   = iack_i;
+    always_comb begin
+        if (iack_i) begin
+            iack_o = (1'b1 << id_o);
+        end
+        else begin
+            iack_o = '0;
+        end
+    end
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Memory Mapped Regs

@@ -61,7 +61,7 @@ module testbench
     logic                   enable_tb_r, enable_rtc_r, enable_plic_r;
     logic                   mti, mei;
     logic [31:0]            irq;
-    logic [i_cnt:1]         irq_int;
+    logic [i_cnt:1]         irq_int, iack;
     logic [$clog2(i_cnt):0] interrupt_id;
 
     assign irq = {20'h0, mei, 3'h0, mti, 7'h0};

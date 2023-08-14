@@ -84,7 +84,7 @@ module Peripherals
         end
     end
 
-    debouncer #(.DEBNC_CLOCKS(2**3), .PORT_WIDTH(1)) Debouncer (
+    debouncer #(.DEBNC_CLOCKS(2**10), .PORT_WIDTH(1)) Debouncer (
         .CLK_I      (clk),
         .SIGNAL_I   (BTND),
         .SIGNAL_O   (BTND_debounced)
