@@ -12,8 +12,6 @@ module Peripherals
     input  logic [31:0]     data_address_i,
     input  logic [31:0]     data_i,
     output logic [31:0]     data_o,
-    output logic [7:0]      gpioa_out,
-    output logic [7:0]      gpioa_addr,
     input  logic            BTND,
     output logic            UART_TX,
     output logic            stall_o,
@@ -37,25 +35,21 @@ module Peripherals
         if (enable_i && write_enable_i != '0) begin
             /// OUTPUT REG
             if ((data_address_i == 32'h80004000 || data_address_i == 32'h80001000) && BUFFER_full == '0) begin
-                gpioa_out <= data_i[7:0];
-                gpioa_addr <= 8'h84;
                 BUFFER_write <= 1;
                 BUFFER_data <= data_i[7:0];
+                $write("%c", data_i[7:0]);
             end
             // END REG
             else if (data_address_i == 32'h80000000) begin
-                gpioa_addr <= 8'h80;
+                $display("\n#%0t END OF SIMULATION\n",$time);
+                $finish;
             end
             // NOTHING
             else begin
-                gpioa_out <= '0;
-                gpioa_addr <= '0;
                 BUFFER_write <= '0;         
             end
 
         end else begin
-            gpioa_out <= '0;
-            gpioa_addr <= '0;
             BUFFER_write <= '0;         
         end
     end
@@ -73,14 +67,14 @@ module Peripherals
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk) begin
-        if (reset == 1'b1) begin
-            button_irq <= 0;
-        end
-        else if (button_ack == 1'b1) begin
+        if (reset) begin
             button_irq <= 0;
         end
         else if (button_detected == 1'b1) begin
             button_irq <= 1;
+        end
+        else if (button_ack == 1'b1) begin
+            button_irq <= 0;
         end
     end
 
@@ -93,7 +87,8 @@ module Peripherals
     always_ff @(posedge clk) begin
         BTND_debounced_r <= BTND_debounced;
     end
-    assign button_detected = (!BTND_debounced_r && BTND_debounced);
+    
+    assign button_detected = (~BTND_debounced_r & BTND_debounced);
 
 //////////////////////////////////////////////////////////////////////////////
 // STALL GENERATION
@@ -102,7 +97,7 @@ module Peripherals
     always_comb begin
         if (enable_i) begin
             // READS
-            if (write_enable_i == '0 && !stall_r) begin
+ /*           if (write_enable_i == '0 && !stall_r) begin
                 if (data_address_i == 32'h80006000) begin
                     stall_o = 1;
                 end
@@ -110,8 +105,9 @@ module Peripherals
                     stall_o = 0;
                 end
             end
+            else */
             // WRITES
-            else if (write_enable_i != '0) begin
+            if (write_enable_i != '0) begin
                 if ((data_address_i == 32'h80004000 || data_address_i == 32'h80001000) && BUFFER_full) begin
                     stall_o = 1;
                 end

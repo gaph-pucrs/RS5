@@ -6,8 +6,6 @@ module RS5_FPGA_Platform
 (
     input  logic       clk,
     input  logic       reset,
-    output logic [7:0] gpioa_out,
-    output logic [7:0] gpioa_addr,
     input  logic       BTND,
     output logic       UART_TX
 );
@@ -179,8 +177,6 @@ module RS5_FPGA_Platform
         .data_address_i (cpu_data_address), 
         .data_i         (cpu_data_out), 
         .data_o         (data_peripherals),
-        .gpioa_out      (gpioa_out),
-        .gpioa_addr     (gpioa_addr),
         .BTND           (BTND),
         .UART_TX        (UART_TX),
         .interrupt_req_o(irq_peripherals),
