@@ -53,7 +53,7 @@ module regbank
 // Reset and Write control
 //////////////////////////////////////////////////////////////////////////////
 
-    for (genvar i = 1; i < 32 ; i++) begin
+    for (genvar i = 1; i < 32 ; i++) begin : gen_regfile
         always_ff @(posedge clk) begin
             if (reset) begin
                 regfile[i] <= '0;
