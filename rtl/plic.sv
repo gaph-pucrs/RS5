@@ -10,7 +10,9 @@ module plic
     input   logic                   en_i,
     input   logic  [3:0]            we_i,
     input   logic [23:0]            addr_i,
+/* verilator lint_off UNUSEDSIGNAL */ 
     input   logic [31:0]            data_i,
+/* verilator lint_on UNUSEDSIGNAL */
     output  logic [31:0]            data_o,
 
     input   logic [i_cnt:1]         irq_i,
@@ -21,7 +23,7 @@ module plic
     output  logic [$clog2(i_cnt):0] id_o
 );
 
-    logic [31:0]    ie;
+    logic [i_cnt:1] ie;
     logic [i_cnt:1] ip;
     logic [i_cnt:1] interrupt;
 
@@ -69,15 +71,15 @@ module plic
         else if (en_i) begin
             if (we_i != '0) begin
                 case (addr_i)
-                    24'h002000:     ie      <= data_i;
+                    24'h002000:     ie      <= data_i[i_cnt:1];
                     default:        ;
                 endcase
             end
             else begin
                 case (addr_i)
-                    24'h001000:     data_o  <= ip;
-                    24'h002000:     data_o  <= ie;
-                    default:        data_o  <= '0;
+                    24'h001000:     data_o[i_cnt:1]  <= ip;
+                    24'h002000:     data_o[i_cnt:1]  <= ie;
+                    default:        data_o[i_cnt:1]  <= '0;
                 endcase
             end
         end
