@@ -130,7 +130,9 @@ module testbench
 // CPU
 //////////////////////////////////////////////////////////////////////////////
 
-    RS5 dut (
+    RS5 #(
+        .i_cnt(i_cnt)
+    ) dut (
         .clk                    (clk_i), 
         .reset                  (rst_i), 
         .stall                  (1'b0),
@@ -138,6 +140,7 @@ module testbench
         .mem_data_i             (mem_data_read), 
         .mtime_i                (mtime),
         .irq_i                  (irq),
+        .interrupt_id_i         (interrupt_id),
         .instruction_address_o  (instruction_address), 
         .mem_operation_enable_o (mem_operation_enable), 
         .mem_write_enable_o     (mem_write_enable),
