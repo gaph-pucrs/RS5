@@ -61,8 +61,6 @@ module testbench
     logic                   enable_tb_r, enable_rtc_r, enable_plic_r;
     logic                   mti, mei;
     logic [31:0]            irq;
-    logic [i_cnt:1]         irq_int, iack;
-    logic [$clog2(i_cnt):0] interrupt_id;
 
     assign irq = {20'h0, mei, 3'h0, mti, 7'h0};
 
@@ -130,9 +128,7 @@ module testbench
 // CPU
 //////////////////////////////////////////////////////////////////////////////
 
-    RS5 #(
-        .i_cnt(i_cnt)
-    ) dut (
+    RS5 dut (
         .clk                    (clk_i), 
         .reset                  (rst_i), 
         .stall                  (1'b0),
@@ -140,7 +136,6 @@ module testbench
         .mem_data_i             (mem_data_read), 
         .mtime_i                (mtime),
         .irq_i                  (irq),
-        .interrupt_id_i         (interrupt_id),
         .instruction_address_o  (instruction_address), 
         .mem_operation_enable_o (mem_operation_enable), 
         .mem_write_enable_o     (mem_write_enable),
@@ -178,11 +173,12 @@ module testbench
         .addr_i (mem_address[23:0]),
         .data_i (mem_data_write),
         .data_o (data_plic),     
-        .irq_i  (irq_int),
+        .irq_i  ('0),
         .iack_i (interrupt_ack),
-        .iack_o (iack),
-        .irq_o  (mei),
-        .id_o   (interrupt_id)
+        /* verilator lint_off PINCONNECTEMPTY */
+        .iack_o (),
+        /* verilator lint_on PINCONNECTEMPTY */
+        .irq_o  (mei)
     );
 
 //////////////////////////////////////////////////////////////////////////////

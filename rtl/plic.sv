@@ -19,13 +19,13 @@ module plic
     input   logic                   iack_i,
 
     output  logic [i_cnt:1]         iack_o,
-    output  logic                   irq_o,
-    output  logic [$clog2(i_cnt):0] id_o
+    output  logic                   irq_o
 );
 
-    logic [i_cnt:1] ie;
-    logic [i_cnt:1] ip;
-    logic [i_cnt:1] interrupt;
+    logic [$clog2(i_cnt):0] id_int, id;
+    logic [i_cnt:1]         ie;
+    logic [i_cnt:1]         ip;
+    logic [i_cnt:1]         interrupt;
 
     always_ff @(posedge clk) begin
         if (reset) begin
@@ -39,20 +39,29 @@ module plic
     assign interrupt = ip & ie;
 
 	always_comb begin
-		id_o = '0;   /* 0 = NO IRQ */
+		id_int = '0;   /* 0 = NO IRQ */
 		for(logic [$clog2(i_cnt):0] i = 1; i <= i_cnt; i++) begin
 			if (interrupt[i]) begin
-				id_o = i;
+				id_int = i;
 				break;
 			end
 		end
 	end
 
+    always_ff @(posedge clk) begin
+        if (reset) begin
+            id <= '0;
+        end
+        else if (iack_i)begin
+            id <= id_int;
+        end
+    end
+
     assign irq_o    = (|interrupt) & ~iack_i;
 
     always_comb begin
         if (iack_i) begin
-            iack_o = (1'b1 << id_o);
+            iack_o = (1'b1 << id);
         end
         else begin
             iack_o = '0;
@@ -77,6 +86,7 @@ module plic
             end
             else begin
                 case (addr_i)
+                    24'h000000:     data_o           <= {{31-$clog2(i_cnt){1'b0}}, id};
                     24'h001000:     data_o[i_cnt:1]  <= ip;
                     24'h002000:     data_o[i_cnt:1]  <= ie;
                     default:        data_o[i_cnt:1]  <= '0;
