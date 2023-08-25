@@ -9,21 +9,21 @@ boot:
     la t0, trap_handler         # Grava o endereço do rótulo trap_handler
     csrw mtvec, t0              # no registrador mtvec
 
-    # Habilita Interrupções Global
+    # # Habilita Interrupções Global
     li t1, 0x80                 # Seta o bit 7 (MPIE)
     csrs mstatus, t1            # do registrador mstatus
 
-    # Habilita Interrupções Externas
-    li t2, 0x888                # Seta os bits 11, 7 e 3 (MEIE, MTIE e MSIE)
-    csrs mie, t2                # do registrador mie
-
 	# Configura timer
 	li	t0, MMR_BASE
-	li	t1, 50000	# 500 us (time / period)
+	li	t1, 500000	# 5000 us (time / period)
 	sw	zero,  0(t0)
 	sw  zero,  4(t0)
 	sw    t1,  8(t0)
 	sw  zero, 12(t0)
+
+	# Habilita Interrupções Externas
+    li t2, 0x888                # Seta os bits 11, 7 e 3 (MEIE, MTIE e MSIE)
+    csrs mie, t2                # do registrador mie
 
     # Ajusta o mscratch
     li t1, 60000	            # Coloca o endereço do buffer para salvar
