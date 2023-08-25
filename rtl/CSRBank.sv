@@ -142,26 +142,19 @@ module CSRBank
     end
 
     always_comb begin
-        if (operation_i == WRITE) begin
-            wr_data = data_i & wmask;
-        end
-        else if (operation_i == SET) begin
-            wr_data = (current_val | data_i) & wmask;
-        end
-        else if (operation_i == CLEAR) begin
-            wr_data = (current_val & (~data_i)) & wmask;
-        end
-        else begin
-            wr_data = 'Z;
-        end
+        case (operation_i)
+            SET:     wr_data = (current_val | data_i) & wmask;
+            CLEAR:   wr_data = (current_val & (~data_i)) & wmask;
+            default: wr_data = data_i & wmask; // WRITE
+        endcase
     end
 
     always_ff @(posedge clk) begin
         if (reset) begin
-            mstatus     <= '0;
-            mstatus[3]  <= 0;        // MIE  = 0
+            // mstatus     <= '0;   // Duplicated behavior. Which one is the right one?
+            mstatus[3]  <= 0;       // MIE  = 0
             mstatus[17] <= 0;       // MPRV = 0
-            misa        <= 32'h40000100;   // 32 - I
+            misa        <= 32'h40000100;   // 32 - I /* @todo: add M/Zmmul with params */
             //medeleg   <= '0;
             //mideleg   <= '0;
             mie         <= '0;
