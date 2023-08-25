@@ -15,7 +15,7 @@ boot:
 
 	# Configura timer
 	li	t0, MMR_BASE
-	li	t1, 500000	# 5000 us (time / period)
+	li	t1, 500000	            # 5000 us (time / period)
 	sw	zero,  0(t0)
 	sw  zero,  4(t0)
 	sw    t1,  8(t0)
@@ -268,6 +268,6 @@ main:
 	sw a4,0(a0)
 	sw a5,0(a0)
 .end:
-	# li	s10, 0x80000000		# this will interrupt the simulation (assertion)
-	# sw	zero, 0(s10)
+	li	s10, 0x80000000		# this will interrupt the simulation (assertion)
+	sw	zero, 0(s10)
 	jal zero, .end
