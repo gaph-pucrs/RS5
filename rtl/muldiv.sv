@@ -76,17 +76,21 @@ module muldiv
     );
 
 `else
+
+/* verilator lint_off UNDRIVEN */
     logic signed [63:0]    mul_opa_signed, mul_opb_signed;
     logic        [63:0]    mul_opa, mul_opb;
+/* verilator lint_on UNDRIVEN */
 
+/*
     assign  mul_opa[63:32] = '0,
             mul_opb[63:32] = '0;
 
-    assign  mul_opa[31:0] = first_operand_i,
-            mul_opb[31:0] = second_operand_i;
-
     assign  mul_opa_signed[63:32] = '0,
             mul_opb_signed[63:32] = '0;
+*/
+    assign  mul_opa[31:0] = first_operand_i,
+            mul_opb[31:0] = second_operand_i;
     
     assign  mul_opa_signed[31:0] = $signed(first_operand_i),
             mul_opb_signed[31:0] = $signed(second_operand_i);

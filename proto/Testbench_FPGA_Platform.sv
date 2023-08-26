@@ -53,7 +53,9 @@ module Testbench_FPGA_Platform ();
 // CPU INSTANTIATION 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     
-    RS5_FPGA_Platform dut (
+    RS5_FPGA_Platform #(
+        .i_cnt(i_cnt)
+    ) dut (
         .clk        (clk), 
         .reset      (rstCPU), 
         .BTND       (BTND)
