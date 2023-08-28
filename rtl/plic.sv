@@ -1,7 +1,7 @@
 module plic
 	import RS5_pkg::*;
 #(
-	parameter i_cnt = 0
+	parameter i_cnt = 1
 )
 (
     input   logic                   clk,
@@ -38,15 +38,17 @@ module plic
 
     assign interrupt = ip & ie;
 
+/* verilator lint_off WIDTHTRUNC */
 	always_comb begin
 		id_int = '0;   /* 0 = NO IRQ */
-		for(logic [$clog2(i_cnt):0] i = 1; i <= i_cnt; i++) begin
+		for (int i = 1; i <= i_cnt; i++) begin
 			if (interrupt[i]) begin
-				id_int = i;
+				id_int = '0;
 				break;
 			end
 		end
 	end
+/* verilator lint_on WIDTHTRUNC */
 
     always_ff @(posedge clk) begin
         if (reset) begin

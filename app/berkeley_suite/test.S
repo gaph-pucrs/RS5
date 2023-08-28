@@ -14,10 +14,6 @@ boot:
     li t1, 0x80                 # Seta o bit 7 (MPIE)
     csrs mstatus, t1            # do registrador mstatus
 
-    # Habilita Interrupções Externas
-    li t2, 0x888                # Seta os bits 11, 7 e 3 (MEIE, MTIE e MSIE)
-    csrs mie, t2                # do registrador mie
-
 	# Habilita Interrupções no PLIC
 	li	t0, PLIC_BASE
 	li  t1, 0x2000
@@ -28,11 +24,15 @@ boot:
 
 	# Configura timer
 	li	t0, MMR_BASE
-	li	t1, 50000	# 500 us (time / period)
+	li	t1, 500000	# 5000 us (time / period)
 	sw	zero,  0(t0)
 	sw  zero,  4(t0)
 	sw    t1,  8(t0)
 	sw  zero, 12(t0)
+
+	# Habilita Interrupções Externas
+    li t2, 0x888                # Seta os bits 11, 7 e 3 (MEIE, MTIE e MSIE)
+    csrs mie, t2                # do registrador mie
 
     # Ajusta o mscratch
     li t1, 60000	            # Coloca o endereço do buffer para salvar
@@ -277,6 +277,6 @@ main:
 	sw a4,0(a0)
 	sw a5,0(a0)
 .end:
-	# li	s10, 0x80000000		# this will interrupt the simulation (assertion)
-	# sw	zero, 0(s10)
+	li	s10, 0x80000000		# this will interrupt the simulation (assertion)
+	sw	zero, 0(s10)
 	jal zero, .end

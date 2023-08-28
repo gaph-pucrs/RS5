@@ -1,7 +1,7 @@
 module RS5_FPGA_Platform
     import RS5_pkg::*;
 #(
-    parameter i_cnt = 0
+    parameter i_cnt = 1
 )
 (
     input  logic       clk,
@@ -22,7 +22,6 @@ module RS5_FPGA_Platform
     logic                   interrupt_ack;
     logic [31:0]            irq;
     logic [i_cnt:1]         irq_peripherals, iack_peripherals;
-    logic [$clog2(i_cnt):0] interrupt_id;
 
     assign irq = {20'h0, mei, 3'h0, mti, 7'h0};
 
@@ -98,7 +97,6 @@ module RS5_FPGA_Platform
         .mem_data_i             (cpu_data_in), 
         .mtime_i                (mtime),
         .irq_i                  (irq),
-        .interrupt_id_i         (interrupt_id),
         .instruction_address_o  (cpu_instruction_address), 
         .mem_operation_enable_o (cpu_operation_enable), 
         .mem_write_enable_o     (cpu_write_enable),
@@ -160,8 +158,7 @@ module RS5_FPGA_Platform
         .irq_i  (irq_peripherals),
         .iack_i (interrupt_ack),
         .irq_o  (mei),
-        .iack_o (iack_peripherals),
-        .id_o   (interrupt_id)
+        .iack_o (iack_peripherals)
     );
 
 //////////////////////////////////////////////////////////////////////////////
