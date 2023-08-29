@@ -207,6 +207,7 @@ module testbench
             if ((mem_address == 32'h80004000 || mem_address == 32'h80001000) && mem_write_enable != '0) begin
                 char <= mem_data_write[7:0];
                 $write("%c",char);
+                $fflush();
             end
             // END REG
             if (mem_address == 32'h80000000 && mem_write_enable != '0) begin
