@@ -40,7 +40,7 @@ module RAM_mem
     int fd_i, fd_r, fd_w;
 
     initial begin
-        fd = $fopen ("../os/MAestro/kernel.bin", "r");
+        fd = $fopen ("./ram.bin", "r");
 
         r = $fread(RAM, fd);
         $display("read %d elements \n", r);
