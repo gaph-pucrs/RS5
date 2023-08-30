@@ -4,7 +4,7 @@ NC		= \033[0m # No Color
 SRCDIR = .
 
 SRC = $(wildcard $(SRCDIR)/*.c)
-TARGET = $(patsubst %.c, %.txt, $(SRC))
+TARGET = $(patsubst %.c, %.bin, $(SRC))
 ELFS = $(patsubst %.c, %.elf, $(SRC))
 
 CC = riscv64-elf-gcc
@@ -15,10 +15,6 @@ CFLAGS	+= -march=rv32im -mabi=ilp32 -Os -fdata-sections -ffunction-sections -Wal
 LDFLAGS += -march=rv32im -mabi=ilp32 -Wl,--gc-sections -L../../libmemphis -L../../libmutils -lmemphis -lmutils
 
 all: $(TARGET) $(ELFS)
-
-$(SRCDIR)/%.txt: $(SRCDIR)/%.bin
-	@printf "${GREEN}Dumping task: %s ...${NC}\n" "$<"
-	@hexdump -v -e '1/4 "%08x" "\n"' $< > $@
 
 $(SRCDIR)/%.bin: $(SRCDIR)/%.elf
 	@printf "${GREEN}Generating binary for task: %s ...${NC}\n" "$<"
@@ -38,7 +34,6 @@ clean:
 	@rm -rf *.bin
 	@rm -rf *.map
 	@rm -rf *.lst
-	@rm -rf *.txt
 	@rm -rf *.elf
 
 .PHONY: clean

@@ -7,7 +7,7 @@ def build_ram():
 
 	binary.write(bytearray(int(65536/2 - binary.tell())))
 
-	with open("../app/coremark/coremark.bin", 'rb') as app:
+	with open("../os/app/hello/hello.bin", 'rb') as app:
 		binary.write(app.read())
 
 	print(binary.tell())
