@@ -94,7 +94,7 @@ module plic
 
                     24'h200000:     data_o <= 32'h00010000;     /* Page size */
                     24'h200004:     data_o <= 32'h00000000;     /* Address -> 0 for single CPU */
-                    24'h200008:     data_o <= 32'h00000000;     /* Number of tasks. 0 = OS only */
+                    24'h200008:     data_o <= 32'h00000001;     /* Number of tasks. 0 = OS only */
                     24'h20000C:     data_o <= 32'h00000001;     /* 1 PE in X-axis */
                     24'h205010:     data_o <= 32'h00000001;     /* 1 PE in Y-axis */
                     default:        data_o <= '0;
