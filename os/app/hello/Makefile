@@ -12,9 +12,13 @@ OBJDUMP = riscv64-elf-objdump
 OBJCOPY = riscv64-elf-objcopy
 
 CFLAGS	+= -march=rv32im -mabi=ilp32 -Os -fdata-sections -ffunction-sections -Wall -std=c99
-LDFLAGS += -march=rv32im -mabi=ilp32 -Wl,--gc-sections -L../../libmemphis -L../../libmutils -lmemphis -lmutils
+LDFLAGS += -march=rv32im -mabi=ilp32 --specs=nano.specs -Wl,-Ttext=0,--gc-sections -u _getpid -L../../libmemphis -L../../libmutils -lmemphis -lmutils
 
 all: $(TARGET) $(ELFS)
+
+$(SRCDIR)/%.txt: $(SRCDIR)/%.bin
+	@printf "${GREEN}Dumping task: %s ...${NC}\n" "$<"
+	@hexdump -v -e '1/4 "%08x" "\n"' $< > $@
 
 $(SRCDIR)/%.bin: $(SRCDIR)/%.elf
 	@printf "${GREEN}Generating binary for task: %s ...${NC}\n" "$<"
