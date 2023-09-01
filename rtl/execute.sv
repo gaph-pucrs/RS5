@@ -427,12 +427,12 @@ end
                 $write("[%0d] EXCEPTION - EBREAK: %8h %8h\n", $time, pc_i, instruction_i);
             end
         `ifdef XOSVM
-            else if (exc_load_access_fault_i) begin
+            else if (exc_load_access_fault_i && (mem_write_enable_o != '0 || mem_read_enable_o)) begin
                 raise_exception_o = 1;
                 machine_return_o  = 0;
                 interrupt_ack_o   = 0;
                 exception_code_o  = LOAD_ACCESS_FAULT;
-                $write("[%0d] EXCEPTION - LOAD ACCESS FAULT: %8h %8h\n", $time, pc_i, instruction_i);
+                $write("[%0d] EXCEPTION - LOAD ACCESS FAULT: %8h %8h %8h\n", $time, pc_i, instruction_i, mem_address_o);
             end 
         `endif
             else if (instruction_operation_i == MRET) begin
