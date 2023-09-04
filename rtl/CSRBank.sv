@@ -53,8 +53,8 @@ module CSRBank
     input   logic [31:0]        jump_target_i,
 
     input   logic [63:0]        mtime_i,
-
-    input   logic [31:0]        IRQ_i,
+    
+    input   logic [31:0]        irq_i,
     input   logic               interrupt_ack_i,
     output  logic               interrupt_pending_o,
 
@@ -90,9 +90,7 @@ module CSRBank
     logic [31:0] interrupt_ack_counter, raise_exception_counter, context_switch_counter;
     logic [31:0] logic_counter, arithmetic_counter, shift_counter, branch_counter, jump_counter;
     logic [31:0] load_counter, store_counter, sys_counter, csr_counter;
-`ifdef M_EXT
     logic [31:0] mul_counter, div_counter;
-`endif
 `endif
     //logic [31:0] medeleg, mideleg; // NOT IMPLEMENTED YET (REQUIRED ONLY WHEN SYSTEM HAVE S-MODE)
     interruptionCode_e Interruption_Code;
@@ -319,15 +317,19 @@ module CSRBank
         end
     end
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Interrupt Control
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
     always_ff @(posedge clk) begin
         if (reset) begin
             mip <= '0;
         end
         else begin
-            mip <= IRQ_i;
+            mip <= irq_i;
         end
     end
-    
+
     always_ff @(posedge clk) begin
         if (mstatus[3] && (mie & mip) != '0 && !interrupt_ack_i) begin
             interrupt_pending_o <= 1;
@@ -345,7 +347,7 @@ module CSRBank
     end
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////// DEBUG ///////////////////////////////////////////////////////////////////////////////////
+// DEBUG
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 `ifdef DEBUG
@@ -364,10 +366,8 @@ module CSRBank
             store_counter               <= '0;
             sys_counter                 <= '0;
             csr_counter                 <= '0;
-        `ifdef M_EXT
             mul_counter                 <= '0;
             div_counter                 <= '0;
-        `endif
 
             hazard_counter              <= '0;
             stall_counter               <= '0;
@@ -396,10 +396,8 @@ module CSRBank
                 store_counter           <= (instruction_operation_i inside {SB, SH, SW})                                    ? store_counter             + 1 : store_counter;
                 sys_counter             <= (instruction_operation_i inside {SRET, MRET, WFI, ECALL, EBREAK})                ? sys_counter               + 1 : sys_counter;
                 csr_counter             <= (instruction_operation_i inside {CSRRW, CSRRWI, CSRRS, CSRRSI, CSRRC, CSRRCI})   ? csr_counter               + 1 : csr_counter;
-            `ifdef M_EXT
                 mul_counter             <= (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU})                      ? mul_counter               + 1 : mul_counter;
                 div_counter             <= (instruction_operation_i inside {DIV, DIVU, REM, REMU})                          ? div_counter               + 1 : div_counter;
-            `endif
             end
         end
     end
@@ -431,10 +429,8 @@ module CSRBank
         $fwrite(fd,"STORE:                  %0d\n", store_counter);
         $fwrite(fd,"SYS:                    %0d\n", sys_counter);
         $fwrite(fd,"CSR:                    %0d\n", csr_counter);
-    `ifdef M_EXT
         $fwrite(fd,"MUL:                    %0d\n", mul_counter);
         $fwrite(fd,"DIV:                    %0d\n", div_counter);
-    `endif
         
     end
 `endif

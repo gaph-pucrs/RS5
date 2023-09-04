@@ -1,3 +1,12 @@
 [submodule "app/riscv-tests"]
 	path = app/riscv-tests
 	url = https://github.com/marlls1989/riscv-tests.git
+[submodule "os/MAestro"]
+	path = os/MAestro
+	url = https://github.com/gaph-pucrs/MAestro
+[submodule "os/libmutils"]
+	path = os/libmutils
+	url = https://github.com/gaph-pucrs/libmutils
+[submodule "os/libmemphis"]
+	path = os/libmemphis
+	url = https://github.com/gaph-pucrs/libmemphis

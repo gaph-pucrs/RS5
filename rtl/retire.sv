@@ -26,9 +26,11 @@ module retire
     input   iType_e         instruction_operation_i,
     input   logic [31:0]    result_i,
 `ifdef HARDWARE_MULTIPLICATION
-    input   logic [63:0]    mul_result_i, 
+    input   logic [63:0]    mul_result_i,
+/* verilator lint_off UNUSEDSIGNAL */ 
     input   logic [63:0]    mulh_result_i, 
     input   logic [63:0]    mulhsu_result_i,
+/* verilator lint_on UNUSEDSIGNAL */
 `endif
     input   logic [31:0]    mem_data_i,
 

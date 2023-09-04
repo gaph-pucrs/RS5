@@ -22,7 +22,11 @@ module muldiv
     output  logic [63:0] mulhsu_result_o 
 );
 
-    logic hold_mul, hold_div;
+    logic hold_mul;
+    
+    /* verilator lint_off UNUSEDSIGNAL */
+    logic hold_div;
+    /* verilator lint_on UNUSEDSIGNAL */
 
 `ifdef HARDWARE_DIVISION
     assign hold_o = hold_mul | hold_div;
@@ -76,19 +80,20 @@ module muldiv
     );
 
 `else
-    logic signed [63:0]    mul_opa_signed, mul_opb_signed;
-    logic        [63:0]    mul_opa, mul_opb;
 
-    assign  mul_opa = first_operand_i,
-            mul_opb = second_operand_i;
+    logic signed [31:0]    mul_opa_signed, mul_opb_signed;
+    logic        [31:0]    mul_opa, mul_opb;
+
+    assign  mul_opa[31:0] = first_operand_i,
+            mul_opb[31:0] = second_operand_i;
     
-    assign  mul_opa_signed = $signed(first_operand_i),
-            mul_opb_signed = $signed(second_operand_i);
+    assign  mul_opa_signed[31:0] = $signed(first_operand_i),
+            mul_opb_signed[31:0] = $signed(second_operand_i);
 
-    always @(posedge clk) begin
-        mul_result_o      = mul_opa        * mul_opb;
-        mulh_result_o     = mul_opa_signed * mul_opb_signed;
-        mulhsu_result_o   = mul_opa_signed * mul_opb;
+    always_ff @(posedge clk) begin
+        mul_result_o      <= mul_opa        * mul_opb;
+        mulh_result_o     <= mul_opa_signed * mul_opb_signed;
+        mulhsu_result_o   <= mul_opa_signed * mul_opb;
     end
 `endif
 
@@ -105,8 +110,8 @@ module muldiv
     logic [31:0]    acc_sig_div, acc_next_sig_div;
     logic [31:0]    quo_unsig_div, quo_next_unsig_div;
     logic [32:0]    acc_unsig_div, acc_next_unsig_div;
-    logic           start_sig_div, busy_sig_div, done_sig_div, valid_sig_div;
-    logic           start_unsig_div, busy_unsig_div, done_unsig_div, valid_unsig_div;
+    logic           start_sig_div, busy_sig_div, valid_sig_div;
+    logic           start_unsig_div, busy_unsig_div, valid_unsig_div;
     logic           divide_by_zero, overflow;
     logic [31:0]    div_result;
 
@@ -161,10 +166,8 @@ module muldiv
     always_ff @(posedge clk) begin
         logic [4:0] i;
 
-        done_unsig_div <= 0;
         if (reset) begin
             busy_unsig_div    <= 0;
-            done_unsig_div    <= 0;
             valid_unsig_div   <= 0;
             acc_unsig_div     <= '0;
             quo_unsig_div     <= '0;
@@ -179,7 +182,6 @@ module muldiv
             i                                   <= 0;
             if (divide_by_zero) begin
                 busy_unsig_div                  <= 0;
-                done_unsig_div                  <= 1;
                 valid_unsig_div                 <= 1;
             end else begin
                 busy_unsig_div                  <= 1;
@@ -190,7 +192,6 @@ module muldiv
         else if (busy_unsig_div) begin
             if (i == 31) begin
                 busy_unsig_div    <= 0;
-                done_unsig_div    <= 1;
                 valid_unsig_div   <= 1;
             end 
             else begin
@@ -220,11 +221,9 @@ module muldiv
     always_ff @(posedge clk) begin
         logic [4:0] i;
 
-        done_sig_div        <= 0;
         if (reset) begin
             div_state       <= D_IDLE; 
             busy_sig_div    <= 0;
-            done_sig_div    <= 0;
             valid_sig_div   <= 0;
             acc_sig_div     <= '0;
             quo_sig_div     <= '0;
@@ -251,7 +250,6 @@ module muldiv
                     if (i == 30 && quo_next_sig_div[30] != 0) begin
                         div_state       <= D_IDLE;
                         busy_sig_div    <= 0;
-                        done_sig_div    <= 1;
                         overflow        <= 1;
                     end
                     else begin
@@ -267,7 +265,6 @@ module muldiv
                 D_SIGN: begin
                     div_state       <= D_IDLE;
                     busy_sig_div    <= 0;
-                    done_sig_div    <= 1;
                     valid_sig_div   <= 1;
                     
                     if (overflow) begin
@@ -289,14 +286,12 @@ module muldiv
                         if (divide_by_zero) begin
                             div_state       <= D_IDLE;
                             busy_sig_div    <= 0;
-                            done_sig_div    <= 1;
                             overflow        <= 0;
                             valid_sig_div   <= 1;
                         end 
                         else if (second_operand_i == 32'h80000000) begin
                             div_state       <= D_IDLE;
                             busy_sig_div    <= 0;
-                            done_sig_div    <= 1;
                             overflow        <= 1;
                             valid_sig_div   <= 1;
                         end 
@@ -311,7 +306,7 @@ module muldiv
                             b_unsig                     <= (b_signal) 
                                                             ? -second_operand_i[30:0] 
                                                             : second_operand_i[30:0];
-                            {acc_sig_div, quo_sig_div}  <= {{32{1'b0}}, first_operand_i, 1'b0};
+                            {acc_sig_div, quo_sig_div}  <= {{30{1'b0}}, first_operand_i, 1'b0};
                         end
                     end
                 end

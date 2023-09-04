@@ -1,4 +1,5 @@
-.equ MMR_BASE, 0x20000000
+.equ MMR_BASE,  0x20000000
+.equ PLIC_BASE, 0x30000000
 
 	.section .text.init
 	.global _entry
@@ -9,13 +10,21 @@ boot:
     la t0, trap_handler         # Grava o endereço do rótulo trap_handler
     csrw mtvec, t0              # no registrador mtvec
 
-    # # Habilita Interrupções Global
+    # Habilita Interrupções Global
     li t1, 0x80                 # Seta o bit 7 (MPIE)
     csrs mstatus, t1            # do registrador mstatus
 
+	# Habilita Interrupções no PLIC
+	li	t0, PLIC_BASE
+	li  t1, 0x2000
+	add t0, t0, t1
+	li	t1, -1
+	sw  t1, 0(t0)
+
+
 	# Configura timer
 	li	t0, MMR_BASE
-	li	t1, 500000	            # 5000 us (time / period)
+	li	t1, 500000	# 5000 us (time / period)
 	sw	zero,  0(t0)
 	sw  zero,  4(t0)
 	sw    t1,  8(t0)
