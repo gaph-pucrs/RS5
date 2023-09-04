@@ -1,12 +1,12 @@
 TRIPLET = riscv64-elf
 CC = $(TRIPLET)-gcc
-CFLAGS = -IbareOS/include -O2 -fno-builtin -march=rv32i -mabi=ilp32 -nostdinc -mbranch-cost=7 -DITERATIONS=1 -DCORE_DEBUG=0
+CFLAGS = -IbareOS/include -O2 -fno-builtin -march=rv32i -fdata-sections -ffunction-sections -mabi=ilp32 -nostdinc -mbranch-cost=7 -DITERATIONS=1 -DCORE_DEBUG=0
 AS = $(TRIPLET)-as
 ASFLAGS = -march=rv32i_zicsr -mabi=ilp32
 CPP = $(TRIPLET)-g++
 CCFLAGS = $(CFLAGS)
 LD = $(TRIPLET)-gcc
-LDFLAGS = -nostdlib -march=rv32i -mabi=ilp32 -Triscv.ld
+LDFLAGS = -nostdlib -march=rv32i -mabi=ilp32 -Triscv.ld -Wl,--gc-sections
 OBJCOPY = $(TRIPLET)-objcopy
 OBJDUMP = $(TRIPLET)-objdump
 
