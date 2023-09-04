@@ -22,7 +22,11 @@ module muldiv
     output  logic [63:0] mulhsu_result_o 
 );
 
-    logic hold_mul, hold_div;
+    logic hold_mul;
+    
+    /* verilator lint_off UNUSEDSIGNAL */
+    logic hold_div;
+    /* verilator lint_on UNUSEDSIGNAL */
 
 `ifdef HARDWARE_DIVISION
     assign hold_o = hold_mul | hold_div;
