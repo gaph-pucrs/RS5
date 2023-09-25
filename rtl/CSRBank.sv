@@ -37,7 +37,7 @@ module CSRBank
     input   logic               killed,
     output  logic [31:0]        out,
 
-`ifdef DEBUG
+`ifdef ZIHPM
     input   iType_e             instruction_operation_i,
     input   logic               hazard,
     input   logic               stall,
@@ -85,7 +85,7 @@ module CSRBank
     
     logic [31:0] wr_data, wmask, current_val;
 
-`ifdef DEBUG
+`ifdef ZIHPM
     logic [31:0] instructions_killed_counter, hazard_counter, stall_counter, nop_counter;
     logic [31:0] interrupt_ack_counter, raise_exception_counter, context_switch_counter;
     logic [31:0] logic_counter, arithmetic_counter, shift_counter, branch_counter, jump_counter;
@@ -148,7 +148,7 @@ module CSRBank
     end
 
     always_ff @(posedge clk) begin
-        if (reset) begin
+        if (reset == 1'b1) begin
             // mstatus     <= '0;   // Duplicated behavior. Which one is the right one?
             mstatus[3]  <= 0;       // MIE  = 0
             mstatus[17] <= 0;       // MPRV = 0
@@ -180,11 +180,11 @@ module CSRBank
                             ? minstret 
                             : minstret + 1;
         
-            if (machine_return_i) begin
+            if (machine_return_i == 1'b1) begin
                 mstatus[3]      <= mstatus[7];          // MIE = MPIE
                 privilege       <= privilegeLevel_e'(mstatus[12:11]);      // priv = MPP
             end
-            else if (raise_exception_i) begin
+            else if (raise_exception_i == 1'b1) begin
                 mcause[31]      <= '0;
                 mcause[30:0]    <= {26'b0, exception_code_i};
                 mstatus[12:11]  <= privilege;           // MPP = previous privilege
@@ -199,7 +199,7 @@ module CSRBank
                                     : pc_i;
 
             end 
-            else if (interrupt_ack_i) begin
+            else if (interrupt_ack_i == 1'b1) begin
                 mcause[31]      <= '1;
                 mcause[30:0]    <=  {26'b0, Interruption_Code};
                 mstatus[12:11]  <= privilege;           // MPP = previous privilege
@@ -213,7 +213,7 @@ module CSRBank
                     mepc_r      <= pc_i;                // Return address
             
             end 
-            else if (write_enable_i && !killed) begin
+            else if ((write_enable_i & ~killed) == 1'b1) begin
                 case(CSR)
                     MSTATUS:      mstatus         <= wr_data;
                     MISA:         misa            <= wr_data;
@@ -246,7 +246,7 @@ module CSRBank
     end
 
     always_comb begin
-        if (read_enable_i && !killed) begin
+        if ((read_enable_i & ~killed) == 1'b1) begin
             case(CSR)
                 //RO
                 MVENDORID:      out = '0;
@@ -279,7 +279,7 @@ module CSRBank
                 TIME:           out = mtime_i[31:0];
                 INSTRET:        out = minstret[31:0];
 
-            `ifdef DEBUG
+            `ifdef ZIHPM
                 MHPMCOUNTER3:   out = instructions_killed_counter;
                 MHPMCOUNTER4:   out = context_switch_counter;
                 MHPMCOUNTER5:   out = raise_exception_counter;
@@ -322,7 +322,7 @@ module CSRBank
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk) begin
-        if (reset) begin
+        if (reset == 1'b1) begin
             mip <= '0;
         end
         else begin
@@ -333,11 +333,11 @@ module CSRBank
     always_ff @(posedge clk) begin
         if (mstatus[3] && (mie & mip) != '0 && !interrupt_ack_i) begin
             interrupt_pending_o <= 1;
-            if (mip[11] & mie[11])                   // Machine External
+            if ((mip[11] & mie[11]) == 1'b1)                   // Machine External
                 Interruption_Code <= M_EXT_INT;
-            else if (mip[3] & mie[3])                // Machine Software
+            else if ((mip[3] & mie[3]) == 1'b1)                // Machine Software
                 Interruption_Code <= M_SW_INT;
-            else if (mip[7] & mie[7])                // Machine Timer
+            else if ((mip[7] & mie[7]) == 1'b1)                // Machine Timer
                 Interruption_Code <= M_TIM_INT;
 
         end 
@@ -347,14 +347,14 @@ module CSRBank
     end
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// DEBUG
+// ZIHPM
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-`ifdef DEBUG
+`ifdef ZIHPM
     int fd;
 
     always_ff @(posedge clk) begin
-        if (reset) begin
+        if (reset == 1'b1) begin
             instructions_killed_counter <= '0;
             nop_counter                 <= '0;
             logic_counter               <= '0;
@@ -386,7 +386,7 @@ module CSRBank
             context_switch_counter      <= (jump_i || raise_exception_i || machine_return_i || interrupt_ack_i) ? context_switch_counter + 1 : context_switch_counter;
             nop_counter                 <= (instruction_operation_i == NOP)                                     ?   nop_counter + 1 : nop_counter;
 
-            if (!killed) begin
+            if (killed == 1'b0) begin
                 logic_counter           <= (instruction_operation_i inside {XOR, OR, AND})                                  ? logic_counter             + 1 : logic_counter;
                 arithmetic_counter      <= (instruction_operation_i inside {ADD, SUB, SLTU, SLT, LUI})                      ? arithmetic_counter        + 1 : arithmetic_counter;
                 shift_counter           <= (instruction_operation_i inside {SLL, SRL, SRA})                                 ? shift_counter             + 1 : shift_counter;

@@ -35,7 +35,7 @@ module rtc (
     assign mtime_o = memory[7:0];
 
     always_ff @(posedge clk) begin
-        if (reset) begin
+        if (reset == 1'b1) begin
             mti_o <= 1'b0;
         end
         else begin
@@ -45,34 +45,34 @@ module rtc (
 
     always_ff @(posedge clk) begin
         memory[7:0] <= memory[7:0] + 1'b1;
-        if (reset) begin
+        if (reset == 1'b1) begin
             memory <= '0;
             data_o <= '0;
         end
-        else if (en_i) begin
+        else if (en_i == 1'b1) begin
             if (we_i != '0) begin
-                if (we_i[7]) begin                                 
+                if (we_i[7] == 1'b1) begin                                 
                     memory[addr_i+7] <= data_i[63:56];
                 end 
-                if (we_i[6]) begin                                 
+                if (we_i[6] == 1'b1) begin                                 
                     memory[addr_i+6] <= data_i[55:48];
                 end
-                if (we_i[5]) begin                                 
+                if (we_i[5] == 1'b1) begin                                 
                     memory[addr_i+5] <= data_i[47:40];
                 end
-                if (we_i[4]) begin                                 
+                if (we_i[4] == 1'b1) begin                                 
                     memory[addr_i+4] <= data_i[39:32];
                 end
-                if (we_i[3]) begin                                
+                if (we_i[3] == 1'b1) begin                                
                     memory[addr_i+3] <= data_i[31:24];
                 end 
-                if (we_i[2]) begin                                 
+                if (we_i[2] == 1'b1) begin                                 
                     memory[addr_i+2] <= data_i[23:16];
                 end
-                if (we_i[1]) begin                                 
+                if (we_i[1] == 1'b1) begin                                 
                     memory[addr_i+1] <= data_i[15:8];
                 end
-                if (we_i[0]) begin                                 
+                if (we_i[0] == 1'b1) begin                                 
                     memory[addr_i]   <= data_i[7:0];
                 end
             end

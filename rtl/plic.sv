@@ -28,7 +28,7 @@ module plic
     logic [i_cnt:1]         interrupt;
 
     always_ff @(posedge clk) begin
-        if (reset) begin
+        if (reset == 1'b1) begin
             ip <= '0;
         end
         else begin
@@ -42,7 +42,7 @@ module plic
 	always_comb begin
 		id_int = '0;   /* 0 = NO IRQ */
 		for (int i = 1; i <= i_cnt; i++) begin
-			if (interrupt[i]) begin
+			if (interrupt[i] == 1'b1) begin
 				id_int = '0;
 				break;
 			end
@@ -51,10 +51,10 @@ module plic
 /* verilator lint_on WIDTHTRUNC */
 
     always_ff @(posedge clk) begin
-        if (reset) begin
+        if (reset == 1'b1) begin
             id <= '0;
         end
-        else if (iack_i)begin
+        else if (iack_i == 1'b1)begin
             id <= id_int;
         end
     end
@@ -62,7 +62,7 @@ module plic
     assign irq_o    = (|interrupt) & ~iack_i;
 
     always_comb begin
-        if (iack_i) begin
+        if (iack_i == 1'b1) begin
             iack_o = (1'b1 << id);
         end
         else begin
@@ -75,11 +75,11 @@ module plic
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     always_ff @( posedge clk ) begin
-        if (reset) begin
+        if (reset == 1'b1) begin
             ie      <= '0;
             data_o  <= '0;
         end  
-        else if (en_i) begin
+        else if (en_i == 1'b1) begin
             if (we_i != '0) begin
                 case (addr_i)
                     24'h002000:     ie      <= data_i[i_cnt:1];

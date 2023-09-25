@@ -55,7 +55,7 @@ module regbank
 
     for (genvar i = 1; i < 32 ; i++) begin : gen_regfile
         always_ff @(posedge clk) begin
-            if (reset) begin
+            if (reset == 1'b1) begin
                 regfile[i] <= '0;
             end
             else if (rd == i && enable == 1'b1) begin
@@ -67,7 +67,6 @@ module regbank
 //////////////////////////////////////////////////////////////////////////////
 // DEBUG 
 //////////////////////////////////////////////////////////////////////////////
-`ifdef DEBUG
     int fd;
 
     initial begin
@@ -80,6 +79,5 @@ module regbank
             $fwrite(fd,"[%0d] --------------------------------- %02d - %8h\n", $time, rd, data_i);
         end
     end
-`endif
 
 endmodule

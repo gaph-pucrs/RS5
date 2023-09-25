@@ -26,7 +26,7 @@ module decode
 (
     input   logic           clk,
     input   logic           reset,
-    input   logic           stall,
+    input   logic           enable,
 
     input   logic [31:0]    instruction_i,
     input   logic [31:0]    pc_i,
@@ -72,11 +72,11 @@ module decode
     always_ff @(posedge clk) begin
         last_instruction <= instruction;
         last_hazard      <= hazard_o;
-        last_stall       <= stall;
+        last_stall       <= ~enable;
     end
 
     always_comb begin
-        if (last_hazard | last_stall) begin
+        if ((last_hazard | last_stall) == 1'b1) begin
             instruction = last_instruction;
         end
         else begin
@@ -264,15 +264,15 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk) begin
-        if (reset) begin
+        if (reset == 1'b1) begin
             locked_register <= '0;
             locked_memory   <= '0;
         end 
-        else if (hazard_o) begin
+        else if (hazard_o == 1'b1) begin
             locked_register <= '0;
             locked_memory   <= '0;
         end
-        else if (!stall) begin
+        else if (enable == 1'b1) begin
             locked_register <= instruction[11:7];
             locked_memory   <= (opcode[6:2] == 5'b01000);
         end
@@ -336,7 +336,7 @@ module decode
     assign hazard_rs1 = locked_rs1      & use_rs1;
     assign hazard_rs2 = locked_rs2      & use_rs2;
 
-    assign hazard_o   = (hazard_mem | hazard_rs1 | hazard_rs2) & !stall;
+    assign hazard_o   = (hazard_mem | hazard_rs1 | hazard_rs2) & enable;
 
 //////////////////////////////////////////////////////////////////////////////
 // Exception Detection 
@@ -382,7 +382,7 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk) begin
-        if (reset) begin
+        if (reset == 1'b1) begin
             first_operand_o         <= '0;
             second_operand_o        <= '0;
             third_operand_o         <= '0;
@@ -396,7 +396,7 @@ module decode
             exc_inst_access_fault_o <= 1'b0;
         `endif
         end 
-        else if (hazard_o) begin
+        else if (hazard_o == 1'b1) begin
             first_operand_o         <= '0;
             second_operand_o        <= '0;
             third_operand_o         <= '0;
@@ -410,7 +410,7 @@ module decode
             exc_inst_access_fault_o <= 1'b0;
         `endif
         end 
-        else if (!stall) begin
+        else if (enable == 1'b1) begin
             first_operand_o         <= first_operand;
             second_operand_o        <= second_operand;
             third_operand_o         <= third_operand;

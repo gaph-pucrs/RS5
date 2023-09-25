@@ -29,7 +29,7 @@ module mmu
 );
 
     always_comb begin
-        if (en_i) begin
+        if (en_i == 1'b1) begin
             address_o = (address_i & size_i) | offset_i;
             if ((address_i & ~size_i) != '0) begin
                 exception_o = 1'b1;

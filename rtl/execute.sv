@@ -202,15 +202,15 @@ end
         unique case (instruction_operation_i)
             CSRRW, CSRRWI: begin
                 csr_read_enable  = (rd == '0) ? 1'b0 : 1'b1;
-                csr_write_enable = 1;
+                csr_write_enable = 1'b1;
             end
             CSRRS, CSRRC, CSRRSI, CSRRCI: begin
-                csr_read_enable  = 1;
+                csr_read_enable  = 1'b1;
                 csr_write_enable = (rs1 == '0) ? 1'b0 : 1'b1;
             end
             default: begin
-                csr_read_enable  = 0;
-                csr_write_enable = 0;
+                csr_read_enable  = 1'b0;
+                csr_write_enable = 1'b0;
             end
         endcase
     end
@@ -234,11 +234,11 @@ end
     
     always_comb begin
         // Raise exeption if CSR is read only and write enable is true
-        if (csr_address_o[11:10] == 2'b11 && csr_write_enable) begin
+        if (csr_address_o[11:10] == 2'b11 && csr_write_enable == 1'b1) begin
             exc_ilegal_csr_inst = 1;
         end
         // Check Level privileges
-        else if (csr_address_o[9:8] > privilege_i && (csr_read_enable || csr_write_enable)) begin
+        else if (csr_address_o[9:8] > privilege_i && ((csr_read_enable | csr_write_enable) == 1'b1)) begin
             exc_ilegal_csr_inst = 1;
         end
         // No exception is raised
@@ -322,9 +322,9 @@ end
 
     always_ff @(posedge clk) begin
         if (
-            !stall 
+            stall == 1'b0 
         `ifdef MULTICYCLE_INSTRUCTIONS
-            & !hold_o
+            & hold_o == 1'b0
         `endif
         ) begin
             write_enable_o          <= write_enable;
@@ -373,10 +373,10 @@ end
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk) begin
-        if (reset) begin
+        if (reset == 1'b1) begin
             curr_tag <= 0;
         end
-        else if (jump_o | raise_exception_o | machine_return_o | interrupt_ack_o) begin
+        else if ((jump_o | raise_exception_o | machine_return_o | interrupt_ack_o) == 1'b1) begin
             curr_tag <= curr_tag + 1;
         end
     end
@@ -386,81 +386,81 @@ end
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        if (!killed & !reset) begin
+        if ((reset | killed) == 1'b0) begin
         `ifdef XOSVM
-            if (exc_inst_access_fault_i) begin
-                raise_exception_o = 1;
-                exception_code_o  = ILLEGAL_INSTRUCTION;
-                machine_return_o  = 0;
-                interrupt_ack_o   = 0;
+            if (exc_inst_access_fault_i == 1'b1) begin
+                raise_exception_o = 1'b1;
+                machine_return_o  = 1'b0;
+                interrupt_ack_o   = 1'b0;
+                //exception_code_o  = ILLEGAL_INSTRUCTION;
                 exception_code_o  = INSTRUCTION_ACCESS_FAULT;
                 $write("[%0d] EXCEPTION - INSTRUCTION ACCESS FAULT: %8h %8h\n", $time, pc_i, instruction_i);
             end
             else
         `endif
-            if (exc_ilegal_inst_i | exc_ilegal_csr_inst) begin
-                raise_exception_o = 1;
-                machine_return_o  = 0;
-                interrupt_ack_o   = 0;
+            if ((exc_ilegal_inst_i | exc_ilegal_csr_inst) == 1'b1) begin
+                raise_exception_o = 1'b1;
+                machine_return_o  = 1'b0;
+                interrupt_ack_o   = 1'b0;
                 exception_code_o  = ILLEGAL_INSTRUCTION;
                 $write("[%0d] EXCEPTION - ILLEGAL INSTRUCTION: %8h %8h\n", $time, pc_i, instruction_i);
             end 
-            else if (exc_misaligned_fetch_i) begin
-                raise_exception_o = 1;
-                machine_return_o  = 0;
-                interrupt_ack_o   = 0;
+            else if (exc_misaligned_fetch_i == 1'b1) begin
+                raise_exception_o = 1'b1;
+                machine_return_o  = 1'b0;
+                interrupt_ack_o   = 1'b0;
                 exception_code_o  = INSTRUCTION_ADDRESS_MISALIGNED;
                 $write("[%0d] EXCEPTION - INSTRUCTION ADDRESS MISALIGNED: %8h %8h\n", $time, pc_i, instruction_i);
             end 
             else if (instruction_operation_i == ECALL) begin
-                raise_exception_o = 1;
+                raise_exception_o = 1'b1;
+                machine_return_o  = 1'b0;
+                interrupt_ack_o   = 1'b0;
                 exception_code_o  = ECALL_FROM_MMODE;
-                machine_return_o  = 0;
-                interrupt_ack_o   = 0;
                 $write("[%0d] EXCEPTION - ECALL_FROM_MMODE: %8h %8h\n", $time, pc_i, instruction_i);
             end 
             else if (instruction_operation_i == EBREAK) begin
-                raise_exception_o = 1;
+                raise_exception_o = 1'b1;
+                machine_return_o  = 1'b0;
+                interrupt_ack_o   = 1'b0;
                 exception_code_o  = BREAKPOINT;
-                machine_return_o  = 0;
-                interrupt_ack_o   = 0;
                 $write("[%0d] EXCEPTION - EBREAK: %8h %8h\n", $time, pc_i, instruction_i);
             end
         `ifdef XOSVM
-            else if (exc_load_access_fault_i && (mem_write_enable_o != '0 || mem_read_enable_o)) begin
-                raise_exception_o = 1;
-                machine_return_o  = 0;
-                interrupt_ack_o   = 0;
+            else if (exc_load_access_fault_i == 1'b1 && (mem_write_enable_o != '0 || mem_read_enable_o == 1'b1)) begin
+                raise_exception_o = 1'b1;
+                machine_return_o  = 1'b0;
+                interrupt_ack_o   = 1'b0;
                 exception_code_o  = LOAD_ACCESS_FAULT;
                 $write("[%0d] EXCEPTION - LOAD ACCESS FAULT: %8h %8h %8h\n", $time, pc_i, instruction_i, mem_address_o);
             end 
         `endif
             else if (instruction_operation_i == MRET) begin
-                raise_exception_o = 0;
+                raise_exception_o = 1'b0;
+                machine_return_o  = 1'b1;
+                interrupt_ack_o   = 1'b0;
                 exception_code_o  = NE;
-                machine_return_o  = 1;
-                interrupt_ack_o   = 0;
                 $write("[%0d] MRET: %8h %8h\n", $time, pc_i, instruction_i);
             end 
             else if (interrupt_pending_i == 1'b1 && instruction_operation_i != NOP) begin
-                raise_exception_o = 0;
+                raise_exception_o = 1'b0;
+                machine_return_o  = 1'b0;
+                interrupt_ack_o   = 1'b1;
                 exception_code_o  = NE;
-                machine_return_o  = 0;
-                interrupt_ack_o   = 1;
                 $write("[%0d] Interrupt Acked\n", $time);
             end
             else begin
-                raise_exception_o = 0;
+                raise_exception_o = 1'b0;
+                machine_return_o  = 1'b0;
+                interrupt_ack_o   = 1'b0;
                 exception_code_o  = NE;
-                machine_return_o  = 0;
-                interrupt_ack_o   = 0;
             end
         end
         else begin
-            raise_exception_o = 0;
+            raise_exception_o = 1'b0;
+            machine_return_o  = 1'b0;
+            interrupt_ack_o   = 1'b0;
             exception_code_o  = NE;
-            machine_return_o  = 0;
-            interrupt_ack_o   = 0;
         end
     end
 

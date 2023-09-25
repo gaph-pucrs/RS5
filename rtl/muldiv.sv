@@ -136,13 +136,13 @@ module muldiv
     end
 
     always_comb begin
-        if (divide_by_zero) begin
+        if (divide_by_zero == 1'b1) begin
             rem_result_o = first_operand_i;
         end
-        else if (overflow) begin
+        else if (overflow == 1'b1) begin
             rem_result_o = 0;
         end
-        else if (a_signal) begin
+        else if (a_signal == 1'b1) begin
             rem_result_o = {1'b1, -acc_sig_div[31:1]};
         end
         else begin
@@ -166,7 +166,7 @@ module muldiv
     always_ff @(posedge clk) begin
         logic [4:0] i;
 
-        if (reset) begin
+        if (reset == 1'b1) begin
             busy_unsig_div    <= 0;
             valid_unsig_div   <= 0;
             acc_unsig_div     <= '0;
@@ -177,10 +177,10 @@ module muldiv
         else if (!(instruction_operation_i inside {DIVU, REMU})) begin
             valid_unsig_div <= 0;
         end 
-        else if (start_unsig_div) begin
+        else if (start_unsig_div == 1'b1) begin
             valid_unsig_div                     <= 0;
             i                                   <= 0;
-            if (divide_by_zero) begin
+            if (divide_by_zero == 1'b1) begin
                 busy_unsig_div                  <= 0;
                 valid_unsig_div                 <= 1;
             end else begin
@@ -189,7 +189,7 @@ module muldiv
                 {acc_unsig_div, quo_unsig_div}  <= {{32{1'b0}}, first_operand_i, 1'b0};
             end
         end 
-        else if (busy_unsig_div) begin
+        else if (busy_unsig_div == 1'b1) begin
             if (i == 31) begin
                 busy_unsig_div    <= 0;
                 valid_unsig_div   <= 1;
@@ -221,7 +221,7 @@ module muldiv
     always_ff @(posedge clk) begin
         logic [4:0] i;
 
-        if (reset) begin
+        if (reset == 1'b1) begin
             div_state       <= D_IDLE; 
             busy_sig_div    <= 0;
             valid_sig_div   <= 0;
@@ -267,7 +267,7 @@ module muldiv
                     busy_sig_div    <= 0;
                     valid_sig_div   <= 1;
                     
-                    if (overflow) begin
+                    if (overflow == 1'b1) begin
                         div_result  <= first_operand_i;
                     end
                     else if (quo_sig_div != 0) begin
@@ -281,9 +281,9 @@ module muldiv
                 end
 
                 default: begin
-                    if (start_sig_div) begin
+                    if (start_sig_div == 1'b1) begin
                         valid_sig_div       <= 0;
-                        if (divide_by_zero) begin
+                        if (divide_by_zero == 1'b1) begin
                             div_state       <= D_IDLE;
                             busy_sig_div    <= 0;
                             overflow        <= 0;

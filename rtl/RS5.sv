@@ -77,7 +77,7 @@ module RS5
 // Fetch signals
 //////////////////////////////////////////////////////////////////////////////
 
-    logic           stall_fetch;
+    logic           enable_fetch;
 
 //////////////////////////////////////////////////////////////////////////////
 // Decoder signals
@@ -85,16 +85,16 @@ module RS5
 
     logic   [31:0]  pc_decode;
     logic    [2:0]  tag_decode;
-    logic           stall_decode;
+    logic           enable_decode;
 
 //////////////////////////////////////////////////////////////////////////////
 // RegBank signals
 //////////////////////////////////////////////////////////////////////////////
 
-    logic   [4:0]   rs1, rs2;
+    logic    [4:0]  rs1, rs2;
     logic   [31:0]  regbank_data1, regbank_data2;
     logic   [31:0]  rs1_data_read, rs2_data_read;
-    logic   [4:0]   rd;
+    logic    [4:0]  rd;
     logic   [31:0]  regbank_data_writeback;
     logic           regbank_write_enable_int, regbank_write_enable;
 
@@ -122,9 +122,9 @@ module RS5
     logic           killed;
 
 `ifdef HARDWARE_MULTIPLICATION
-    logic [63:0]    mul_result;
-    logic [63:0]    mulh_result;
-    logic [63:0]    mulhsu_result;
+    logic   [63:0]  mul_result;
+    logic   [63:0]  mulh_result;
+    logic   [63:0]  mulhsu_result;
 `endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -164,16 +164,16 @@ module RS5
                             ? regbank_data_writeback 
                             : regbank_data2;
 
-    assign stall_fetch = (stall
-                    `ifdef MULTICYCLE_INSTRUCTIONS
-                        | hold
-                    `endif
+    assign enable_fetch = ~(stall | hazard
+                        `ifdef MULTICYCLE_INSTRUCTIONS
+                            | hold
+                        `endif
                         );
 
-    assign stall_decode = (stall
-                    `ifdef MULTICYCLE_INSTRUCTIONS
-                        | hold
-                    `endif
+    assign enable_decode = ~(stall
+                        `ifdef MULTICYCLE_INSTRUCTIONS
+                            | hold
+                        `endif
                         );
 
 
@@ -184,18 +184,17 @@ module RS5
     fetch fetch1 (
         .clk                    (clk), 
         .reset                  (reset), 
-        .stall                  (stall_fetch),
-        .hazard_i               (hazard), 
+        .enable                 (enable_fetch),
         .jump_i                 (jump), 
         .jump_target_i          (jump_target),
-        .instruction_address_o  (instruction_address), 
-        .pc_o                   (pc_decode), 
-        .tag_o                  (tag_decode),
-        .mepc_i                 (mepc), 
         .mtvec_i                (mtvec),
+        .mepc_i                 (mepc), 
         .exception_raised_i     (RAISE_EXCEPTION), 
         .machine_return_i       (MACHINE_RETURN), 
-        .interrupt_ack_i        (interrupt_ack_o)
+        .interrupt_ack_i        (interrupt_ack_o),
+        .instruction_address_o  (instruction_address), 
+        .pc_o                   (pc_decode), 
+        .tag_o                  (tag_decode)
     );
 
 `ifdef XOSVM
@@ -218,7 +217,7 @@ module RS5
     decode decoder1 (
         .clk                        (clk), 
         .reset                      (reset),
-        .stall                      (stall_decode),
+        .enable                     (enable_decode),
         .instruction_i              (instruction_i), 
         .pc_i                       (pc_decode), 
         .tag_i                      (tag_decode), 
@@ -361,7 +360,7 @@ module RS5
         .data_i                     (csr_data_to_write), 
         .killed                     (killed),
         .out                        (csr_data_read),
-    `ifdef DEBUG
+    `ifdef ZIHPM
         .instruction_operation_i    (instruction_operation_execute),
         .hazard                     (hazard),
         .stall                      (stall),

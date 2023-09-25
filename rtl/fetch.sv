@@ -24,47 +24,43 @@
 module fetch  #(parameter start_address = 32'b0)(
     input   logic           clk,
     input   logic           reset,
-    input   logic           stall,
+    input   logic           enable,
 
-    input   logic           hazard_i,
     input   logic           jump_i,
     input   logic [31:0]    jump_target_i,
-
-    output  logic [31:0]    instruction_address_o,
-    output  logic [31:0]    pc_o,
-    output  logic [2:0]     tag_o,
 
     input   logic [31:0]    mtvec_i,
     input   logic [31:0]    mepc_i,
     input   logic           exception_raised_i,
     input   logic           machine_return_i,
-    input   logic           interrupt_ack_i
+    input   logic           interrupt_ack_i,
+    
+    output  logic [31:0]    instruction_address_o,
+    output  logic [31:0]    pc_o,
+    output  logic  [2:0]    tag_o
 );
 
     logic [31:0] pc;
     logic  [2:0] next_tag, current_tag;
-    logic can_propagate;
-
-    assign can_propagate = ~(hazard_i | stall);
 
 //////////////////////////////////////////////////////////////////////////////
 // PC Control
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk) begin
-        if (reset) begin
+        if (reset == 1'b1) begin
             pc <= start_address;
         end
-        else if (machine_return_i) begin                              
+        else if (machine_return_i == 1'b1) begin                              
             pc <= mepc_i;
         end
-        else if ((exception_raised_i | interrupt_ack_i)) begin
+        else if ((exception_raised_i | interrupt_ack_i) == 1'b1) begin
             pc <= mtvec_i;
         end
-        else if (jump_i) begin
+        else if (jump_i == 1'b1) begin
             pc <= jump_target_i;
         end
-        else if (can_propagate) begin
+        else if (enable == 1'b1) begin
             pc <= pc + 4;
         end
     end
@@ -74,7 +70,7 @@ module fetch  #(parameter start_address = 32'b0)(
 //////////////////////////////////////////////////////////////////////////////
     
     always_ff @(posedge clk) begin
-        if (can_propagate) begin
+        if (enable == 1'b1) begin
             pc_o <= pc;
         end
     end
@@ -91,14 +87,14 @@ module fetch  #(parameter start_address = 32'b0)(
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk) begin
-        if (reset) begin
+        if (reset == 1'b1) begin
             current_tag <= '0;
             next_tag    <= '0;
         end
-        else if (jump_i | exception_raised_i | machine_return_i | interrupt_ack_i) begin
+        else if ((jump_i | exception_raised_i | machine_return_i | interrupt_ack_i) == 1'b1) begin
             next_tag    <= current_tag + 1'b1;
         end
-        else if (can_propagate) begin
+        else if (enable == 1'b1) begin
             current_tag <= next_tag;
         end
     end
