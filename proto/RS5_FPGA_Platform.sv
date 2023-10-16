@@ -1,8 +1,9 @@
 module RS5_FPGA_Platform
     import RS5_pkg::*;
 #(
-    parameter int i_cnt       = 1,
-    parameter bit XOSVMEnable = 1'b0
+    parameter int           i_cnt       = 1,
+    parameter environment_e Environment = FPGA,
+    parameter bit           XOSVMEnable = 1'b0
 )
 (
     input  logic       clk,
@@ -91,6 +92,7 @@ module RS5_FPGA_Platform
 //////////////////////////////////////////////////////////////////////////////
 
     RS5 #(
+        .Environment    (Environment),
         .XOSVMEnable    (XOSVMEnable)
     ) dut (
         .clk                    (clk), 

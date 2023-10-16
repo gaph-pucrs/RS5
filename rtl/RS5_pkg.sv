@@ -20,11 +20,9 @@
 
 package RS5_pkg;
 
-    // `define PROTO 1
     // `define ZIHPM 1
     
-    `define XOSVM 1
-    `define M_EXT 1
+    //`define M_EXT 1
     // `define ZMMUL 1
 
     `ifdef M_EXT
@@ -35,6 +33,11 @@ package RS5_pkg;
         `define MULTICYCLE_INSTRUCTIONS 1
         `define HARDWARE_MULTIPLICATION 1
     `endif
+
+    typedef enum integer {
+        ASIC    = 0,
+        FPGA    = 1
+    } environment_e;
 
     typedef enum  logic[5:0] {
         R_TYPE = 6'b000001, 
@@ -118,9 +121,7 @@ package RS5_pkg;
         MVENDORID = 12'hF11, MARCHID, MIMPID, MHARTID, MCONFIGPTR, 
         MSTATUS = 12'h300, MISA, MEDELEG, MIDELEG, MIE, MTVEC, MCOUNTEREN, MSTATUSH = 12'h310, 
         MSCRATCH = 12'h340, MEPC, MCAUSE, MTVAL, MIP, MTINST = 12'h34A, MTVAL2,
-    `ifdef XOSVM
         MVMDO = 12'h7C0, MVMDS, MVMIO, MVMIS, MVMCTL,
-    `endif
         MCYCLE = 12'hB00, MINSTRET = 12'hB02, MHPMCOUNTER3 = 12'hB03, MHPMCOUNTER4 = 12'hB04, MHPMCOUNTER5 = 12'hB05, MHPMCOUNTER6  = 12'hB06, 
         MHPMCOUNTER7  = 12'hB07, MHPMCOUNTER8  = 12'hB08, MHPMCOUNTER9  = 12'hB09, MHPMCOUNTER10 = 12'hB0A, MHPMCOUNTER11 = 12'hB0B, 
         MHPMCOUNTER12 = 12'hB0C, MHPMCOUNTER13 = 12'hB0D, MHPMCOUNTER14 = 12'hB0E, MHPMCOUNTER15 = 12'hB0F, MHPMCOUNTER16 = 12'hB10, 

@@ -46,12 +46,13 @@ module testbench
 // PARAMETERS FOR CORE INSTANTIATION
 //////////////////////////////////////////////////////////////////////////////
 
-    localparam int      MEM_WIDTH = 65536;
-    localparam string   BIN_FILE = "../app/berkeley_suite/test.bin";
+    localparam int           MEM_WIDTH = 65536;
+    localparam string        BIN_FILE = "../app/berkeley_suite/test.bin";
     
-    localparam int      i_cnt = 1;
+    localparam int           i_cnt = 1;
 
-    localparam bit      XOSVMEnable = 1'b0;
+    localparam environment_e Environment = ASIC;
+    localparam bit           XOSVMEnable = 1'b0;
 
 //////////////////////////////////////////////////////////////////////////////
 // TB SIGNALS
@@ -141,6 +142,7 @@ module testbench
 //////////////////////////////////////////////////////////////////////////////
 
     RS5 #(
+        .Environment(Environment),
         .XOSVMEnable(XOSVMEnable)
     ) dut (
         .clk                    (clk_i), 

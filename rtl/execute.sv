@@ -27,6 +27,9 @@
 
 module execute
     import RS5_pkg::*;
+#(
+    parameter environment_e Environment = ASIC
+)
 (
     input   logic               clk,
     input   logic               reset,
@@ -257,7 +260,9 @@ end
         logic [31:0] remu_result;
     `endif
 
-    muldiv muldiv1 (
+    muldiv #(
+        .Environment    (Environment)
+    ) muldiv1 (
         .clk                        (clk),
         .reset                      (reset),
         .first_operand_i            (first_operand_i),

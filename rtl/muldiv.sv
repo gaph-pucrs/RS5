@@ -1,5 +1,8 @@
 module muldiv 
     import RS5_pkg::*;
+#(
+    parameter environment_e Environment = ASIC
+)
 (
     input   logic        clk,
     input   logic        reset,
@@ -57,45 +60,44 @@ module muldiv
         end
     end
 
-`ifdef PROTO
-    mult_unsigned_unsigned mult_unsig_unsig (
-        .CLK(clk),              // input wire CLK
-        .A(first_operand_i),    // input wire [31 : 0] A
-        .B(second_operand_i),   // input wire [31 : 0] B
-        .P(mul_result_o)        // output wire [63 : 0] P
-    );
+    if (Environment == FPGA) begin :FPGA_muls_blk
+        mult_unsigned_unsigned mult_unsig_unsig (
+            .CLK(clk),              // input wire CLK
+            .A(first_operand_i),    // input wire [31 : 0] A
+            .B(second_operand_i),   // input wire [31 : 0] B
+            .P(mul_result_o)        // output wire [63 : 0] P
+        );
 
-    mult_signed_signed mult_sig_sig (
-        .CLK(clk),              // input wire CLK
-        .A(first_operand_i),    // input wire [31 : 0] A
-        .B(second_operand_i),   // input wire [31 : 0] B
-        .P(mulh_result_o)       // output wire [63 : 0] P
-    );
+        mult_signed_signed mult_sig_sig (
+            .CLK(clk),              // input wire CLK
+            .A(first_operand_i),    // input wire [31 : 0] A
+            .B(second_operand_i),   // input wire [31 : 0] B
+            .P(mulh_result_o)       // output wire [63 : 0] P
+        );
 
-    mult_signed_unsigned mult_sig_unsig (
-        .CLK(clk),              // input wire CLK
-        .A(first_operand_i),    // input wire [31 : 0] A
-        .B(second_operand_i),   // input wire [31 : 0] B
-        .P(mulhsu_result_o)     // output wire [63 : 0] P
-    );
-
-`else
-
-    logic signed [31:0]    mul_opa_signed, mul_opb_signed;
-    logic        [31:0]    mul_opa, mul_opb;
-
-    assign  mul_opa[31:0] = first_operand_i,
-            mul_opb[31:0] = second_operand_i;
-    
-    assign  mul_opa_signed[31:0] = $signed(first_operand_i),
-            mul_opb_signed[31:0] = $signed(second_operand_i);
-
-    always_ff @(posedge clk) begin
-        mul_result_o      <= mul_opa        * mul_opb;
-        mulh_result_o     <= mul_opa_signed * mul_opb_signed;
-        mulhsu_result_o   <= mul_opa_signed * mul_opb;
+        mult_signed_unsigned mult_sig_unsig (
+            .CLK(clk),              // input wire CLK
+            .A(first_operand_i),    // input wire [31 : 0] A
+            .B(second_operand_i),   // input wire [31 : 0] B
+            .P(mulhsu_result_o)     // output wire [63 : 0] P
+        );
     end
-`endif
+    else begin :ASIC_muls_blk
+        logic signed [31:0]    mul_opa_signed, mul_opb_signed;
+        logic        [31:0]    mul_opa, mul_opb;
+
+        assign  mul_opa[31:0] = first_operand_i,
+                mul_opb[31:0] = second_operand_i;
+        
+        assign  mul_opa_signed[31:0] = $signed(first_operand_i),
+                mul_opb_signed[31:0] = $signed(second_operand_i);
+
+        always_ff @(posedge clk) begin
+            mul_result_o      <= mul_opa        * mul_opb;
+            mulh_result_o     <= mul_opa_signed * mul_opb_signed;
+            mulhsu_result_o   <= mul_opa_signed * mul_opb;
+        end
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 // Div Operations Control

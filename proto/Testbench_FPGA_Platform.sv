@@ -26,16 +26,17 @@ import RS5_pkg::*;
 
 module Testbench_FPGA_Platform ();
 
+    logic           clk=1, rstCPU;
+    logic           BTND;
+
 //////////////////////////////////////////////////////////////////////////////
 // PARAMETERS FOR CORE INSTANTIATION
 //////////////////////////////////////////////////////////////////////////////
     
-    localparam int      i_cnt = 1;
+    localparam int              i_cnt = 1;
 
-    localparam bit      XOSVMEnable = 1'b0;
-
-    logic           clk=1, rstCPU;
-    logic           BTND;
+    localparam environment_e    Environment = FPGA;
+    localparam bit              XOSVMEnable = 1'b0;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // RESET CPU 
@@ -62,6 +63,7 @@ module Testbench_FPGA_Platform ();
     
     RS5_FPGA_Platform #(
         .i_cnt          (i_cnt),
+        .Environment    (Environment),
         .XOSVMEnable    (XOSVMEnable)
     ) dut (
         .clk        (clk), 

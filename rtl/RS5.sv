@@ -32,8 +32,9 @@
 module RS5
     import RS5_pkg::*;
 #(
-    parameter rv32m_e   RV32M       = RV32MNone,
-    parameter bit       XOSVMEnable = 1'b0
+    parameter environment_e Environment = ASIC,
+    parameter rv32m_e       RV32M       = RV32MNone,
+    parameter bit           XOSVMEnable = 1'b0
 )
 (
     input  logic                    clk,
@@ -251,38 +252,38 @@ module RS5
 /////////////////////////////////////////////////////////// REGISTER BANK ///////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-`ifdef PROTO
-    DRAM_RegBank RegBankA (
-        .clk        (clk),
-        .we         (regbank_write_enable),
-        .a          (rd),
-        .d          (regbank_data_writeback),
-        .dpra       (rs1),
-        .dpo        (regbank_data1)
-    );
+    if (Environment == FPGA) begin :RegFileFPGA_blk
+        DRAM_RegBank RegBankA (
+            .clk        (clk),
+            .we         (regbank_write_enable),
+            .a          (rd),
+            .d          (regbank_data_writeback),
+            .dpra       (rs1),
+            .dpo        (regbank_data1)
+        );
 
-    DRAM_RegBank RegBankB (
-        .clk        (clk),
-        .we         (regbank_write_enable),
-        .a          (rd),
-        .d          (regbank_data_writeback),
-        .dpra       (rs2),
-        .dpo        (regbank_data2)
-    );
-
-`else
-    regbank regbank1 (
-        .clk(clk),
-        .reset(reset),
-        .rs1(rs1), 
-        .rs2(rs2),
-        .rd(rd), 
-        .enable(regbank_write_enable),
-        .data_i(regbank_data_writeback), 
-        .data1_o(regbank_data1), 
-        .data2_o(regbank_data2)
-    );
-`endif
+        DRAM_RegBank RegBankB (
+            .clk        (clk),
+            .we         (regbank_write_enable),
+            .a          (rd),
+            .d          (regbank_data_writeback),
+            .dpra       (rs2),
+            .dpo        (regbank_data2)
+        );
+    end
+    else begin : RegFileFF_blk
+        regbank regbankff (
+            .clk        (clk),
+            .reset      (reset),
+            .rs1        (rs1), 
+            .rs2        (rs2),
+            .rd         (rd), 
+            .enable     (regbank_write_enable),
+            .data_i     (regbank_data_writeback), 
+            .data1_o    (regbank_data1), 
+            .data2_o    (regbank_data2)
+        );
+    end
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// EXECUTE /////////////////////////////////////////////////////////////////////////////////
