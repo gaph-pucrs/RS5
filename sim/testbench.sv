@@ -46,9 +46,12 @@ module testbench
 // PARAMETERS FOR CORE INSTANTIATION
 //////////////////////////////////////////////////////////////////////////////
 
-    localparam int      i_cnt = 1;
     localparam int      MEM_WIDTH = 65536;
     localparam string   BIN_FILE = "../app/berkeley_suite/test.bin";
+    
+    localparam int      i_cnt = 1;
+
+    localparam bit      XOSVMEnable = 1'b0;
 
 //////////////////////////////////////////////////////////////////////////////
 // TB SIGNALS
@@ -137,7 +140,9 @@ module testbench
 // CPU
 //////////////////////////////////////////////////////////////////////////////
 
-    RS5 dut (
+    RS5 #(
+        .XOSVMEnable(XOSVMEnable)
+    ) dut (
         .clk                    (clk_i), 
         .reset                  (rst_i), 
         .stall                  (1'b0),

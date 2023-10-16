@@ -31,6 +31,10 @@
 
 module RS5
     import RS5_pkg::*;
+#(
+    parameter rv32m_e   RV32M       = RV32MNone,
+    parameter bit       XOSVMEnable = 1'b0
+)
 (
     input  logic                    clk,
     input  logic                    reset,
@@ -59,10 +63,9 @@ module RS5
     logic            hold;
 `endif
 
-`ifdef XOSVM
     logic            mmu_inst_fault;
     logic            mmu_data_fault;
-`endif
+
     privilegeLevel_e privilege;
     logic   [31:0]   jump_target;
 
@@ -109,9 +112,7 @@ module RS5
     logic    [2:0]  tag_execute;
     logic           exc_ilegal_inst_execute;
     logic           exc_misaligned_fetch_execute;
-`ifdef XOSVM
     logic           exc_inst_access_fault_execute;
-`endif
 
 //////////////////////////////////////////////////////////////////////////////
 // Retire signals
@@ -139,21 +140,24 @@ module RS5
     logic           RAISE_EXCEPTION, MACHINE_RETURN;
     logic           interrupt_pending;
     exceptionCode_e Exception_Code;
-`ifdef XOSVM
+
     logic   [31:0]  mvmdo, mvmio, mvmds, mvmis;
     logic           mvmctl;
     logic           mmu_en;
-`endif
 
 //////////////////////////////////////////////////////////////////////////////
 // Assigns
 //////////////////////////////////////////////////////////////////////////////
-`ifdef XOSVM
-    assign mmu_en = privilege != privilegeLevel_e'(2'b11) && mvmctl;
-`endif
+    
+    if (XOSVMEnable == 1'b1) begin
+        assign mmu_en = privilege != privilegeLevel_e'(2'b11) && mvmctl == 1'b1;
+    end
+    else begin
+        assign mmu_en = 1'b0;     
+    end
 
     assign regbank_write_enable =   (rd == '0) 
-                                    ? 0 
+                                    ? 1'b0 
                                     : regbank_write_enable_int;
 
     assign rs1_data_read =  (rs1 == rd && regbank_write_enable) 
@@ -197,18 +201,21 @@ module RS5
         .tag_o                  (tag_decode)
     );
 
-`ifdef XOSVM
-    mmu i_mmu (
-        .en_i           (mmu_en),
-        .offset_i       (mvmio),
-        .size_i         (mvmis),
-        .address_i      (instruction_address),
-        .exception_o    (mmu_inst_fault),
-        .address_o      (instruction_address_o)
-    );
-`else
-    assign instruction_address_o = instruction_address;
-`endif
+    if (XOSVMEnable == 1'b1) begin :i_mmu_blk
+        mmu i_mmu (
+            .en_i           (mmu_en),
+            .offset_i       (mvmio),
+            .size_i         (mvmis),
+            .address_i      (instruction_address),
+            .exception_o    (mmu_inst_fault),
+            .address_o      (instruction_address_o)
+        );
+    end 
+    else begin
+        assign mmu_inst_fault        = 1'b0;
+        assign instruction_address_o = instruction_address;
+    end
+
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// DECODER /////////////////////////////////////////////////////////////////////////////////
@@ -234,10 +241,8 @@ module RS5
         .tag_o                      (tag_execute), 
         .instruction_operation_o    (instruction_operation_execute), 
         .hazard_o                   (hazard),
-    `ifdef XOSVM
         .exc_inst_access_fault_i    (mmu_inst_fault),
         .exc_inst_access_fault_o    (exc_inst_access_fault_execute),
-    `endif
         .exc_ilegal_inst_o          (exc_ilegal_inst_execute),
         .exc_misaligned_fetch_o     (exc_misaligned_fetch_execute)
     );
@@ -300,10 +305,8 @@ module RS5
         .privilege_i            (privilege),
         .exc_ilegal_inst_i      (exc_ilegal_inst_execute),
         .exc_misaligned_fetch_i (exc_misaligned_fetch_execute),
-    `ifdef XOSVM
         .exc_inst_access_fault_i(exc_inst_access_fault_execute),
         .exc_load_access_fault_i(mmu_data_fault),
-    `endif
         .killed_o               (killed),
         .write_enable_o         (regbank_write_enable_int),
         .instruction_operation_o(instruction_operation_retire), 
@@ -350,7 +353,9 @@ module RS5
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// CSRs BANK ///////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    CSRBank CSRBank1 (
+    CSRBank #(
+      .XOSVMEnable  (XOSVMEnable)  
+    ) CSRBank1 (
         .clk                        (clk), 
         .reset                      (reset), 
         .read_enable_i              (csr_read_enable), 
@@ -378,46 +383,42 @@ module RS5
         .interrupt_pending_o        (interrupt_pending),
         .privilege_o                (privilege), 
         .mepc                       (mepc), 
-    `ifdef XOSVM
+        .mtvec                      (mtvec),
+    // XOSVM Signals
         .mvmctl_o                   (mvmctl),
         .mvmdo_o                    (mvmdo),
         .mvmds_o                    (mvmds),
         .mvmio_o                    (mvmio),
-        .mvmis_o                    (mvmis),
-    `endif
-        .mtvec                      (mtvec)
+        .mvmis_o                    (mvmis)
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// MEMORY SIGNALS //////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    always_comb begin
-        if (
-            (!killed && (mem_write_enable != '0 || mem_read_enable))
-        `ifdef XOSVM
-            && !mmu_data_fault
-        `endif
-        ) begin
-            mem_operation_enable_o = 1;
-        end
-        else begin
-            mem_operation_enable_o = 0;
-        end
+    if (XOSVMEnable == 1'b1) begin : d_mmu_blk
+        mmu d_mmu (
+            .en_i           (mmu_en),
+            .offset_i       (mvmdo),
+            .size_i         (mvmds),
+            .address_i      (mem_address),
+            .exception_o    (mmu_data_fault),
+            .address_o      (mem_address_o)
+        );
+    end
+    else begin
+        assign mmu_data_fault = 1'b0;
+        assign mem_address_o  = mem_address;
     end
 
-`ifdef XOSVM
-    mmu d_mmu (
-        .en_i           (mmu_en),
-        .offset_i       (mvmdo),
-        .size_i         (mvmds),
-        .address_i      (mem_address),
-        .exception_o    (mmu_data_fault),
-        .address_o      (mem_address_o)
-    );
-`else
-    assign mem_address_o = mem_address;
-`endif
+    always_comb begin
+        if ((killed == 1'b0 && (mem_write_enable != '0 || mem_read_enable == 1'b1)) && mmu_data_fault == 1'b0) begin
+            mem_operation_enable_o = 1'b1;
+        end
+        else begin
+            mem_operation_enable_o = 1'b0;
+        end
+    end
 
     assign mem_write_enable_o = mem_write_enable;
 

@@ -1,7 +1,8 @@
 module RS5_FPGA_Platform
     import RS5_pkg::*;
 #(
-    parameter i_cnt = 1
+    parameter int i_cnt       = 1,
+    parameter bit XOSVMEnable = 1'b0
 )
 (
     input  logic       clk,
@@ -89,7 +90,9 @@ module RS5_FPGA_Platform
 // CPU INSTANTIATION
 //////////////////////////////////////////////////////////////////////////////
 
-    RS5 dut (
+    RS5 #(
+        .XOSVMEnable    (XOSVMEnable)
+    ) dut (
         .clk                    (clk), 
         .reset                  (!reset),
         .stall                  (stall),

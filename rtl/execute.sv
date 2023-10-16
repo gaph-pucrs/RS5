@@ -47,10 +47,8 @@ module execute
 
     input   logic               exc_ilegal_inst_i,
     input   logic               exc_misaligned_fetch_i,
-`ifdef XOSVM
     input   logic               exc_inst_access_fault_i,
     input   logic               exc_load_access_fault_i,
-`endif
 
     output  logic               killed_o,
     output  logic               write_enable_o,
@@ -387,7 +385,6 @@ end
 
     always_comb begin
         if ((reset | killed) == 1'b0) begin
-        `ifdef XOSVM
             if (exc_inst_access_fault_i == 1'b1) begin
                 raise_exception_o = 1'b1;
                 machine_return_o  = 1'b0;
@@ -397,7 +394,6 @@ end
                 $write("[%0d] EXCEPTION - INSTRUCTION ACCESS FAULT: %8h %8h\n", $time, pc_i, instruction_i);
             end
             else
-        `endif
             if ((exc_ilegal_inst_i | exc_ilegal_csr_inst) == 1'b1) begin
                 raise_exception_o = 1'b1;
                 machine_return_o  = 1'b0;
@@ -426,7 +422,6 @@ end
                 exception_code_o  = BREAKPOINT;
                 $write("[%0d] EXCEPTION - EBREAK: %8h %8h\n", $time, pc_i, instruction_i);
             end
-        `ifdef XOSVM
             else if (exc_load_access_fault_i == 1'b1 && (mem_write_enable_o != '0 || mem_read_enable_o == 1'b1)) begin
                 raise_exception_o = 1'b1;
                 machine_return_o  = 1'b0;
@@ -434,7 +429,6 @@ end
                 exception_code_o  = LOAD_ACCESS_FAULT;
                 $write("[%0d] EXCEPTION - LOAD ACCESS FAULT: %8h %8h %8h\n", $time, pc_i, instruction_i, mem_address_o);
             end 
-        `endif
             else if (instruction_operation_i == MRET) begin
                 raise_exception_o = 1'b0;
                 machine_return_o  = 1'b1;

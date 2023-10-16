@@ -25,6 +25,9 @@
 
 module CSRBank 
     import RS5_pkg::*;
+#( 
+    parameter bit   XOSVMEnable = 1'b0
+)
 (
     input   logic               clk,
     input   logic               reset,
@@ -60,30 +63,28 @@ module CSRBank
 
     output  privilegeLevel_e    privilege_o,
 
+    output  logic [31:0]        mepc,
     output  logic [31:0]        mtvec,
 
-`ifdef XOSVM
     output  logic               mvmctl_o,
     output  logic [31:0]        mvmdo_o, 
     output  logic [31:0]        mvmio_o, 
     output  logic [31:0]        mvmds_o, 
-    output  logic [31:0]        mvmis_o,
-`endif
+    output  logic [31:0]        mvmis_o
 
-    output  logic [31:0]        mepc
 );
 
     CSRs CSR;
     privilegeLevel_e privilege;
 
     logic [31:0] mstatus, misa, mie, mtvec_r, mscratch, mepc_r, mcause, mtval, mip;
-`ifdef XOSVM
     logic [31:0] mvmdo, mvmio, mvmds, mvmis;
     logic        mvmctl;
-`endif
     logic [63:0] mcycle, minstret;
     
     logic [31:0] wr_data, wmask, current_val;
+
+    logic read_allowed, write_allowed;
 
 `ifdef ZIHPM
     logic [31:0] instructions_killed_counter, hazard_counter, stall_counter, nop_counter;
@@ -98,15 +99,12 @@ module CSRBank
     assign privilege_o = privilege;
     assign mtvec       = mtvec_r;
     assign mepc        = mepc_r;
-`ifdef XOSVM
-    assign mvmctl_o    = mvmctl;
-    assign mvmdo_o     = mvmdo;
-    assign mvmds_o     = mvmds;
-    assign mvmio_o     = mvmio;
-    assign mvmis_o     = mvmis;
-`endif
 
     assign CSR = CSRs'(address_i);
+
+    assign write_allowed = (write_enable_i == 1'b1 & killed == 1'b0);
+
+    assign read_allowed = (read_enable_i == 1'b1 & killed == 1'b0);
 
     always_comb begin
         wmask = '1;
@@ -128,13 +126,13 @@ module CSRBank
             MCYCLEH:    begin current_val = mcycle[63:32];   wmask = 32'hFFFFFFFF; end
             MINSTRET:   begin current_val = minstret[31:0];  wmask = 32'hFFFFFFFF; end
             MINSTRETH:  begin current_val = minstret[63:32]; wmask = 32'hFFFFFFFF; end
-        `ifdef XOSVM
+
             MVMDO:      begin current_val = mvmdo;           wmask = 32'hFFFFFFFC; end
             MVMDS:      begin current_val = mvmds;           wmask = 32'hFFFFFFFC; end
             MVMIO:      begin current_val = mvmio;           wmask = 32'hFFFFFFFC; end
             MVMIS:      begin current_val = mvmis;           wmask = 32'hFFFFFFFC; end
             MVMCTL:     begin current_val = {31'b0, mvmctl}; wmask = 32'h00000001; end
-        `endif
+
             default:    begin current_val = '0;              wmask = 32'h00000000; end
         endcase
     end
@@ -166,13 +164,7 @@ module CSRBank
             //mip       <= '0;
             mcycle      <= '0;
             minstret    <= '0;
-        `ifdef XOSVM
-            mvmctl      <= '0;
-            mvmdo       <= '0;
-            mvmds       <= '0;
-            mvmio       <= '0;
-            mvmis       <= '0;
-        `endif
+
         end 
         else begin
             mcycle      <= mcycle + 1;
@@ -213,7 +205,7 @@ module CSRBank
                     mepc_r      <= pc_i;                // Return address
             
             end 
-            else if ((write_enable_i & ~killed) == 1'b1) begin
+            else if (write_allowed == 1'b1) begin
                 case(CSR)
                     MSTATUS:      mstatus         <= wr_data;
                     MISA:         misa            <= wr_data;
@@ -232,13 +224,7 @@ module CSRBank
                     MCYCLEH:      mcycle[63:32]   <= wr_data;
                     MINSTRET:     minstret[31:0]  <= wr_data;
                     MINSTRETH:    minstret[63:32] <= wr_data;
-                `ifdef XOSVM
-                    MVMCTL:       mvmctl          <= wr_data[0];
-                    MVMDO:        mvmdo           <= wr_data;
-                    MVMDS:        mvmds           <= wr_data;
-                    MVMIO:        mvmio           <= wr_data;
-                    MVMIS:        mvmis           <= wr_data;
-                `endif
+                    
                     default:    ; // no op
                 endcase
             end
@@ -246,7 +232,7 @@ module CSRBank
     end
 
     always_comb begin
-        if ((read_enable_i & ~killed) == 1'b1) begin
+        if (read_allowed == 1'b1) begin
             case(CSR)
                 //RO
                 MVENDORID:      out = '0;
@@ -302,13 +288,12 @@ module CSRBank
                 TIMEH:          out = mtime_i[63:32];
                 INSTRETH:       out = minstret[63:32];
                 
-            `ifdef XOSVM
                 MVMCTL:         out = {31'b0,mvmctl};
                 MVMDO:          out = mvmdo[31:0];
                 MVMDS:          out = mvmds[31:0];
                 MVMIO:          out = mvmio[31:0];
                 MVMIS:          out = mvmis[31:0];
-            `endif
+
                 default:        out = '0;
             endcase
         end
@@ -316,6 +301,44 @@ module CSRBank
             out = '0;
         end
     end
+
+//////////////////////////////////////////////////////////////////////////////
+// XOSVM Extension
+//////////////////////////////////////////////////////////////////////////////
+    
+    if (XOSVMEnable == 1'b1) begin
+        always_ff @(posedge clk) begin
+            if (reset == 1'b1) begin
+                mvmctl      <= '0;
+                mvmdo       <= '0;
+                mvmds       <= '0;
+                mvmio       <= '0;
+                mvmis       <= '0;
+            end 
+            else if (write_allowed == 1'b1) begin
+                case (CSR)
+                    MVMCTL: mvmctl  <= wr_data[0];
+                    MVMDO:  mvmdo   <= wr_data;
+                    MVMDS:  mvmds   <= wr_data;
+                    MVMIO:  mvmio   <= wr_data;
+                    MVMIS:  mvmis   <= wr_data;
+                endcase
+            end
+        end
+    end
+    else begin
+        assign mvmctl   = '0;
+        assign mvmdo    = '0;
+        assign mvmds    = '0;
+        assign mvmio    = '0;
+        assign mvmis    = '0;
+    end
+
+    assign mvmctl_o = mvmctl;
+    assign mvmdo_o  = mvmdo;
+    assign mvmds_o  = mvmds;
+    assign mvmio_o  = mvmio;
+    assign mvmis_o  = mvmis;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Interrupt Control
