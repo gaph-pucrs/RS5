@@ -1,0 +1,12 @@
+./RS5_pkg.sv
+./mmu.sv
+./fetch.sv
+./decode.sv
+./muldiv.sv
+./execute.sv
+./retire.sv
+./regbank.sv
+./CSRBank.sv
+./RS5.sv
+./plic.sv
+./rtc.sv
