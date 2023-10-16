@@ -149,19 +149,19 @@ module testbench
 //////////////////////////////////////////////////////////////////////////////
 
     RAM_mem RAM_MEM(
-        .clk                    (clk_i), 
+        .clk        (clk_i), 
 
-        .enA_i                  (1'b1), 
-        .weA_i       (4'h0), 
-        .addrA_i            (instruction_address[15:0]), 
-        .dataA_i               (32'h00000000), 
-        .dataA_o               (instruction),
+        .enA_i      (1'b1), 
+        .weA_i      (4'h0), 
+        .addrA_i    (instruction_address[15:0]), 
+        .dataA_i    (32'h00000000), 
+        .dataA_o    (instruction),
 
-        .enB_i               (enable_ram), 
-        .weB_i       (mem_write_enable), 
-        .addrB_i            (mem_address[15:0]), 
-        .dataB_i               (mem_data_write), 
-        .dataB_o               (data_ram)
+        .enB_i      (enable_ram), 
+        .weB_i      (mem_write_enable), 
+        .addrB_i    (mem_address[15:0]), 
+        .dataB_i    (mem_data_write), 
+        .dataB_o    (data_ram)
     );
 
 //////////////////////////////////////////////////////////////////////////////
