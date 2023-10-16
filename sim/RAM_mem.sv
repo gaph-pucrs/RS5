@@ -1,11 +1,10 @@
 /*!\file ram.sv
- * RS5 VERSION - 1.0 - Public Release
+ * RS5 VERSION - 1.1.0 - Pipeline Simplified and Core Renamed
  *
- * Distribution:  December 2021
+ * Distribution:  OCtober 2023
  *
- * Willian Nunes   <willian.nunes@edu.pucrs.br>
- * Marcos Sartori  <marcos.sartori@acad.pucrs.br>
- * Ney calazans    <ney.calazans@pucrs.br>
+ * Willian Nunes    <willian.nunes@edu.pucrs.br>
+ * Angelo Dal Zotto <angelo.dalzotto@edu.pucrs.br>
  *
  * Research group: GAPH-PUCRS  <>
  *
@@ -22,8 +21,12 @@
 
 module RAM_mem 
     import RS5_pkg::*;
+#(
+    parameter int    MEM_WIDTH = 65536,
+    parameter string BIN_FILE  = "../app/berkeley_suite/test.bin"
+)
 (
-    input  logic clk,
+    input  logic        clk,
 
     input  logic        enA_i,
     input  logic [ 3:0] weA_i,
@@ -38,7 +41,7 @@ module RAM_mem
     output logic [31:0] dataB_o
 );
 
-    reg [7:0] RAM [0:65535];
+    reg [7:0] RAM [0:MEM_WIDTH-1];
     int fd, r;
 
 `ifdef DEBUG
@@ -46,7 +49,7 @@ module RAM_mem
 `endif
 
     initial begin
-        fd = $fopen ("../app/berkeley_suite/test.bin", "r");
+        fd = $fopen (BIN_FILE, "r");
 
         r = $fread(RAM, fd);
         $display("read %d elements \n", r);

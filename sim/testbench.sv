@@ -1,11 +1,10 @@
 /*!\file testbench.sv
- * RS5 VERSION - 1.0 - Public Release
+ * RS5 VERSION - 1.1.0 - Pipeline Simplified and Core Renamed
  *
- * Distribution:  December 2021
+ * Distribution:  October 2023
  *
- * Willian Nunes   <willian.nunes@edu.pucrs.br>
- * Marcos Sartori  <marcos.sartori@acad.pucrs.br>
- * Ney calazans    <ney.calazans@pucrs.br>
+ * Willian Nunes    <willian.nunes@edu.pucrs.br>
+ * Angelo Dal Zotto <angelo.dalzotto@edu.pucrs.br>
  *
  * Research group: GAPH-PUCRS  <>
  *
@@ -43,7 +42,17 @@ module testbench
         input logic rst_i
     );
 
-    parameter i_cnt = 1;
+//////////////////////////////////////////////////////////////////////////////
+// PARAMETERS FOR CORE INSTANTIATION
+//////////////////////////////////////////////////////////////////////////////
+
+    localparam int      i_cnt = 1;
+    localparam int      MEM_WIDTH = 65536;
+    localparam string   BIN_FILE = "../app/berkeley_suite/test.bin";
+
+//////////////////////////////////////////////////////////////////////////////
+// TB SIGNALS
+//////////////////////////////////////////////////////////////////////////////
 
     /* verilator lint_off UNUSEDSIGNAL */
     logic [31:0]            instruction_address;
@@ -148,7 +157,10 @@ module testbench
 // RAM
 //////////////////////////////////////////////////////////////////////////////
 
-    RAM_mem RAM_MEM(
+    RAM_mem #(
+        .MEM_WIDTH(MEM_WIDTH),
+        .BIN_FILE(BIN_FILE)
+    ) RAM_MEM (
         .clk        (clk_i), 
 
         .enA_i      (1'b1), 
