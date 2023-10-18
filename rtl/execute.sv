@@ -28,16 +28,13 @@
 module execute
     import RS5_pkg::*;
 #(
-    parameter environment_e Environment = ASIC
+    parameter environment_e Environment = ASIC,
+    parameter rv32_e        RV32        = RV32I
 )
 (
     input   logic               clk,
     input   logic               reset,
     input   logic               stall,
-
-`ifdef MULTICYCLE_INSTRUCTIONS
-    output  logic               hold_o,
-`endif
 
     input   logic [31:0]        instruction_i,
     input   logic [31:0]        pc_i,
@@ -53,16 +50,15 @@ module execute
     input   logic               exc_inst_access_fault_i,
     input   logic               exc_load_access_fault_i,
 
+    output  logic               hold_o,
     output  logic               killed_o,
     output  logic               write_enable_o,
     output  iType_e             instruction_operation_o,
     output  logic [31:0]        result_o,
 
-`ifdef HARDWARE_MULTIPLICATION
     output  logic [63:0]        mul_result_o, 
     output  logic [63:0]        mulh_result_o, 
     output  logic [63:0]        mulhsu_result_o,
-`endif
 
     output  logic [31:0]        mem_address_o,
     output  logic               mem_read_enable_o,
@@ -251,35 +247,42 @@ end
 /////////////////////////////////////////////////////////////////////////////
 // Multiplication and Division Operations
 //////////////////////////////////////////////////////////////////////////////
-`ifdef HARDWARE_MULTIPLICATION
+    
+    logic [31:0] div_result;
+    logic [31:0] divu_result;
+    logic [31:0] rem_result;
+    logic [31:0] remu_result;
 
-    `ifdef HARDWARE_DIVISION
-        logic [31:0] div_result;
-        logic [31:0] divu_result;
-        logic [31:0] rem_result;
-        logic [31:0] remu_result;
-    `endif
-
-    muldiv #(
-        .Environment    (Environment)
-    ) muldiv1 (
-        .clk                        (clk),
-        .reset                      (reset),
-        .first_operand_i            (first_operand_i),
-        .second_operand_i           (second_operand_i),
-        .instruction_operation_i    (instruction_operation_i),
-        .hold_o                     (hold_o),
-    `ifdef HARDWARE_DIVISION
-        .div_result_o               (div_result),
-        .divu_result_o              (divu_result),
-        .rem_result_o               (rem_result),
-        .remu_result_o              (remu_result),
-    `endif
-        .mul_result_o               (mul_result_o),
-        .mulh_result_o              (mulh_result_o),
-        .mulhsu_result_o            (mulhsu_result_o)
-    );
-`endif
+    if (RV32 == RV32M || RV32 == RV32ZMMUL) begin
+        muldiv #(
+            .Environment    (Environment),
+            .RV32           (RV32)
+        ) muldiv1 (
+            .clk                        (clk),
+            .reset                      (reset),
+            .first_operand_i            (first_operand_i),
+            .second_operand_i           (second_operand_i),
+            .instruction_operation_i    (instruction_operation_i),
+            .hold_o                     (hold_o),
+            .div_result_o               (div_result),
+            .divu_result_o              (divu_result),
+            .rem_result_o               (rem_result),
+            .remu_result_o              (remu_result),
+            .mul_result_o               (mul_result_o),
+            .mulh_result_o              (mulh_result_o),
+            .mulhsu_result_o            (mulhsu_result_o)
+        );
+    end 
+    else begin
+        assign hold_o           = 1'b0;
+        assign mul_result_o     = '0;
+        assign mulh_result_o    = '0;
+        assign mulhsu_result_o  = '0;
+        assign div_result       = '0;
+        assign divu_result      = '0;
+        assign rem_result       = '0;
+        assign remu_result      = '0;
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 // Demux
@@ -299,12 +302,10 @@ end
             SRL:                    result = srl_result;
             SRA:                    result = sra_result;
             LUI:                    result = second_operand_i;
-        `ifdef HARDWARE_DIVISION
             DIV:                    result = div_result;
             DIVU:                   result = divu_result;
             REM:                    result = rem_result;
             REMU:                   result = remu_result;
-        `endif
             default:                result = sum_result;
         endcase
     end
@@ -325,10 +326,7 @@ end
 
     always_ff @(posedge clk) begin
         if (
-            stall == 1'b0 
-        `ifdef MULTICYCLE_INSTRUCTIONS
-            & hold_o == 1'b0
-        `endif
+            stall == 1'b0 & hold_o == 1'b0
         ) begin
             write_enable_o          <= write_enable;
             instruction_operation_o <= instruction_operation_i;

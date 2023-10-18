@@ -22,7 +22,7 @@ module RS5
     import RS5_pkg::*;
 #(
     parameter environment_e Environment = ASIC,
-    //parameter rv32m_e       RV32M       = RV32MNone,
+    parameter rv32_e        RV32        = RV32I,
     parameter bit           XOSVMEnable = 1'b0,
     parameter bit           ZIHPMEnable = 1'b0
 )
@@ -49,10 +49,7 @@ module RS5
 //////////////////////////////////////////////////////////////////////////////
     logic            jump;
     logic            hazard;
-
-`ifdef MULTICYCLE_INSTRUCTIONS
     logic            hold;
-`endif
 
     logic            mmu_inst_fault;
     logic            mmu_data_fault;
@@ -113,11 +110,9 @@ module RS5
     logic   [31:0]  result_retire;
     logic           killed;
 
-`ifdef HARDWARE_MULTIPLICATION
     logic   [63:0]  mul_result;
     logic   [63:0]  mulh_result;
     logic   [63:0]  mulhsu_result;
-`endif
 
 //////////////////////////////////////////////////////////////////////////////
 // CSR Bank signals
@@ -159,17 +154,9 @@ module RS5
                             ? regbank_data_writeback 
                             : regbank_data2;
 
-    assign enable_fetch = ~(stall | hazard
-                        `ifdef MULTICYCLE_INSTRUCTIONS
-                            | hold
-                        `endif
-                        );
+    assign enable_fetch = ~(stall | hazard | hold);
 
-    assign enable_decode = ~(stall
-                        `ifdef MULTICYCLE_INSTRUCTIONS
-                            | hold
-                        `endif
-                        );
+    assign enable_decode = ~(stall | hold);
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -279,13 +266,13 @@ module RS5
 /////////////////////////////////////////////////////////// EXECUTE /////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    execute execute1 (
+    execute #(
+        .Environment (Environment),
+        .RV32        (RV32)
+    ) execute1 (
         .clk                    (clk), 
         .reset                  (reset), 
         .stall                  (stall),
-    `ifdef MULTICYCLE_INSTRUCTIONS
-        .hold_o                 (hold),
-    `endif
         .instruction_i          (instruction_execute), 
         .pc_i                   (pc_execute), 
         .first_operand_i        (first_operand_execute), 
@@ -298,15 +285,14 @@ module RS5
         .exc_misaligned_fetch_i (exc_misaligned_fetch_execute),
         .exc_inst_access_fault_i(exc_inst_access_fault_execute),
         .exc_load_access_fault_i(mmu_data_fault),
+        .hold_o                 (hold),
         .killed_o               (killed),
         .write_enable_o         (regbank_write_enable_int),
         .instruction_operation_o(instruction_operation_retire), 
         .result_o               (result_retire),
-    `ifdef HARDWARE_MULTIPLICATION
         .mul_result_o           (mul_result),
         .mulh_result_o          (mulh_result),
         .mulhsu_result_o        (mulhsu_result),
-    `endif
         .mem_address_o          (mem_address), 
         .mem_read_enable_o      (mem_read_enable), 
         .mem_write_enable_o     (mem_write_enable),
@@ -329,14 +315,14 @@ module RS5
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// RETIRE //////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    retire retire1 (
+    retire #(
+        .RV32   (RV32)
+    ) retire1 (
         .instruction_operation_i(instruction_operation_retire),
         .result_i               (result_retire),
-    `ifdef HARDWARE_MULTIPLICATION
         .mul_result_i           (mul_result),
         .mulh_result_i          (mulh_result),
         .mulhsu_result_i        (mulhsu_result),
-    `endif
         .mem_data_i             (mem_data_i), 
         .regbank_data_o         (regbank_data_writeback)
     );

@@ -20,22 +20,16 @@
 
 package RS5_pkg;
 
-    //`define M_EXT 1
-    // `define ZMMUL 1
-
-    `ifdef M_EXT
-        `define MULTICYCLE_INSTRUCTIONS 1
-        `define HARDWARE_MULTIPLICATION 1
-        `define HARDWARE_DIVISION 1
-    `elsif ZMMUL
-        `define MULTICYCLE_INSTRUCTIONS 1
-        `define HARDWARE_MULTIPLICATION 1
-    `endif
-
     typedef enum integer {
         ASIC    = 0,
         FPGA    = 1
     } environment_e;
+
+    typedef enum integer {
+        RV32I       = 0,
+        RV32M       = 1,
+        RV32ZMMUL   = 2
+    } rv32_e;
 
     typedef enum  logic[5:0] {
         R_TYPE = 6'b000001, 
