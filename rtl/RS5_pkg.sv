@@ -20,8 +20,6 @@
 
 package RS5_pkg;
 
-    // `define ZIHPM 1
-    
     //`define M_EXT 1
     // `define ZMMUL 1
 

@@ -3,7 +3,8 @@ module RS5_FPGA_Platform
 #(
     parameter int           i_cnt       = 1,
     parameter environment_e Environment = FPGA,
-    parameter bit           XOSVMEnable = 1'b0
+    parameter bit           XOSVMEnable = 1'b0,
+    parameter bit           ZIHPMEnable = 1'b1
 )
 (
     input  logic       clk,
@@ -93,7 +94,8 @@ module RS5_FPGA_Platform
 
     RS5 #(
         .Environment    (Environment),
-        .XOSVMEnable    (XOSVMEnable)
+        .XOSVMEnable    (XOSVMEnable),
+        .ZIHPMEnable    (ZIHPMEnable)
     ) dut (
         .clk                    (clk), 
         .reset                  (!reset),

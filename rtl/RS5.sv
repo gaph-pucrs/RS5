@@ -17,24 +17,14 @@
  * and is responsible for the instantiation of the lower level modules
  * and also defines the interface ports (inputs and outputs) os the processor.
  */
-/*
-`include "../rtl/RS5_pkg.sv"
-`include "../rtl/fetch.sv"
-`include "../rtl/decode.sv"
-`include "../rtl/muldiv.sv"
-`include "../rtl/execute.sv"
-`include "../rtl/retire.sv"
-`include "../rtl/regbank.sv"
-`include "../rtl/mmu.sv"
-`include "../rtl/CSRBank.sv"
-*/
 
 module RS5
     import RS5_pkg::*;
 #(
     parameter environment_e Environment = ASIC,
-    parameter rv32m_e       RV32M       = RV32MNone,
-    parameter bit           XOSVMEnable = 1'b0
+    //parameter rv32m_e       RV32M       = RV32MNone,
+    parameter bit           XOSVMEnable = 1'b0,
+    parameter bit           ZIHPMEnable = 1'b0
 )
 (
     input  logic                    clk,
@@ -355,7 +345,8 @@ module RS5
 /////////////////////////////////////////////////////////// CSRs BANK ///////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     CSRBank #(
-      .XOSVMEnable  (XOSVMEnable)  
+      .XOSVMEnable  (XOSVMEnable),
+      .ZIHPMEnable  (ZIHPMEnable)
     ) CSRBank1 (
         .clk                        (clk), 
         .reset                      (reset), 
@@ -366,11 +357,9 @@ module RS5
         .data_i                     (csr_data_to_write), 
         .killed                     (killed),
         .out                        (csr_data_read),
-    `ifdef ZIHPM
         .instruction_operation_i    (instruction_operation_execute),
         .hazard                     (hazard),
         .stall                      (stall),
-    `endif
         .raise_exception_i          (RAISE_EXCEPTION), 
         .machine_return_i           (MACHINE_RETURN),
         .exception_code_i           (Exception_Code), 
