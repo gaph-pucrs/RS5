@@ -51,9 +51,6 @@ module testbench
     
     localparam int           i_cnt = 1;
 
-    localparam environment_e Environment = ASIC;
-    localparam bit           XOSVMEnable = 1'b0;
-
 //////////////////////////////////////////////////////////////////////////////
 // TB SIGNALS
 //////////////////////////////////////////////////////////////////////////////
@@ -141,10 +138,7 @@ module testbench
 // CPU
 //////////////////////////////////////////////////////////////////////////////
 
-    RS5 #(
-        .Environment(Environment),
-        .XOSVMEnable(XOSVMEnable)
-    ) dut (
+    RS5 dut (
         .clk                    (clk_i), 
         .reset                  (rst_i), 
         .stall                  (1'b0),
