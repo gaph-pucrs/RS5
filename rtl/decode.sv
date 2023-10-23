@@ -46,10 +46,8 @@ module decode
     output  iType_e         instruction_operation_o,
     output  logic           hazard_o,
 
-`ifdef XOSVM
     input   logic           exc_inst_access_fault_i,
     output  logic           exc_inst_access_fault_o,
-`endif
     output  logic           exc_ilegal_inst_o,
     output  logic           exc_misaligned_fetch_o
 );
@@ -392,9 +390,7 @@ module decode
             tag_o                   <= '0;
             exc_ilegal_inst_o       <= 1'b0;
             exc_misaligned_fetch_o  <= 1'b0;
-        `ifdef XOSVM
             exc_inst_access_fault_o <= 1'b0;
-        `endif
         end 
         else if (hazard_o == 1'b1) begin
             first_operand_o         <= '0;
@@ -406,9 +402,7 @@ module decode
             tag_o                   <= tag_i;
             exc_ilegal_inst_o       <= 1'b0;
             exc_misaligned_fetch_o  <= 1'b0;
-        `ifdef XOSVM
             exc_inst_access_fault_o <= 1'b0;
-        `endif
         end 
         else if (enable == 1'b1) begin
             first_operand_o         <= first_operand;
@@ -420,9 +414,7 @@ module decode
             tag_o                   <= tag_i;
             exc_ilegal_inst_o       <= invalid_inst;
             exc_misaligned_fetch_o  <= misaligned_fetch;
-        `ifdef XOSVM
             exc_inst_access_fault_o <= exc_inst_access_fault_i;
-        `endif
         end
     end
 

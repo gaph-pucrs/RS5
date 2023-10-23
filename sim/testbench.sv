@@ -46,9 +46,10 @@ module testbench
 // PARAMETERS FOR CORE INSTANTIATION
 //////////////////////////////////////////////////////////////////////////////
 
-    localparam int      i_cnt = 1;
-    localparam int      MEM_WIDTH = 65536;
-    localparam string   BIN_FILE = "../app/berkeley_suite/test.bin";
+    localparam int           MEM_WIDTH = 65536;
+    localparam string        BIN_FILE = "../app/berkeley_suite/test.bin";
+    
+    localparam int           i_cnt = 1;
 
 //////////////////////////////////////////////////////////////////////////////
 // TB SIGNALS

@@ -25,6 +25,10 @@
 
 module CSRBank 
     import RS5_pkg::*;
+#( 
+    parameter bit   XOSVMEnable = 1'b0,
+    parameter bit   ZIHPMEnable = 1'b0
+)
 (
     input   logic               clk,
     input   logic               reset,
@@ -37,11 +41,9 @@ module CSRBank
     input   logic               killed,
     output  logic [31:0]        out,
 
-`ifdef ZIHPM
     input   iType_e             instruction_operation_i,
     input   logic               hazard,
     input   logic               stall,
-`endif
 
     input   logic               raise_exception_i,
     input   logic               machine_return_i,
@@ -60,53 +62,47 @@ module CSRBank
 
     output  privilegeLevel_e    privilege_o,
 
+    output  logic [31:0]        mepc,
     output  logic [31:0]        mtvec,
 
-`ifdef XOSVM
     output  logic               mvmctl_o,
     output  logic [31:0]        mvmdo_o, 
     output  logic [31:0]        mvmio_o, 
     output  logic [31:0]        mvmds_o, 
-    output  logic [31:0]        mvmis_o,
-`endif
+    output  logic [31:0]        mvmis_o
 
-    output  logic [31:0]        mepc
 );
 
     CSRs CSR;
     privilegeLevel_e privilege;
 
     logic [31:0] mstatus, misa, mie, mtvec_r, mscratch, mepc_r, mcause, mtval, mip;
-`ifdef XOSVM
     logic [31:0] mvmdo, mvmio, mvmds, mvmis;
     logic        mvmctl;
-`endif
     logic [63:0] mcycle, minstret;
     
     logic [31:0] wr_data, wmask, current_val;
 
-`ifdef ZIHPM
+    logic read_allowed, write_allowed;
+
     logic [31:0] instructions_killed_counter, hazard_counter, stall_counter, nop_counter;
     logic [31:0] interrupt_ack_counter, raise_exception_counter, context_switch_counter;
     logic [31:0] logic_counter, arithmetic_counter, shift_counter, branch_counter, jump_counter;
     logic [31:0] load_counter, store_counter, sys_counter, csr_counter;
     logic [31:0] mul_counter, div_counter;
-`endif
+
     //logic [31:0] medeleg, mideleg; // NOT IMPLEMENTED YET (REQUIRED ONLY WHEN SYSTEM HAVE S-MODE)
     interruptionCode_e Interruption_Code;
 
     assign privilege_o = privilege;
     assign mtvec       = mtvec_r;
     assign mepc        = mepc_r;
-`ifdef XOSVM
-    assign mvmctl_o    = mvmctl;
-    assign mvmdo_o     = mvmdo;
-    assign mvmds_o     = mvmds;
-    assign mvmio_o     = mvmio;
-    assign mvmis_o     = mvmis;
-`endif
 
     assign CSR = CSRs'(address_i);
+
+    assign write_allowed = (write_enable_i == 1'b1 & killed == 1'b0);
+
+    assign read_allowed = (read_enable_i == 1'b1 & killed == 1'b0);
 
     always_comb begin
         wmask = '1;
@@ -128,13 +124,13 @@ module CSRBank
             MCYCLEH:    begin current_val = mcycle[63:32];   wmask = 32'hFFFFFFFF; end
             MINSTRET:   begin current_val = minstret[31:0];  wmask = 32'hFFFFFFFF; end
             MINSTRETH:  begin current_val = minstret[63:32]; wmask = 32'hFFFFFFFF; end
-        `ifdef XOSVM
+
             MVMDO:      begin current_val = mvmdo;           wmask = 32'hFFFFFFFC; end
             MVMDS:      begin current_val = mvmds;           wmask = 32'hFFFFFFFC; end
             MVMIO:      begin current_val = mvmio;           wmask = 32'hFFFFFFFC; end
             MVMIS:      begin current_val = mvmis;           wmask = 32'hFFFFFFFC; end
             MVMCTL:     begin current_val = {31'b0, mvmctl}; wmask = 32'h00000001; end
-        `endif
+
             default:    begin current_val = '0;              wmask = 32'h00000000; end
         endcase
     end
@@ -166,13 +162,7 @@ module CSRBank
             //mip       <= '0;
             mcycle      <= '0;
             minstret    <= '0;
-        `ifdef XOSVM
-            mvmctl      <= '0;
-            mvmdo       <= '0;
-            mvmds       <= '0;
-            mvmio       <= '0;
-            mvmis       <= '0;
-        `endif
+
         end 
         else begin
             mcycle      <= mcycle + 1;
@@ -213,7 +203,7 @@ module CSRBank
                     mepc_r      <= pc_i;                // Return address
             
             end 
-            else if ((write_enable_i & ~killed) == 1'b1) begin
+            else if (write_allowed == 1'b1) begin
                 case(CSR)
                     MSTATUS:      mstatus         <= wr_data;
                     MISA:         misa            <= wr_data;
@@ -232,13 +222,7 @@ module CSRBank
                     MCYCLEH:      mcycle[63:32]   <= wr_data;
                     MINSTRET:     minstret[31:0]  <= wr_data;
                     MINSTRETH:    minstret[63:32] <= wr_data;
-                `ifdef XOSVM
-                    MVMCTL:       mvmctl          <= wr_data[0];
-                    MVMDO:        mvmdo           <= wr_data;
-                    MVMDS:        mvmds           <= wr_data;
-                    MVMIO:        mvmio           <= wr_data;
-                    MVMIS:        mvmis           <= wr_data;
-                `endif
+                    
                     default:    ; // no op
                 endcase
             end
@@ -246,7 +230,7 @@ module CSRBank
     end
 
     always_comb begin
-        if ((read_enable_i & ~killed) == 1'b1) begin
+        if (read_allowed == 1'b1) begin
             case(CSR)
                 //RO
                 MVENDORID:      out = '0;
@@ -279,7 +263,6 @@ module CSRBank
                 TIME:           out = mtime_i[31:0];
                 INSTRET:        out = minstret[31:0];
 
-            `ifdef ZIHPM
                 MHPMCOUNTER3:   out = instructions_killed_counter;
                 MHPMCOUNTER4:   out = context_switch_counter;
                 MHPMCOUNTER5:   out = raise_exception_counter;
@@ -296,19 +279,17 @@ module CSRBank
                 MHPMCOUNTER16:  out = store_counter;
                 MHPMCOUNTER17:  out = sys_counter;
                 MHPMCOUNTER18:  out = csr_counter;
-            `endif
 
                 CYCLEH:         out = mcycle[63:32];
                 TIMEH:          out = mtime_i[63:32];
                 INSTRETH:       out = minstret[63:32];
                 
-            `ifdef XOSVM
                 MVMCTL:         out = {31'b0,mvmctl};
                 MVMDO:          out = mvmdo[31:0];
                 MVMDS:          out = mvmds[31:0];
                 MVMIO:          out = mvmio[31:0];
                 MVMIS:          out = mvmis[31:0];
-            `endif
+
                 default:        out = '0;
             endcase
         end
@@ -316,6 +297,44 @@ module CSRBank
             out = '0;
         end
     end
+
+//////////////////////////////////////////////////////////////////////////////
+// XOSVM Extension
+//////////////////////////////////////////////////////////////////////////////
+    
+    if (XOSVMEnable == 1'b1) begin
+        always_ff @(posedge clk) begin
+            if (reset == 1'b1) begin
+                mvmctl      <= '0;
+                mvmdo       <= '0;
+                mvmds       <= '0;
+                mvmio       <= '0;
+                mvmis       <= '0;
+            end 
+            else if (write_allowed == 1'b1) begin
+                case (CSR)
+                    MVMCTL: mvmctl  <= wr_data[0];
+                    MVMDO:  mvmdo   <= wr_data;
+                    MVMDS:  mvmds   <= wr_data;
+                    MVMIO:  mvmio   <= wr_data;
+                    MVMIS:  mvmis   <= wr_data;
+                endcase
+            end
+        end
+    end
+    else begin
+        assign mvmctl   = '0;
+        assign mvmdo    = '0;
+        assign mvmds    = '0;
+        assign mvmio    = '0;
+        assign mvmis    = '0;
+    end
+
+    assign mvmctl_o = mvmctl;
+    assign mvmdo_o  = mvmdo;
+    assign mvmds_o  = mvmds;
+    assign mvmio_o  = mvmio;
+    assign mvmis_o  = mvmis;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Interrupt Control
@@ -350,89 +369,108 @@ module CSRBank
 // ZIHPM
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-`ifdef ZIHPM
-    int fd;
+    if (ZIHPMEnable == 1'b1) begin
+        int fd;
 
-    always_ff @(posedge clk) begin
-        if (reset == 1'b1) begin
-            instructions_killed_counter <= '0;
-            nop_counter                 <= '0;
-            logic_counter               <= '0;
-            arithmetic_counter          <= '0;
-            shift_counter               <= '0;
-            branch_counter              <= '0;
-            jump_counter                <= '0;
-            load_counter                <= '0;
-            store_counter               <= '0;
-            sys_counter                 <= '0;
-            csr_counter                 <= '0;
-            mul_counter                 <= '0;
-            div_counter                 <= '0;
+        always_ff @(posedge clk) begin
+            if (reset == 1'b1) begin
+                instructions_killed_counter <= '0;
+                nop_counter                 <= '0;
+                logic_counter               <= '0;
+                arithmetic_counter          <= '0;
+                shift_counter               <= '0;
+                branch_counter              <= '0;
+                jump_counter                <= '0;
+                load_counter                <= '0;
+                store_counter               <= '0;
+                sys_counter                 <= '0;
+                csr_counter                 <= '0;
+                mul_counter                 <= '0;
+                div_counter                 <= '0;
 
-            hazard_counter              <= '0;
-            stall_counter               <= '0;
-            interrupt_ack_counter       <= '0;
-            raise_exception_counter     <= '0;
-            context_switch_counter      <= '0;
-        end
-        else begin
-            instructions_killed_counter <= (killed)                                                             ? instructions_killed_counter  + 1 : instructions_killed_counter;
+                hazard_counter              <= '0;
+                stall_counter               <= '0;
+                interrupt_ack_counter       <= '0;
+                raise_exception_counter     <= '0;
+                context_switch_counter      <= '0;
+            end
+            else begin
+                instructions_killed_counter <= (killed)                                                             ? instructions_killed_counter  + 1 : instructions_killed_counter;
 
-            hazard_counter              <= (hazard)                                                             ? hazard_counter               + 1 : hazard_counter;
-            stall_counter               <= (stall)                                                              ? stall_counter                + 1 : stall_counter;
+                hazard_counter              <= (hazard)                                                             ? hazard_counter               + 1 : hazard_counter;
+                stall_counter               <= (stall)                                                              ? stall_counter                + 1 : stall_counter;
 
-            interrupt_ack_counter       <= (interrupt_ack_i)                                                    ? interrupt_ack_counter   + 1 : interrupt_ack_counter;
-            raise_exception_counter     <= (raise_exception_i)                                                  ? raise_exception_counter + 1 : raise_exception_counter;
-            context_switch_counter      <= (jump_i || raise_exception_i || machine_return_i || interrupt_ack_i) ? context_switch_counter + 1 : context_switch_counter;
-            nop_counter                 <= (instruction_operation_i == NOP)                                     ?   nop_counter + 1 : nop_counter;
+                interrupt_ack_counter       <= (interrupt_ack_i)                                                    ? interrupt_ack_counter   + 1 : interrupt_ack_counter;
+                raise_exception_counter     <= (raise_exception_i)                                                  ? raise_exception_counter + 1 : raise_exception_counter;
+                context_switch_counter      <= (jump_i || raise_exception_i || machine_return_i || interrupt_ack_i) ? context_switch_counter + 1 : context_switch_counter;
+                nop_counter                 <= (instruction_operation_i == NOP)                                     ?   nop_counter + 1 : nop_counter;
 
-            if (killed == 1'b0) begin
-                logic_counter           <= (instruction_operation_i inside {XOR, OR, AND})                                  ? logic_counter             + 1 : logic_counter;
-                arithmetic_counter      <= (instruction_operation_i inside {ADD, SUB, SLTU, SLT, LUI})                      ? arithmetic_counter        + 1 : arithmetic_counter;
-                shift_counter           <= (instruction_operation_i inside {SLL, SRL, SRA})                                 ? shift_counter             + 1 : shift_counter;
-                branch_counter          <= (instruction_operation_i inside {BEQ, BNE, BLT, BLTU, BGE, BGEU})                ? branch_counter            + 1 : branch_counter;
-                jump_counter            <= (instruction_operation_i inside {JAL, JALR})                                     ? jump_counter              + 1 : jump_counter;
-                load_counter            <= (instruction_operation_i inside {LB, LBU, LH, LHU, LW})                          ? load_counter              + 1 : load_counter;
-                store_counter           <= (instruction_operation_i inside {SB, SH, SW})                                    ? store_counter             + 1 : store_counter;
-                sys_counter             <= (instruction_operation_i inside {SRET, MRET, WFI, ECALL, EBREAK})                ? sys_counter               + 1 : sys_counter;
-                csr_counter             <= (instruction_operation_i inside {CSRRW, CSRRWI, CSRRS, CSRRSI, CSRRC, CSRRCI})   ? csr_counter               + 1 : csr_counter;
-                mul_counter             <= (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU})                      ? mul_counter               + 1 : mul_counter;
-                div_counter             <= (instruction_operation_i inside {DIV, DIVU, REM, REMU})                          ? div_counter               + 1 : div_counter;
+                if (killed == 1'b0) begin
+                    logic_counter           <= (instruction_operation_i inside {XOR, OR, AND})                                  ? logic_counter             + 1 : logic_counter;
+                    arithmetic_counter      <= (instruction_operation_i inside {ADD, SUB, SLTU, SLT, LUI})                      ? arithmetic_counter        + 1 : arithmetic_counter;
+                    shift_counter           <= (instruction_operation_i inside {SLL, SRL, SRA})                                 ? shift_counter             + 1 : shift_counter;
+                    branch_counter          <= (instruction_operation_i inside {BEQ, BNE, BLT, BLTU, BGE, BGEU})                ? branch_counter            + 1 : branch_counter;
+                    jump_counter            <= (instruction_operation_i inside {JAL, JALR})                                     ? jump_counter              + 1 : jump_counter;
+                    load_counter            <= (instruction_operation_i inside {LB, LBU, LH, LHU, LW})                          ? load_counter              + 1 : load_counter;
+                    store_counter           <= (instruction_operation_i inside {SB, SH, SW})                                    ? store_counter             + 1 : store_counter;
+                    sys_counter             <= (instruction_operation_i inside {SRET, MRET, WFI, ECALL, EBREAK})                ? sys_counter               + 1 : sys_counter;
+                    csr_counter             <= (instruction_operation_i inside {CSRRW, CSRRWI, CSRRS, CSRRSI, CSRRC, CSRRCI})   ? csr_counter               + 1 : csr_counter;
+                    mul_counter             <= (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU})                      ? mul_counter               + 1 : mul_counter;
+                    div_counter             <= (instruction_operation_i inside {DIV, DIVU, REM, REMU})                          ? div_counter               + 1 : div_counter;
+                end
             end
         end
+
+        initial begin
+            fd = $fopen ("./debug/Report.txt", "w");
+        end
+
+        final begin
+            $fwrite(fd,"Clock Cycles:           %0d\n", mcycle);
+            $fwrite(fd,"Instructions Retired:   %0d\n", minstret);
+            $fwrite(fd,"Instructions Killed:    %0d\n", instructions_killed_counter);
+            $fwrite(fd,"Context Switches:       %0d\n", context_switch_counter);
+            $fwrite(fd,"Exceptions Raised:      %0d\n", raise_exception_counter);
+            $fwrite(fd,"Interrupts Acked:       %0d\n", interrupt_ack_counter);
+
+            $fwrite(fd,"\nCYCLES WITH::\n");
+            $fwrite(fd,"HAZARDS:                %0d\n", hazard_counter);
+            $fwrite(fd,"STALL:                  %0d\n", stall_counter);
+
+            $fwrite(fd,"\nINSTRUCTION COUNTERS:\n");
+            $fwrite(fd,"NOP:                    %0d\n", nop_counter);
+            $fwrite(fd,"LOGIC:                  %0d\n", logic_counter);
+            $fwrite(fd,"ARITH:                  %0d\n", arithmetic_counter);
+            $fwrite(fd,"SHIFT:                  %0d\n", shift_counter);
+            $fwrite(fd,"BRANCH:                 %0d\n", branch_counter);
+            $fwrite(fd,"JUMP:                   %0d\n", jump_counter);
+            $fwrite(fd,"LOAD:                   %0d\n", load_counter);
+            $fwrite(fd,"STORE:                  %0d\n", store_counter);
+            $fwrite(fd,"SYS:                    %0d\n", sys_counter);
+            $fwrite(fd,"CSR:                    %0d\n", csr_counter);
+            $fwrite(fd,"MUL:                    %0d\n", mul_counter);
+            $fwrite(fd,"DIV:                    %0d\n", div_counter);
+        end
     end
-
-    initial begin
-        fd = $fopen ("./debug/Report.txt", "w");
+    else begin
+        assign instructions_killed_counter = '0;
+        assign nop_counter                 = '0;
+        assign logic_counter               = '0;
+        assign arithmetic_counter          = '0;
+        assign shift_counter               = '0;
+        assign branch_counter              = '0;
+        assign jump_counter                = '0;
+        assign load_counter                = '0;
+        assign store_counter               = '0;
+        assign sys_counter                 = '0;
+        assign csr_counter                 = '0;
+        assign mul_counter                 = '0;
+        assign div_counter                 = '0;
+        assign hazard_counter              = '0;
+        assign stall_counter               = '0;
+        assign interrupt_ack_counter       = '0;
+        assign raise_exception_counter     = '0;
+        assign context_switch_counter      = '0;
     end
-
-    final begin
-        $fwrite(fd,"Clock Cycles:           %0d\n", mcycle);
-        $fwrite(fd,"Instructions Retired:   %0d\n", minstret);
-        $fwrite(fd,"Instructions Killed:    %0d\n", instructions_killed_counter);
-        $fwrite(fd,"Context Switches:       %0d\n", context_switch_counter);
-        $fwrite(fd,"Exceptions Raised:      %0d\n", raise_exception_counter);
-        $fwrite(fd,"Interrupts Acked:       %0d\n", interrupt_ack_counter);
-
-        $fwrite(fd,"\nCYCLES WITH::\n");
-        $fwrite(fd,"HAZARDS:                %0d\n", hazard_counter);
-        $fwrite(fd,"STALL:                  %0d\n", stall_counter);
-
-        $fwrite(fd,"\nINSTRUCTION COUNTERS:\n");
-        $fwrite(fd,"NOP:                    %0d\n", nop_counter);
-        $fwrite(fd,"LOGIC:                  %0d\n", logic_counter);
-        $fwrite(fd,"ARITH:                  %0d\n", arithmetic_counter);
-        $fwrite(fd,"SHIFT:                  %0d\n", shift_counter);
-        $fwrite(fd,"BRANCH:                 %0d\n", branch_counter);
-        $fwrite(fd,"JUMP:                   %0d\n", jump_counter);
-        $fwrite(fd,"LOAD:                   %0d\n", load_counter);
-        $fwrite(fd,"STORE:                  %0d\n", store_counter);
-        $fwrite(fd,"SYS:                    %0d\n", sys_counter);
-        $fwrite(fd,"CSR:                    %0d\n", csr_counter);
-        $fwrite(fd,"MUL:                    %0d\n", mul_counter);
-        $fwrite(fd,"DIV:                    %0d\n", div_counter);
-        
-    end
-`endif
 
 endmodule
