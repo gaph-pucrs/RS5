@@ -127,9 +127,11 @@ module RS5
     logic           interrupt_pending;
     exceptionCode_e Exception_Code;
 
+    /* verilator lint_off UNUSEDSIGNAL */
     logic   [31:0]  mvmdo, mvmio, mvmds, mvmis;
     logic           mvmctl;
     logic           mmu_en;
+    /* verilator lint_on UNUSEDSIGNAL */
 
 //////////////////////////////////////////////////////////////////////////////
 // Assigns

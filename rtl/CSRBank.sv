@@ -41,9 +41,11 @@ module CSRBank
     input   logic               killed,
     output  logic [31:0]        out,
 
+/* verilator lint_off UNUSEDSIGNAL */
     input   iType_e             instruction_operation_i,
     input   logic               hazard,
     input   logic               stall,
+/* verilator lint_on UNUSEDSIGNAL */
 
     input   logic               raise_exception_i,
     input   logic               machine_return_i,
@@ -77,8 +79,10 @@ module CSRBank
     privilegeLevel_e privilege;
 
     logic [31:0] mstatus, misa, mie, mtvec_r, mscratch, mepc_r, mcause, mtval, mip;
+    /* verilator lint_off UNUSEDSIGNAL */
     logic [31:0] mvmdo, mvmio, mvmds, mvmis;
     logic        mvmctl;
+    /* verilator lint_on UNUSEDSIGNAL */
     logic [63:0] mcycle, minstret;
     
     logic [31:0] wr_data, wmask, current_val;
@@ -89,8 +93,9 @@ module CSRBank
     logic [31:0] interrupt_ack_counter, raise_exception_counter, context_switch_counter;
     logic [31:0] logic_counter, arithmetic_counter, shift_counter, branch_counter, jump_counter;
     logic [31:0] load_counter, store_counter, sys_counter, csr_counter;
+    /* verilator lint_off UNUSEDSIGNAL */
     logic [31:0] mul_counter, div_counter;
-
+    /* verilator lint_on UNUSEDSIGNAL */
     //logic [31:0] medeleg, mideleg; // NOT IMPLEMENTED YET (REQUIRED ONLY WHEN SYSTEM HAVE S-MODE)
     interruptionCode_e Interruption_Code;
 
@@ -312,6 +317,7 @@ module CSRBank
                 mvmis       <= '0;
             end 
             else if (write_allowed == 1'b1) begin
+                /* verilator lint_off CASEINCOMPLETE */
                 case (CSR)
                     MVMCTL: mvmctl  <= wr_data[0];
                     MVMDO:  mvmdo   <= wr_data;
@@ -319,6 +325,7 @@ module CSRBank
                     MVMIO:  mvmio   <= wr_data;
                     MVMIS:  mvmis   <= wr_data;
                 endcase
+                /* verilator lint_on CASEINCOMPLETE */
             end
         end
     end
