@@ -26,19 +26,19 @@ module RAM_mem
     parameter string BIN_FILE  = "../app/berkeley_suite/test.bin"
 )
 (
-    input  logic        clk,
+    input  logic                             clk,
 
-    input  logic        enA_i,
-    input  logic [ 3:0] weA_i,
-    input  logic [15:0] addrA_i,
-    input  logic [31:0] dataA_i,
-    output logic [31:0] dataA_o,
+    input  logic                             enA_i,
+    input  logic [ 3:0]                      weA_i,
+    input  logic [($clog2(MEM_WIDTH) - 1):0] addrA_i,
+    input  logic [31:0]                      dataA_i,
+    output logic [31:0]                      dataA_o,
 
-    input  logic        enB_i,
-    input  logic [ 3:0] weB_i,
-    input  logic [15:0] addrB_i,
-    input  logic [31:0] dataB_i,
-    output logic [31:0] dataB_o
+    input  logic                             enB_i,
+    input  logic [ 3:0]                      weB_i,
+    input  logic [($clog2(MEM_WIDTH) - 1):0] addrB_i,
+    input  logic [31:0]                      dataB_i,
+    output logic [31:0]                      dataB_o
 );
 
     reg [7:0] RAM [0:MEM_WIDTH-1];
