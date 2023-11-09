@@ -82,7 +82,7 @@ module plic
         else if (en_i == 1'b1) begin
             if (we_i != '0) begin
                 case (addr_i)
-                    24'h002000:     ie      <= data_i[i_cnt:1];
+                    24'h000008:     ie      <= data_i[i_cnt:1];
                     default:        ;
                 endcase
             end
@@ -92,11 +92,6 @@ module plic
                     24'h000004:     data_o <= {{31-i_cnt{1'b0}}, ip, 1'b0};
                     24'h000008:     data_o <= {{31-i_cnt{1'b0}}, ie, 1'b0};
 
-                    24'h200000:     data_o <= 32'h00008000;     /* Page size */
-                    24'h200004:     data_o <= 32'h00000000;     /* Address -> 0 for single CPU */
-                    24'h200008:     data_o <= 32'h00000001;     /* Number of tasks. 0 = OS only */
-                    24'h20000C:     data_o <= 32'h00000001;     /* 1 PE in X-axis */
-                    24'h205010:     data_o <= 32'h00000001;     /* 1 PE in Y-axis */
                     default:        data_o <= '0;
                 endcase
             end
