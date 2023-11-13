@@ -20,6 +20,7 @@ module mmu
 (
     input  logic        en_i,
 
+    input  logic [31:0] mask_i,
     input  logic [31:0] offset_i,
     input  logic [31:0] size_i,
     input  logic [31:0] address_i,
@@ -30,8 +31,8 @@ module mmu
 
     always_comb begin
         if (en_i == 1'b1) begin
-            address_o = (address_i & size_i) | offset_i;
-            if ((address_i & ~size_i) != '0) begin
+            address_o = (address_i | offset_i);
+            if (((address_i & ~mask_i) & ~size_i) != '0) begin
                 exception_o = 1'b1;
             end
             else begin

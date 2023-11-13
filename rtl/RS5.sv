@@ -128,7 +128,7 @@ module RS5
     exceptionCode_e Exception_Code;
 
     /* verilator lint_off UNUSEDSIGNAL */
-    logic   [31:0]  mvmdo, mvmio, mvmds, mvmis;
+    logic   [31:0]  mvmdo, mvmio, mvmds, mvmis, mvmdm, mvmim;
     logic           mvmctl;
     logic           mmu_en;
     /* verilator lint_on UNUSEDSIGNAL */
@@ -183,11 +183,12 @@ module RS5
 
     if (XOSVMEnable == 1'b1) begin :i_mmu_blk
         mmu i_mmu (
-            .en_i           (mmu_en),
-            .offset_i       (mvmio),
-            .size_i         (mvmis),
-            .address_i      (instruction_address),
-            .exception_o    (mmu_inst_fault),
+            .en_i           (mmu_en               ),
+            .mask_i         (mvmim                ),
+            .offset_i       (mvmio                ),
+            .size_i         (mvmis                ),
+            .address_i      (instruction_address  ),
+            .exception_o    (mmu_inst_fault       ),
             .address_o      (instruction_address_o)
         );
     end 
@@ -366,8 +367,10 @@ module RS5
         .mvmctl_o                   (mvmctl),
         .mvmdo_o                    (mvmdo),
         .mvmds_o                    (mvmds),
+        .mvmdm_o                    (mvmdm),
         .mvmio_o                    (mvmio),
-        .mvmis_o                    (mvmis)
+        .mvmis_o                    (mvmis),
+        .mvmim_o                    (mvmim)
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -376,12 +379,13 @@ module RS5
 
     if (XOSVMEnable == 1'b1) begin : d_mmu_blk
         mmu d_mmu (
-            .en_i           (mmu_en),
-            .offset_i       (mvmdo),
-            .size_i         (mvmds),
-            .address_i      (mem_address),
+            .en_i           (mmu_en        ),
+            .mask_i         (mvmdm         ),
+            .offset_i       (mvmdo         ),
+            .size_i         (mvmds         ),
+            .address_i      (mem_address   ),
             .exception_o    (mmu_data_fault),
-            .address_o      (mem_address_o)
+            .address_o      (mem_address_o )
         );
     end
     else begin

@@ -71,8 +71,9 @@ module CSRBank
     output  logic [31:0]        mvmdo_o, 
     output  logic [31:0]        mvmio_o, 
     output  logic [31:0]        mvmds_o, 
-    output  logic [31:0]        mvmis_o
-
+    output  logic [31:0]        mvmis_o,
+    output  logic [31:0]        mvmim_o,
+    output  logic [31:0]        mvmdm_o
 );
 
     CSRs CSR;
@@ -80,7 +81,7 @@ module CSRBank
 
     logic [31:0] mstatus, misa, mie, mtvec_r, mscratch, mepc_r, mcause, mtval, mip;
     /* verilator lint_off UNUSEDSIGNAL */
-    logic [31:0] mvmdo, mvmio, mvmds, mvmis;
+    logic [31:0] mvmdo, mvmio, mvmds, mvmis, mvmdm, mvmim;
     logic        mvmctl;
     /* verilator lint_on UNUSEDSIGNAL */
     logic [63:0] mcycle, minstret;
@@ -132,8 +133,10 @@ module CSRBank
 
             MVMDO:      begin current_val = mvmdo;           wmask = 32'hFFFFFFFC; end
             MVMDS:      begin current_val = mvmds;           wmask = 32'hFFFFFFFC; end
+            MVMDM:      begin current_val = mvmdm;           wmask = 32'hFFFFFFFC; end
             MVMIO:      begin current_val = mvmio;           wmask = 32'hFFFFFFFC; end
             MVMIS:      begin current_val = mvmis;           wmask = 32'hFFFFFFFC; end
+            MVMIM:      begin current_val = mvmim;           wmask = 32'hFFFFFFFC; end
             MVMCTL:     begin current_val = {31'b0, mvmctl}; wmask = 32'h00000001; end
 
             default:    begin current_val = '0;              wmask = 32'h00000000; end
@@ -292,8 +295,10 @@ module CSRBank
                 MVMCTL:         out = {31'b0,mvmctl};
                 MVMDO:          out = mvmdo[31:0];
                 MVMDS:          out = mvmds[31:0];
+                MVMDM:          out = mvmdm[31:0];
                 MVMIO:          out = mvmio[31:0];
                 MVMIS:          out = mvmis[31:0];
+                MVMIM:          out = mvmim[31:0];
 
                 default:        out = '0;
             endcase
@@ -313,8 +318,10 @@ module CSRBank
                 mvmctl      <= '0;
                 mvmdo       <= '0;
                 mvmds       <= '0;
+                mvmdm       <= '0;
                 mvmio       <= '0;
                 mvmis       <= '0;
+                mvmim       <= '0;
             end 
             else if (write_allowed == 1'b1) begin
                 /* verilator lint_off CASEINCOMPLETE */
@@ -322,8 +329,10 @@ module CSRBank
                     MVMCTL: mvmctl  <= wr_data[0];
                     MVMDO:  mvmdo   <= wr_data;
                     MVMDS:  mvmds   <= wr_data;
+                    MVMDM:  mvmdm   <= wr_data;
                     MVMIO:  mvmio   <= wr_data;
                     MVMIS:  mvmis   <= wr_data;
+                    MVMIM:  mvmim   <= wr_data;
                 endcase
                 /* verilator lint_on CASEINCOMPLETE */
             end
@@ -333,15 +342,19 @@ module CSRBank
         assign mvmctl   = '0;
         assign mvmdo    = '0;
         assign mvmds    = '0;
+        assign mvmdm    = '0;
         assign mvmio    = '0;
         assign mvmis    = '0;
+        assign mvmim    = '0;
     end
 
     assign mvmctl_o = mvmctl;
     assign mvmdo_o  = mvmdo;
     assign mvmds_o  = mvmds;
+    assign mvmdm_o  = mvmdm;
     assign mvmio_o  = mvmio;
     assign mvmis_o  = mvmis;
+    assign mvmim_o  = mvmim;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Interrupt Control
