@@ -394,7 +394,7 @@ end
                 interrupt_ack_o   = 1'b0;
                 //exception_code_o  = ILLEGAL_INSTRUCTION;
                 exception_code_o  = INSTRUCTION_ACCESS_FAULT;
-                $write("[%0d] EXCEPTION - INSTRUCTION ACCESS FAULT: %8h %8h\n", $time, pc_i, instruction_i);
+                // $write("[%0d] EXCEPTION - INSTRUCTION ACCESS FAULT: %8h %8h\n", $time, pc_i, instruction_i);
             end
             else
             if ((exc_ilegal_inst_i | exc_ilegal_csr_inst) == 1'b1) begin
@@ -402,49 +402,49 @@ end
                 machine_return_o  = 1'b0;
                 interrupt_ack_o   = 1'b0;
                 exception_code_o  = ILLEGAL_INSTRUCTION;
-                $write("[%0d] EXCEPTION - ILLEGAL INSTRUCTION: %8h %8h\n", $time, pc_i, instruction_i);
+                // $write("[%0d] EXCEPTION - ILLEGAL INSTRUCTION: %8h %8h\n", $time, pc_i, instruction_i);
             end 
             else if (exc_misaligned_fetch_i == 1'b1) begin
                 raise_exception_o = 1'b1;
                 machine_return_o  = 1'b0;
                 interrupt_ack_o   = 1'b0;
                 exception_code_o  = INSTRUCTION_ADDRESS_MISALIGNED;
-                $write("[%0d] EXCEPTION - INSTRUCTION ADDRESS MISALIGNED: %8h %8h\n", $time, pc_i, instruction_i);
+                // $write("[%0d] EXCEPTION - INSTRUCTION ADDRESS MISALIGNED: %8h %8h\n", $time, pc_i, instruction_i);
             end 
             else if (instruction_operation_i == ECALL) begin
                 raise_exception_o = 1'b1;
                 machine_return_o  = 1'b0;
                 interrupt_ack_o   = 1'b0;
                 exception_code_o  = ECALL_FROM_MMODE;
-                $write("[%0d] EXCEPTION - ECALL_FROM_MMODE: %8h %8h\n", $time, pc_i, instruction_i);
+                // $write("[%0d] EXCEPTION - ECALL_FROM_MMODE: %8h %8h\n", $time, pc_i, instruction_i);
             end 
             else if (instruction_operation_i == EBREAK) begin
                 raise_exception_o = 1'b1;
                 machine_return_o  = 1'b0;
                 interrupt_ack_o   = 1'b0;
                 exception_code_o  = BREAKPOINT;
-                $write("[%0d] EXCEPTION - EBREAK: %8h %8h\n", $time, pc_i, instruction_i);
+                // $write("[%0d] EXCEPTION - EBREAK: %8h %8h\n", $time, pc_i, instruction_i);
             end
             else if (exc_load_access_fault_i == 1'b1 && (mem_write_enable_o != '0 || mem_read_enable_o == 1'b1)) begin
                 raise_exception_o = 1'b1;
                 machine_return_o  = 1'b0;
                 interrupt_ack_o   = 1'b0;
                 exception_code_o  = LOAD_ACCESS_FAULT;
-                $write("[%0d] EXCEPTION - LOAD ACCESS FAULT: %8h %8h %8h\n", $time, pc_i, instruction_i, mem_address_o);
+                // $write("[%0d] EXCEPTION - LOAD ACCESS FAULT: %8h %8h %8h\n", $time, pc_i, instruction_i, mem_address_o);
             end 
             else if (instruction_operation_i == MRET) begin
                 raise_exception_o = 1'b0;
                 machine_return_o  = 1'b1;
                 interrupt_ack_o   = 1'b0;
                 exception_code_o  = NE;
-                $write("[%0d] MRET: %8h %8h\n", $time, pc_i, instruction_i);
+                // $write("[%0d] MRET: %8h %8h\n", $time, pc_i, instruction_i);
             end 
             else if (interrupt_pending_i == 1'b1 && instruction_operation_i != NOP) begin
                 raise_exception_o = 1'b0;
                 machine_return_o  = 1'b0;
                 interrupt_ack_o   = 1'b1;
                 exception_code_o  = NE;
-                $write("[%0d] Interrupt Acked\n", $time);
+                // $write("[%0d] Interrupt Acked\n", $time);
             end
             else begin
                 raise_exception_o = 1'b0;
