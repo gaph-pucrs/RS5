@@ -154,8 +154,8 @@ module CSRBank
     always_ff @(posedge clk) begin
         if (reset == 1'b1) begin
             // mstatus     <= '0;   // Duplicated behavior. Which one is the right one?
-            mstatus[3]  <= 0;       // MIE  = 0
-            mstatus[17] <= 0;       // MPRV = 0
+            mstatus[3]  <= 1'b0;       // MIE  = 0
+            mstatus[17] <= 1'b0;       // MPRV = 0
             misa        <= 32'h40000100;   // 32 - I /* @todo: add M/Zmmul with params */
             //medeleg   <= '0;
             //mideleg   <= '0;
@@ -170,8 +170,8 @@ module CSRBank
             //mip       <= '0;
             mcycle      <= '0;
             minstret    <= '0;
-
-        end 
+            privilege   <= privilegeLevel_e'(2'b11);
+        end
         else begin
             mcycle      <= mcycle + 1;
             minstret    <= (killed) 
