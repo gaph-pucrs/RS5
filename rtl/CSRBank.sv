@@ -26,8 +26,9 @@
 module CSRBank 
     import RS5_pkg::*;
 #( 
-    parameter bit   XOSVMEnable = 1'b0,
-    parameter bit   ZIHPMEnable = 1'b0
+    parameter bit       XOSVMEnable = 1'b0,
+    parameter bit       ZIHPMEnable = 1'b0,
+    parameter rv32_e    RV32        = RV32I
 )
 (
     input   logic               clk,
@@ -79,13 +80,36 @@ module CSRBank
     CSRs CSR;
     privilegeLevel_e privilege;
 
-    logic [31:0] mstatus, misa, mie, mtvec_r, mscratch, mepc_r, mcause, mtval, mip;
+//////////////////////////////////////////////////////////////////////////////
+// CSRs definition
+//////////////////////////////////////////////////////////////////////////////
+
+    localparam logic [31:0] MISA_VALUE =  (0 << 0)              // A - Atomic Extension
+                                        | (0 << 1)              // B - Bit-Manipulation extension
+                                        | (0 << 2)              // C - Compressed extension
+                                        | (0 << 3)              // D - Double precision floating-point extension
+                                        | (0 << 4)              // E - RV32E base ISA
+                                        | (0 << 5)              // F - Single precision floating-point extension
+                                        | (0 << 6)              // F - Reserved
+                                        | (0 << 7)              // F - Hypervisor extension
+                                        | (1 << 8)              // I - RV32I/64I/128I base ISA
+                                        | ((RV32==RV32M) << 12) // M - Integer Multiply/Divide extension
+                                        | (0 << 13)             // N - User level interrupts supported
+                                        | (0 << 15)             // P - Packed-SIMD extension
+                                        | (0 << 18)             // S - Supervisor mode implemented
+                                        | (1 << 20)             // U - User mode implemented
+                                        | (0 << 21)             // V - Vector extension
+                                        | (XOSVMEnable << 23)   // X - Non-standard extensions present
+                                        | (32'(1) << 30);       // M-XLEN
+
+    logic [31:0] misa, mstatus, mtvec_r, mip, mie, mscratch, mepc_r, mcause, mtval;
+    logic [63:0] mcycle, minstret;
+
     /* verilator lint_off UNUSEDSIGNAL */
     logic [31:0] mvmdo, mvmio, mvmds, mvmis, mvmdm, mvmim;
     logic        mvmctl;
     /* verilator lint_on UNUSEDSIGNAL */
-    logic [63:0] mcycle, minstret;
-    
+
     logic [31:0] wr_data, wmask, current_val;
 
     logic read_allowed, write_allowed;
@@ -100,6 +124,47 @@ module CSRBank
     //logic [31:0] medeleg, mideleg; // NOT IMPLEMENTED YET (REQUIRED ONLY WHEN SYSTEM HAVE S-MODE)
     interruptionCode_e Interruption_Code;
 
+//////////////////////////////////////////////////////////////////////////////
+// Complex CSRs
+//////////////////////////////////////////////////////////////////////////////
+
+    logic        mcause_interrupt;
+    logic [30:0] mcause_exc_code;
+
+    assign mcause = {mcause_interrupt, mcause_exc_code};
+
+    logic mstatus_SIE, mstatus_MIE, mstatus_SPIE, mstatus_UBE, mstatus_MPIE, mstatus_SPP;
+    logic [1:0] mstatus_VS, mstatus_MPP, mstatus_FS, mstatus_XS;
+    logic mstatus_MPRV, mstatus_SUM, mstatus_MXR, mstatus_TVM, mstatus_TW, mstatus_TSR, mstatus_SD;
+
+    assign mstatus = {
+                        mstatus_SD, 
+                        8'b0, 
+                        mstatus_TSR, 
+                        mstatus_TW, 
+                        mstatus_TVM, 
+                        mstatus_MXR, 
+                        mstatus_SUM, 
+                        mstatus_MPRV, 
+                        mstatus_XS, 
+                        mstatus_FS, 
+                        mstatus_MPP, 
+                        mstatus_VS, 
+                        mstatus_SPP, 
+                        mstatus_MPIE, 
+                        mstatus_UBE, 
+                        mstatus_SPIE, 
+                        1'b0, 
+                        mstatus_MIE, 
+                        1'b0, 
+                        mstatus_SIE, 
+                        1'b0
+                    };
+
+//////////////////////////////////////////////////////////////////////////////
+// Assigns
+//////////////////////////////////////////////////////////////////////////////
+
     assign privilege_o = privilege;
     assign mtvec       = mtvec_r;
     assign mepc        = mepc_r;
@@ -109,6 +174,10 @@ module CSRBank
     assign write_allowed = (write_enable_i == 1'b1 & killed == 1'b0);
 
     assign read_allowed = (read_enable_i == 1'b1 & killed == 1'b0);
+
+//////////////////////////////////////////////////////////////////////////////
+// Masks and Current Value
+//////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
         wmask = '1;
@@ -125,7 +194,6 @@ module CSRBank
             MEPC:       begin current_val = mepc_r;          wmask = 32'hFFFFFFFC; end
             MCAUSE:     begin current_val = mcause;          wmask = 32'hFFFFFFFF; end
             MTVAL:      begin current_val = mtval;           wmask = 32'hFFFFFFFF; end
-            // MIP:        begin current_val = mip;             wmask = 32'h00000000; end
             MCYCLE:     begin current_val = mcycle[31:0];    wmask = 32'hFFFFFFFF; end
             MCYCLEH:    begin current_val = mcycle[63:32];   wmask = 32'hFFFFFFFF; end
             MINSTRET:   begin current_val = minstret[31:0];  wmask = 32'hFFFFFFFF; end
@@ -143,6 +211,10 @@ module CSRBank
         endcase
     end
 
+//////////////////////////////////////////////////////////////////////////////
+// Operation
+//////////////////////////////////////////////////////////////////////////////
+
     always_comb begin
         case (operation_i)
             SET:     wr_data = (current_val | data_i) & wmask;
@@ -151,91 +223,133 @@ module CSRBank
         endcase
     end
 
+//////////////////////////////////////////////////////////////////////////////
+// CSR Writing
+//////////////////////////////////////////////////////////////////////////////
+
     always_ff @(posedge clk) begin
+        //////////////////////////////////////////////////////////////////////////////
+        // Reset
+        //////////////////////////////////////////////////////////////////////////////
         if (reset == 1'b1) begin
-            // mstatus     <= '0;   // Duplicated behavior. Which one is the right one?
-            mstatus[3]  <= 1'b0;       // MIE  = 0
-            mstatus[17] <= 1'b0;       // MPRV = 0
-            misa        <= 32'h40000100;   // 32 - I /* @todo: add M/Zmmul with params */
-            //medeleg   <= '0;
-            //mideleg   <= '0;
-            mie         <= '0;
-            mtvec_r     <= '0;
-            //mcounteren <= '0;
-            //mstatush  <= '0;
-            mscratch    <= '0;
-            mepc_r      <= '0;
-            mcause      <= '0;
-            mtval       <= '0;
-            //mip       <= '0;
-            mcycle      <= '0;
-            minstret    <= '0;
-            privilege   <= privilegeLevel_e'(2'b11);
+            mstatus_MIE      <= 1'b0;
+            mstatus_MPRV     <= 1'b0;
+            misa             <= MISA_VALUE;
+            //medeleg        <= '0;
+            //mideleg        <= '0;
+            mie              <= '0;
+            mtvec_r          <= '0;
+            //mcounteren     <= '0;
+            //mstatush       <= '0;
+            mscratch         <= '0;
+            mepc_r           <= '0;
+            mcause_interrupt <= '0;
+            mcause_exc_code  <= '0;
+            mtval            <= '0;
+            mcycle           <= '0;
+            minstret         <= '0;
+            privilege        <= privilegeLevel_e'(2'b11);
         end
+        //////////////////////////////////////////////////////////////////////////////
+        // Cycle Updates
+        //////////////////////////////////////////////////////////////////////////////
         else begin
             mcycle      <= mcycle + 1;
             minstret    <= (killed) 
                             ? minstret 
                             : minstret + 1;
-        
+        //////////////////////////////////////////////////////////////////////////////
+        // Machine Return
+        //////////////////////////////////////////////////////////////////////////////
             if (machine_return_i == 1'b1) begin
-                mstatus[3]      <= mstatus[7];          // MIE = MPIE
-                privilege       <= privilegeLevel_e'(mstatus[12:11]);      // priv = MPP
+                mstatus_MIE     <= mstatus_MPIE;
+                privilege       <= privilegeLevel_e'(mstatus_MPP);      // priv = MPP
             end
+        //////////////////////////////////////////////////////////////////////////////
+        // Exception
+        //////////////////////////////////////////////////////////////////////////////
             else if (raise_exception_i == 1'b1) begin
-                mcause[31]      <= '0;
-                mcause[30:0]    <= {26'b0, exception_code_i};
-                mstatus[12:11]  <= privilege;           // MPP = previous privilege
+                mcause_interrupt<= '0;
+                mcause_exc_code <= {26'b0, exception_code_i};
+                mstatus_MPP     <= privilege;
                 privilege       <= privilegeLevel_e'(2'b11);
-                mstatus[7]      <= mstatus[3];          // MPIE = MIE
-                mstatus[3]      <= 0;                   // MIE = 0
+                mstatus_MPIE    <= mstatus_MIE;
+                mstatus_MIE     <= 0;
                 mepc_r          <= (exception_code_i == ECALL_FROM_MMODE || exception_code_i == BREAKPOINT) 
                                     ? pc_i 
                                     : pc_i+4;             // Return address
                 mtval           <= (exception_code_i == ILLEGAL_INSTRUCTION) 
                                     ? instruction_i 
                                     : pc_i;
-
             end 
+        //////////////////////////////////////////////////////////////////////////////
+        // Interrupt
+        //////////////////////////////////////////////////////////////////////////////
             else if (interrupt_ack_i == 1'b1) begin
-                mcause[31]      <= '1;
-                mcause[30:0]    <=  {26'b0, Interruption_Code};
-                mstatus[12:11]  <= privilege;           // MPP = previous privilege
+                mcause_interrupt<= '1;
+                mcause_exc_code <= {26'b0, Interruption_Code};
+                mstatus_MPP     <= privilege;
                 privilege       <= privilegeLevel_e'(2'b11);
-                mstatus[7]      <= mstatus[3];          // MPIE = MIE
-                mstatus[3]      <= 0;                   // MIE = 0
+                mstatus_MPIE    <= mstatus_MIE;
+                mstatus_MIE     <= 0;
 
                 if(jump_i)
                     mepc_r      <= jump_target_i;
                 else
                     mepc_r      <= pc_i;                // Return address
-            
             end 
+        //////////////////////////////////////////////////////////////////////////////
+        // CSR Write
+        //////////////////////////////////////////////////////////////////////////////
             else if (write_allowed == 1'b1) begin
                 case(CSR)
-                    MSTATUS:      mstatus         <= wr_data;
-                    MISA:         misa            <= wr_data;
-                    // MEDELEG:      medeleg         <= wr_data;
-                    // MIDELEG:      mideleg         <= wr_data;
-                    MIE:          mie             <= wr_data;
-                    MTVEC:        mtvec_r         <= wr_data;
-                    // MCOUNTEREN:   mcounteren      <= wr_data;
-                    // MSTATUSH:     mstatush        <= wr_data;
-                    MSCRATCH:     mscratch        <= wr_data;
-                    MEPC:         mepc_r          <= wr_data;
-                    MCAUSE:       mcause          <= wr_data;
-                    MTVAL:        mtval           <= wr_data;
-                    // MIP:          mip             <= wr_data;
-                    MCYCLE:       mcycle[31:0]    <= wr_data;
-                    MCYCLEH:      mcycle[63:32]   <= wr_data;
-                    MINSTRET:     minstret[31:0]  <= wr_data;
-                    MINSTRETH:    minstret[63:32] <= wr_data;
-                    
+                    MISA:           misa                <= wr_data;
+                    // MEDELEG:     medeleg             <= wr_data;
+                    // MIDELEG:     mideleg             <= wr_data;
+                    MIE:            mie                 <= wr_data;
+                    MTVEC:          mtvec_r             <= wr_data;
+                    // MCOUNTEREN:  mcounteren          <= wr_data;
+                    // MSTATUSH:    mstatush            <= wr_data;
+                    MSCRATCH:       mscratch            <= wr_data;
+                    MEPC:           mepc_r              <= wr_data;
+                    MTVAL:          mtval               <= wr_data;
+                    MCYCLE:         mcycle[31:0]        <= wr_data;
+                    MCYCLEH:        mcycle[63:32]       <= wr_data;
+                    MINSTRET:       minstret[31:0]      <= wr_data;
+                    MINSTRETH:      minstret[63:32]     <= wr_data;
+                    MCAUSE: begin
+                                    mcause_interrupt    <= wr_data[31];
+                                    mcause_exc_code     <= wr_data[30:0];
+                            end    
+                    MSTATUS:begin
+                                    mstatus_SD          <= wr_data[31];
+                                    mstatus_TSR         <= wr_data[22];
+                                    mstatus_TW          <= wr_data[21];
+                                    mstatus_TVM         <= wr_data[20];
+                                    mstatus_MXR         <= wr_data[19];
+                                    mstatus_SUM         <= wr_data[18];
+                                    mstatus_MPRV        <= wr_data[17];
+                                    mstatus_XS          <= wr_data[16:15];
+                                    mstatus_FS          <= wr_data[14:13];
+                                    mstatus_MPP         <= wr_data[12:11];
+                                    mstatus_VS          <= wr_data[10:9];
+                                    mstatus_SPP         <= wr_data[8];
+                                    mstatus_MPIE        <= wr_data[7];
+                                    mstatus_UBE         <= wr_data[6];
+                                    mstatus_SPIE        <= wr_data[5];
+                                    mstatus_MIE         <= wr_data[3];
+                                    mstatus_SIE         <= wr_data[1];
+                            end
+
                     default:    ; // no op
                 endcase
             end
         end
     end
+
+//////////////////////////////////////////////////////////////////////////////
+// CSR Reading
+//////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
         if (read_allowed == 1'b1) begin
@@ -360,6 +474,16 @@ module CSRBank
 // Interrupt Control
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+    logic MEIP, MTIP, MSIP;
+    assign  MEIP = mip[11],
+            MTIP = mip[ 7],
+            MSIP = mip[ 3];
+
+    logic MEIE, MTIE, MSIE;
+    assign  MEIE = mie[11],
+            MTIE = mie[ 7],
+            MSIE = mie[ 3];
+
     always_ff @(posedge clk) begin
         if (reset == 1'b1) begin
             mip <= '0;
@@ -370,13 +494,13 @@ module CSRBank
     end
 
     always_ff @(posedge clk) begin
-        if (mstatus[3] && (mie & mip) != '0 && !interrupt_ack_i) begin
+        if (mstatus_MIE && (mie & mip) != '0 && !interrupt_ack_i) begin
             interrupt_pending_o <= 1;
-            if ((mip[11] & mie[11]) == 1'b1)                   // Machine External
+            if ((MEIP & MEIE) == 1'b1)          // Machine External
                 Interruption_Code <= M_EXT_INT;
-            else if ((mip[3] & mie[3]) == 1'b1)                // Machine Software
+            else if ((MSIP & MSIE) == 1'b1)     // Machine Software
                 Interruption_Code <= M_SW_INT;
-            else if ((mip[7] & mie[7]) == 1'b1)                // Machine Timer
+            else if ((MTIP & MTIE) == 1'b1)     // Machine Timer
                 Interruption_Code <= M_TIM_INT;
 
         end 

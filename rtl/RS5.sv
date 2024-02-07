@@ -335,7 +335,8 @@ module RS5
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     CSRBank #(
       .XOSVMEnable  (XOSVMEnable),
-      .ZIHPMEnable  (ZIHPMEnable)
+      .ZIHPMEnable  (ZIHPMEnable),
+      .RV32         (RV32       )
     ) CSRBank1 (
         .clk                        (clk), 
         .reset                      (reset), 
