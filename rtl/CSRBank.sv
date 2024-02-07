@@ -125,7 +125,7 @@ module CSRBank
     interruptionCode_e Interruption_Code;
 
 //////////////////////////////////////////////////////////////////////////////
-// Complex CSRs
+// MCAUSE and MSTATUS CSRs
 //////////////////////////////////////////////////////////////////////////////
 
     logic        mcause_interrupt;
@@ -133,31 +133,31 @@ module CSRBank
 
     assign mcause = {mcause_interrupt, mcause_exc_code};
 
-    logic mstatus_SIE, mstatus_MIE, mstatus_SPIE, mstatus_UBE, mstatus_MPIE, mstatus_SPP;
-    logic [1:0] mstatus_VS, mstatus_MPP, mstatus_FS, mstatus_XS;
-    logic mstatus_MPRV, mstatus_SUM, mstatus_MXR, mstatus_TVM, mstatus_TW, mstatus_TSR, mstatus_SD;
+    logic mstatus_sie, mstatus_mie, mstatus_spie, mstatus_ube, mstatus_mpie, mstatus_spp;
+    logic [1:0] mstatus_vs, mstatus_mpp, mstatus_fs, mstatus_xs;
+    logic mstatus_mprv, mstatus_sum, mstatus_mxr, mstatus_tvm, mstatus_tw, mstatus_tsr, mstatus_sd;
 
     assign mstatus = {
-                        mstatus_SD, 
+                        mstatus_sd, 
                         8'b0, 
-                        mstatus_TSR, 
-                        mstatus_TW, 
-                        mstatus_TVM, 
-                        mstatus_MXR, 
-                        mstatus_SUM, 
-                        mstatus_MPRV, 
-                        mstatus_XS, 
-                        mstatus_FS, 
-                        mstatus_MPP, 
-                        mstatus_VS, 
-                        mstatus_SPP, 
-                        mstatus_MPIE, 
-                        mstatus_UBE, 
-                        mstatus_SPIE, 
+                        mstatus_tsr, 
+                        mstatus_tw, 
+                        mstatus_tvm, 
+                        mstatus_mxr, 
+                        mstatus_sum, 
+                        mstatus_mprv, 
+                        mstatus_xs, 
+                        mstatus_fs, 
+                        mstatus_mpp, 
+                        mstatus_vs, 
+                        mstatus_spp, 
+                        mstatus_mpie, 
+                        mstatus_ube, 
+                        mstatus_spie, 
                         1'b0, 
-                        mstatus_MIE, 
+                        mstatus_mie, 
                         1'b0, 
-                        mstatus_SIE, 
+                        mstatus_sie, 
                         1'b0
                     };
 
@@ -232,8 +232,8 @@ module CSRBank
         // Reset
         //////////////////////////////////////////////////////////////////////////////
         if (reset == 1'b1) begin
-            mstatus_MIE      <= 1'b0;
-            mstatus_MPRV     <= 1'b0;
+            mstatus_mie      <= 1'b0;
+            mstatus_mprv     <= 1'b0;
             misa             <= MISA_VALUE;
             //medeleg        <= '0;
             //mideleg        <= '0;
@@ -262,8 +262,8 @@ module CSRBank
         // Machine Return
         //////////////////////////////////////////////////////////////////////////////
             if (machine_return_i == 1'b1) begin
-                mstatus_MIE     <= mstatus_MPIE;
-                privilege       <= privilegeLevel_e'(mstatus_MPP);      // priv = MPP
+                mstatus_mie     <= mstatus_mpie;
+                privilege       <= privilegeLevel_e'(mstatus_mpp);      // priv = MPP
             end
         //////////////////////////////////////////////////////////////////////////////
         // Exception
@@ -271,10 +271,10 @@ module CSRBank
             else if (raise_exception_i == 1'b1) begin
                 mcause_interrupt<= '0;
                 mcause_exc_code <= {26'b0, exception_code_i};
-                mstatus_MPP     <= privilege;
+                mstatus_mpp     <= privilege;
                 privilege       <= privilegeLevel_e'(2'b11);
-                mstatus_MPIE    <= mstatus_MIE;
-                mstatus_MIE     <= 0;
+                mstatus_mpie    <= mstatus_mie;
+                mstatus_mie     <= 0;
                 mepc_r          <= (exception_code_i == ECALL_FROM_MMODE || exception_code_i == BREAKPOINT) 
                                     ? pc_i 
                                     : pc_i+4;             // Return address
@@ -288,10 +288,10 @@ module CSRBank
             else if (interrupt_ack_i == 1'b1) begin
                 mcause_interrupt<= '1;
                 mcause_exc_code <= {26'b0, Interruption_Code};
-                mstatus_MPP     <= privilege;
+                mstatus_mpp     <= privilege;
                 privilege       <= privilegeLevel_e'(2'b11);
-                mstatus_MPIE    <= mstatus_MIE;
-                mstatus_MIE     <= 0;
+                mstatus_mpie    <= mstatus_mie;
+                mstatus_mie     <= 0;
 
                 if(jump_i)
                     mepc_r      <= jump_target_i;
@@ -322,23 +322,23 @@ module CSRBank
                                     mcause_exc_code     <= wr_data[30:0];
                             end    
                     MSTATUS:begin
-                                    mstatus_SD          <= wr_data[31];
-                                    mstatus_TSR         <= wr_data[22];
-                                    mstatus_TW          <= wr_data[21];
-                                    mstatus_TVM         <= wr_data[20];
-                                    mstatus_MXR         <= wr_data[19];
-                                    mstatus_SUM         <= wr_data[18];
-                                    mstatus_MPRV        <= wr_data[17];
-                                    mstatus_XS          <= wr_data[16:15];
-                                    mstatus_FS          <= wr_data[14:13];
-                                    mstatus_MPP         <= wr_data[12:11];
-                                    mstatus_VS          <= wr_data[10:9];
-                                    mstatus_SPP         <= wr_data[8];
-                                    mstatus_MPIE        <= wr_data[7];
-                                    mstatus_UBE         <= wr_data[6];
-                                    mstatus_SPIE        <= wr_data[5];
-                                    mstatus_MIE         <= wr_data[3];
-                                    mstatus_SIE         <= wr_data[1];
+                                    mstatus_sd          <= wr_data[31];
+                                    mstatus_tsr         <= wr_data[22];
+                                    mstatus_tw          <= wr_data[21];
+                                    mstatus_tvm         <= wr_data[20];
+                                    mstatus_mxr         <= wr_data[19];
+                                    mstatus_sum         <= wr_data[18];
+                                    mstatus_mprv        <= wr_data[17];
+                                    mstatus_xs          <= wr_data[16:15];
+                                    mstatus_fs          <= wr_data[14:13];
+                                    mstatus_mpp         <= wr_data[12:11];
+                                    mstatus_vs          <= wr_data[10:9];
+                                    mstatus_spp         <= wr_data[8];
+                                    mstatus_mpie        <= wr_data[7];
+                                    mstatus_ube         <= wr_data[6];
+                                    mstatus_spie        <= wr_data[5];
+                                    mstatus_mie         <= wr_data[3];
+                                    mstatus_sie         <= wr_data[1];
                             end
 
                     default:    ; // no op
@@ -494,7 +494,7 @@ module CSRBank
     end
 
     always_ff @(posedge clk) begin
-        if (mstatus_MIE && (mie & mip) != '0 && !interrupt_ack_i) begin
+        if (mstatus_mie && (mie & mip) != '0 && !interrupt_ack_i) begin
             interrupt_pending_o <= 1;
             if ((MEIP & MEIE) == 1'b1)          // Machine External
                 Interruption_Code <= M_EXT_INT;
