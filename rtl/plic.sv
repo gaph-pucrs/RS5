@@ -43,7 +43,7 @@ module plic
 		id_int = '0;   /* 0 = NO IRQ */
 		for (int i = 1; i <= i_cnt; i++) begin
 			if (interrupt[i] == 1'b1) begin
-				id_int = '0;
+				id_int = i-1;               
 				break;
 			end
 		end
