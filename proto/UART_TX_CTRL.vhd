@@ -38,8 +38,12 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.std_logic_unsigned.all;
+use IEEE.Numeric_Std.ALL;
 
 entity UART_TX_CTRL is
+	generic(
+		CLKS_PER_BIT : in integer
+	); 
     Port ( SEND : in  STD_LOGIC;
            DATA : in  STD_LOGIC_VECTOR (7 downto 0);
            CLK : in  STD_LOGIC;
@@ -51,12 +55,13 @@ architecture Behavioral of UART_TX_CTRL is
 
 type TX_STATE_TYPE is (RDY, LOAD_BIT, SEND_BIT);
 
-constant BIT_TMR_MAX : std_logic_vector(13 downto 0) := "10100010110000"; --10416 = (round(100MHz / 9600)) - 1
+
+constant BIT_TMR_MAX : std_logic_vector(14 downto 0) := std_logic_vector(to_unsigned(CLKS_PER_BIT, 15)); --1736 = (round(200MHz / 115200)) 
 constant BIT_INDEX_MAX : natural := 10;
 
 --Counter that keeps track of the number of clock cycles the current bit has been held stable over the
 --UART TX line. It is used to signal when the ne
-signal bitTmr : std_logic_vector(13 downto 0) := (others => '0');
+signal bitTmr : std_logic_vector(14 downto 0) := (others => '0');
 
 --combinatorial logic that goes high when bitTmr has counted to the proper value to ensure
 --a 9600 baud rate

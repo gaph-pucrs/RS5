@@ -1,7 +1,8 @@
 module Peripherals
     import RS5_pkg::*;
 #(
-    parameter i_cnt = 0
+    parameter i_cnt = 0,
+    parameter CLKS_PER_BIT_UART
 )
 (
     input  logic            clk,
@@ -14,18 +15,26 @@ module Peripherals
     output logic [31:0]     data_o,
     input  logic            BTND,
     output logic            UART_TX,
+    input  logic            UART_RX,
     output logic            stall_o,
     output logic [i_cnt:1]  interrupt_req_o,
-    input  logic [i_cnt:1]  interrupt_ack_i
+    input  logic [i_cnt:1]  interrupt_ack_i    
 );
-
+     
     logic           stall_r;
     logic           BUFFER_write, BUFFER_read, BUFFER_empty, BUFFER_full;
     logic [7:0]     BUFFER_data;
     logic           UART_send, UART_ready;
     logic [7:0]     UART_data;
+    logic           UART_receive_int, UART_ready_rx;
+    logic [7:0]     UART_data_rx;
+    logic [7:0]     UART_data_rx_reg;
+    logic           UART_ack;
+    logic           UART_RX_irq;
     logic [i_cnt:1] irq;
     logic           BTND_debounced, BTND_debounced_r, button_detected, button_irq, button_ack;
+
+    assign UART_receive_int = UART_RX;
 
 //////////////////////////////////////////////////////////////////////////////
 // Writes in Peripherals
@@ -46,11 +55,11 @@ module Peripherals
             end
             // NOTHING
             else begin
-                BUFFER_write <= '0;         
+                BUFFER_write <= '0;
             end
 
         end else begin
-            BUFFER_write <= '0;         
+            BUFFER_write <= '0;
         end
     end
 
@@ -59,8 +68,10 @@ module Peripherals
 //////////////////////////////////////////////////////////////////////////////
 
     assign interrupt_req_o[1]   = button_irq;
+    assign interrupt_req_o[2]   = UART_RX_irq;
 
     assign button_ack           = interrupt_ack_i[1];
+    assign UART_RX_ACK          = interrupt_ack_i[2];
 
 //////////////////////////////////////////////////////////////////////////////
 // BUTTON
@@ -126,20 +137,72 @@ module Peripherals
 
     always_ff @(posedge clk) begin
         stall_r <= stall_o;
-        data_o  <= '0;
     end
 
+    always_ff @(posedge clk) begin
+        if(reset)begin
+            data_o <= '0;
+        end
+        else begin
+            if(write_enable_i == '0 && enable_i) begin
+                if(data_address_i == 32'h80005000) begin
+                    data_o <= {{24{1'b0}}, UART_data_rx_reg };
+                end
+            end
+        end
+    end
 //////////////////////////////////////////////////////////////////////////////
 // UART INSTANTIATION
 //////////////////////////////////////////////////////////////////////////////
 
-    UART_TX_CTRL UART(
+    //////////////////////////////////////////////////////////////////////////////
+    // UART TX
+    //////////////////////////////////////////////////////////////////////////////
+    UART_TX_CTRL #(CLKS_PER_BIT_UART) UART(
         .CLK        (clk),
         .SEND       (UART_send),
         .DATA       (UART_data),
         .READY      (UART_ready),
         .UART_TX    (UART_TX)
     );
+    
+    //////////////////////////////////////////////////////////////////////////////
+    // UART RX
+    //////////////////////////////////////////////////////////////////////////////
+
+    always_ff @(posedge clk) begin
+        if (reset) begin
+            UART_RX_irq <= 0;
+        end
+        else if (UART_ready_rx == 1'b1) begin
+            UART_RX_irq <= 1;
+        end
+        else if (UART_RX_ACK == 1'b1) begin
+            UART_RX_irq <= 0;
+        end
+    end
+    always_ff @(posedge clk) begin
+        if (reset) begin
+            UART_data_rx_reg <= '0;
+        end 
+        else begin
+            if(UART_ready_rx)begin
+                UART_data_rx_reg <= UART_data_rx;
+            end
+        end
+    end
+
+    ////////////////////////////
+    // 20833 for 9600 baudrate
+    // 1736 for 115200 baudrate
+    ////////////////////////////
+
+    UART_RX_CTRL #(CLKS_PER_BIT_UART) UART_RX(
+        .i_Clock    (clk),
+        .i_Rx_Serial(UART_receive_int),
+        .o_Rx_DV    (UART_ready_rx),
+        .o_Rx_Byte  (UART_data_rx)
+    ); 
 
 //////////////////////////////////////////////////////////////////////////////
 // UART BUFFER

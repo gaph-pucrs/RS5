@@ -1,18 +1,20 @@
 module RS5_FPGA_Platform
     import RS5_pkg::*;
 #(
-    parameter int           i_cnt       = 1,
+    parameter int           i_cnt       = 2,
     parameter environment_e Environment = FPGA,
     parameter rv32_e        RV32        = RV32I,
     parameter bit           XOSVMEnable = 1'b0,
-    parameter bit           ZIHPMEnable = 1'b0
+    parameter bit           ZIHPMEnable = 1'b0,
+    parameter int           CLKS_PER_BIT_UART = 868
 )
 (
     input  logic       clk,
     input  logic       reset,
     input  logic       BTND,
+    input  logic       UART_RX,
     output logic       UART_TX
-);
+); 
     logic [31:0]            cpu_instruction_address, cpu_instruction;
     logic [31:0]            cpu_data_address, cpu_data_in, cpu_data_out;
     logic                   cpu_operation_enable, enable_ram, enable_peripherals, enable_rtc, enable_plic;
@@ -26,7 +28,7 @@ module RS5_FPGA_Platform
     logic                   interrupt_ack;
     logic [31:0]            irq;
     logic [i_cnt:1]         irq_peripherals, iack_peripherals;
-
+    
     assign irq = {20'h0, mei, 3'h0, mti, 7'h0};
 
 //////////////////////////////////////////////////////////////////////////////
@@ -174,7 +176,10 @@ module RS5_FPGA_Platform
 // PERIPHERALS
 //////////////////////////////////////////////////////////////////////////////
 
-    Peripherals Peripherals1 (
+    Peripherals #(
+        .i_cnt(i_cnt),
+        .CLKS_PER_BIT_UART(CLKS_PER_BIT_UART)
+    ) Peripherals1 (
         .clk            (clk), 
         .reset          (!reset), 
         .stall_o        (stall),
@@ -185,6 +190,7 @@ module RS5_FPGA_Platform
         .data_o         (data_peripherals),
         .BTND           (BTND),
         .UART_TX        (UART_TX),
+        .UART_RX        (UART_RX),
         .interrupt_req_o(irq_peripherals),
         .interrupt_ack_i(iack_peripherals)
     );
