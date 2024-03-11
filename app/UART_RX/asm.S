@@ -6,8 +6,8 @@ _entry:
     la t0, MEI_handler         # Grava o endereço do rótulo trap_handler
     csrw mtvec, t0              # no registrador mtvec
 
-    li t3, 0xffffffff
-    la t4, 0x70000008
+    li t3, 0xffffffff           # Habilita todas as interrupções externas
+    la t4, 0x70000008           # endereço do registrador ie
     sw t3, 0(t4)
 
     # Habilita Interrupções Global
@@ -26,6 +26,7 @@ loop:
     j loop
 
 MEI_handler:
+
     li t1, 0x80005000 # uart_rx
     lw t2, 0(t1)      # byte recebido
    
