@@ -1,7 +1,7 @@
 module Peripherals
     import RS5_pkg::*;
 #(
-    parameter i_cnt = 0,
+    parameter i_cnt = 1,
     parameter CLKS_PER_BIT_UART
 )
 (
@@ -24,17 +24,17 @@ module Peripherals
     logic           stall_r;
     logic           BUFFER_write, BUFFER_read, BUFFER_empty, BUFFER_full;
     logic [7:0]     BUFFER_data;
-    logic           UART_send, UART_ready;
-    logic [7:0]     UART_data;
-    logic           UART_receive_int, UART_ready_rx;
-    logic [7:0]     UART_data_rx;
-    logic [7:0]     UART_data_rx_reg;
-    logic           UART_ack;
+    logic           UART_TX_send;
+    logic           UART_TX_ready;
+    logic [7:0]     UART_TX_data;
+    logic           UART_RX_ready;
+    logic [7:0]     UART_RX_data;
+    logic [7:0]     UART_RX_data_reg;
     logic           UART_RX_irq;
     logic [i_cnt:1] irq;
     logic           BTND_debounced, BTND_debounced_r, button_detected, button_irq, button_ack;
 
-    assign UART_receive_int = UART_RX;
+    
 
 //////////////////////////////////////////////////////////////////////////////
 // Writes in Peripherals
@@ -146,7 +146,7 @@ module Peripherals
         else begin
             if(write_enable_i == '0 && enable_i) begin
                 if(data_address_i == 32'h80005000) begin
-                    data_o <= {{24{1'b0}}, UART_data_rx_reg };
+                    data_o <= {{24{1'b0}}, UART_RX_data_reg };
                 end
             end
         end
@@ -160,10 +160,10 @@ module Peripherals
     //////////////////////////////////////////////////////////////////////////////
     UART_TX_CTRL #(CLKS_PER_BIT_UART) UART(
         .CLK        (clk),
-        .SEND       (UART_send),
-        .DATA       (UART_data),
-        .READY      (UART_ready),
-        .UART_TX    (UART_TX)
+        .SEND       (UART_TX_send),            // enable send
+        .DATA       (UART_TX_data),            // 8 bit 
+        .READY      (UART_TX_ready),           // ready to serialize new data
+        .UART_TX    (UART_TX)                  // serialized data
     );
     
     //////////////////////////////////////////////////////////////////////////////
@@ -174,7 +174,7 @@ module Peripherals
         if (reset) begin
             UART_RX_irq <= 0;
         end
-        else if (UART_ready_rx == 1'b1) begin
+        else if (UART_RX_ready == 1'b1) begin
             UART_RX_irq <= 1;
         end
         else if (UART_RX_ACK == 1'b1) begin
@@ -183,25 +183,20 @@ module Peripherals
     end
     always_ff @(posedge clk) begin
         if (reset) begin
-            UART_data_rx_reg <= '0;
+            UART_RX_data_reg <= '0;
         end 
         else begin
-            if(UART_ready_rx)begin
-                UART_data_rx_reg <= UART_data_rx;
+            if(UART_RX_ready)begin
+                UART_RX_data_reg <= UART_RX_data;
             end
         end
     end
 
-    ////////////////////////////
-    // 20833 for 9600 baudrate
-    // 1736 for 115200 baudrate
-    ////////////////////////////
-
-    UART_RX_CTRL #(CLKS_PER_BIT_UART) UART_RX(
+    UART_RX_CTRL #(CLKS_PER_BIT_UART) UART_RX_CTRL(
         .i_Clock    (clk),
-        .i_Rx_Serial(UART_receive_int),
-        .o_Rx_DV    (UART_ready_rx),
-        .o_Rx_Byte  (UART_data_rx)
+        .i_Rx_Serial(UART_RX),
+        .o_Rx_DV    (UART_RX_ready),
+        .o_Rx_Byte  (UART_RX_data)
     ); 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -214,15 +209,15 @@ module Peripherals
         .din    (BUFFER_data),          // input wire [7 : 0] din
         .wr_en  (BUFFER_write),         // input wire wr_en
         .rd_en  (BUFFER_read),          // input wire rd_en
-        .dout   (UART_data),            // output wire [7 : 0] dout
+        .dout   (UART_TX_data),            // output wire [7 : 0] dout
         .full   (BUFFER_full),          // output wire full
         .empty  (BUFFER_empty)          // output wire empty
     );
 
-    assign BUFFER_read = UART_ready & !BUFFER_empty & !UART_send;
+    assign BUFFER_read = UART_TX_ready & !BUFFER_empty & !UART_TX_send;
 
     always_ff @(posedge clk) begin
-        UART_send <= BUFFER_read;
+        UART_TX_send <= BUFFER_read;
     end
 
 endmodule
