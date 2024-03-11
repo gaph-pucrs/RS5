@@ -6,7 +6,7 @@ module RS5_FPGA_Platform
     parameter rv32_e        RV32        = RV32I,
     parameter bit           XOSVMEnable = 1'b0,
     parameter bit           ZIHPMEnable = 1'b0,
-    parameter int           CLKS_PER_BIT_UART = 1736
+    parameter int           CLKS_PER_BIT_UART = 20833
 )
 (
     input  logic       clk_p,
