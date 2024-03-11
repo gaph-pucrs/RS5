@@ -22,7 +22,8 @@ module plic
     output  logic                   irq_o
 );
 
-    logic [$clog2(i_cnt):0] id_int, id;
+    logic [$clog2(i_cnt):0] id_int;
+    logic [$clog2(i_cnt):0] id_r;
     logic [i_cnt:1]         ie;
     logic [i_cnt:1]         ip;
     logic [i_cnt:1]         interrupt;
@@ -38,37 +39,35 @@ module plic
 
     assign interrupt = ip & ie;
 
-/* verilator lint_off WIDTHTRUNC */
 	always_comb begin
 		id_int = '0;   /* 0 = NO IRQ */
 		for (int i = 1; i <= i_cnt; i++) begin
 			if (interrupt[i] == 1'b1) begin
-				id_int = i-1;               
+				id_int = i;           
 				break;
 			end
 		end
 	end
-/* verilator lint_on WIDTHTRUNC */
+
+    always_ff @(posedge clk) begin
+        if (reset == 1'b1)
+            id_r <= '0;
+        else
+            id_r <= id_int;
+    end
 
     always_ff @(posedge clk) begin
         if (reset == 1'b1) begin
-            id <= '0;
+            iack_o <= '0;
         end
-        else if (iack_i == 1'b1)begin
-            id <= id_int;
+        else begin
+            iack_o <= '0;
+            if (iack_i == 1'b1)
+                iack_o[id_int] <= 1'b1;
         end
     end
 
     assign irq_o    = (|interrupt) & ~iack_i;
-
-    always_comb begin
-        if (iack_i == 1'b1) begin
-            iack_o = (1'b1 << id);
-        end
-        else begin
-            iack_o = '0;
-        end
-    end
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Memory Mapped Regs
@@ -88,9 +87,9 @@ module plic
             end
             else begin
                 case (addr_i)
-                    24'h000000:     data_o <= {{31-$clog2(i_cnt){1'b0}}, id};
-                    24'h000004:     data_o <= {{31-i_cnt{1'b0}}, ip, 1'b0};
-                    24'h000008:     data_o <= {{31-i_cnt{1'b0}}, ie, 1'b0};
+                    24'h000000:     data_o <= {{31-$clog2(i_cnt){1'b0}}, id_r};   /* ID */
+                    24'h000004:     data_o <= {{31-i_cnt{1'b0}}, ip, 1'b0};     /* IP */
+                    24'h000008:     data_o <= {{31-i_cnt{1'b0}}, ie, 1'b0};     /* IE */
 
                     default:        data_o <= '0;
                 endcase
