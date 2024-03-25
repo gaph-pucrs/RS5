@@ -19,9 +19,11 @@ all: $(TEST_OBJS)
 	$(DUMP_RISCV) --disassemble --reloc test.axf > test.lst
 	$(DUMP_RISCV) -h test.axf > test.sec
 	$(DUMP_RISCV) -s test.axf > test.cnt
-	$(OBJ_RISCV) -O binary test.axf test.bin
+	$(OBJ_RISCV) -j *data -O binary test.axf test_data.bin
+	$(OBJ_RISCV) -j *text -O binary test.axf test_inst.bin
 	$(SIZE_RISCV) test.axf
-	hexdump -v -e '4/1 "%02x" "\n"' test.bin > test.hex
+	hexdump -v -e '4/1 "%02x" "\n"' test_inst.bin > test_inst.hex
+	hexdump -v -e '4/1 "%02x" "\n"' test_data.bin > test_data.hex
 
 %.o: %.S tests/riscv_test.h tests/test_macros.h
 	$(GCC_RISCV) -o $@ -DTEST_FUNC_NAME=$(notdir $(basename $<)) \

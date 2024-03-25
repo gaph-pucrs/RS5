@@ -1,7 +1,11 @@
 ENTRY(_entry)
 
 /* specify HF-RISC memory areas */
-
+MEMORY
+{
+    INST (rx) : ORIGIN = 0x00000000, LENGTH = 0x00080000
+    DATA (rwx) : ORIGIN = 0x10000000, LENGTH = 0x00008000
+}
 
 /* define a global symbol _stack  */
 
@@ -16,7 +20,7 @@ SECTIONS {
 			*(.text)
 			*(.text.*)
 			_etext = .;
-	}
+	} > INST
 
 	.data : {
 			_rodata = .;
@@ -41,7 +45,7 @@ SECTIONS {
 			_bss_end = . ;
 			. += 0x2000;
 			_stack = .;
-	}
+	} > DATA
 
 	_end = .;
 }
