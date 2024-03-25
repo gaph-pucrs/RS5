@@ -56,9 +56,7 @@ module execute
     output  iType_e             instruction_operation_o,
     output  logic [31:0]        result_o,
 
-    output  logic [63:0]        mul_result_o, 
-    output  logic [63:0]        mulh_result_o, 
-    output  logic [63:0]        mulhsu_result_o,
+    output  logic [31:0]        mul_result_o, 
 
     output  logic [31:0]        mem_address_o,
     output  logic               mem_read_enable_o,
@@ -252,25 +250,39 @@ end
     logic [31:0] divu_result;
     logic [31:0] rem_result;
     logic [31:0] remu_result;
+    logic        hold_div;
+    logic        hold_mul;
+
+    assign hold_o = (hold_mul | hold_div);
 
     if (RV32 == RV32M || RV32 == RV32ZMMUL) begin
-        muldiv #(
-            .Environment    (Environment),
+        mul #(
             .RV32           (RV32)
-        ) muldiv1 (
+        ) mul1 (
             .clk                        (clk),
             .reset                      (reset),
             .first_operand_i            (first_operand_i),
             .second_operand_i           (second_operand_i),
             .instruction_operation_i    (instruction_operation_i),
-            .hold_o                     (hold_o),
+            .hold_o                     (hold_mul),
+            
+            .mul_result_o               (mul_result_o)
+            
+        );
+        div #(
+            .Environment    (Environment),
+            .RV32           (RV32)
+        ) div1 (
+            .clk                        (clk),
+            .reset                      (reset),
+            .first_operand_i            (first_operand_i),
+            .second_operand_i           (second_operand_i),
+            .instruction_operation_i    (instruction_operation_i),
+            .hold_o                     (hold_div),
             .div_result_o               (div_result),
             .divu_result_o              (divu_result),
             .rem_result_o               (rem_result),
-            .remu_result_o              (remu_result),
-            .mul_result_o               (mul_result_o),
-            .mulh_result_o              (mulh_result_o),
-            .mulhsu_result_o            (mulhsu_result_o)
+            .remu_result_o              (remu_result)
         );
     end 
     else begin
@@ -306,6 +318,10 @@ end
             DIVU:                   result = divu_result;
             REM:                    result = rem_result;
             REMU:                   result = remu_result;
+            MUL:                    result = mul_result_o;
+            MULHSU:                 result = mul_result_o;
+            MULHU:                  result = mul_result_o;
+            MULH:                   result = mul_result_o;
             default:                result = sum_result;
         endcase
     end

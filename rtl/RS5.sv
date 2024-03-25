@@ -22,7 +22,7 @@ module RS5
     import RS5_pkg::*;
 #(
     parameter environment_e Environment = ASIC,
-    parameter rv32_e        RV32        = RV32I,
+    parameter rv32_e        RV32        = RV32M,
     parameter bit           XOSVMEnable = 1'b0,
     parameter bit           ZIHPMEnable = 1'b0
 )
@@ -110,9 +110,8 @@ module RS5
     logic   [31:0]  result_retire;
     logic           killed;
 
-    logic   [63:0]  mul_result;
-    logic   [63:0]  mulh_result;
-    logic   [63:0]  mulhsu_result;
+    logic   [31:0]  mul_result;
+
 
 //////////////////////////////////////////////////////////////////////////////
 // CSR Bank signals
@@ -294,8 +293,6 @@ module RS5
         .instruction_operation_o(instruction_operation_retire), 
         .result_o               (result_retire),
         .mul_result_o           (mul_result),
-        .mulh_result_o          (mulh_result),
-        .mulhsu_result_o        (mulhsu_result),
         .mem_address_o          (mem_address), 
         .mem_read_enable_o      (mem_read_enable), 
         .mem_write_enable_o     (mem_write_enable),
@@ -324,8 +321,6 @@ module RS5
         .instruction_operation_i(instruction_operation_retire),
         .result_i               (result_retire),
         .mul_result_i           (mul_result),
-        .mulh_result_i          (mulh_result),
-        .mulhsu_result_i        (mulhsu_result),
         .mem_data_i             (mem_data_i), 
         .regbank_data_o         (regbank_data_writeback)
     );

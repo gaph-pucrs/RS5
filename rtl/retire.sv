@@ -28,11 +28,8 @@ module retire
 (
     input   iType_e         instruction_operation_i,
     input   logic [31:0]    result_i,
-    input   logic [63:0]    mul_result_i,
-/* verilator lint_off UNUSEDSIGNAL */ 
-    input   logic [63:0]    mulh_result_i, 
-    input   logic [63:0]    mulhsu_result_i,
-/* verilator lint_on UNUSEDSIGNAL */
+    input   logic [31:0]    mul_result_i,
+
     input   logic [31:0]    mem_data_i,
 
     output  logic [31:0]    regbank_data_o
@@ -105,23 +102,18 @@ module retire
 //////////////////////////////////////////////////////////////////////////////
 // Assign to Register Bank Write Back
 //////////////////////////////////////////////////////////////////////////////
-
-    if (RV32 == RV32M || RV32 == RV32ZMMUL) begin
-        always_comb begin
-            unique case (instruction_operation_i)
-                LB,LBU,LH,LHU,LW:   regbank_data_o = memory_data;
-                MUL:                regbank_data_o = mul_result_i[31:0]; 
-                MULHU:              regbank_data_o = mul_result_i[63:32]; 
-                MULH:               regbank_data_o = mulh_result_i[63:32]; 
-                MULHSU:             regbank_data_o = mulhsu_result_i[63:32]; 
-                default:            regbank_data_o = result_i;
-            endcase         
+if (RV32 == RV32M || RV32 == RV32ZMMUL) begin
+    always_comb begin
+        unique case (instruction_operation_i)
+            LB,LBU,LH,LHU,LW:         regbank_data_o = memory_data;
+            // MUL, MULHSU, MULH, MULHU: regbank_data_o = mul_result_i[31:0];  
+            default:            regbank_data_o = result_i;
+        endcase         
         end
-    end
-    else begin
-        assign regbank_data_o = (instruction_operation_i inside {LB,LBU,LH,LHU,LW}) 
+end else begin
+    assign regbank_data_o = (instruction_operation_i inside {LB,LBU,LH,LHU,LW}) 
                                 ? memory_data 
                                 : result_i;
-    end
+end
 
 endmodule
