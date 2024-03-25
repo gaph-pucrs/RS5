@@ -37,10 +37,34 @@ module RS5
     input  logic [31:0]             irq_i,
 
     output logic [31:0]             instruction_address_o,
-    output logic                    mem_operation_enable_o,
-    output logic  [3:0]             mem_write_enable_o,
-    output logic [31:0]             mem_address_o,
-    output logic [31:0]             mem_data_o,
+    //output logic                    mem_operation_enable_o,
+    //output logic  [3:0]             mem_write_enable_o,
+    //output logic [31:0]             mem_address_o,
+    //output logic [31:0]             mem_data_o,
+
+    //////////////////////////////////////////////////////////////////////////////
+    // AXI signals
+    //////////////////////////////////////////////////////////////////////////////
+    output logic        mem_awvalid_o,
+    output logic        mem_arvalid_o,
+    output logic        mem_rready_o,
+    input  logic        mem_arready_i,
+    output logic        mem_wvalid_o,
+    output logic [ 3:0] mem_wstrb_o,
+    output logic [31:0] mem_araddr_o,
+    output logic [31:0] mem_awaddr_o,
+    output logic [31:0] mem_wdata_o,
+    input  logic [31:0] mem_rdata_i,
+    input  logic        mem_rvalid_i,
+    input  logic        mem_wready_i,
+    input  logic        mem_awready_i,
+    input  logic        mem_bvalid_i,
+    output logic        mem_bready_o,
+    input  logic [1:0]  mem_bresp_i,
+    input  logic [1:0]  mem_rresp_i,
+    output logic [2:0]  mem_awprot_o,
+    output logic [2:0]  mem_arprot_o,
+
     output logic                    interrupt_ack_o
 );
 
@@ -101,6 +125,10 @@ module RS5
     logic           exc_ilegal_inst_execute;
     logic           exc_misaligned_fetch_execute;
     logic           exc_inst_access_fault_execute;
+
+    logic        mem_awvalid;
+    logic        mem_arvalid;
+    logic        mem_wvalid;
 
 //////////////////////////////////////////////////////////////////////////////
 // Retire signals
@@ -296,10 +324,32 @@ module RS5
         .mul_result_o           (mul_result),
         .mulh_result_o          (mulh_result),
         .mulhsu_result_o        (mulhsu_result),
-        .mem_address_o          (mem_address), 
-        .mem_read_enable_o      (mem_read_enable), 
-        .mem_write_enable_o     (mem_write_enable),
-        .mem_write_data_o       (mem_data_o),
+        //.mem_address_o          (mem_address), 
+        //.mem_read_enable_o      (mem_read_enable), 
+        //.mem_write_enable_o     (mem_write_enable),
+        //.mem_write_data_o       (mem_data_o),
+
+        // AXI
+        .mem_awvalid_o(mem_awvalid),
+        .mem_arvalid_o(mem_arvalid),
+        .mem_rready_o,
+        .mem_arready_i,
+        .mem_wvalid_o(mem_wvalid),
+        .mem_wstrb_o,
+        .mem_araddr_o,
+        .mem_awaddr_o,
+        .mem_rvalid_i,
+        .mem_wready_i,
+        .mem_awready_i,
+        .mem_bvalid_i,
+        .mem_bready_o,
+        .mem_bresp_i,
+        .mem_rresp_i,
+        .mem_awprot_o,
+        .mem_arprot_o,
+        .mem_wdata_o,
+        .mem_rdata_i,
+
         .csr_address_o          (csr_addr), 
         .csr_read_enable_o      (csr_read_enable), 
         .csr_data_read_i        (csr_data_read),
@@ -314,6 +364,10 @@ module RS5
         .raise_exception_o      (RAISE_EXCEPTION), 
         .exception_code_o       (Exception_Code)
     );
+
+    assign mem_awvalid_o = killed ? '0 : mem_awvalid;
+    assign mem_arvalid_o = killed ? '0 : mem_arvalid;
+    assign mem_wvalid_o = killed ? '0 : mem_wvalid;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// RETIRE //////////////////////////////////////////////////////////////////////////////////
@@ -378,31 +432,31 @@ module RS5
 /////////////////////////////////////////////////////////// MEMORY SIGNALS //////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    if (XOSVMEnable == 1'b1) begin : d_mmu_blk
-        mmu d_mmu (
-            .en_i           (mmu_en        ),
-            .mask_i         (mvmdm         ),
-            .offset_i       (mvmdo         ),
-            .size_i         (mvmds         ),
-            .address_i      (mem_address   ),
-            .exception_o    (mmu_data_fault),
-            .address_o      (mem_address_o )
-        );
-    end
-    else begin
-        assign mmu_data_fault = 1'b0;
-        assign mem_address_o  = mem_address;
-    end
+    //if (XOSVMEnable == 1'b1) begin : d_mmu_blk
+    //    mmu d_mmu (
+    //        .en_i           (mmu_en        ),
+    //        .mask_i         (mvmdm         ),
+    //        .offset_i       (mvmdo         ),
+    //        .size_i         (mvmds         ),
+    //        .address_i      (mem_address   ),
+    //        .exception_o    (mmu_data_fault),
+    //        .address_o      (mem_address_o )
+    //    );
+    //end
+    //else begin
+    //    assign mmu_data_fault = 1'b0;
+    //    assign mem_address_o  = mem_address;
+    //end
 
-    always_comb begin
-        if ((killed == 1'b0 && (mem_write_enable != '0 || mem_read_enable == 1'b1)) && mmu_data_fault == 1'b0) begin
-            mem_operation_enable_o = 1'b1;
-        end
-        else begin
-            mem_operation_enable_o = 1'b0;
-        end
-    end
+    //always_comb begin
+    //    if ((killed == 1'b0 && (mem_write_enable != '0 || mem_read_enable == 1'b1)) && mmu_data_fault == 1'b0) begin
+    //        mem_operation_enable_o = 1'b1;
+    //    end
+    //    else begin
+    //        mem_operation_enable_o = 1'b0;
+    //    end
+    //end
 
-    assign mem_write_enable_o = mem_write_enable;
+    //assign mem_write_enable_o = mem_write_enable;
 
 endmodule

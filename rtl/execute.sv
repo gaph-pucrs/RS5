@@ -60,10 +60,32 @@ module execute
     output  logic [63:0]        mulh_result_o, 
     output  logic [63:0]        mulhsu_result_o,
 
-    output  logic [31:0]        mem_address_o,
-    output  logic               mem_read_enable_o,
-    output  logic  [3:0]        mem_write_enable_o,
-    output  logic [31:0]        mem_write_data_o,
+
+    // AXI signals for load/store
+    output logic                           mem_awvalid_o,
+    output logic                           mem_arvalid_o,
+    output logic                           mem_rready_o,
+    input  logic                           mem_awready_i,
+    input  logic                           mem_wready_i,
+    output logic        [32-1:0] mem_awaddr_o,
+    output logic        [32-1:0] mem_araddr_o,
+    output logic        [ 32/8-1:0] mem_wstrb_o,
+    output logic        [   32-1:0] mem_wdata_o, 
+    output logic                           mem_wvalid_o,
+    input  logic                           mem_arready_i,
+    input  logic                           mem_rvalid_i,
+    input  logic                           mem_bvalid_i,
+    output logic                           mem_bready_o,
+    input logic         [   32-1:0] mem_rdata_i,
+    input logic                    [1:0]   mem_bresp_i,
+    input logic                    [1:0]   mem_rresp_i,
+    output logic                   [2:0]   mem_arprot_o,
+    output logic                   [2:0]   mem_awprot_o,
+    /////////////////////////////////////////////////////
+
+    //output  logic [31:0]        mem_address_o,
+    //output  logic               mem_read_enable_o,
+    //output  logic [31:0]        mem_write_data_o,
 
     output  logic [11:0]        csr_address_o,
     output  logic               csr_read_enable_o,
@@ -93,6 +115,11 @@ module execute
 
     assign first_operand_signed  = first_operand_i;
     assign second_operand_signed = second_operand_i;
+
+    // AXI
+    assign mem_bready_o = 1'b1;
+    assign mem_arprot_o = 3'b000;  
+    assign mem_awprot_o = 3'b000;  
 
 //////////////////////////////////////////////////////////////////////////////
 // ALU
@@ -152,31 +179,103 @@ module execute
 // Load/Store signals
 //////////////////////////////////////////////////////////////////////////////
 
-    assign mem_address_o[31:2]  = sum_result[31:2];
-    assign mem_address_o [1:0]  = '0;
-    assign mem_read_enable_o    = instruction_operation_i inside {LB, LBU, LH, LHU, LW};
+    assign mem_araddr_o[31:2]  = sum_result[31:2];
+    assign mem_araddr_o [1:0]  = '0;
+    assign mem_awaddr_o[31:2]  = sum_result[31:2];
+    assign mem_awaddr_o [1:0]  = '0;
+
+    logic mem_read_enable;
+    assign mem_read_enable    = instruction_operation_i inside {LB, LBU, LH, LHU, LW};
+    logic mem_enable;
+    assign mem_enable = instruction_operation_i inside {LB, LBU, LH, LHU, LW, SB, SH, SW};
+
+    //logic hold_lsu;
+
+    enum logic[1:0] {LSU_IDLE = 0, LSU_WAIT_READ = 1, LSU_WAIT_WRITE = 2} lsu_state, lsu_next_state;
+
+    always_comb begin
+        lsu_next_state = LSU_IDLE;
+        //hold_lsu = 1'b0;
+        case (lsu_state)
+            LSU_IDLE: begin
+                if (mem_enable && mem_read_enable && !mem_arready_i) begin
+                    lsu_next_state = LSU_WAIT_READ;
+                    //hold_lsu = 1'b1;
+                end
+                else if (mem_enable && !mem_read_enable && (!mem_awready_i || !mem_wready_i)) begin
+                    lsu_next_state = LSU_WAIT_WRITE;
+                    //hold_lsu = 1'b1;
+                end
+            end
+            LSU_WAIT_READ: begin
+                if (mem_arready_i) lsu_next_state = LSU_IDLE;
+            end
+            LSU_WAIT_WRITE: begin
+                if (mem_awready_i || mem_wready_i) lsu_next_state = LSU_IDLE;
+            end
+            default: lsu_next_state = LSU_IDLE;
+        endcase
+    end
+
+    always_ff @(posedge clk) begin
+        if (reset) begin
+            lsu_state <= LSU_IDLE;
+        end
+        else begin
+            lsu_state <= lsu_next_state;
+        end
+    end
+
+    always_comb begin
+
+        mem_awvalid_o      = 1'b0;
+        mem_arvalid_o      = 1'b0;
+        mem_wvalid_o       = 1'b0;
+        mem_rready_o       = 1'b1;
+
+
+        if (lsu_state == LSU_WAIT_WRITE) begin
+            mem_awvalid_o = 1'b1;
+            mem_wvalid_o  = 1'b1;
+        end else if (lsu_state == LSU_WAIT_READ) begin
+            mem_arvalid_o = 1'b1;
+            mem_rready_o = 1'b1;
+        end else begin
+            if (mem_enable) begin
+                if (mem_read_enable) begin
+                    mem_arvalid_o = 1'b1;
+                    mem_rready_o = 1'b1;
+                end
+                else begin
+                    mem_awvalid_o = 1'b1;
+                    mem_wvalid_o  = 1'b1;
+                end
+            end
+        end
+
+    end
 
     always_comb begin
         unique case (instruction_operation_i)
-            SB:         mem_write_data_o = {4{third_operand_i[7:0]}};
-            SH:         mem_write_data_o = {2{third_operand_i[15:0]}};
-            default:    mem_write_data_o = third_operand_i;
+            SB:         mem_wdata_o = {4{third_operand_i[7:0]}};
+            SH:         mem_wdata_o = {2{third_operand_i[15:0]}};
+            default:    mem_wdata_o = third_operand_i;
         endcase
     end
 
     always_comb begin
         unique case (instruction_operation_i)
             SB: unique case (sum_result[1:0])
-                    2'b11:   mem_write_enable_o = 4'b1000;
-                    2'b10:   mem_write_enable_o = 4'b0100;
-                    2'b01:   mem_write_enable_o = 4'b0010;
-                    default: mem_write_enable_o = 4'b0001;
+                    2'b11:   mem_wstrb_o = 4'b1000;
+                    2'b10:   mem_wstrb_o = 4'b0100;
+                    2'b01:   mem_wstrb_o = 4'b0010;
+                    default: mem_wstrb_o = 4'b0001;
                 endcase
-            SH:              mem_write_enable_o = (sum_result[1]) 
+            SH:              mem_wstrb_o = (sum_result[1]) 
                                                 ? 4'b1100 
                                                 : 4'b0011;
-            SW:              mem_write_enable_o = 4'b1111;
-            default:         mem_write_enable_o = 4'b0000;
+            SW:              mem_wstrb_o = 4'b1111;
+            default:         mem_wstrb_o = 4'b0000;
         endcase
 end
 
@@ -274,7 +373,7 @@ end
         );
     end 
     else begin
-        assign hold_o           = 1'b0;
+        assign hold_o           = '0;
         assign mul_result_o     = '0;
         assign mulh_result_o    = '0;
         assign mulhsu_result_o  = '0;
@@ -425,7 +524,7 @@ end
                 exception_code_o  = BREAKPOINT;
                 // $write("[%0d] EXCEPTION - EBREAK: %8h %8h\n", $time, pc_i, instruction_i);
             end
-            else if (exc_load_access_fault_i == 1'b1 && (mem_write_enable_o != '0 || mem_read_enable_o == 1'b1)) begin
+            else if (exc_load_access_fault_i == 1'b1 && (mem_wstrb_o != '0 || mem_read_enable == 1'b1)) begin
                 raise_exception_o = 1'b1;
                 machine_return_o  = 1'b0;
                 interrupt_ack_o   = 1'b0;
