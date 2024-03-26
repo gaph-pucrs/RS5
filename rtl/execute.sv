@@ -263,31 +263,30 @@ end
             .second_operand_i           (second_operand_i),
             .instruction_operation_i    (instruction_operation_i),
             .hold_o                     (hold_mul),
-            
             .mul_result_o               (mul_result)
-            
         );
-        div #(
-            .Environment    (Environment),
-            .RV32           (RV32)
-        ) div1 (
-            .clk                        (clk),
-            .reset                      (reset),
-            .first_operand_i            (first_operand_i),
-            .second_operand_i           (second_operand_i),
-            .instruction_operation_i    (instruction_operation_i),
-            .hold_o                     (hold_div),
-            .div_result_o               (div_result),
-            .divu_result_o              (divu_result),
-            .rem_result_o               (rem_result),
-            .remu_result_o              (remu_result)
-        );
-    end 
+
+        if (RV32 != RV32ZMMUL) begin
+            div #(
+                .Environment    (Environment),
+                .RV32           (RV32)
+            ) div1 (
+                .clk                        (clk),
+                .reset                      (reset),
+                .first_operand_i            (first_operand_i),
+                .second_operand_i           (second_operand_i),
+                .instruction_operation_i    (instruction_operation_i),
+                .hold_o                     (hold_div),
+                .div_result_o               (div_result),
+                .divu_result_o              (divu_result),
+                .rem_result_o               (rem_result),
+                .remu_result_o              (remu_result)
+            );
+        end 
+    end
     else begin
         assign hold_o           = 1'b0;
-        assign mul_resul     = '0;
-        assign mulh_result_o    = '0;
-        assign mulhsu_result_o  = '0;
+        assign mul_result       = '0;
         assign div_result       = '0;
         assign divu_result      = '0;
         assign rem_result       = '0;

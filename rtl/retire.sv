@@ -28,7 +28,6 @@ module retire
 (
     input   iType_e         instruction_operation_i,
     input   logic [31:0]    result_i,
-
     input   logic [31:0]    mem_data_i,
 
     output  logic [31:0]    regbank_data_o
@@ -109,9 +108,7 @@ module retire
         endcase         
     end
 
-    assign regbank_data_o = (instruction_operation_i inside {LB,LBU,LH,LHU,LW}) 
-                                ? memory_data 
-                                : result_i;
+    
 
 
 endmodule

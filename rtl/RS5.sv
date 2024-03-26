@@ -110,7 +110,6 @@ module RS5
     logic   [31:0]  result_retire;
     logic           killed;
 
-    logic   [31:0]  mul_result;
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -319,7 +318,6 @@ module RS5
     ) retire1 (
         .instruction_operation_i(instruction_operation_retire),
         .result_i               (result_retire),
-        .mul_result_i           (mul_result),
         .mem_data_i             (mem_data_i), 
         .regbank_data_o         (regbank_data_writeback)
     );
