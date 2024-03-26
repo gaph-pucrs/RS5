@@ -20,11 +20,7 @@ module div
     output  logic [31:0] remu_result_o
 
     
-);
-
-    logic hold_div;
-    assign hold_o =  hold_div;
-    
+);  
 //////////////////////////////////////////////////////////////////////////////
 // Div Operations Control
 //////////////////////////////////////////////////////////////////////////////
@@ -47,7 +43,7 @@ module div
         assign start_sig_div    = instruction_operation_i inside {DIV, REM}   && busy_sig_div   == 0 && valid_sig_div   == 0;
         assign start_unsig_div  = instruction_operation_i inside {DIVU, REMU} && busy_unsig_div == 0 && valid_unsig_div == 0;
 
-        assign hold_div = (start_unsig_div | busy_unsig_div) || (start_sig_div | busy_sig_div);
+        assign hold_o = (start_unsig_div | busy_unsig_div) || (start_sig_div | busy_sig_div);
 
         always_comb begin
             div_result_o    = (divide_by_zero) 
@@ -243,7 +239,7 @@ module div
         end
     end
     else begin
-        assign hold_div         = 1'b0;
+        assign hold_o         = 1'b0;
         assign div_result_o     = '0;
         assign divu_result_o    = '0;
         assign rem_result_o     = '0;

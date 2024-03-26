@@ -56,8 +56,6 @@ module execute
     output  iType_e             instruction_operation_o,
     output  logic [31:0]        result_o,
 
-    output  logic [31:0]        mul_result_o, 
-
     output  logic [31:0]        mem_address_o,
     output  logic               mem_read_enable_o,
     output  logic  [3:0]        mem_write_enable_o,
@@ -266,7 +264,7 @@ end
             .instruction_operation_i    (instruction_operation_i),
             .hold_o                     (hold_mul),
             
-            .mul_result_o               (mul_result_o)
+            .mul_result_o               (mul_result)
             
         );
         div #(
@@ -287,7 +285,7 @@ end
     end 
     else begin
         assign hold_o           = 1'b0;
-        assign mul_result_o     = '0;
+        assign mul_resul     = '0;
         assign mulh_result_o    = '0;
         assign mulhsu_result_o  = '0;
         assign div_result       = '0;
@@ -318,10 +316,7 @@ end
             DIVU:                   result = divu_result;
             REM:                    result = rem_result;
             REMU:                   result = remu_result;
-            MUL:                    result = mul_result_o;
-            MULHSU:                 result = mul_result_o;
-            MULHU:                  result = mul_result_o;
-            MULH:                   result = mul_result_o;
+            MUL,MULH,MULHU,MULHSU:  result = mul_result;
             default:                result = sum_result;
         endcase
     end

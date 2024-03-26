@@ -22,7 +22,7 @@ module RS5
     import RS5_pkg::*;
 #(
     parameter environment_e Environment = ASIC,
-    parameter rv32_e        RV32        = RV32M,
+    parameter rv32_e        RV32        = RV32I,
     parameter bit           XOSVMEnable = 1'b0,
     parameter bit           ZIHPMEnable = 1'b0
 )
@@ -292,7 +292,6 @@ module RS5
         .write_enable_o         (regbank_write_enable_int),
         .instruction_operation_o(instruction_operation_retire), 
         .result_o               (result_retire),
-        .mul_result_o           (mul_result),
         .mem_address_o          (mem_address), 
         .mem_read_enable_o      (mem_read_enable), 
         .mem_write_enable_o     (mem_write_enable),
