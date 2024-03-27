@@ -37,10 +37,15 @@
 
 module testbench
     import RS5_pkg::*;
-    (
-        input logic clk_i,
-        input logic rst_i
-    );
+#(
+    parameter rv32_e INSTRUCTION_SET = RV32M,
+    parameter bit    USE_XOSVM       = 1'b1,
+    parameter bit    USE_ZIHPM       = 1'b1
+)
+(
+    input logic clk_i,
+    input logic rst_i
+);
 
 //////////////////////////////////////////////////////////////////////////////
 // PARAMETERS FOR CORE INSTANTIATION
@@ -144,7 +149,12 @@ module testbench
 // CPU
 //////////////////////////////////////////////////////////////////////////////
 
-    RS5 dut (
+    RS5 #(
+        .Environment(ASIC),
+        .RV32(INSTRUCTION_SET),
+        .XOSVMEnable(USE_XOSVM),
+        .ZIHPMEnable(USE_ZIHPM)
+    ) dut (
         .clk                    (clk_i), 
         .reset                  (rst_i), 
         .stall                  (1'b0),
