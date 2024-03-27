@@ -28,11 +28,14 @@ module retire
 (
     input   iType_e         instruction_operation_i,
     input   logic [31:0]    result_i,
+
+    /* Signals used in Zmmul */
+    /* verilator lint_off UNUSEDSIGNAL */
     input   logic [63:0]    mul_result_i,
-/* verilator lint_off UNUSEDSIGNAL */ 
     input   logic [63:0]    mulh_result_i, 
     input   logic [63:0]    mulhsu_result_i,
-/* verilator lint_on UNUSEDSIGNAL */
+    /* verilator lint_on UNUSEDSIGNAL */
+
     input   logic [31:0]    mem_data_i,
 
     output  logic [31:0]    regbank_data_o
@@ -106,7 +109,7 @@ module retire
 // Assign to Register Bank Write Back
 //////////////////////////////////////////////////////////////////////////////
 
-    if (RV32 == RV32M || RV32 == RV32ZMMUL) begin
+    if (RV32 == RV32M || RV32 == RV32ZMMUL) begin : gen_zmmul_retire_on
         always_comb begin
             unique case (instruction_operation_i)
                 LB,LBU,LH,LHU,LW:   regbank_data_o = memory_data;
@@ -118,7 +121,7 @@ module retire
             endcase         
         end
     end
-    else begin
+    else begin : gen_zmmul_retire_off 
         assign regbank_data_o = (instruction_operation_i inside {LB,LBU,LH,LHU,LW}) 
                                 ? memory_data 
                                 : result_i;

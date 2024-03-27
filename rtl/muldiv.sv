@@ -95,7 +95,7 @@ module muldiv
 // Div Operations Control
 //////////////////////////////////////////////////////////////////////////////
 
-    if (RV32 == RV32M) begin
+    if (RV32 == RV32M) begin : gen_m_on
         div_states_e    div_state;
         logic           a_signal, b_signal, signal_diff;
         logic [30:0]    a_unsig, b_unsig;
@@ -308,7 +308,7 @@ module muldiv
             end
         end
     end
-    else begin
+    else begin : gen_m_off
         assign hold_div         = 1'b0;
         assign div_result_o     = '0;
         assign divu_result_o    = '0;

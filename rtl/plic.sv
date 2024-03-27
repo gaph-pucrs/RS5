@@ -10,10 +10,12 @@ module plic
     input   logic                   en_i,
     input   logic  [3:0]            we_i,
     input   logic [23:0]            addr_i,
-/* verilator lint_off UNUSEDSIGNAL */ 
-    input   logic [31:0]            data_i,
-/* verilator lint_on UNUSEDSIGNAL */
     output  logic [31:0]            data_o,
+
+    /* Only a reduced number of bits is used depending on the number of interrupts */
+    /* verilator lint_off UNUSEDSIGNAL */
+    input   logic [31:0]            data_i,
+    /* verilator lint_on UNUSEDSIGNAL */
 
     input   logic [i_cnt:1]         irq_i,
     input   logic                   iack_i,
@@ -21,12 +23,13 @@ module plic
     output  logic [i_cnt:1]         iack_o,
     output  logic                   irq_o
 );
+    typedef logic [$clog2(i_cnt):0] intr_t;
 
-    logic [$clog2(i_cnt):0] id_int;
-    logic [$clog2(i_cnt):0] id_r;
-    logic [i_cnt:1]         ie;
-    logic [i_cnt:1]         ip;
-    logic [i_cnt:1]         interrupt;
+    intr_t          id_int;
+    intr_t          id_r;
+    logic [i_cnt:1] ie;
+    logic [i_cnt:1] ip;
+    logic [i_cnt:1] interrupt;
 
     always_ff @(posedge clk) begin
         if (reset == 1'b1) begin
@@ -43,7 +46,7 @@ module plic
 		id_int = '0;   /* 0 = NO IRQ */
 		for (int i = 1; i <= i_cnt; i++) begin
 			if (interrupt[i] == 1'b1) begin
-				id_int = i;           
+				id_int = intr_t'(i);           
 				break;
 			end
 		end

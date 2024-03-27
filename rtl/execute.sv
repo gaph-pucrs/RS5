@@ -36,7 +36,11 @@ module execute
     input   logic               reset,
     input   logic               stall,
 
+    /* Bits 14:12 and 6:0 are not used in this module */
+    /* verilator lint_off UNUSEDSIGNAL */
     input   logic [31:0]        instruction_i,
+    /* verilator lint_on UNUSEDSIGNAL */
+
     input   logic [31:0]        pc_i,
     input   logic [31:0]        first_operand_i,
     input   logic [31:0]        second_operand_i,
@@ -253,7 +257,7 @@ end
     logic [31:0] rem_result;
     logic [31:0] remu_result;
 
-    if (RV32 == RV32M || RV32 == RV32ZMMUL) begin
+    if (RV32 == RV32M || RV32 == RV32ZMMUL) begin : gen_zmmul_on
         muldiv #(
             .Environment    (Environment),
             .RV32           (RV32)
@@ -273,7 +277,7 @@ end
             .mulhsu_result_o            (mulhsu_result_o)
         );
     end 
-    else begin
+    else begin : gen_zmmul_off
         assign hold_o           = 1'b0;
         assign mul_result_o     = '0;
         assign mulh_result_o    = '0;

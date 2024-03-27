@@ -42,11 +42,12 @@ module CSRBank
     input   logic               killed,
     output  logic [31:0]        out,
 
-/* verilator lint_off UNUSEDSIGNAL */
+    /* Signals enabled with ZIHPM */
+    /* verilator lint_off UNUSEDSIGNAL */
     input   iType_e             instruction_operation_i,
     input   logic               hazard,
     input   logic               stall,
-/* verilator lint_on UNUSEDSIGNAL */
+    /* verilator lint_on UNUSEDSIGNAL */
 
     input   logic               raise_exception_i,
     input   logic               machine_return_i,
@@ -84,27 +85,37 @@ module CSRBank
 // CSRs definition
 //////////////////////////////////////////////////////////////////////////////
 
-    localparam logic [31:0] MISA_VALUE =  (0 << 0)              // A - Atomic Extension
-                                        | (0 << 1)              // B - Bit-Manipulation extension
-                                        | (0 << 2)              // C - Compressed extension
-                                        | (0 << 3)              // D - Double precision floating-point extension
-                                        | (0 << 4)              // E - RV32E base ISA
-                                        | (0 << 5)              // F - Single precision floating-point extension
-                                        | (0 << 6)              // F - Reserved
-                                        | (0 << 7)              // F - Hypervisor extension
-                                        | (1 << 8)              // I - RV32I/64I/128I base ISA
-                                        | ((RV32==RV32M) << 12) // M - Integer Multiply/Divide extension
-                                        | (0 << 13)             // N - User level interrupts supported
-                                        | (0 << 15)             // P - Packed-SIMD extension
-                                        | (0 << 18)             // S - Supervisor mode implemented
-                                        | (1 << 20)             // U - User mode implemented
-                                        | (0 << 21)             // V - Vector extension
-                                        | (XOSVMEnable << 23)   // X - Non-standard extensions present
-                                        | (32'(1) << 30);       // M-XLEN
+    localparam logic [31:0] MISA_VALUE = {
+        1'b0,
+        1'b1,           // M-XLEN
+        6'b0,
+        XOSVMEnable,    // X - Non-standard extensions present
+        1'b0,
+        1'b0,           // V - Vector extension
+        1'b1,           // U - User mode implemented
+        1'b0,
+        1'b0,           // S - Supervisor mode implemented
+        2'b0,
+        1'b0,           // P - Packed-SIMD extension
+        1'b0,
+        1'b0,           // N - User level interrupts supported
+        (RV32==RV32M),  // M - Integer Multiply/Divide extension
+        3'b0,
+        1'b1,           // I - RV32I/64I/128I base ISA
+        1'b0,           // F - Hypervisor extension
+        1'b0,           // F - Reserved
+        1'b0,           // F - Single precision floating-point extension
+        1'b0,           // E - RV32E base ISA
+        1'b0,           // D - Double precision floating-point extension
+        1'b0,           // C - Compressed extension
+        1'b0,           // B - Bit-Manipulation extension
+        1'b0            // A - Atomic Extension
+    };
 
     logic [31:0] misa, mstatus, mtvec_r, mip, mie, mscratch, mepc_r, mcause, mtval;
     logic [63:0] mcycle, minstret;
 
+    /* Signals enabled with XOSVM */
     /* verilator lint_off UNUSEDSIGNAL */
     logic [31:0] mvmdo, mvmio, mvmds, mvmis, mvmdm, mvmim;
     logic        mvmctl;
@@ -118,11 +129,12 @@ module CSRBank
     logic [31:0] interrupt_ack_counter, raise_exception_counter, context_switch_counter;
     logic [31:0] logic_counter, arithmetic_counter, shift_counter, branch_counter, jump_counter;
     logic [31:0] load_counter, store_counter, sys_counter, csr_counter;
+    interruptionCode_e Interruption_Code;
+
+    /* Signals enabled with ZIHPM */
     /* verilator lint_off UNUSEDSIGNAL */
     logic [31:0] mul_counter, div_counter;
     /* verilator lint_on UNUSEDSIGNAL */
-    //logic [31:0] medeleg, mideleg; // NOT IMPLEMENTED YET (REQUIRED ONLY WHEN SYSTEM HAVE S-MODE)
-    interruptionCode_e Interruption_Code;
 
 //////////////////////////////////////////////////////////////////////////////
 // MCAUSE and MSTATUS CSRs
@@ -426,7 +438,7 @@ module CSRBank
 // XOSVM Extension
 //////////////////////////////////////////////////////////////////////////////
     
-    if (XOSVMEnable == 1'b1) begin
+    if (XOSVMEnable == 1'b1) begin : gen_xosvm_csr_on
         always_ff @(posedge clk) begin
             if (reset == 1'b1) begin
                 mvmctl      <= '0;
@@ -438,21 +450,20 @@ module CSRBank
                 mvmim       <= '0;
             end 
             else if (write_allowed == 1'b1) begin
-                /* verilator lint_off CASEINCOMPLETE */
                 case (CSR)
-                    MVMCTL: mvmctl  <= wr_data[0];
-                    MVMDO:  mvmdo   <= wr_data;
-                    MVMDS:  mvmds   <= wr_data;
-                    MVMDM:  mvmdm   <= wr_data;
-                    MVMIO:  mvmio   <= wr_data;
-                    MVMIS:  mvmis   <= wr_data;
-                    MVMIM:  mvmim   <= wr_data;
+                    MVMCTL:     mvmctl  <= wr_data[0];
+                    MVMDO:      mvmdo   <= wr_data;
+                    MVMDS:      mvmds   <= wr_data;
+                    MVMDM:      mvmdm   <= wr_data;
+                    MVMIO:      mvmio   <= wr_data;
+                    MVMIS:      mvmis   <= wr_data;
+                    MVMIM:      mvmim   <= wr_data;
+                    default: ;
                 endcase
-                /* verilator lint_on CASEINCOMPLETE */
             end
         end
     end
-    else begin
+    else begin : gen_xosvm_csr_off
         assign mvmctl   = '0;
         assign mvmdo    = '0;
         assign mvmds    = '0;
@@ -513,7 +524,7 @@ module CSRBank
 // ZIHPM
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    if (ZIHPMEnable == 1'b1) begin
+    if (ZIHPMEnable == 1'b1) begin : gen_zihpm_csr_on
         int fd;
 
         always_ff @(posedge clk) begin
@@ -596,7 +607,7 @@ module CSRBank
             $fwrite(fd,"DIV:                    %0d\n", div_counter);
         end
     end
-    else begin
+    else begin : gen_zihpm_csr_off
         assign instructions_killed_counter = '0;
         assign nop_counter                 = '0;
         assign logic_counter               = '0;

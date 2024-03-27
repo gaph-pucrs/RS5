@@ -55,12 +55,18 @@ module testbench
 // TB SIGNALS
 //////////////////////////////////////////////////////////////////////////////
 
+    /* Number of used bits is defined by the memory size */
     /* verilator lint_off UNUSEDSIGNAL */
     logic [31:0]            instruction_address;
-    logic                   interrupt_ack;
-    logic [63:0]            mtime;
+    /* verilator lint_on UNUSEDSIGNAL */
+
+    /* RTC is 64 bits but the bus is 32 bits */
+    /* verilator lint_off UNUSEDSIGNAL */
     logic [63:0]            data_rtc;
     /* verilator lint_on UNUSEDSIGNAL */
+
+    logic                   interrupt_ack;
+    logic [63:0]            mtime;
     logic [31:0]            instruction;
     logic                   enable_ram, enable_rtc, enable_plic, enable_tb;
     logic                   mem_operation_enable;
@@ -181,6 +187,11 @@ module testbench
 // PLIC
 //////////////////////////////////////////////////////////////////////////////
 
+    /* Bits depending on connected peripherals */
+    /* verilator lint_off UNUSED */
+    logic [i_cnt:1] iack_periph;
+    /* verilator lint_on UNUSED */
+
     plic #(
         .i_cnt(i_cnt)
     ) plic1 (
@@ -193,9 +204,7 @@ module testbench
         .data_o (data_plic),     
         .irq_i  ('0),
         .iack_i (interrupt_ack),
-        /* verilator lint_off PINCONNECTEMPTY */
-        .iack_o (),
-        /* verilator lint_on PINCONNECTEMPTY */
+        .iack_o (iack_periph),
         .irq_o  (mei)
     );
 
