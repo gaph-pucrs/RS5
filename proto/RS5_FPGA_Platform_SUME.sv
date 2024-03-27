@@ -6,15 +6,20 @@ module RS5_FPGA_Platform
     parameter rv32_e        RV32        = RV32I,
     parameter bit           XOSVMEnable = 1'b0,
     parameter bit           ZIHPMEnable = 1'b0,
-    parameter int           CLKS_PER_BIT_UART = 868
+    parameter int           CLKS_PER_BIT_UART = 20833
 )
 (
-    input  logic       clk,
+    input  logic       clk_p,
+    input  logic       clk_n,
     input  logic       reset,
     input  logic       BTND,
     input  logic       UART_RX,
     output logic       UART_TX
-); 
+    
+);
+
+    IBUFDS CLK_IBUFDS (.I(clk_p), .IB(clk_n), .O(clk));
+
     logic [31:0]            cpu_instruction_address, cpu_instruction;
     logic [31:0]            cpu_data_address, cpu_data_in, cpu_data_out;
     logic                   cpu_operation_enable, enable_ram, enable_peripherals, enable_rtc, enable_plic;
@@ -102,7 +107,7 @@ module RS5_FPGA_Platform
         .ZIHPMEnable    (ZIHPMEnable)
     ) dut (
         .clk                    (clk), 
-        .reset                  (!reset),
+        .reset                  (reset),
         .stall                  (stall),
         .instruction_i          (cpu_instruction), 
         .mem_data_i             (cpu_data_in), 
@@ -142,7 +147,7 @@ module RS5_FPGA_Platform
 
     rtc rtc(
         .clk        (clk),
-        .reset      (!reset),
+        .reset      (reset),
         .en_i       (enable_rtc),
         .addr_i     (cpu_data_address[3:0]),
         .we_i       ({4'h0, cpu_write_enable}),
@@ -160,7 +165,7 @@ module RS5_FPGA_Platform
         .i_cnt(i_cnt)
     ) plic1 (
         .clk    (clk),
-        .reset  (!reset),
+        .reset  (reset),
         .en_i   (enable_plic),
         .we_i   (cpu_write_enable),
         .addr_i (cpu_data_address[23:0]),
@@ -181,7 +186,7 @@ module RS5_FPGA_Platform
         .CLKS_PER_BIT_UART(CLKS_PER_BIT_UART)
     ) Peripherals1 (
         .clk            (clk), 
-        .reset          (!reset), 
+        .reset          (reset), 
         .stall_o        (stall),
         .enable_i       (enable_peripherals), 
         .write_enable_i (cpu_write_enable),
