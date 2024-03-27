@@ -1,4 +1,4 @@
-module muldiv 
+module div 
     import RS5_pkg::*;
 #(
     parameter environment_e Environment = ASIC,
@@ -17,80 +17,10 @@ module muldiv
     output  logic [31:0] div_result_o, 
     output  logic [31:0] divu_result_o, 
     output  logic [31:0] rem_result_o, 
-    output  logic [31:0] remu_result_o,
+    output  logic [31:0] remu_result_o
 
-    output  logic [63:0] mul_result_o, 
-    output  logic [63:0] mulh_result_o, 
-    output  logic [63:0] mulhsu_result_o 
-);
-
-    logic hold_mul;
-    logic hold_div;
-
-    assign hold_o = hold_mul | hold_div;
-
-//////////////////////////////////////////////////////////////////////////////
-// Mul Operations
-//////////////////////////////////////////////////////////////////////////////
-
-    mult_states_e   mul_state;
-    logic           start_mul;
-
-    assign start_mul = (mul_state == M_IDLE && instruction_operation_i inside {MUL, MULH, MULHU, MULHSU});
-
-    assign hold_mul = (mul_state == M_IDLE && start_mul == 1'b1);
-
-    always_ff @(posedge clk ) begin
-        if (reset == 1'b1) begin
-            mul_state <= M_IDLE;
-        end
-        else if (start_mul == 1'b1) begin
-            mul_state <= M_CALC;
-        end
-        else begin
-            mul_state <= M_IDLE;
-        end
-    end
-
-    if (Environment == FPGA) begin :FPGA_muls_blk
-        mult_unsigned_unsigned mult_unsig_unsig (
-            .CLK(clk),              // input wire CLK
-            .A(first_operand_i),    // input wire [31 : 0] A
-            .B(second_operand_i),   // input wire [31 : 0] B
-            .P(mul_result_o)        // output wire [63 : 0] P
-        );
-
-        mult_signed_signed mult_sig_sig (
-            .CLK(clk),              // input wire CLK
-            .A(first_operand_i),    // input wire [31 : 0] A
-            .B(second_operand_i),   // input wire [31 : 0] B
-            .P(mulh_result_o)       // output wire [63 : 0] P
-        );
-
-        mult_signed_unsigned mult_sig_unsig (
-            .CLK(clk),              // input wire CLK
-            .A(first_operand_i),    // input wire [31 : 0] A
-            .B(second_operand_i),   // input wire [31 : 0] B
-            .P(mulhsu_result_o)     // output wire [63 : 0] P
-        );
-    end
-    else begin :ASIC_muls_blk
-        logic signed [31:0]    mul_opa_signed, mul_opb_signed;
-        logic        [31:0]    mul_opa, mul_opb;
-
-        assign  mul_opa[31:0] = first_operand_i,
-                mul_opb[31:0] = second_operand_i;
-        
-        assign  mul_opa_signed[31:0] = $signed(first_operand_i),
-                mul_opb_signed[31:0] = $signed(second_operand_i);
-
-        always_ff @(posedge clk) begin
-            mul_result_o      <= mul_opa        * mul_opb;
-            mulh_result_o     <= mul_opa_signed * mul_opb_signed;
-            mulhsu_result_o   <= mul_opa_signed * mul_opb;
-        end
-    end
-
+    
+);  
 //////////////////////////////////////////////////////////////////////////////
 // Div Operations Control
 //////////////////////////////////////////////////////////////////////////////
@@ -113,7 +43,7 @@ module muldiv
         assign start_sig_div    = instruction_operation_i inside {DIV, REM}   && busy_sig_div   == 0 && valid_sig_div   == 0;
         assign start_unsig_div  = instruction_operation_i inside {DIVU, REMU} && busy_unsig_div == 0 && valid_unsig_div == 0;
 
-        assign hold_div = (start_unsig_div | busy_unsig_div) || (start_sig_div | busy_sig_div);
+        assign hold_o = (start_unsig_div | busy_unsig_div) || (start_sig_div | busy_sig_div);
 
         always_comb begin
             div_result_o    = (divide_by_zero) 
@@ -309,7 +239,7 @@ module muldiv
         end
     end
     else begin
-        assign hold_div         = 1'b0;
+        assign hold_o         = 1'b0;
         assign div_result_o     = '0;
         assign divu_result_o    = '0;
         assign rem_result_o     = '0;
