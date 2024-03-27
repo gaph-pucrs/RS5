@@ -202,6 +202,8 @@ module RS5
 /////////////////////////////////////////////////////////// DECODER /////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+    iTypeVector_e vector_operation;
+
     decode decoder1 (
         .clk                        (clk), 
         .reset                      (reset),
@@ -220,7 +222,8 @@ module RS5
         .pc_o                       (pc_execute), 
         .instruction_o              (instruction_execute), 
         .tag_o                      (tag_execute), 
-        .instruction_operation_o    (instruction_operation_execute), 
+        .instruction_operation_o    (instruction_operation_execute),
+        .vector_operation_o         (vector_operation),
         .hazard_o                   (hazard),
         .exc_inst_access_fault_i    (mmu_inst_fault),
         .exc_inst_access_fault_o    (exc_inst_access_fault_execute),
@@ -281,7 +284,8 @@ module RS5
         .first_operand_i        (first_operand_execute), 
         .second_operand_i       (second_operand_execute), 
         .third_operand_i        (third_operand_execute),
-        .instruction_operation_i(instruction_operation_execute), 
+        .instruction_operation_i(instruction_operation_execute),
+        .vector_operation_i     (vector_operation),
         .tag_i                  (tag_execute), 
         .privilege_i            (privilege),
         .exc_ilegal_inst_i      (exc_ilegal_inst_execute),

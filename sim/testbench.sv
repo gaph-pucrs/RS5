@@ -22,6 +22,7 @@
 `include "../rtl/fetch.sv"
 `include "../rtl/decode.sv"
 `include "../rtl/muldiv.sv"
+`include "../rtl/VectorUnit.sv"
 `include "../rtl/execute.sv"
 `include "../rtl/retire.sv"
 `include "../rtl/regbank.sv"
@@ -47,7 +48,7 @@ module testbench
 //////////////////////////////////////////////////////////////////////////////
 
     localparam int           MEM_WIDTH = 65536;
-    localparam string        BIN_FILE = "../app/berkeley_suite/test.bin";
+    localparam string        BIN_FILE = "../app/assembly/vector.bin";
     
     localparam int           i_cnt = 1;
 

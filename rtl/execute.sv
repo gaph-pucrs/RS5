@@ -29,7 +29,8 @@ module execute
     import RS5_pkg::*;
 #(
     parameter environment_e Environment = ASIC,
-    parameter rv32_e        RV32        = RV32I
+    parameter rv32_e        RV32        = RV32I,
+    parameter int           VLEN        = 64
 )
 (
     input   logic               clk,
@@ -42,6 +43,7 @@ module execute
     input   logic [31:0]        second_operand_i,
     input   logic [31:0]        third_operand_i,
     input   iType_e             instruction_operation_i,
+    input   iTypeVector_e       vector_operation_i,
     input   logic  [2:0]        tag_i,
     input   privilegeLevel_e    privilege_i,
 
@@ -252,6 +254,7 @@ end
     logic [31:0] divu_result;
     logic [31:0] rem_result;
     logic [31:0] remu_result;
+    logic        hold_muldiv;
 
     if (RV32 == RV32M || RV32 == RV32ZMMUL) begin
         muldiv #(
@@ -263,7 +266,7 @@ end
             .first_operand_i            (first_operand_i),
             .second_operand_i           (second_operand_i),
             .instruction_operation_i    (instruction_operation_i),
-            .hold_o                     (hold_o),
+            .hold_o                     (hold_muldiv),
             .div_result_o               (div_result),
             .divu_result_o              (divu_result),
             .rem_result_o               (rem_result),
@@ -274,7 +277,7 @@ end
         );
     end 
     else begin
-        assign hold_o           = 1'b0;
+        assign hold_muldiv      = 1'b0;
         assign mul_result_o     = '0;
         assign mulh_result_o    = '0;
         assign mulhsu_result_o  = '0;
@@ -285,28 +288,55 @@ end
     end
 
 //////////////////////////////////////////////////////////////////////////////
+// Vector Extension
+//////////////////////////////////////////////////////////////////////////////
+    logic [31:0] vector_scalar_result;
+    logic        vector_wr_en;
+    logic        hold_vector;
+
+    vectorUnit #(
+        .Environment(Environment),
+        .RV32       (RV32       ), 
+        .VLEN       (64         )
+    ) vector (
+        .clk                    (clk),
+        .reset                  (reset),
+        .instruction_i          (instruction_i),
+        .instruction_operation_i(instruction_operation_i),
+        .vector_operation_i     (vector_operation_i),
+        .op1_scalar_i           (first_operand_i),
+        .op2_scalar_i           (second_operand_i),
+        .op3_scalar_i           (third_operand_i),
+        .hold_o                 (hold_vector),
+        .res_scalar_o           (vector_scalar_result),
+        .wr_en_scalar_o         (vector_wr_en)
+    );
+
+//////////////////////////////////////////////////////////////////////////////
 // Demux
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin 
         unique case (instruction_operation_i)
             CSRRW, CSRRS, CSRRC,
-            CSRRWI,CSRRSI,CSRRCI:   result = csr_data_read_i;
-            JAL,JALR,SUB:           result = sum2_result;
-            SLT:                    result = {31'b0, less_than};
-            SLTU:                   result = {31'b0, less_than_unsigned};
-            XOR:                    result = xor_result;
-            OR:                     result = or_result;
-            AND:                    result = and_result;
-            SLL:                    result = sll_result;
-            SRL:                    result = srl_result;
-            SRA:                    result = sra_result;
-            LUI:                    result = second_operand_i;
-            DIV:                    result = div_result;
-            DIVU:                   result = divu_result;
-            REM:                    result = rem_result;
-            REMU:                   result = remu_result;
-            default:                result = sum_result;
+            CSRRWI,CSRRSI,CSRRCI:    result = csr_data_read_i;
+            JAL,JALR,SUB:            result = sum2_result;
+            SLT:                     result = {31'b0, less_than};
+            SLTU:                    result = {31'b0, less_than_unsigned};
+            XOR:                     result = xor_result;
+            OR:                      result = or_result;
+            AND:                     result = and_result;
+            SLL:                     result = sll_result;
+            SRL:                     result = srl_result;
+            SRA:                     result = sra_result;
+            LUI:                     result = second_operand_i;
+            DIV:                     result = div_result;
+            DIVU:                    result = divu_result;
+            REM:                     result = rem_result;
+            REMU:                    result = remu_result;
+            VSETVL,VSETVLI,
+            VSETIVLI, VECTOR:        result = vector_scalar_result;
+            default:                 result = sum_result;
         endcase
     end
 
@@ -315,14 +345,16 @@ end
             SB,SH,SW,
             BEQ,BNE,
             BLT,BLTU,
-            BGE,BGEU:  write_enable = 1'b0;
-            default:   write_enable = !killed;
+            BGE,BGEU:                write_enable = 1'b0;
+            VSETVL,VSETVLI,VSETIVLI: write_enable = vector_wr_en;
+            default:                 write_enable = !killed;
         endcase
     end 
 
 //////////////////////////////////////////////////////////////////////////////
 // Output Registers
 //////////////////////////////////////////////////////////////////////////////
+    assign hold_o = hold_muldiv | hold_vector;
 
     always_ff @(posedge clk) begin
         if (

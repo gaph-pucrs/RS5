@@ -44,6 +44,7 @@ module decode
     output  logic [31:0]    instruction_o,
     output  logic  [2:0]    tag_o,
     output  iType_e         instruction_operation_o,
+    output  iTypeVector_e   vector_operation_o,
     output  logic           hazard_o,
 
     input   logic           exc_inst_access_fault_i,
@@ -93,6 +94,7 @@ module decode
     iType_e decode_op;
     iType_e decode_misc_mem;
     iType_e decode_system;
+    iType_e decode_vector;
 
     logic [2:0] funct3;
     logic [6:0] funct7;
@@ -197,6 +199,15 @@ module decode
         endcase
     end
 
+    always_comb begin
+        unique case (instruction[31:30]) inside
+            2'b0?:      decode_vector = VSETVLI;
+            2'b11:      decode_vector = VSETIVLI;
+            2'b10:      decode_vector = VSETVL;
+            default:    decode_vector = VECTOR;
+        endcase
+    end
+
     always_comb begin 
         unique case (opcode)
             7'b0110111: instruction_operation = LUI;
@@ -210,9 +221,69 @@ module decode
             7'b0110011: instruction_operation = decode_op;          /* OP */
             7'b0001111: instruction_operation = decode_misc_mem;    /* MISC-MEM */
             7'b1110011: instruction_operation = decode_system;      /* SYSTEM */
+            7'b1010111: instruction_operation = (opCat_e'(funct3) == OPCFG) 
+                                                ? decode_vector
+                                                : VECTOR;           /* OP-V */
+            7'b0000111: instruction_operation = VLOAD;              /* LOAD-FP */
+            7'b0100111: instruction_operation = VSTORE;             /* STORE-FP */
             default:    instruction_operation = INVALID;
         endcase
     end        
+
+//////////////////////////////////////////////////////////////////////////////
+//  Decode Vector Instruction
+//////////////////////////////////////////////////////////////////////////////
+
+    iTypeVector_e vector_operation;
+    opCat_e opCat;
+
+    assign opCat = opCat_e'(funct3);
+
+    always_comb begin
+        if (opCat inside {OPIVV, OPIVX, OPIVI}) begin
+            unique case (funct7[6:1]) inside
+                6'b000000:     vector_operation = vadd;
+                6'b000010:     vector_operation = vsub;
+                6'b000100:     vector_operation = vminu;
+                6'b000101:     vector_operation = vmin;
+                6'b000110:     vector_operation = vmaxu;
+                6'b000111:     vector_operation = vmax;
+                6'b001001:     vector_operation = vand;
+                6'b001010:     vector_operation = vor;
+                6'b001011:     vector_operation = vxor;
+                6'b011000:     vector_operation = vmseq;
+                6'b011001:     vector_operation = vmsne;
+                6'b011010:     vector_operation = vmsltu;
+                6'b011011:     vector_operation = vmslt;
+                6'b011100:     vector_operation = vmsleu;
+                6'b011101:     vector_operation = vmsle;
+                6'b011110:     vector_operation = vmsgtu;
+                6'b011111:     vector_operation = vmsgt;
+                6'b100101:     vector_operation = vsll;
+                6'b101000:     vector_operation = vsrl;
+                6'b101001:     vector_operation = vsra;
+                default:       vector_operation = vnop;
+            endcase
+        end else if (opCat inside {OPMVV, OPMVX}) begin
+            unique case (funct7[6:1]) inside
+                6'b100000:     vector_operation = vdivu;
+                6'b100001:     vector_operation = vdiv;
+                6'b100010:     vector_operation = vremu;
+                6'b100011:     vector_operation = vrem;
+                6'b100100:     vector_operation = vmulhu;
+                6'b100101:     vector_operation = vmul;
+                6'b100110:     vector_operation = vmulhsu;
+                6'b100111:     vector_operation = vmulh;
+                6'b101101:     vector_operation = vmacc;
+                6'b101111:     vector_operation = vnmsac;
+                6'b101001:     vector_operation = vmadd;
+                6'b101011:     vector_operation = vnmsub;
+                default:       vector_operation = vnop;
+            endcase
+        end else begin
+            vector_operation = vnop;
+        end
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 //  Decodes the instruction format
@@ -220,11 +291,11 @@ module decode
 
     always_comb begin
         unique case (opcode[6:2])
-            5'b11001, 5'b00000, 5'b00100:   instruction_format = I_TYPE;    /* JALR, LOAD, OP-IMM */
-            5'b01000:                       instruction_format = S_TYPE;    /* STORE */
-            5'b11000:                       instruction_format = B_TYPE;    /* BRANCH */
-            5'b01101, 5'b00101:             instruction_format = U_TYPE;    /* LUI, AUIPC */
-            5'b11011:                       instruction_format = J_TYPE;    /* JAL */
+            5'b11001, 5'b00000, 5'b00100:   instruction_format = I_TYPE;        /* JALR, LOAD, OP-IMM */
+            5'b01000:                       instruction_format = S_TYPE;        /* STORE */
+            5'b11000:                       instruction_format = B_TYPE;        /* BRANCH */
+            5'b01101, 5'b00101:             instruction_format = U_TYPE;        /* LUI, AUIPC */
+            5'b11011:                       instruction_format = J_TYPE;        /* JAL */
             default:                        instruction_format = R_TYPE;
         endcase
     end
@@ -237,14 +308,12 @@ module decode
     logic [31:0] imm_b;
     logic [31:0] imm_u;
     logic [31:0] imm_j;
-    logic [31:0] imm_r;
 
     assign imm_i = {{21{instruction[31]}}, instruction[30:20]};
     assign imm_s = {{21{instruction[31]}}, instruction[30:25], instruction[11:7]};
     assign imm_b = {{20{instruction[31]}}, instruction[7], instruction[30:25], instruction[11:8], 1'b0};
     assign imm_u = {instruction[31:12], 12'b0};
     assign imm_j = {{12{instruction[31]}}, instruction[19:12], instruction[20], instruction[30:25], instruction[24:21], 1'b0};
-    assign imm_r = '0;
 
     always_comb begin
         unique case (instruction_format)
@@ -253,7 +322,7 @@ module decode
             B_TYPE:     immediate = imm_b;
             U_TYPE:     immediate = imm_u;
             J_TYPE:     immediate = imm_j;
-            default:    immediate = imm_r;  /* R_TYPE */
+            default:    immediate = '0;    /* R_TYPE */
         endcase
     end
 
@@ -352,26 +421,22 @@ module decode
 
     always_comb begin
         unique case (instruction_format)
-            U_TYPE, J_TYPE: begin
-                                first_operand   = pc_i;
-                                second_operand  = immediate;
-                                third_operand   = immediate;
-                            end
-            R_TYPE, B_TYPE: begin
-                                first_operand   = rs1_data_read_i;
-                                second_operand  = rs2_data_read_i;
-                                third_operand   = immediate;
-                            end
-            S_TYPE:         begin
-                                first_operand   = rs1_data_read_i;
-                                second_operand  = immediate;
-                                third_operand   = rs2_data_read_i;
-                            end
-            default:        begin
-                                first_operand   = rs1_data_read_i;
-                                second_operand  = immediate;
-                                third_operand   = immediate;
-                            end
+            U_TYPE, J_TYPE:     first_operand   = pc_i;
+            default:            first_operand   = rs1_data_read_i;
+        endcase
+    end
+
+    always_comb begin
+        unique case (instruction_format)
+            R_TYPE:             second_operand   = rs2_data_read_i;
+            default:            second_operand   = immediate;
+        endcase
+    end
+
+    always_comb begin
+        unique case (instruction_format)
+            S_TYPE:             third_operand   = rs2_data_read_i;
+            default:            third_operand   = immediate;
         endcase
     end
 
@@ -391,6 +456,7 @@ module decode
             exc_ilegal_inst_o       <= 1'b0;
             exc_misaligned_fetch_o  <= 1'b0;
             exc_inst_access_fault_o <= 1'b0;
+            vector_operation_o      <= vnop;
         end 
         else if (hazard_o == 1'b1) begin
             first_operand_o         <= '0;
@@ -403,6 +469,7 @@ module decode
             exc_ilegal_inst_o       <= 1'b0;
             exc_misaligned_fetch_o  <= 1'b0;
             exc_inst_access_fault_o <= 1'b0;
+            vector_operation_o      <= vnop;
         end 
         else if (enable == 1'b1) begin
             first_operand_o         <= first_operand;
@@ -415,6 +482,7 @@ module decode
             exc_ilegal_inst_o       <= invalid_inst;
             exc_misaligned_fetch_o  <= misaligned_fetch;
             exc_inst_access_fault_o <= exc_inst_access_fault_i;
+            vector_operation_o      <= vector_operation;
         end
     end
 

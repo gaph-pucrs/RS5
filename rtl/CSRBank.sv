@@ -28,7 +28,9 @@ module CSRBank
 #( 
     parameter bit       XOSVMEnable = 1'b0,
     parameter bit       ZIHPMEnable = 1'b0,
-    parameter rv32_e    RV32        = RV32I
+    parameter rv32_e    RV32        = RV32I,
+    parameter bit       VEnable     = 1'b0,
+    parameter int       VLEN        = 128
 )
 (
     input   logic               clk,
@@ -98,7 +100,7 @@ module CSRBank
                                         | (0 << 15)             // P - Packed-SIMD extension
                                         | (0 << 18)             // S - Supervisor mode implemented
                                         | (1 << 20)             // U - User mode implemented
-                                        | (0 << 21)             // V - Vector extension
+                                        | (VEnable << 21)       // V - Vector extension
                                         | (XOSVMEnable << 23)   // X - Non-standard extensions present
                                         | (32'(1) << 30);       // M-XLEN
 
@@ -133,9 +135,9 @@ module CSRBank
 
     assign mcause = {mcause_interrupt, mcause_exc_code};
 
-    logic mstatus_sie, mstatus_mie, mstatus_spie, mstatus_ube, mstatus_mpie, mstatus_spp;
+    logic       mstatus_sie, mstatus_mie, mstatus_spie, mstatus_ube, mstatus_mpie, mstatus_spp;
     logic [1:0] mstatus_vs, mstatus_mpp, mstatus_fs, mstatus_xs;
-    logic mstatus_mprv, mstatus_sum, mstatus_mxr, mstatus_tvm, mstatus_tw, mstatus_tsr, mstatus_sd;
+    logic       mstatus_mprv, mstatus_sum, mstatus_mxr, mstatus_tvm, mstatus_tw, mstatus_tsr, mstatus_sd;
 
     assign mstatus = {
                         mstatus_sd, 
@@ -413,6 +415,9 @@ module CSRBank
                 MVMIO:          out = mvmio[31:0];
                 MVMIS:          out = mvmis[31:0];
                 MVMIM:          out = mvmim[31:0];
+
+                // Vector Extension CSRs
+                VLENB:          out = VLEN/8;
 
                 default:        out = '0;
             endcase
