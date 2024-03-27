@@ -103,7 +103,7 @@ module retire
 
     always_comb begin
         unique case (instruction_operation_i)
-            LB,LBU,LH,LHU,LW:         regbank_data_o = memory_data;
+            LB,LBU,LH,LHU,LW:   regbank_data_o = memory_data;
             default:            regbank_data_o = result_i;
         endcase         
     end
