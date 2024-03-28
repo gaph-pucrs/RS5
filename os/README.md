@@ -13,3 +13,19 @@ make -C libmutils
 make -C libmemphis
 make -C MAestro
 ```
+
+Then build the app. For instance, here we will use `hello`:
+```
+make -C app/hello
+```
+
+## Simulating
+
+Build the memory image by running rambuild.py inside `sim` folder:
+```
+./rambuild.py
+```
+This command produces ram.bin, now, change the simulation binary to ram.bin in `testbench.sv`:
+```
+localparam string        BIN_FILE = "./ram.bin";
+```
