@@ -11,6 +11,7 @@
 #include "riscv_test.h"
 #include "test_macros.h"
 #define __MACHINE_MODE
+#define scall ecall
 
 RVTEST_RV32U
 RVTEST_CODE_BEGIN
@@ -27,18 +28,17 @@ RVTEST_CODE_BEGIN
   #define SSTATUS_SPP MSTATUS_MPP
 #endif
 
+  la t0, stvec_handler
+  csrw stvec, t0
+
   li TESTNUM, 2
 
   # This is the expected trap code.
-  li t1, CAUSE_MACHINE_ECALL
+  li t1, CAUSE_USER_ECALL
 
 #ifdef __MACHINE_MODE
   # If running in M mode, use mstatus.MPP to check existence of U mode.
   # Otherwise, if in S mode, then U mode must exist and we don't need to check.
-  
-  la t0, stvec_handler         # Grava o endereço do rótulo trap_handler
-  csrw mtvec, t0               # no registrador mtvec
-
   li t0, MSTATUS_MPP
   csrc mstatus, t0
   csrr t2, mstatus
@@ -58,8 +58,8 @@ RVTEST_CODE_BEGIN
 1:
 
   li TESTNUM, 1
-do_ecall:
-  ecall
+do_scall:
+  scall
   j fail
 
   TEST_PASSFAIL
@@ -70,7 +70,6 @@ do_ecall:
 # CAUSE_MACHINE_ECALL exception and mark the test as having passed.
 # Either way, we'll get the coverage we desire: such a handler must check
 # both mcause and TESTNUM, just like the following handler.
-  .align 2
 stvec_handler:
   csrr t0, scause
   # Check if CLIC mode
@@ -81,7 +80,7 @@ stvec_handler:
   andi t0, t0, 255
 skip_mask:
   bne t0, t1, fail
-  la t2, do_ecall
+  la t2, do_scall
   csrr t0, sepc
   bne t0, t2, fail
   j pass

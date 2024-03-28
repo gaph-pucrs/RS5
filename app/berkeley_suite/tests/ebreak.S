@@ -11,6 +11,7 @@
 #include "riscv_test.h"
 #include "test_macros.h"
 #define __MACHINE_MODE
+#define sbreak ebreak
 
 RVTEST_RV32U
 RVTEST_CODE_BEGIN
@@ -22,23 +23,21 @@ RVTEST_CODE_BEGIN
   #define stvec mtvec
   #define sepc mepc
   #define sret mret
-  #define stvec_handler_ebreak mtvec_handler_ebreak
+  #define stvec_handler mtvec_handler
 #endif
 
-  la t0, stvec_handler_ebreak    # Grava o endereço do rótulo trap_handler
-  csrw mtvec, t0                 # no registrador mtvec
+  la t0, stvec_handler
+  csrw stvec, t0
 
   li TESTNUM, 2
 
 do_break:
-  ebreak
+  sbreak
   j fail
 
   TEST_PASSFAIL
 
-  .align 2
-  .global stvec_handler_ebreak
-stvec_handler_ebreak:
+stvec_handler:
   li t1, CAUSE_BREAKPOINT
   csrr t0, scause
   # Check if CLIC mode

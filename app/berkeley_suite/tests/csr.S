@@ -11,23 +11,24 @@
 #include "riscv_test.h"
 #include "test_macros.h"
 #define __MACHINE_MODE
+#define stvec mtvec
 
 RVTEST_RV32U
 RVTEST_CODE_BEGIN
 
-  #ifdef __MACHINE_MODE
+#ifdef __MACHINE_MODE
   #define sscratch mscratch
   #define sstatus mstatus
   #define scause mcause
   #define sepc mepc
   #define sret mret
-  #define stvec_handler_csr mtvec_handler_csr
+  #define stvec_handler mtvec_handler
   #undef SSTATUS_SPP
   #define SSTATUS_SPP MSTATUS_MPP
 #endif
 
-  la t0, stvec_handler_csr    # Grava o endereço do rótulo trap_handler
-  csrw mtvec, t0              # no registrador mtvec
+  la t0, stvec_handler
+  csrw stvec, t0
 
   # For RV64, make sure UXL encodes RV64.  (UXL does not exist for RV32.)
 #if __riscv_xlen == 64
@@ -135,9 +136,7 @@ finish:
   # We should only fall through to this if scall failed.
   TEST_PASSFAIL
 
-  .align 2
-  .global stvec_handler_csr
-stvec_handler_csr:
+stvec_handler:
   # Trapping on tests 13-15 is good news.
   li t0, 13
   bltu TESTNUM, t0, 1f

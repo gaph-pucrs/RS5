@@ -13,8 +13,8 @@
 RVTEST_RV32U
 RVTEST_CODE_BEGIN
 
-  la t0, mtvec_handler_zicntr # Grava o endereço do rótulo trap_handler
-  csrw mtvec, t0              # no registrador mtvec
+  la t0, mtvec_handler
+  csrw mtvec, t0
 
   # Make sure reading the cycle counter in four ways doesn't trap.
   TEST_CASE( 2, x0, 0, csrrc  x0, cycle,    x0);
@@ -39,9 +39,7 @@ RVTEST_CODE_BEGIN
 2:
   TEST_PASSFAIL
 
-  .align 2
-  .global mtvec_handler_zicntr
-mtvec_handler_zicntr:
+mtvec_handler:
   j fail
 
 RVTEST_CODE_END

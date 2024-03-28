@@ -10,14 +10,19 @@
 #include "encoding.h"
 #include "riscv_test.h"
 #include "test_macros.h"
+#define sstatus mstatus
+#define sie mie
+#define sip mip
+#define SSTATUS_SIE MSTATUS_MIE
+#define SIP_SSIP MIP_MSIP
 
 RVTEST_RV32U
 RVTEST_CODE_BEGIN
 
   # Make sure wfi doesn't halt the hart, even if interrupts are disabled
-  csrc mstatus, MSTATUS_MIE
-  csrs mie, MIP_MSIP
-  csrs mip, MIP_MSIP
+  csrc sstatus, SSTATUS_SIE
+  csrs sie, SIP_SSIP
+  csrs sip, SIP_SSIP
   wfi
 
   RVTEST_PASS
