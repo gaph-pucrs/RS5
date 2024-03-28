@@ -90,7 +90,7 @@ module plic
             end
             else begin
                 case (addr_i)
-                    24'h000000:     data_o <= {{31-$clog2(i_cnt){1'b0}}, id_r};   /* ID */
+                    24'h000000:     data_o <= {{31-$clog2(i_cnt){1'b0}}, id_r}; /* ID */
                     24'h000004:     data_o <= {{31-i_cnt{1'b0}}, ip, 1'b0};     /* IP */
                     24'h000008:     data_o <= {{31-i_cnt{1'b0}}, ie, 1'b0};     /* IE */
 
