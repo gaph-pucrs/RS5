@@ -14,7 +14,7 @@ TEST_OBJS = $(addsuffix .o,$(basename $(wildcard tests/*.S)))
 
 all: $(TEST_OBJS)
 	$(GCC_RISCV) -o test.o test.S
-	$(LD_RISCV) -Tqdi-riscv.ld -Map test.map -N -o test.axf \
+	$(LD_RISCV) -Trs5.ld -Map test.map -N -o test.axf \
 		test.o $(TEST_OBJS)
 	$(DUMP_RISCV) --disassemble --reloc test.axf > test.lst
 	$(DUMP_RISCV) -h test.axf > test.sec
