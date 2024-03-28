@@ -287,9 +287,7 @@ module CSRBank
                 privilege       <= privilegeLevel_e'(2'b11);
                 mstatus_mpie    <= mstatus_mie;
                 mstatus_mie     <= 0;
-                mepc_r          <= (exception_code_i == ECALL_FROM_MMODE || exception_code_i == BREAKPOINT) 
-                                    ? pc_i 
-                                    : pc_i+4;             // Return address
+                mepc_r          <= pc_i;
                 mtval           <= (exception_code_i == ILLEGAL_INSTRUCTION) 
                                     ? instruction_i 
                                     : pc_i;
