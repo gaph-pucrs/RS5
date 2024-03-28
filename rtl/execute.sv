@@ -419,7 +419,7 @@ end
                 raise_exception_o = 1'b1;
                 machine_return_o  = 1'b0;
                 interrupt_ack_o   = 1'b0;
-                exception_code_o  = ECALL_FROM_MMODE;
+                exception_code_o  = (privilege_i == USER) ? ECALL_FROM_UMODE : ECALL_FROM_MMODE;
                 // $write("[%0d] EXCEPTION - ECALL_FROM_MMODE: %8h %8h\n", $time, pc_i, instruction_i);
             end 
             else if (instruction_operation_i == EBREAK) begin
