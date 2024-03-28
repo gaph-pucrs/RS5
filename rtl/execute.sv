@@ -320,7 +320,7 @@ end
             BEQ,BNE,
             BLT,BLTU,
             BGE,BGEU:  write_enable = 1'b0;
-            default:   write_enable = !killed;
+            default:   write_enable = ~(killed | raise_exception_o);
         endcase
     end 
 
