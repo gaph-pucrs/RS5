@@ -28,7 +28,6 @@
 module execute
     import RS5_pkg::*;
 #(
-    parameter environment_e Environment = ASIC,
     parameter rv32_e        RV32        = RV32I
 )
 (
@@ -59,10 +58,6 @@ module execute
     output  logic               write_enable_o,
     output  iType_e             instruction_operation_o,
     output  logic [31:0]        result_o,
-
-    output  logic [63:0]        mul_result_o, 
-    output  logic [63:0]        mulh_result_o, 
-    output  logic [63:0]        mulhsu_result_o,
 
     output  logic [31:0]        mem_address_o,
     output  logic               mem_read_enable_o,
@@ -249,39 +244,54 @@ end
     end
 
 /////////////////////////////////////////////////////////////////////////////
-// Multiplication and Division Operations
+// Multiplication signals
 //////////////////////////////////////////////////////////////////////////////
-    
-    logic [31:0] div_result;
-    logic [31:0] divu_result;
-    logic [31:0] rem_result;
-    logic [31:0] remu_result;
+    logic [31:0] mul_result;
+    logic        hold_mul;
+    logic        hold_div;
+
+    assign hold_o = (hold_mul | hold_div);
 
     if (RV32 == RV32M || RV32 == RV32ZMMUL) begin : gen_zmmul_on
-        muldiv #(
-            .Environment    (Environment),
-            .RV32           (RV32)
-        ) muldiv1 (
+        mul mul1 (
             .clk                        (clk),
             .reset                      (reset),
             .first_operand_i            (first_operand_i),
             .second_operand_i           (second_operand_i),
             .instruction_operation_i    (instruction_operation_i),
-            .hold_o                     (hold_o),
+            .hold_o                     (hold_mul),
+            .mul_result_o               (mul_result)
+        );
+    end
+    else begin : gen_zmmul_off
+        assign hold_mul       = 1'b0;
+        assign mul_result     = '0;
+    end
+    /////////////////////////////////////////////////////////////////////////////
+    // Division
+    //////////////////////////////////////////////////////////////////////////////
+    
+    logic [31:0] div_result;
+    logic [31:0] divu_result;
+    logic [31:0] rem_result;
+    logic [31:0] remu_result;
+    
+    if (RV32 == RV32M) begin : gen_div_on
+        div div1 (
+            .clk                        (clk),
+            .reset                      (reset),
+            .first_operand_i            (first_operand_i),
+            .second_operand_i           (second_operand_i),
+            .instruction_operation_i    (instruction_operation_i),
+            .hold_o                     (hold_div),
             .div_result_o               (div_result),
             .divu_result_o              (divu_result),
             .rem_result_o               (rem_result),
-            .remu_result_o              (remu_result),
-            .mul_result_o               (mul_result_o),
-            .mulh_result_o              (mulh_result_o),
-            .mulhsu_result_o            (mulhsu_result_o)
+            .remu_result_o              (remu_result)
         );
     end 
-    else begin : gen_zmmul_off
-        assign hold_o           = 1'b0;
-        assign mul_result_o     = '0;
-        assign mulh_result_o    = '0;
-        assign mulhsu_result_o  = '0;
+    else begin : gen_div_off
+        assign hold_div         = 1'b0;
         assign div_result       = '0;
         assign divu_result      = '0;
         assign rem_result       = '0;
@@ -310,6 +320,7 @@ end
             DIVU:                   result = divu_result;
             REM:                    result = rem_result;
             REMU:                   result = remu_result;
+            MUL,MULH,MULHU,MULHSU:  result = mul_result;
             default:                result = sum_result;
         endcase
     end
