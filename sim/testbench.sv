@@ -52,7 +52,7 @@ module testbench
 //////////////////////////////////////////////////////////////////////////////
 
     localparam int           MEM_WIDTH = 65536;
-    localparam string        BIN_FILE = "../app/berkeley_suite/test.bin";
+    localparam string        BIN_FILE = "../app/riscv-tests/test.bin";
     
     localparam int           i_cnt = 1;
 
