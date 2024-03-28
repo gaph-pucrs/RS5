@@ -1,7 +1,7 @@
 	.section .text.init
 	.global _entry
 _entry:
-    # Desabilita globalmente as interrupções
+    /* Globally disable interrupts */
     csrw mstatus, zero
 	csrw mip, zero
 	csrw mie, zero
@@ -48,50 +48,49 @@ _entry:
 	.global n ## _ret; \
 	n ## _ret:
 
-	TEST(simple)
-
-	TEST(lui)
+	/* RV32UI */
+	TEST(add)
+	TEST(addi)
+	TEST(and)
+	TEST(andi)
 	TEST(auipc)
-	TEST(j)
+	TEST(beq)
+	TEST(bge)
+	TEST(bgeu)
+	TEST(blt)
+	TEST(bltu)
+	TEST(bne)
+	# TEST(fence_i)
 	TEST(jal)
 	TEST(jalr)
-
-	TEST(beq)
-	TEST(bne)
-	TEST(blt)
-	TEST(bge)
-	TEST(bltu)
-	TEST(bgeu)
-
 	TEST(lb)
-	TEST(lh)
-	TEST(lw)
 	TEST(lbu)
+	TEST(lh)
 	TEST(lhu)
-
+	TEST(lui)
+	TEST(lw)
+	# TEST(ma_data)
+	TEST(or)
+	TEST(ori)
 	TEST(sb)
 	TEST(sh)
-	TEST(sw)
-
-	TEST(addi)
-	TEST(slti)
-	TEST(xori)
-	TEST(ori)
-	TEST(andi)
-	TEST(slli)
-	TEST(srli)
-	TEST(srai)
-
-	TEST(add)
-	TEST(sub)
+	TEST(simple)
 	TEST(sll)
+	TEST(slli)
 	TEST(slt)
-	TEST(xor)
-	TEST(srl)
+	TEST(slti)
+	TEST(sltiu)
+	TEST(sltu)
 	TEST(sra)
-	TEST(or)
-	TEST(and)
+	TEST(srai)
+	TEST(srl)
+	TEST(srli)
+	TEST(sub)
+	TEST(sw)
+	TEST(xor)
+	TEST(xori)
 
+	/* RV32UM */
 	TEST(div)
 	TEST(divu)
 	TEST(mul)
@@ -101,15 +100,20 @@ _entry:
 	TEST(rem)
 	TEST(remu)
 
-	TEST(csr)
+	/* I don't know where this one came from */
+	TEST(j)
+
+	/* RV32MI */
 	TEST(mcsr)
 	TEST(ebreak)
 	TEST(ecall)
-	TEST(wfi)
 	TEST(zicntr)
 
-	TEST(sltiu)
-	TEST(sltu)
+	/* RV32SI */
+	TEST(wfi)
+
+	/* RV32MI csr test changes privilege level without coming back so it needs to be the last */
+	TEST(csr)
 
 	li a0,0x80001000
 	addi a1,zero,'D'
