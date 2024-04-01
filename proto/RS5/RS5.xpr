@@ -3,7 +3,7 @@
 <!--                                                         -->
 <!-- Copyright 1986-2021 Xilinx, Inc. All Rights Reserved.   -->
 
-<Project Version="7" Minor="55" Path="/sim/lucas_damo/RS5/proto/RS5/RS5.xpr">
+<Project Version="7" Minor="55" Path="/sim/lucas_damo/RS5_public/proto/RS5/RS5.xpr">
   <DefaultLaunch Dir="$PRUNDIR"/>
   <Configuration>
     <Option Name="Id" Val="29f547082ef44dd2aa383b58a59302c8"/>

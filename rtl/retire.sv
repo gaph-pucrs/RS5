@@ -22,9 +22,6 @@
 
 module retire
     import RS5_pkg::*;
-#(
-    parameter rv32_e        RV32 = RV32I
-)
 (
     input   iType_e         instruction_operation_i,
     input   logic [31:0]    result_i,
@@ -107,8 +104,5 @@ module retire
             default:            regbank_data_o = result_i;
         endcase         
     end
-
-    
-
 
 endmodule

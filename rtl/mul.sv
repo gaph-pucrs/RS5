@@ -5,9 +5,6 @@
 
 module mul
     import RS5_pkg::*;
-#(
-    parameter rv32_e        RV32        = RV32I
-)
 (
     input   logic        clk,
     input   logic        reset,
@@ -91,16 +88,17 @@ module mul
                 sign_a = '0;
                 sign_b = (second_operand_i[31] & signed_mode[1]);
 
-                accum  = {18'b0, mac_result_reg[31:16]};
+                accum  = {19'b0, mac_result_reg[31:16]};
 
                 if (instruction_operation_i == MUL) begin
-                    mac_result_partial = {2'b0, mac_result[15:0], mac_result_reg[15:0]};
+                    mac_result_partial = {3'b0, mac_result[15:0], mac_result_reg[15:0]};
                 end 
                 else begin
                     mac_result_partial = mac_result;
                 end
 
                 next_state = AHBL;
+                hold_o     = 1'b1;
             end
             AHBL: begin
                 op_a   = first_operand_i[31:16];
@@ -109,8 +107,8 @@ module mul
                 sign_b = '0;
 
                 if (instruction_operation_i == MUL) begin
-                    accum               = {18'b0, mac_result_reg[31:16]};
-                    mac_result_partial  = {2'b0, mac_result[15:0], mac_result_reg[15:0]};
+                    accum               = {19'b0, mac_result_reg[31:16]};
+                    mac_result_partial  = {3'b0, mac_result[15:0], mac_result_reg[15:0]};
 
                     hold_o     = 1'b0;
                     next_state = ALBL;
@@ -118,9 +116,9 @@ module mul
                 else begin
                     mac_result_partial = mac_result;
                     accum      = mac_result_reg;
+                    hold_o     = 1'b1;
                     next_state = AHBH;
                 end
-
             end
             AHBH: begin
                 op_a    = first_operand_i[31:16];
@@ -130,7 +128,7 @@ module mul
                 sign_b  = (signed_mode[1] & second_operand_i[31]);
 
                 accum[17:0]  = mac_result_reg[33:16];
-                accum[34:18] = {16{signed_mult & mac_result_reg[33]}};
+                accum[34:18] = {17{signed_mult & mac_result_reg[33]}};
 
                 mac_result_partial = mac_result;
 
@@ -151,8 +149,5 @@ module mul
             mul_state <= next_state;
         end
     end
-
-
-
 
 endmodule

@@ -83,9 +83,7 @@ module RS5
 
     logic            mem_read_enable;
     logic    [3:0]   mem_write_enable;
-    /* verilator lint_off UNUSEDSIGNAL */
     logic   [31:0]   mem_address;
-    /* verilator lint_on UNUSEDSIGNAL */
     logic   [31:0]   instruction_address;
 
 //////////////////////////////////////////////////////////////////////////////
@@ -153,6 +151,7 @@ module RS5
     logic           interrupt_pending;
     exceptionCode_e Exception_Code;
 
+    /* Signals enabled with XOSVM */
     /* verilator lint_off UNUSEDSIGNAL */
     logic   [31:0]  mvmdo, mvmio, mvmds, mvmis, mvmdm, mvmim;
     logic           mvmctl;
@@ -163,11 +162,11 @@ module RS5
 // Assigns
 //////////////////////////////////////////////////////////////////////////////
     
-    if (XOSVMEnable == 1'b1) begin
+    if (XOSVMEnable == 1'b1) begin : gen_xosvm_mmu_on
         assign mmu_en = privilege != privilegeLevel_e'(2'b11) && mvmctl == 1'b1;
     end
-    else begin
-        assign mmu_en = 1'b0;     
+    else begin : gen_xosvm_mmu_off
+        assign mmu_en = 1'b0;
     end
 
     assign regbank_write_enable =   (rd == '0) 
@@ -207,7 +206,7 @@ module RS5
         .tag_o                  (tag_decode)
     );
 
-    if (XOSVMEnable == 1'b1) begin :i_mmu_blk
+    if (XOSVMEnable == 1'b1) begin : gen_xosvm_i_mmu_on
         mmu i_mmu (
             .en_i           (mmu_en               ),
             .mask_i         (mvmim                ),
@@ -218,7 +217,7 @@ module RS5
             .address_o      (instruction_address_o)
         );
     end 
-    else begin
+    else begin : gen_xosvm_i_mmu_off
         assign mmu_inst_fault        = 1'b0;
         assign instruction_address_o = instruction_address;
     end
@@ -296,7 +295,6 @@ module RS5
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     execute #(
-        .Environment (Environment),
         .RV32        (RV32)
     ) execute1 (
         .clk                    (clk), 
@@ -363,9 +361,7 @@ module RS5
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// RETIRE //////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    retire #(
-        .RV32   (RV32)
-    ) retire1 (
+    retire retire1 (
         .instruction_operation_i(instruction_operation_retire),
         .result_i               (result_retire),
         .mem_data_i             (mem_data_i), 
