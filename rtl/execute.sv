@@ -224,15 +224,16 @@ module execute
         mem_wvalid_o       = 1'b0;
         mem_rready_o       = 1'b1;
 
-
-        if (lsu_state == LSU_WAIT_WRITE) begin
-            mem_awvalid_o = 1'b1;
-            mem_wvalid_o  = 1'b1;
-        end else if (lsu_state == LSU_WAIT_READ) begin
-            mem_arvalid_o = 1'b1;
-            mem_rready_o = 1'b1;
-        end else begin
-            if (mem_enable) begin
+        if (mem_enable) begin
+            if (lsu_state == LSU_WAIT_WRITE) begin
+                mem_awvalid_o = 1'b1;
+                mem_wvalid_o  = 1'b1;
+            end 
+            else if (lsu_state == LSU_WAIT_READ) begin
+                mem_arvalid_o = 1'b1;
+                mem_rready_o = 1'b1;
+            end 
+            else begin
                 if (mem_read_enable) begin
                     mem_arvalid_o = 1'b1;
                     mem_rready_o = 1'b1;
