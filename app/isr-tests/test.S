@@ -15,10 +15,8 @@ boot:
 
 	# Habilita Interrupções no PLIC
 	li	t0, PLIC_BASE
-	li  t1, 0x2000
-	add t0, t0, t1
 	li	t1, -1
-	sw  t1, 0(t0)
+	sw  t1, 8(t0)
 
 	# Configura timer
 	li	t0, MMR_BASE
