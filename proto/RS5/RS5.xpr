@@ -3,7 +3,7 @@
 <!--                                                         -->
 <!-- Copyright 1986-2021 Xilinx, Inc. All Rights Reserved.   -->
 
-<Project Version="7" Minor="55" Path="/sim/lucas_damo/RS5/proto/RS5/RS5.xpr">
+<Project Version="7" Minor="55" Path="/sim/lucas_damo/RS5_public/proto/RS5/RS5.xpr">
   <DefaultLaunch Dir="$PRUNDIR"/>
   <Configuration>
     <Option Name="Id" Val="29f547082ef44dd2aa383b58a59302c8"/>
@@ -327,12 +327,12 @@
       <Strategy Version="1" Minor="2">
         <StratHandle Name="Flow_PerfOptimized_high" Flow="Vivado Synthesis 2021"/>
         <Step Id="synth_design">
-          <Option Id="Directive">7</Option>
           <Option Id="KeepEquivalentRegisters">1</Option>
+          <Option Id="Directive">7</Option>
           <Option Id="FsmExtraction">1</Option>
           <Option Id="ResourceSharing">2</Option>
-          <Option Id="ReTiming">1</Option>
           <Option Id="ShregMinSize">5</Option>
+          <Option Id="ReTiming">1</Option>
         </Step>
       </Strategy>
       <GeneratedRun Dir="$PRUNDIR" File="gen_run.xml"/>
