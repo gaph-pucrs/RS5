@@ -22,7 +22,7 @@ boot:
 
 	# Configura timer
 	li	t0, MMR_BASE
-	li	t1, 500000	# 5000 us (time / period)
+	li	t1, 100000000	# 0.5 to 1 seconds (time / period)
 	sw	zero,  0(t0)
 	sw  zero,  4(t0)
 	sw    t1,  8(t0)
