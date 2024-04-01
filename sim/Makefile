@@ -11,8 +11,6 @@ VERILATOR_FLAGS += -Wall
 #VERILATOR_FLAGS += --assert
 # Generate coverage analysis
 #VERILATOR_FLAGS += --coverage
-# Run make to compile model, with as many CPUs as are free
-VERILATOR_FLAGS += --build -j
 # Run Verilator in debug mode
 #VERILATOR_FLAGS += --debug
 # Add this trace to get a backtrace in gdb
@@ -27,7 +25,7 @@ run:
 	@echo
 	@echo "-- VERILATE ----------------"
 	$(VERILATOR) --version
-	$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_INPUT)
+	$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_INPUT) --build -j
 
 	@echo
 	@echo "-- RUN ---------------------"
@@ -37,6 +35,9 @@ run:
 
 	@echo
 	@echo "-- DONE --------------------"
+
+lint:
+	@$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_INPUT) --lint-only
 
 clean:
 	@echo
