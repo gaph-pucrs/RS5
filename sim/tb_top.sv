@@ -8,7 +8,11 @@ module tb_top
 
     logic        clk=1, rstCPU;
     
-    testbench tb(
+    testbench #(
+        .INSTRUCTION_SET(RV32M),
+        .USE_XOSVM(1'b1),
+        .USE_ZIHPM(1'b1)
+    ) tb (
         .clk_i(clk),
         .rst_i(rstCPU)
     );

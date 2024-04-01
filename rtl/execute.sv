@@ -28,7 +28,6 @@
 module execute
     import RS5_pkg::*;
 #(
-    parameter environment_e Environment = ASIC,
     parameter rv32_e        RV32        = RV32I
 )
 (
@@ -36,7 +35,11 @@ module execute
     input   logic               reset,
     input   logic               stall,
 
+    /* Bits 14:12 and 6:0 are not used in this module */
+    /* verilator lint_off UNUSEDSIGNAL */
     input   logic [31:0]        instruction_i,
+    /* verilator lint_on UNUSEDSIGNAL */
+
     input   logic [31:0]        pc_i,
     input   logic [31:0]        first_operand_i,
     input   logic [31:0]        second_operand_i,
@@ -245,13 +248,12 @@ end
 //////////////////////////////////////////////////////////////////////////////
     logic [31:0] mul_result;
     logic        hold_mul;
+    logic        hold_div;
 
     assign hold_o = (hold_mul | hold_div);
 
-    if (RV32 == RV32M || RV32 == RV32ZMMUL) begin
-        mul #(
-            .RV32           (RV32)
-        ) mul1 (
+    if (RV32 == RV32M || RV32 == RV32ZMMUL) begin : gen_zmmul_on
+        mul mul1 (
             .clk                        (clk),
             .reset                      (reset),
             .first_operand_i            (first_operand_i),
@@ -261,7 +263,7 @@ end
             .mul_result_o               (mul_result)
         );
     end
-    else begin
+    else begin : gen_zmmul_off
         assign hold_mul       = 1'b0;
         assign mul_result     = '0;
     end
@@ -273,13 +275,9 @@ end
     logic [31:0] divu_result;
     logic [31:0] rem_result;
     logic [31:0] remu_result;
-    logic        hold_div;
     
-    if (RV32 == RV32M ) begin
-        div #(
-            .Environment    (Environment),
-            .RV32           (RV32)
-        ) div1 (
+    if (RV32 == RV32M) begin : gen_div_on
+        div div1 (
             .clk                        (clk),
             .reset                      (reset),
             .first_operand_i            (first_operand_i),
@@ -292,7 +290,7 @@ end
             .remu_result_o              (remu_result)
         );
     end 
-    else begin
+    else begin : gen_div_off
         assign hold_div         = 1'b0;
         assign div_result       = '0;
         assign divu_result      = '0;
@@ -333,7 +331,7 @@ end
             BEQ,BNE,
             BLT,BLTU,
             BGE,BGEU:  write_enable = 1'b0;
-            default:   write_enable = !killed;
+            default:   write_enable = ~(killed | raise_exception_o);
         endcase
     end 
 
@@ -432,7 +430,7 @@ end
                 raise_exception_o = 1'b1;
                 machine_return_o  = 1'b0;
                 interrupt_ack_o   = 1'b0;
-                exception_code_o  = ECALL_FROM_MMODE;
+                exception_code_o  = (privilege_i == USER) ? ECALL_FROM_UMODE : ECALL_FROM_MMODE;
                 // $write("[%0d] EXCEPTION - ECALL_FROM_MMODE: %8h %8h\n", $time, pc_i, instruction_i);
             end 
             else if (instruction_operation_i == EBREAK) begin

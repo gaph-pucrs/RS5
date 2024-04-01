@@ -51,7 +51,7 @@ module RAM_mem
         fd = $fopen (BIN_FILE, "r");
 
         r = $fread(RAM, fd);
-        // $display("read %d elements", r);
+        $display("read %d elements", r);
 
         if (DEBUG) begin
             fd_r_a = $fopen ({DEBUG_FILE, "_A_reads.txt"}, "w");

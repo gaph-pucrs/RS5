@@ -17,6 +17,8 @@
 // Include model header, generated from Verilating "top.v"
 #include "Vtestbench.h"
 
+#define TRACE 0
+
 int main(int argc, char** argv, char** env) {
     // Construct a VerilatedContext to hold simulation time, etc.
     const auto contextp = std::make_unique<VerilatedContext>();
@@ -32,9 +34,17 @@ int main(int argc, char** argv, char** env) {
     // Construct the Verilated model, from Vtestbench.h generated from Verilating "testbench.sv".
     const auto top = std::make_unique<Vtestbench>(contextp.get());
 
+    #if TRACE
+        contextp->traceEverOn(true);
+        const auto tfp = std::make_unique<VerilatedVcdC>();
+        top->trace(tfp.get(), 99);
+        tfp->open("simx.vcd");
+    #endif
+
     auto then = std::chrono::high_resolution_clock::now();
 
     // Simulate until $finish
+    top->rst_i = 1;
     while (!contextp->gotFinish()) {
         contextp->timeInc(5);  // 5 timeprecision period passes...
 
@@ -52,7 +62,15 @@ int main(int argc, char** argv, char** env) {
 
         // Evaluate model
         top->eval();
+
+        #if TRACE
+            tfp->dump(contextp->time());
+        #endif
     }
+
+    #if TRACE
+        tfp->close();
+    #endif
 
     auto now = std::chrono::high_resolution_clock::now();
 	auto diff = now - then;

@@ -3,7 +3,7 @@ module RS5_FPGA_Platform
 #(
     parameter int           i_cnt       = 2,
     parameter environment_e Environment = FPGA,
-    parameter rv32_e        RV32        = RV32I,
+    parameter rv32_e        RV32        = RV32M,
     parameter bit           XOSVMEnable = 1'b0,
     parameter bit           ZIHPMEnable = 1'b0,
     parameter int           CLKS_PER_BIT_UART = 868
