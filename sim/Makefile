@@ -25,7 +25,7 @@ run:
 	@echo
 	@echo "-- VERILATE ----------------"
 	$(VERILATOR) --version
-	$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_INPUT) --build -j
+	$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_INPUT) --build -j 0
 
 	@echo
 	@echo "-- RUN ---------------------"
