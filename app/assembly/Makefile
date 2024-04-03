@@ -2,7 +2,7 @@ TRIPLET = riscv64-elf
 CC = $(TRIPLET)-gcc
 CFLAGS = -O2 -fno-builtin -march=rv32i -mabi=ilp32 -nostdinc -mbranch-cost=7
 AS = $(TRIPLET)-as
-ASFLAGS = -march=rv32i_zicsr -mabi=ilp32
+ASFLAGS = -march=rv32iv_zicsr -mabi=ilp32
 CPP = $(TRIPLET)-g++
 CCFLAGS = $(CFLAGS)
 LD = $(TRIPLET)-gcc
@@ -10,7 +10,7 @@ LDFLAGS = -nostdlib -march=rv32i -mabi=ilp32 -Triscv.ld
 OBJCOPY = $(TRIPLET)-objcopy
 OBJDUMP = $(TRIPLET)-objdump
 
-PROGNAME = asm
+PROGNAME = vector
 
 BIN_FILES = $(addsuffix .bin, $(PROGNAME))
 LST_FILES = $(addsuffix .lst, $(PROGNAME))

@@ -64,7 +64,64 @@
     nop
     nop
 
-    vsetvli t0, x0, e8, m4, ta, ma          # SEW= 8, LMUL=1
+    jal ra, clear_vreg_bank
+
+    nop
+    nop
+    nop
+    
+    # ARITHMETICH INSTRUCTIONS
+    # Test 8 Bits Adds
+    vsetvli t0, x0, e8, m1, ta, ma          # SEW= 8, LMUL=1, VL=VLMAX
+    li a0, 255                              # Loads 0xFF (8 bits) to a0
+    vor.vx  v1, v1, a0
+    vor.vx  v2, v2, a0
+    vadd.vv v3, v1, v2
+
+    nop
+    li a0, 154                              # Loads 0x9A (8 bits) to a0
+    vadd.vx v4, v4, a0
+    li a0, 91                               # Loads 0x5B (8 bits) to a0
+    vadd.vx v5, v4, a0
+
+    nop
+    vadd.vi v6, v6, 15
+    vadd.vi v7, v6, 12
+
+    # Test VADD For LMUL > 1
+    nop
+    vsetvli t0, x0, e8, m2, ta, ma          # SEW= 8, LMUL=2, VL=VLMAX
+    li a0, 58                               # Loads 0x3A to a0
+    vadd.vx v8, v6, a0
+    nop
+    vadd.vi v10, v4, 10
+
+    jal ra, clear_vreg_bank
+
+    # Test 16 Bits Adds
+    vsetvli t0, x0, e16, m1, ta, ma          # SEW= 16, LMUL=1, VL=VLMAX
+    li a0, 8144                              # Loads 0x1FD0 to a0
+    vor.vx  v1, v1, a0
+    vor.vx  v2, v2, a0
+    vadd.vv v3, v1, v2
+
+    nop
+    li a0, 39578                            # Loads 0x9A9A to a0
+    vadd.vx v4, v4, a0
+    li a0, 26214                            # Loads 0x6666 to a0
+    vadd.vx v5, v4, a0
+
+    nop
+    li a0, 39578                            # Loads 0x9A9A to a0
+    vadd.vx v6, v6, a0
+    li a0, 25957                            # Loads 0x6565 to a0
+    vadd.vx v7, v6, a0
+
+    nop
+    nop
+    nop
+
+    vsetvli t0, x0, e8, m4, ta, ma          # SEW= 8, LMUL=4
     
     nop
     nop
@@ -120,6 +177,18 @@
     vsetivli t0, 20, e8, m2, ta, ma      # SEW= 8, LMUL=2
     vsetivli t0, 25, e32, mf2, ta, ma    # SEW=32, LMUL=1/2
     vsetivli t0, 31, e32, mf8, ta, ma    # Set vector length based on 32-bit vectors
+
+
+clear_vreg_bank:
+    # CLEARS VREG BANK
+    vsetvli t0, x0, e32, m8, ta, ma          # SEW= 32, LMUL=8, VL=VLMAX
+    vand.vi v0,  v0,  0
+    vand.vi v8,  v8,  0
+    vand.vi v16, v16, 0
+    vand.vi v24, v24, 0
+    jr ra
+
+
 .section .rodata		# Constants
 .align 4
 .globl _has_priv	# Set available for 'extern'

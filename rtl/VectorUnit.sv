@@ -337,12 +337,50 @@ module vectorUnit
 //////////////////////////////////////////////////////////////////////////////
 // Logical
 //////////////////////////////////////////////////////////////////////////////
+
     logic [VLEN-1:0] result_and, result_or, result_xor;
 
     always_comb begin
         result_and = first_operand & second_operand;
         result_or  = first_operand | second_operand;
         result_xor = first_operand ^ second_operand;
+    end
+
+//////////////////////////////////////////////////////////////////////////////
+// Arithmetic
+//////////////////////////////////////////////////////////////////////////////
+
+    logic [VLEN-1:0] summand_1, summand_2;
+    logic [8:0]      result_add_bytes [VLENB-1:0];
+    logic            adder_carry [VLENB-1:0];
+    logic [VLEN-1:0] result_add;
+
+    assign summand_1 = first_operand;
+    assign summand_2 = (vector_operation_i == vadd) ? second_operand : -second_operand;
+
+    always_comb begin
+        automatic int i;
+        for (i = 0; i < VLENB; i++) begin
+            case (vsew)
+                EW16:    adder_carry[i] = (i%2 == 0) ? 1'b0 : result_add_bytes[i-1][8];
+                EW32:    adder_carry[i] = (i%4 == 0) ? 1'b0 : result_add_bytes[i-1][8];
+                default: adder_carry[i] = 1'b0;
+            endcase
+        end
+    end
+
+    always_comb begin
+        automatic int i;
+        for (i = 0; i < VLENB; i++) begin
+            result_add_bytes[i] = {1'b0, summand_1[(8*(i+1))-1-:8]} + {1'b0, summand_2[(8*(i+1))-1-:8]} + adder_carry[i];
+        end
+    end
+
+    always_comb begin
+        automatic int i;
+        for (i = 0; i < VLENB; i++) begin
+            result_add[(8*(i+1))-1-:8] = result_add_bytes[i][7:0];
+        end
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -354,6 +392,7 @@ module vectorUnit
             vand:       result = result_and;
             vor:        result = result_or;
             vxor:       result = result_xor;
+            vadd:       result = result_add;
             default:    result = '0;
         endcase
     end
