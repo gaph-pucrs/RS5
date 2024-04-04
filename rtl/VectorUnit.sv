@@ -350,13 +350,14 @@ module vectorUnit
 // Arithmetic
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [VLEN-1:0] subtraend_int, subtraend;
+    logic [VLEN-1:0] subtraend_int, subtraend_neg, subtraend;
     logic [VLEN-1:0] summand_1, summand_2;
     logic [8:0]      result_add_bytes [VLENB-1:0];
     logic            adder_carry [VLENB-1:0];
     logic [VLEN-1:0] result_add;
 
-    assign subtraend_int = ~second_operand;
+    assign subtraend_int = (vector_operation_i == vrsub) ? first_operand : second_operand;
+    assign subtraend_neg = ~subtraend_int;
 
     always_comb begin
         automatic int i;
@@ -365,19 +366,19 @@ module vectorUnit
             case (vsew)
                 EW8:
                     for (i = 0; i < VLENB; i++)
-                        subtraend[(8*(i+1))-1-:8]   <= subtraend_int[(8*(i+1))-1-:8] + 1'b1;
+                        subtraend[(8*(i+1))-1-:8]   <= subtraend_neg[(8*(i+1))-1-:8] + 1'b1;
                 EW16:
                     for (i = 0; i < VLENB/2; i++)
-                        subtraend[(16*(i+1))-1-:16] <= subtraend_int[(16*(i+1))-1-:16] + 1'b1;
+                        subtraend[(16*(i+1))-1-:16] <= subtraend_neg[(16*(i+1))-1-:16] + 1'b1;
                 default:
                     for (i = 0; i < VLENB/4; i++)
-                        subtraend[(32*(i+1))-1-:32] <= subtraend_int[(32*(i+1))-1-:32] + 1'b1;
+                        subtraend[(32*(i+1))-1-:32] <= subtraend_neg[(32*(i+1))-1-:32] + 1'b1;
             endcase
         end
     end
 
-    assign summand_1 = first_operand;
-    assign summand_2 = (vector_operation_i == vsub) ? subtraend : second_operand;
+    assign summand_1 = (vector_operation_i == vrsub) ? second_operand : first_operand;
+    assign summand_2 = (vector_operation_i inside {vsub, vrsub})  ? subtraend      : second_operand;
 
     always_comb begin
         automatic int i;
@@ -413,7 +414,9 @@ module vectorUnit
             vand:       result = result_and;
             vor:        result = result_or;
             vxor:       result = result_xor;
-            vadd, vsub: result = result_add;
+            vadd, 
+            vsub, 
+            vrsub:      result = result_add;
             default:    result = '0;
         endcase
     end

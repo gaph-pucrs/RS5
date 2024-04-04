@@ -146,6 +146,33 @@
     li a0, 1634                             # Loads 0x0662 to a0
     vsub.vx v8, v7, a0
 
+    # REVERSE SUB INSTRUCTION
+    vsetvli t0, x0, e8, m1, ta, ma          # SEW= 8, LMUL=1, VL=VLMAX
+    li a0, 7                                # Loads 0x07 to a0
+    vadd.vx v15, v15, a0
+    li a0, 16                               # Loads 0x10 to a0
+    vrsub.vx v16, v15, a0                   # Makes 16 - 8
+    nop
+    vrsub.vi v17, v16, 10                   # Makes 10 - 8
+
+    # Test 16 Bits Reverse Subs
+    vsetvli t0, x0, e16, m1, ta, ma         # SEW= 8, LMUL=1, VL=VLMAX
+    li a0, 2200                             # Loads 0x0898 to a0
+    vadd.vx v18, v18, a0
+    li a0, 4000                             # Loads 0x0FA0 to a0
+    vrsub.vx v19, v18, a0                   # Makes 4000 - 2200 = 1800(708)
+    nop
+    vrsub.vi v20, v19, 8                    # Makes 8 - 1800 = -700 (F900)
+
+    # Test LMUL_2 Reverse Subs
+    vsetvli t0, x0, e8, m2, ta, ma          # SEW= 8, LMUL=1, VL=VLMAX
+    li a0, 7                                # Loads 0x07 to a0
+    vadd.vx v21, v21, a0
+    li a0, 16                               # Loads 0x10 to a0
+    vrsub.vx v23, v21, a0                   # Makes 16 - 8
+    nop
+    vrsub.vi v25, v23, 10                   # Makes 10 - 8
+
     # VSETVL INSTRUCTIONS
     nop
     nop
