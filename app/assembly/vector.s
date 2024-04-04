@@ -73,15 +73,15 @@
     # ARITHMETICH INSTRUCTIONS
     # Test 8 Bits Adds
     vsetvli t0, x0, e8, m1, ta, ma          # SEW= 8, LMUL=1, VL=VLMAX
-    li a0, 255                              # Loads 0xFF (8 bits) to a0
+    li a0, 255                              # Loads 0xFF to a0
     vor.vx  v1, v1, a0
     vor.vx  v2, v2, a0
     vadd.vv v3, v1, v2
 
     nop
-    li a0, 154                              # Loads 0x9A (8 bits) to a0
+    li a0, 154                              # Loads 0x9A to a0
     vadd.vx v4, v4, a0
-    li a0, 91                               # Loads 0x5B (8 bits) to a0
+    li a0, 91                               # Loads 0x5B to a0
     vadd.vx v5, v4, a0
 
     nop
@@ -117,6 +117,36 @@
     li a0, 25957                            # Loads 0x6565 to a0
     vadd.vx v7, v6, a0
 
+    jal ra, clear_vreg_bank
+    nop
+    nop
+    nop
+
+    # SUB INSTRUCTION
+    vsetvli t0, x0, e8, m1, ta, ma          # SEW= 8, LMUL=1, VL=VLMAX
+    li a0, 2                                # Loads 0x02 to a0
+    vadd.vx v1, v1, a0
+    li a0, 1                                # Loads 0x01 to a0
+    vsub.vx v2, v1, a0
+
+    li a0, 10                               # Loads 0x0A to a0
+    vadd.vx v3, v3, a0
+    li a0, 6                                # Loads 0x06 to a0
+    vsub.vx v4, v3, a0
+
+    li a0, 30                               # Loads 0x1E to a0
+    vadd.vx v5, v5, a0
+    li a0, -15                              # Loads 0xF1 to a0
+    vsub.vx v6, v5, a0
+
+    # Test 16 Bits Subs
+    vsetvli t0, x0, e16, m1, ta, ma         # SEW= 16, LMUL=1, VL=VLMAX
+    li a0, 2472                             # Loads 0x09A8 to a0
+    vadd.vx v7, v7, a0
+    li a0, 1634                             # Loads 0x0662 to a0
+    vsub.vx v8, v7, a0
+
+    # VSETVL INSTRUCTIONS
     nop
     nop
     nop
