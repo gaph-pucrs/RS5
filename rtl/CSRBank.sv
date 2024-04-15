@@ -417,7 +417,7 @@ module CSRBank
                 MVMIM:          out = mvmim[31:0];
 
                 // Vector Extension CSRs
-                VLENB:          out = VLEN/8;
+                VLENB_CSR:      out = VLEN/8;
 
                 default:        out = '0;
             endcase

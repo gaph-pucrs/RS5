@@ -1,4 +1,4 @@
-module vectorUnit 
+module VectorUnit 
     import RS5_pkg::*;
 #(
     parameter environment_e Environment = ASIC,
@@ -27,11 +27,12 @@ module vectorUnit
 
     vector_states_e  state, next_state;
 
-    logic [VLEN-1:0] result;
-    logic [VLEN-1:0] first_operand, second_operand, third_operand;
-    logic [VLEN-1:0] vs1_rd_data, vs2_rd_data, vd_rd_data;
+    logic [VLEN-1:0]        result;
+    logic [VLEN-1:0]        first_operand, second_operand, third_operand;
+    logic signed [VLEN-1:0] first_operand_signed, second_operand_signed, third_operand_signed;
 
-    logic [4:0]      cycle_count;
+    logic [VLEN-1:0]        vs1_rd_data, vs2_rd_data, vd_rd_data;
+    logic [4:0]             cycle_count;
 
     logic [$bits(VLEN/8)-1:0] elementsPerRegister;
     logic [$bits(VLEN)-1:0]   vl, vl_next, vl_max;
@@ -66,7 +67,7 @@ module vectorUnit
     logic [VLEN-1:0] scalar_replicated, imm_replicated;
 
     always_comb begin 
-        case (vsew)
+        unique case (vsew)
             EW8:     scalar_replicated = {(VLENB){op1_scalar_i[7:0]}};
             EW16:    scalar_replicated = {(VLENB/2){op1_scalar_i[15:0]}};
             default: scalar_replicated = {(VLENB/4){op1_scalar_i[31:0]}};
@@ -76,7 +77,7 @@ module vectorUnit
     always_comb begin 
         // unsigned
             if (vector_operation_i inside {vsrl, vsll, vsra}) begin
-                case (vsew)
+                unique case (vsew)
                     EW8:     imm_replicated = {(VLENB){'0, rs1}};
                     EW16:    imm_replicated = {(VLENB/2){'0, rs1}};
                     default: imm_replicated = {(VLENB/4){'0, rs1}};
@@ -84,7 +85,7 @@ module vectorUnit
             // signed
             end
             else begin
-                case (vsew)
+                unique case (vsew)
                     EW8:     imm_replicated = {(VLENB){{3{rs1[4]}}, rs1}};
                     EW16:    imm_replicated = {(VLENB/2){{11{rs1[4]}}, rs1}};
                     default: imm_replicated = {(VLENB/4){{27{rs1[4]}}, rs1}};
@@ -115,6 +116,10 @@ module vectorUnit
         third_operand  <= vd_rd_data;
     end
 
+    assign first_operand_signed  = first_operand;
+    assign second_operand_signed = second_operand;
+    assign third_operand_signed  = third_operand;
+
 //////////////////////////////////////////////////////////////////////////////
 // FSM
 //////////////////////////////////////////////////////////////////////////////
@@ -127,13 +132,14 @@ module vectorUnit
     always_ff @(posedge clk) begin
         if (reset == 1'b1) begin
             state <= V_IDLE;
-        end else begin
+        end
+        else begin
             state <= next_state;
         end
     end
 
     always_comb begin
-        case (state)
+        unique case (state)
             V_IDLE:
                 if (instruction_operation_i == VECTOR)
                     next_state = V_EXEC;
@@ -145,12 +151,15 @@ module vectorUnit
                     next_state = V_EXEC;
                 else
                     next_state = V_IDLE;
+
+            default:
+                next_state = V_IDLE;
         endcase
     end
 /*
     always_comb begin
         if (widening) begin
-            case (vsew)
+            unique case (vsew)
                 EW8:  vsew_effective = EW16;
                 EW16: vsew_effective = EW32;
                 EW32: vsew_effective = EW64;
@@ -215,7 +224,7 @@ module vectorUnit
                 vl_next = (instruction_operation_i == VSETVL) ? op1_scalar_i : {'0, op1_scalar_i[4:0]};
         end
         else begin
-            vl_next <= vl;
+            vl_next = vl;
         end
     end
 
@@ -252,6 +261,10 @@ module vectorUnit
             res_scalar_o   = vl_next;
             wr_en_scalar_o = 1'b1;
         end
+        else if (instruction_operation_i == VECTOR) begin
+            res_scalar_o   = result[31:0];
+            wr_en_scalar_o = 1'b0;
+        end
         else begin
             res_scalar_o   = '0;
             wr_en_scalar_o = 1'b0;
@@ -287,10 +300,9 @@ module vectorUnit
         if (reset == 1'b1)
             vregs <= '{32{'0}};
         else begin
-            automatic int i;
             // Don't write to v0 (reserved for vector mask)
-            if (wr_en & (vd_addr != '0)) begin
-                for (i=0; i < VLENB; i++) begin
+            if ((wr_en != '0) && (vd_addr != '0)) begin
+                for (int i = 0; i < VLENB; i++) begin
                     if (wr_en[i])
                         vregs[vd_addr][(8*(i+1))-1-:8]  <= result[(8*(i+1))-1-:8];
                 end
@@ -302,21 +314,20 @@ module vectorUnit
     always_ff @(posedge clk) begin
         if (instruction_operation_i == VECTOR && next_state == V_EXEC) begin
             if (vl > 0) begin
-                automatic int i = 0;
-                case (vsew)
+                unique case (vsew)
                     EW8: begin
-                        for (i = 0; i < VLENB; i++) begin
+                        for (int i = 0; i < VLENB; i++) begin
                             wr_en[i] <= (i < vl) ? 1'b1 : 1'b0;
                         end
                     end
                     EW16: begin
-                        for (i = 0; i < VLENB/2; i++) begin
+                        for (int i = 0; i < VLENB/2; i++) begin
                             wr_en[(i*2)]   <= (i < vl) ? 1'b1 : 1'b0;
                             wr_en[(i*2)+1] <= (i < vl) ? 1'b1 : 1'b0;
                         end
                     end
                     default: begin
-                        for (i = 0; i < VLENB/4; i++) begin
+                        for (int i = 0; i < VLENB/4; i++) begin
                             wr_en[(i*4)]   <= (i < vl) ? 1'b1 : 1'b0;
                             wr_en[(i*4)+1] <= (i < vl) ? 1'b1 : 1'b0;
                             wr_en[(i*4)+2] <= (i < vl) ? 1'b1 : 1'b0;
@@ -350,59 +361,203 @@ module vectorUnit
 // Arithmetic
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [VLEN-1:0] subtraend_int, subtraend_neg, subtraend;
+    logic [VLEN-1:0] subtraend_neg, subtraend;
     logic [VLEN-1:0] summand_1, summand_2;
     logic [8:0]      result_add_bytes [VLENB-1:0];
     logic            adder_carry [VLENB-1:0];
     logic [VLEN-1:0] result_add;
 
-    assign subtraend_int = (vector_operation_i == vrsub) ? first_operand : second_operand;
-    assign subtraend_neg = ~subtraend_int;
+    assign subtraend_neg = ~second_operand;
 
     always_comb begin
-        automatic int i;
-        for (i = 0; i < VLENB; i++) begin
-            automatic int i = 0;
-            case (vsew)
-                EW8:
-                    for (i = 0; i < VLENB; i++)
-                        subtraend[(8*(i+1))-1-:8]   <= subtraend_neg[(8*(i+1))-1-:8] + 1'b1;
-                EW16:
-                    for (i = 0; i < VLENB/2; i++)
-                        subtraend[(16*(i+1))-1-:16] <= subtraend_neg[(16*(i+1))-1-:16] + 1'b1;
-                default:
-                    for (i = 0; i < VLENB/4; i++)
-                        subtraend[(32*(i+1))-1-:32] <= subtraend_neg[(32*(i+1))-1-:32] + 1'b1;
-            endcase
-        end
+        unique case (vsew)
+            EW8:
+                for (int i = 0; i < VLENB; i++)
+                    subtraend[(8*(i+1))-1-:8]   = subtraend_neg[(8*(i+1))-1-:8] + 1'b1;
+            EW16:
+                for (int i = 0; i < VLENB/2; i++)
+                    subtraend[(16*(i+1))-1-:16] = subtraend_neg[(16*(i+1))-1-:16] + 1'b1;
+            default:
+                for (int i = 0; i < VLENB/4; i++)
+                    subtraend[(32*(i+1))-1-:32] = subtraend_neg[(32*(i+1))-1-:32] + 1'b1;
+        endcase
     end
 
-    assign summand_1 = (vector_operation_i == vrsub) ? second_operand : first_operand;
-    assign summand_2 = (vector_operation_i inside {vsub, vrsub})  ? subtraend      : second_operand;
+    assign summand_1 = first_operand;
+    assign summand_2 = (vector_operation_i == vsub)  ? subtraend : second_operand;
 
     always_comb begin
-        automatic int i;
-        for (i = 0; i < VLENB; i++) begin
-            case (vsew)
+        for (int i = 0; i < VLENB; i++) begin
+            unique case (vsew)
+                EW8:     adder_carry[i] = 1'b0;
                 EW16:    adder_carry[i] = (i%2 == 0) ? 1'b0 : result_add_bytes[i-1][8];
-                EW32:    adder_carry[i] = (i%4 == 0) ? 1'b0 : result_add_bytes[i-1][8];
-                default: adder_carry[i] = 1'b0;
+                default: adder_carry[i] = (i%4 == 0) ? 1'b0 : result_add_bytes[i-1][8];
             endcase
         end
     end
 
     always_comb begin
-        automatic int i;
-        for (i = 0; i < VLENB; i++) begin
+        for (int i = 0; i < VLENB; i++) begin
             result_add_bytes[i] = {1'b0, summand_1[(8*(i+1))-1-:8]} + {1'b0, summand_2[(8*(i+1))-1-:8]} + adder_carry[i];
         end
     end
 
     always_comb begin
-        automatic int i;
-        for (i = 0; i < VLENB; i++) begin
+        for (int i = 0; i < VLENB; i++) begin
             result_add[(8*(i+1))-1-:8] = result_add_bytes[i][7:0];
         end
+    end
+
+//////////////////////////////////////////////////////////////////////////////
+// Shifts
+//////////////////////////////////////////////////////////////////////////////
+
+    logic [VLEN-1:0] result_sll, result_srl, result_sra;
+
+    always_comb begin
+        unique case (vsew)
+            EW8:
+                for (int i = 0; i < VLENB; i++) begin
+                    automatic logic [7:0] operand_sliced, operand_sliced_signed;
+                    operand_sliced        = second_operand[(8*(i+1))-1-:8];
+                    operand_sliced_signed = second_operand_signed[(8*(i+1))-1-:8];
+
+                    result_sll[(8*(i+1))-1-:8]   = first_operand[(8*(i+1))-1-:8]           <<  operand_sliced[2:0];
+                    result_srl[(8*(i+1))-1-:8]   = first_operand[(8*(i+1))-1-:8]           >>  operand_sliced[2:0];
+                    result_sra[(8*(i+1))-1-:8]   = first_operand_signed[(8*(i+1))-1-:8]    >>> operand_sliced_signed[2:0];
+                end
+            EW16:
+                for (int i = 0; i < VLENB/2; i++) begin
+                    automatic logic [15:0] operand_sliced, operand_sliced_signed;
+                    operand_sliced        = second_operand[(16*(i+1))-1-:16];
+                    operand_sliced_signed = second_operand_signed[(16*(i+1))-1-:16];
+
+                    result_sll[(16*(i+1))-1-:16] = first_operand[(16*(i+1))-1-:16]         <<  operand_sliced[3:0];
+                    result_srl[(16*(i+1))-1-:16] = first_operand[(16*(i+1))-1-:16]         >>  operand_sliced[3:0];
+                    result_sra[(16*(i+1))-1-:16] = first_operand_signed[(16*(i+1))-1-:16]  >>> operand_sliced_signed[3:0];
+                end
+            default:
+                for (int i = 0; i < VLENB/4; i++) begin
+                    automatic logic [31:0] operand_sliced, operand_sliced_signed;
+                    operand_sliced        = second_operand[(32*(i+1))-1-:32];
+                    operand_sliced_signed = second_operand_signed[(32*(i+1))-1-:32];
+
+                    result_sll[(32*(i+1))-1-:32] = first_operand[(32*(i+1))-1-:32]         <<  operand_sliced[4:0];
+                    result_srl[(32*(i+1))-1-:32] = first_operand[(32*(i+1))-1-:32]         >>  operand_sliced[4:0];
+                    result_sra[(32*(i+1))-1-:32] = first_operand_signed[(32*(i+1))-1-:32]  >>> operand_sliced_signed[4:0];
+                end
+        endcase
+    end
+
+//////////////////////////////////////////////////////////////////////////////
+// Compare
+//////////////////////////////////////////////////////////////////////////////
+
+    logic [VLENB-1:0]     equal_8b,  greater_than_8b,  greater_than_signed_8b,  result_comparison_8b;
+    logic [(VLENB/2)-1:0] equal_16b, greater_than_16b, greater_than_signed_16b, result_comparison_16b;
+    logic [(VLENB/4)-1:0] equal_32b, greater_than_32b, greater_than_signed_32b, result_comparison_32b;
+
+    always_comb begin
+        for (int i = 0; i < VLENB; i++) begin
+            equal_8b[i]                 = first_operand[(8*(i+1))-1-:8] == second_operand[(8*(i+1))-1-:8];
+            greater_than_8b[i]          = first_operand[(8*(i+1))-1-:8] >  second_operand[(8*(i+1))-1-:8];
+            greater_than_signed_8b[i]   = first_operand_signed[(8*(i+1))-1-:8] > second_operand_signed[(8*(i+1))-1-:8];
+        end
+
+        for (int i = 0; i < VLENB/2; i++) begin
+            equal_16b[i]                 = first_operand[(16*(i+1))-1-:16] == second_operand[(16*(i+1))-1-:16];
+            greater_than_16b[i]          = first_operand[(16*(i+1))-1-:16] >  second_operand[(16*(i+1))-1-:16];
+            greater_than_signed_16b[i]   = first_operand_signed[(16*(i+1))-1-:16] > second_operand_signed[(16*(i+1))-1-:16];
+        end
+
+        for (int i = 0; i < VLENB/4; i++) begin
+            equal_32b[i]               = first_operand[(32*(i+1))-1-:32] == second_operand[(32*(i+1))-1-:32];
+            greater_than_32b[i]        = first_operand[(32*(i+1))-1-:32] >  second_operand[(32*(i+1))-1-:32];
+            greater_than_signed_32b[i] = first_operand_signed[(32*(i+1))-1-:32] > second_operand_signed[(32*(i+1))-1-:32];
+        end
+    end
+
+    always_comb begin
+        unique case(vector_operation_i)
+            vmsne:  begin 
+                        result_comparison_8b  = ~equal_8b;
+                        result_comparison_16b = ~equal_16b;
+                        result_comparison_32b = ~equal_32b;
+                    end 
+            vmsltu: begin 
+                        result_comparison_8b  = ~equal_8b  & ~greater_than_8b;
+                        result_comparison_16b = ~equal_16b & ~greater_than_16b;
+                        result_comparison_32b = ~equal_32b & ~greater_than_32b;
+                    end 
+            vmslt:  begin 
+                        result_comparison_8b  = ~equal_8b  & ~greater_than_signed_8b;
+                        result_comparison_16b = ~equal_16b & ~greater_than_signed_16b;
+                        result_comparison_32b = ~equal_32b & ~greater_than_signed_32b;
+                    end 
+            vmsleu: begin 
+                        result_comparison_8b  = equal_8b  | ~greater_than_8b;
+                        result_comparison_16b = equal_16b | ~greater_than_16b;
+                        result_comparison_32b = equal_32b | ~greater_than_32b;
+                    end 
+            vmsle:  begin 
+                        result_comparison_8b  = equal_8b  | ~greater_than_signed_8b;
+                        result_comparison_16b = equal_16b | ~greater_than_signed_16b;
+                        result_comparison_32b = equal_32b | ~greater_than_signed_32b;
+                    end 
+            vmsgtu: begin 
+                        result_comparison_8b  = greater_than_8b;
+                        result_comparison_16b = greater_than_16b;
+                        result_comparison_32b = greater_than_32b;
+                    end 
+            vmsgt : begin 
+                        result_comparison_8b  = greater_than_signed_8b;
+                        result_comparison_16b = greater_than_signed_16b;
+                        result_comparison_32b = greater_than_signed_32b;
+                    end 
+            default:begin 
+                        result_comparison_8b  = equal_8b;
+                        result_comparison_16b = equal_16b;
+                        result_comparison_32b = equal_32b;
+                    end 
+        endcase
+    end
+
+//////////////////////////////////////////////////////////////////////////////
+// Min/Max
+//////////////////////////////////////////////////////////////////////////////
+
+    logic [VLEN-1:0] result_minu, result_min, result_maxu, result_max;
+
+    always_comb begin
+        unique case (vsew)
+            EW8:    begin
+                        for (int i = 0; i < VLENB; i++) begin
+                            result_minu[(8*(i+1))-1-:8] = (greater_than_8b[i])         ? second_operand[(8*(i+1))-1-:8] : first_operand [(8*(i+1))-1-:8];
+                            result_min [(8*(i+1))-1-:8] = (greater_than_signed_8b[i])  ? second_operand[(8*(i+1))-1-:8] : first_operand [(8*(i+1))-1-:8];
+                            result_maxu[(8*(i+1))-1-:8] = (greater_than_8b[i])         ? first_operand [(8*(i+1))-1-:8] : second_operand[(8*(i+1))-1-:8];
+                            result_max [(8*(i+1))-1-:8] = (greater_than_signed_8b[i])  ? first_operand [(8*(i+1))-1-:8] : second_operand[(8*(i+1))-1-:8];
+                        end
+                    end
+
+            EW16:   begin
+                        for (int i = 0; i < VLENB/2; i++) begin
+                            result_minu[(16*(i+1))-1-:16] = (greater_than_16b[i])         ? second_operand[(16*(i+1))-1-:16] : first_operand [(16*(i+1))-1-:16];
+                            result_min [(16*(i+1))-1-:16] = (greater_than_signed_16b[i])  ? second_operand[(16*(i+1))-1-:16] : first_operand [(16*(i+1))-1-:16];
+                            result_maxu[(16*(i+1))-1-:16] = (greater_than_16b[i])         ? first_operand [(16*(i+1))-1-:16] : second_operand[(16*(i+1))-1-:16];
+                            result_max [(16*(i+1))-1-:16] = (greater_than_signed_16b[i])  ? first_operand [(16*(i+1))-1-:16] : second_operand[(16*(i+1))-1-:16];
+                        end
+                    end
+
+            default:begin
+                        for (int i = 0; i < VLENB/4; i++) begin
+                            result_minu[(32*(i+1))-1-:32] = (greater_than_32b[i])         ? second_operand[(32*(i+1))-1-:32] : first_operand [(32*(i+1))-1-:32];
+                            result_min [(32*(i+1))-1-:32] = (greater_than_signed_32b[i])  ? second_operand[(32*(i+1))-1-:32] : first_operand [(32*(i+1))-1-:32];
+                            result_maxu[(32*(i+1))-1-:32] = (greater_than_32b[i])         ? first_operand [(32*(i+1))-1-:32] : second_operand[(32*(i+1))-1-:32];
+                            result_max [(32*(i+1))-1-:32] = (greater_than_signed_32b[i])  ? first_operand [(32*(i+1))-1-:32] : second_operand[(32*(i+1))-1-:32];
+                        end
+                    end
+        endcase
+        
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -415,8 +570,15 @@ module vectorUnit
             vor:        result = result_or;
             vxor:       result = result_xor;
             vadd, 
-            vsub, 
-            vrsub:      result = result_add;
+            //vrsub,
+            vsub:       result = result_add;
+            vsll:       result = result_sll;
+            vsrl:       result = result_srl;
+            vsra:       result = result_sra;
+            vmin:       result = result_min;
+            vminu:      result = result_minu;
+            vmax:       result = result_max;
+            vmaxu:      result = result_maxu;
             default:    result = '0;
         endcase
     end

@@ -132,7 +132,7 @@ package RS5_pkg;
         MHPMCOUNTER27 = 12'hB1B, MHPMCOUNTER28 = 12'hB1C, MHPMCOUNTER29 = 12'hB1D, MHPMCOUNTER30 = 12'hB1E, MHPMCOUNTER31 = 12'hB1F,
         MCYCLEH = 12'hB80, MINSTRETH = 12'hB82,
         CYCLE = 12'hC00, TIME, INSTRET, CYCLEH=12'hC80, TIMEH, INSTRETH,
-        VL=12'hC20, VTYPE, VLENB, VSTART
+        VL=12'hC20, VTYPE, VLENB_CSR, VSTART
     } CSRs;
 
     typedef enum  logic[4:0] {  
@@ -171,7 +171,7 @@ package RS5_pkg;
         LMUL_1_2  = 3'b111
   } vlmul_e;
 
-  typedef enum  logic[5:0] {
+  typedef enum  logic[7:0] {
         vnop,
         vadd,
         vsub,
@@ -205,7 +205,15 @@ package RS5_pkg;
         vmacc,
         vnmsac,
         vmadd,
-        vnmsub
+        vnmsub,
+        vredsum,
+        vredmaxu,
+        vredmax,
+        vredminu,
+        vredmin,
+        vredand,
+        vredor,
+        vredxor
   } iTypeVector_e;
 
     typedef enum  logic[2:0] {

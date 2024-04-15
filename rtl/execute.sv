@@ -294,7 +294,7 @@ end
     logic        vector_wr_en;
     logic        hold_vector;
 
-    vectorUnit #(
+    VectorUnit #(
         .Environment(Environment),
         .RV32       (RV32       ), 
         .VLEN       (64         )

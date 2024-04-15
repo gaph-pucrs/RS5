@@ -244,7 +244,7 @@ module decode
             unique case (funct7[6:1]) inside
                 6'b000000:     vector_operation = vadd;
                 6'b000010:     vector_operation = vsub;
-                6'b000011:     vector_operation = vrsub;
+                //6'b000011:     vector_operation = vrsub;
                 6'b000100:     vector_operation = vminu;
                 6'b000101:     vector_operation = vmin;
                 6'b000110:     vector_operation = vmaxu;
@@ -267,6 +267,14 @@ module decode
             endcase
         end else if (opCat inside {OPMVV, OPMVX}) begin
             unique case (funct7[6:1]) inside
+                6'b000000:     vector_operation = vredsum;
+                6'b000001:     vector_operation = vredand;
+                6'b000010:     vector_operation = vredor;
+                6'b000011:     vector_operation = vredxor;
+                6'b000100:     vector_operation = vredminu;
+                6'b000101:     vector_operation = vredmin;
+                6'b000110:     vector_operation = vredmaxu;
+                6'b000111:     vector_operation = vredmax;
                 6'b100000:     vector_operation = vdivu;
                 6'b100001:     vector_operation = vdiv;
                 6'b100010:     vector_operation = vremu;
