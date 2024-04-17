@@ -12,25 +12,10 @@
  * Testbench for RS5 simulation.
  *
  * \detailed
- * Testbench for RS5 simulation.
+ * Testbench for RS5 simulation.de
  */
 
-`timescale 1ns/1ps
-
 `include "../rtl/RS5_pkg.sv"
-`include "../rtl/mmu.sv"
-`include "../rtl/fetch.sv"
-`include "../rtl/decode.sv"
-`include "../rtl/mul.sv"
-`include "../rtl/div.sv"
-`include "../rtl/execute.sv"
-`include "../rtl/retire.sv"
-`include "../rtl/regbank.sv"
-`include "../rtl/CSRBank.sv"
-`include "../rtl/RS5.sv"
-`include "../rtl/plic.sv"
-`include "../rtl/rtc.sv"
-`include "./RAM_mem.sv"
 
 //////////////////////////////////////////////////////////////////////////////
 // CPU TESTBENCH

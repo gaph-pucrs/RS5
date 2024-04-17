@@ -18,6 +18,9 @@
  * interrupts causes and CSR addresses.
  */
 
+`ifndef RS5_PKG
+`define RS5_PKG
+
 package RS5_pkg;
 
     typedef enum integer {
@@ -137,3 +140,5 @@ package RS5_pkg;
     } interruptionCode_e;
 
 endpackage
+
+`endif

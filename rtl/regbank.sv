@@ -19,6 +19,8 @@
  * value 0 and the other 31 registers are read-write registers.
  */
 
+`include "RS5_pkg.sv"
+
 module regbank
     import RS5_pkg::*;
 (

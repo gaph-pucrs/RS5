@@ -25,6 +25,8 @@
  * instruction fetched from the new flow arrives with the updated tag.
  */
 
+`include "RS5_pkg.sv"
+
 module execute
     import RS5_pkg::*;
 #(

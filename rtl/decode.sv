@@ -21,6 +21,8 @@
  * consists in a NOP (NO Operation) instruction.
  */
 
+`include "RS5_pkg.sv"
+
 module decode 
     import RS5_pkg::*;
 (

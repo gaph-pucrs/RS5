@@ -23,6 +23,8 @@
  * current content in a determined way to generate the new CSR content.
  */
 
+`include "RS5_pkg.sv"
+
 module CSRBank 
     import RS5_pkg::*;
 #( 

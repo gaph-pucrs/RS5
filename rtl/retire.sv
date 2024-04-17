@@ -20,6 +20,8 @@
  * 
  */
 
+`include "RS5_pkg.sv"
+
 module retire
     import RS5_pkg::*;
 (

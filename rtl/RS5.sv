@@ -18,6 +18,8 @@
  * and also defines the interface ports (inputs and outputs) os the processor.
  */
 
+`include "RS5_pkg.sv"
+
 module RS5
     import RS5_pkg::*;
 #(

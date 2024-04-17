@@ -1,3 +1,5 @@
+`include "RS5_pkg.sv"
+
 module div 
     import RS5_pkg::*;
 (

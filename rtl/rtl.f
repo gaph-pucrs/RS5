@@ -1,4 +1,3 @@
-./RS5_pkg.sv
 ./mmu.sv
 ./fetch.sv
 ./decode.sv

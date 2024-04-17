@@ -1,6 +1,6 @@
-timeunit 1ns; timeprecision 1ns;
+`timescale 1ns/1ns
 
-`include "./testbench.sv"
+`include "../rtl/RS5_pkg.sv"
 
 module tb_top
     import RS5_pkg::*;

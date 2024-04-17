@@ -15,6 +15,8 @@
  *
  */
 
+`include "RS5_pkg.sv"
+
 module mmu
     import RS5_pkg::*;
 (
