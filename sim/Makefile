@@ -24,20 +24,19 @@ default: run
 run: 
 	@echo
 	@echo "-- VERILATE ----------------"
-	$(VERILATOR) --version
-	$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_INPUT) --build -j 0
+	@$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_INPUT) --build -j 0 -I../rtl
 
 	@echo
 	@echo "-- RUN ---------------------"
 	@rm -rf debug
 	@mkdir -p debug
-	obj_dir/Vtestbench
+	@obj_dir/Vtestbench
 
 	@echo
 	@echo "-- DONE --------------------"
 
 lint:
-	@$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_INPUT) --lint-only
+	@$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_INPUT) --lint-only -I../rtl
 
 clean:
 	@echo
