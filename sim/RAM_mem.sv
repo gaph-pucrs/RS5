@@ -46,15 +46,18 @@ module RAM_mem
 );
 
     reg [7:0] RAM [0:MEM_WIDTH-1];
-    int fd, r;
+    int fd;
     int fd_r_a, fd_r_b, fd_w_a, fd_w_b;
 
     initial begin
         fd = $fopen (BIN_FILE, "r");
+        if (fd == '0) begin
+            $display("[%d] [RAM_mem] ERROR: %s not found.", $time(), BIN_FILE);
+            $finish();
+        end
 
-        r = $fread(RAM, fd);
-        $display("read %d elements", r);
-
+        $fread(RAM, fd);
+        
         if (DEBUG) begin
             fd_r_a = $fopen ({DEBUG_FILE, "_A_reads.txt"}, "w");
             fd_r_b = $fopen ({DEBUG_FILE, "_B_reads.txt"}, "w");
