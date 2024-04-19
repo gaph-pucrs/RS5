@@ -17,7 +17,7 @@
 
 module rtc (
     input  logic        clk,
-    input  logic        reset,
+    input  logic        reset_n,
     input  logic        en_i,
     input  logic [3:0]  addr_i,
     input  logic [7:0]  we_i,
@@ -34,8 +34,8 @@ module rtc (
     assign intr = (memory[7:0] >= memory[15:8]);
     assign mtime_o = memory[7:0];
 
-    always_ff @(posedge clk) begin
-        if (reset == 1'b1) begin
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
             mti_o <= 1'b0;
         end
         else begin
@@ -43,9 +43,9 @@ module rtc (
         end
     end
 
-    always_ff @(posedge clk) begin
+    always_ff @(posedge clk or negedge reset_n) begin
         memory[7:0] <= memory[7:0] + 1'b1;
-        if (reset == 1'b1) begin
+        if (!reset_n) begin
             memory <= '0;
             data_o <= '0;
         end

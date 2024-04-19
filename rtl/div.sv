@@ -4,7 +4,7 @@ module div
     import RS5_pkg::*;
 (
     input   logic        clk,
-    input   logic        reset,
+    input   logic        reset_n,
 
     input   logic [31:0] first_operand_i,
     input   logic [31:0] second_operand_i,
@@ -90,10 +90,10 @@ module div
         end
     end
 
-    always_ff @(posedge clk) begin
+    always_ff @(posedge clk or negedge reset_n) begin
         logic [4:0] i;
 
-        if (reset == 1'b1) begin
+        if (!reset_n) begin
             busy_unsig_div    <= 1'b0;
             valid_unsig_div   <= 1'b0;
             acc_unsig_div     <= '0;
@@ -145,10 +145,10 @@ module div
         end
     end
 
-    always_ff @(posedge clk) begin
+    always_ff @(posedge clk or negedge reset_n) begin
         logic [4:0] i;
 
-        if (reset == 1'b1) begin
+        if (!reset_n) begin
             div_state       <= D_IDLE; 
             busy_sig_div    <= 1'b0;
             valid_sig_div   <= 1'b0;

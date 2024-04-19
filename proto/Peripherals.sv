@@ -6,7 +6,7 @@ module Peripherals
 )
 (
     input  logic            clk,
-    input  logic            reset,
+    input  logic            reset_n,
     
     input  logic            enable_i,
     input  logic [3:0]      write_enable_i,
@@ -77,8 +77,8 @@ module Peripherals
 // BUTTON
 //////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk) begin
-        if (reset) begin
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
             button_irq <= 0;
         end
         else if (button_detected == 1'b1) begin
@@ -139,8 +139,8 @@ module Peripherals
         stall_r <= stall_o;
     end
 
-    always_ff @(posedge clk) begin
-        if(reset)begin
+    always_ff @(posedge clk or negedge reset_n) begin
+        if(!reset_n)begin
             data_o <= '0;
         end
         else begin
@@ -170,8 +170,8 @@ module Peripherals
     // UART RX
     //////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk) begin
-        if (reset) begin
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
             UART_RX_irq <= 0;
         end
         else if (UART_RX_ready == 1'b1) begin
@@ -181,8 +181,8 @@ module Peripherals
             UART_RX_irq <= 0;
         end
     end
-    always_ff @(posedge clk) begin
-        if (reset) begin
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
             UART_RX_data_reg <= '0;
         end 
         else begin
@@ -205,7 +205,7 @@ module Peripherals
 
     FIFO_BUFFER_UART FIFO_BUFFER_UART1 (
         .clk    (clk),                  // input wire clk
-        .srst   (reset),                // input wire srst
+        .srst   (!reset_n),                // input wire srst
         .din    (BUFFER_data),          // input wire [7 : 0] din
         .wr_en  (BUFFER_write),         // input wire wr_en
         .rd_en  (BUFFER_read),          // input wire rd_en

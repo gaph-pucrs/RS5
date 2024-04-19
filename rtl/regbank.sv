@@ -25,7 +25,7 @@ module regbank
     import RS5_pkg::*;
 (
     input   logic         clk, 
-    input   logic         reset,
+    input   logic         reset_n,
 
     input   logic [4:0]   rs1,
     input   logic [4:0]   rs2,
@@ -56,8 +56,8 @@ module regbank
 //////////////////////////////////////////////////////////////////////////////
 
     for (genvar i = 1; i < 32 ; i++) begin : gen_regfile
-        always_ff @(posedge clk) begin
-            if (reset == 1'b1) begin
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n) begin
                 regfile[i] <= '0;
             end
             else if (rd == i && enable == 1'b1) begin

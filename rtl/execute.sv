@@ -34,7 +34,7 @@ module execute
 )
 (
     input   logic               clk,
-    input   logic               reset,
+    input   logic               reset_n,
     input   logic               stall,
 
     /* Bits 14:12 and 6:0 are not used in this module */
@@ -257,7 +257,7 @@ end
     if (RV32 == RV32M || RV32 == RV32ZMMUL) begin : gen_zmmul_on
         mul mul1 (
             .clk                        (clk),
-            .reset                      (reset),
+            .reset_n                    (reset_n),
             .first_operand_i            (first_operand_i),
             .second_operand_i           (second_operand_i),
             .instruction_operation_i    (instruction_operation_i),
@@ -281,7 +281,7 @@ end
     if (RV32 == RV32M) begin : gen_div_on
         div div1 (
             .clk                        (clk),
-            .reset                      (reset),
+            .reset_n                    (reset_n),
             .first_operand_i            (first_operand_i),
             .second_operand_i           (second_operand_i),
             .instruction_operation_i    (instruction_operation_i),
@@ -390,8 +390,8 @@ end
 // TAG control based on signals Jump and Killed
 //////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk) begin
-        if (reset == 1'b1) begin
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
             curr_tag <= 0;
         end
         else if ((jump_o | raise_exception_o | machine_return_o | interrupt_ack_o) == 1'b1) begin
@@ -404,7 +404,7 @@ end
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        if ((reset | killed) == 1'b0) begin
+        if ((!reset_n | killed) == 1'b0) begin
             if (exc_inst_access_fault_i == 1'b1) begin
                 raise_exception_o = 1'b1;
                 machine_return_o  = 1'b0;

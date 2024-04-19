@@ -23,7 +23,7 @@
 
 module fetch  #(parameter start_address = 32'b0)(
     input   logic           clk,
-    input   logic           reset,
+    input   logic           reset_n,
     input   logic           enable,
 
     input   logic           jump_i,
@@ -47,8 +47,8 @@ module fetch  #(parameter start_address = 32'b0)(
 // PC Control
 //////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk) begin
-        if (reset == 1'b1) begin
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
             pc <= start_address;
         end
         else if (machine_return_i == 1'b1) begin                              
@@ -86,8 +86,8 @@ module fetch  #(parameter start_address = 32'b0)(
 // TAG Calculator 
 //////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk) begin
-        if (reset == 1'b1) begin
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
             current_tag <= '0;
             next_tag    <= '0;
         end

@@ -14,7 +14,7 @@ module tb_top
         .USE_ZIHPM(1'b1)
     ) tb (
         .clk_i(clk),
-        .rst_i(rstCPU)
+        .rst_n_i(rstCPU)
     );
 
 ///////////////////////////////////////// Clock generator //////////////////////////////
@@ -27,9 +27,9 @@ module tb_top
 ////////////////////////////////////////////////////// RESET CPU ////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     initial begin
-        rstCPU = 1;                                          // RESET for CPU initialization
+        rstCPU = 0;                                          // RESET for CPU initialization
         
-        #100 rstCPU = 0;                                     // Hold state for 100 ns
+        #100 rstCPU = 1;                                     // Hold state for 100 ns
     end
 
 endmodule

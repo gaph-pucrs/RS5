@@ -27,7 +27,7 @@ module decode
     import RS5_pkg::*;
 (
     input   logic           clk,
-    input   logic           reset,
+    input   logic           reset_n,
     input   logic           enable,
 
     input   logic [31:0]    instruction_i,
@@ -263,8 +263,8 @@ module decode
 // Registe Lock Queue (RLQ)
 //////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk) begin
-        if (reset == 1'b1) begin
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
             locked_register <= '0;
             locked_memory   <= '0;
         end 
@@ -381,8 +381,8 @@ module decode
 // Outputs
 //////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk) begin
-        if (reset == 1'b1) begin
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
             first_operand_o         <= '0;
             second_operand_o        <= '0;
             third_operand_o         <= '0;

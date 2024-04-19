@@ -34,7 +34,7 @@ module CSRBank
 )
 (
     input   logic               clk,
-    input   logic               reset,
+    input   logic               reset_n,
 
     input   logic               read_enable_i,
     input   logic               write_enable_i,
@@ -241,11 +241,11 @@ module CSRBank
 // CSR Writing
 //////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk) begin
+    always_ff @(posedge clk or negedge reset_n) begin
         //////////////////////////////////////////////////////////////////////////////
         // Reset
         //////////////////////////////////////////////////////////////////////////////
-        if (reset == 1'b1) begin
+        if (!reset_n) begin
             mstatus_mie      <= 1'b0;
             mstatus_mprv     <= 1'b0;
             misa             <= MISA_VALUE;
@@ -439,8 +439,8 @@ module CSRBank
 //////////////////////////////////////////////////////////////////////////////
     
     if (XOSVMEnable == 1'b1) begin : gen_xosvm_csr_on
-        always_ff @(posedge clk) begin
-            if (reset == 1'b1) begin
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n) begin
                 mvmctl      <= '0;
                 mvmdo       <= '0;
                 mvmds       <= '0;
@@ -495,8 +495,8 @@ module CSRBank
             MTIE = mie[ 7],
             MSIE = mie[ 3];
 
-    always_ff @(posedge clk) begin
-        if (reset == 1'b1) begin
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
             mip <= '0;
         end
         else begin
@@ -527,8 +527,8 @@ module CSRBank
     if (ZIHPMEnable == 1'b1) begin : gen_zihpm_csr_on
         int fd;
 
-        always_ff @(posedge clk) begin
-            if (reset == 1'b1) begin
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n) begin
                 instructions_killed_counter <= '0;
                 nop_counter                 <= '0;
                 logic_counter               <= '0;

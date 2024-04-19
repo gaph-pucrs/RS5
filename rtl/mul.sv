@@ -9,7 +9,7 @@ module mul
     import RS5_pkg::*;
 (
     input   logic        clk,
-    input   logic        reset,
+    input   logic        reset_n,
 
     input   logic [31:0] first_operand_i,
     input   logic [31:0] second_operand_i,
@@ -51,8 +51,8 @@ module mul
     
     assign mac_result   = $signed({sign_a, op_a}) * $signed({sign_b, op_b}) + $signed(accum);     
 
-    always_ff @(posedge clk) begin
-        if (reset) begin
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
             mac_result_reg <= 0;
         end 
         else begin
@@ -144,8 +144,8 @@ module mul
         endcase
     end
 
-    always_ff@(posedge clk) begin
-        if (reset) begin
+    always_ff@(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
             mul_state <= ALBL;
         end else begin
             mul_state <= next_state;
