@@ -33,6 +33,7 @@ module VectorUnit
 
     logic [VLEN-1:0]        vs1_rd_data, vs2_rd_data, vd_rd_data;
     logic [4:0]             cycle_count;
+    logic reduction_instruction;
 
     logic [$bits(VLEN/8)-1:0] elementsPerRegister;
     logic [$bits(VLEN)-1:0]   vl, vl_next, vl_max;
@@ -40,6 +41,8 @@ module VectorUnit
     logic        vill, vill_next, vma, vma_next, vta, vta_next;
     vew_e        vsew, vsew_next;
     vlmul_e      vlmul, vlmul_next;
+
+    assign reduction_instruction = (vector_operation_i inside {vredsum, vredmaxu, vredmax, vredminu, vredmin, vredand, vredor, vredxor});
 
 //////////////////////////////////////////////////////////////////////////////
 // Decoding
@@ -124,7 +127,7 @@ module VectorUnit
 // FSM
 //////////////////////////////////////////////////////////////////////////////
 
-    assign hold_o = (next_state == V_EXEC);
+    assign hold_o = (next_state == V_EXEC || next_state == V_END);
 
     //logic   widening;
     //vew_e   vsew_effective;
@@ -150,7 +153,10 @@ module VectorUnit
                 if ((vlmul == LMUL_2 && cycle_count < 2) || (vlmul == LMUL_4 && cycle_count < 4) || (vlmul == LMUL_8 && cycle_count < 8))
                     next_state = V_EXEC;
                 else
-                    next_state = V_IDLE;
+                    next_state = V_END;
+
+            V_END:
+                next_state = V_IDLE;
 
             default:
                 next_state = V_IDLE;
@@ -312,7 +318,7 @@ module VectorUnit
 
     // WRITE ENABLE GENERATION
     always_ff @(posedge clk) begin
-        if (instruction_operation_i == VECTOR && next_state == V_EXEC) begin
+        if (instruction_operation_i == VECTOR && state == V_EXEC) begin
             if (vl > 0) begin
                 unique case (vsew)
                     EW8: begin
@@ -361,51 +367,43 @@ module VectorUnit
 // Arithmetic
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [VLEN-1:0] subtraend_neg, subtraend;
-    logic [VLEN-1:0] summand_1, summand_2;
-    logic [8:0]      result_add_bytes [VLENB-1:0];
-    logic            adder_carry [VLENB-1:0];
+    logic [VLEN-1:0] subtraend_neg;
+    logic [VLEN-1:0] subtraend_8b, subtraend_16b, subtraend_32b;
+    logic [VLEN-1:0] summand_1, summand_2_8b, summand_2_16b, summand_2_32b;
+    logic [VLEN-1:0] result_add_8b, result_add_16b, result_add_32b;
     logic [VLEN-1:0] result_add;
 
     assign subtraend_neg = ~second_operand;
 
     always_comb begin
-        unique case (vsew)
-            EW8:
-                for (int i = 0; i < VLENB; i++)
-                    subtraend[(8*(i+1))-1-:8]   = subtraend_neg[(8*(i+1))-1-:8] + 1'b1;
-            EW16:
-                for (int i = 0; i < VLENB/2; i++)
-                    subtraend[(16*(i+1))-1-:16] = subtraend_neg[(16*(i+1))-1-:16] + 1'b1;
-            default:
-                for (int i = 0; i < VLENB/4; i++)
-                    subtraend[(32*(i+1))-1-:32] = subtraend_neg[(32*(i+1))-1-:32] + 1'b1;
-        endcase
+        for (int i = 0; i < VLENB; i++)
+            subtraend_8b[(8*(i+1))-1-:8]    = subtraend_neg[(8*(i+1))-1-:8] + 1'b1;
+        for (int i = 0; i < VLENB/2; i++)
+            subtraend_16b[(16*(i+1))-1-:16] = subtraend_neg[(16*(i+1))-1-:16] + 1'b1;
+        for (int i = 0; i < VLENB/4; i++)
+            subtraend_32b[(32*(i+1))-1-:32] = subtraend_neg[(32*(i+1))-1-:32] + 1'b1;
     end
 
     assign summand_1 = first_operand;
-    assign summand_2 = (vector_operation_i == vsub)  ? subtraend : second_operand;
+    assign summand_2_8b = (vector_operation_i == vsub)  ? subtraend_8b : second_operand;
+    assign summand_2_16b = (vector_operation_i == vsub)  ? subtraend_16b : second_operand;
+    assign summand_2_32b = (vector_operation_i == vsub)  ? subtraend_32b : second_operand;
 
     always_comb begin
-        for (int i = 0; i < VLENB; i++) begin
-            unique case (vsew)
-                EW8:     adder_carry[i] = 1'b0;
-                EW16:    adder_carry[i] = (i%2 == 0) ? 1'b0 : result_add_bytes[i-1][8];
-                default: adder_carry[i] = (i%4 == 0) ? 1'b0 : result_add_bytes[i-1][8];
-            endcase
-        end
+        for (int i = 0; i < VLENB; i++)
+            result_add_8b[(8*(i+1))-1-:8]    = summand_1[(8*(i+1))-1-:8] + summand_2_8b[(8*(i+1))-1-:8];
+        for (int i = 0; i < VLENB/2; i++)
+            result_add_16b[(16*(i+1))-1-:16] = summand_1[(16*(i+1))-1-:16] + summand_2_16b[(16*(i+1))-1-:16];
+        for (int i = 0; i < VLENB/4; i++)
+            result_add_32b[(32*(i+1))-1-:32] = summand_1[(32*(i+1))-1-:32] + summand_2_32b[(32*(i+1))-1-:32];
     end
 
     always_comb begin
-        for (int i = 0; i < VLENB; i++) begin
-            result_add_bytes[i] = {1'b0, summand_1[(8*(i+1))-1-:8]} + {1'b0, summand_2[(8*(i+1))-1-:8]} + adder_carry[i];
-        end
-    end
-
-    always_comb begin
-        for (int i = 0; i < VLENB; i++) begin
-            result_add[(8*(i+1))-1-:8] = result_add_bytes[i][7:0];
-        end
+        unique case (vsew)
+            EW8:    result_add = result_add_8b;
+            EW16:   result_add = result_add_16b;
+            default:result_add = result_add_32b;
+        endcase
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -564,22 +562,27 @@ module VectorUnit
 // Result Demux
 //////////////////////////////////////////////////////////////////////////////
 
-    always_comb begin
-        unique case(vector_operation_i)
-            vand:       result = result_and;
-            vor:        result = result_or;
-            vxor:       result = result_xor;
-            vadd, 
-            //vrsub,
-            vsub:       result = result_add;
-            vsll:       result = result_sll;
-            vsrl:       result = result_srl;
-            vsra:       result = result_sra;
-            vmin:       result = result_min;
-            vminu:      result = result_minu;
-            vmax:       result = result_max;
-            vmaxu:      result = result_maxu;
-            default:    result = '0;
-        endcase
+    always @(posedge clk ) begin
+        if (reset == 1'b1) begin
+            result <= '0;
+        end        
+        else begin
+            unique case(vector_operation_i)
+                vand:       result <= result_and;
+                vor:        result <= result_or;
+                vxor:       result <= result_xor;
+                vadd, 
+                //vrsub,
+                vsub:       result <= result_add;
+                vsll:       result <= result_sll;
+                vsrl:       result <= result_srl;
+                vsra:       result <= result_sra;
+                vmin:       result <= result_min;
+                vminu:      result <= result_minu;
+                vmax:       result <= result_max;
+                vmaxu:      result <= result_maxu;
+                default:    result <= '0;
+            endcase
+        end
     end
 endmodule

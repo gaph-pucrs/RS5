@@ -111,3 +111,179 @@
         endcase
          
     end
+
+
+
+
+
+
+
+
+
+
+
+
+
+//////////////////////////////////////////////////////////////////////////////
+// Logical
+//////////////////////////////////////////////////////////////////////////////
+    // TODO: ADAPT for 128
+    logic [VLEN-1:0] op1_logical, op2_logical, op3_logical;
+    logic [VLEN-1:0] result_and, result_or, result_xor;
+    logic [3:0] sub_cycle_count;
+
+    always @(posedge clk ) begin
+        result_r <= result;
+    end
+
+    logic [VLEN-1:0]        second_operand_scalar;
+
+    always_comb begin
+        unique case (vsew)
+            EW8:        second_operand_scalar = {'0, second_operand[7:0]};
+            EW16:       second_operand_scalar = {'0, second_operand[15:0]};
+            default:    second_operand_scalar = {'0, second_operand[31:0]};
+        endcase
+    end
+
+    always_comb begin
+        if (!reduction_instruction) begin
+            op1_logical = first_operand;
+            op2_logical = second_operand;
+            op3_logical = (vector_operation_i == vand) ? '1 : '0;
+        end
+        else begin
+            if (sub_cycle_count == 0) begin // 32 x 32 x 32
+                op1_logical = first_operand[31:0];
+                op2_logical = first_operand[63:32];
+                op3_logical = {'1, second_operand_scalar};
+            end
+            else if (sub_cycle_count == 1) begin // 16 x 16
+                op1_logical = result_r[15:0];
+                op2_logical = result_r[31:0];
+                op3_logical = (vector_operation_i == vand) ? '1 : '0;
+            end
+            else begin  // 8 x 8
+                op1_logical = result_r[7:0];
+                op2_logical = result_r[15:0];
+                op3_logical = (vector_operation_i == vand) ? '1 : '0;
+            end
+        end
+    end
+
+    always_comb begin
+        result_and = op1_logical & op2_logical & op3_logical;
+        result_or  = op1_logical | op2_logical | op3_logical;
+        result_xor = op1_logical ^ op2_logical ^ op3_logical;
+    end
+
+
+
+
+
+
+
+
+
+
+
+
+
+    logic [31:0]        second_operand_scalar;
+    logic [3:0] sub_cycle_count;
+
+    always_ff @(posedge clk) begin
+        if (reset == 1'b1)
+            sub_cycle_count <= 0;
+        else if (next_state == V_EXEC)
+            sub_cycle_count <= sub_cycle_count + 1;
+    end
+
+    always_comb begin
+        unique case (vsew)
+            EW8:        second_operand_scalar = {'0, second_operand[7:0]};
+            EW16:       second_operand_scalar = {'0, second_operand[15:0]};
+            default:    second_operand_scalar = second_operand[31:0];
+        endcase
+    end
+/*
+    always_comb begin
+        if (!reduction_instruction) begin
+            result_and = first_operand & second_operand;
+            result_or  = first_operand | second_operand;
+            result_xor = first_operand ^ second_operand;
+        end
+        else begin
+            if (sub_cycle_count == 0) begin // 32 x 32 x 32
+                result_and = first_operand[31:0] & first_operand[63:32] & second_operand_scalar;
+                result_or  = first_operand[31:0] | first_operand[63:32] | second_operand_scalar;
+                result_xor = first_operand[31:0] ^ first_operand[63:32] ^ second_operand_scalar;
+            end
+            else if (sub_cycle_count == 1) begin // 16 x 16
+                result_and = result[15:0] & result[31:16];
+                result_or  = result[15:0] | result[31:16];
+                result_xor = result[15:0] ^ result[31:16];
+            end
+            else begin  // 8 x 8
+                result_and = result[7:0] & result[15:8];
+                result_or  = result[7:0] | result[15:8];
+                result_xor = result[7:0] ^ result[15:8];
+            end
+        end
+    end
+*/
+
+    logic [VLEN-1:0] result_and, result_or, result_xor;
+    logic [VLEN-1:0] result_and_64, result_or_64, result_xor_64;
+    logic [31:0] result_and_32, result_or_32, result_xor_32;
+    logic [15:0] result_and_16, result_or_16, result_xor_16;
+    logic [7:0]  result_and_8, result_or_8, result_xor_8;
+
+    always_comb begin
+        result_and_64 = first_operand & second_operand;
+        result_or_64  = first_operand | second_operand;
+        result_xor_64 = first_operand ^ second_operand;
+    end
+
+    always @(posedge clk ) begin
+        if (sub_cycle_count == 0) begin // 32 x 32 x 32
+            result_and_32 = first_operand[31:0] & first_operand[63:32] & second_operand_scalar;
+            result_or_32  = first_operand[31:0] | first_operand[63:32] | second_operand_scalar;
+            result_xor_32 = first_operand[31:0] ^ first_operand[63:32] ^ second_operand_scalar;
+        end
+        else if (sub_cycle_count == 1) begin // 16 x 16
+            result_and_16 = result_and_32[15:0] & result_and_32[31:16];
+            result_or_16  = result_or_32 [15:0] | result_or_32 [31:16];
+            result_xor_16 = result_xor_32[15:0] ^ result_xor_32[31:16];
+        end
+        else begin  // 8 x 8
+            result_and_8 = result_and_16[7:0] &  result_and_16[15:8];
+            result_or_8  = result_or_16 [7:0] |  result_or_16 [15:8];
+            result_xor_8 = result_xor_16[7:0] ^  result_xor_16[15:8];
+        end
+    end
+
+    always_comb begin
+        if (!reduction_instruction) begin
+            result_and = result_and_64;   
+            result_or  = result_or_64;   
+            result_xor = result_xor_64;   
+        end
+        else begin
+            if (vsew == EW8) begin
+                result_and = {'0, result_and_8};   
+                result_or  = {'0, result_or_8};   
+                result_xor = {'0, result_xor_8};  
+            end
+            else if (vsew == EW16) begin
+                result_and = {'0, result_and_16};   
+                result_or  = {'0, result_or_16};   
+                result_xor = {'0, result_xor_16};  
+            end
+            else begin
+                result_and = {'0, result_and_32};   
+                result_or  = {'0, result_or_32};   
+                result_xor = {'0, result_xor_32};  
+            end
+        end
+    end
