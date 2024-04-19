@@ -1,13 +1,11 @@
-module VectorUnit 
+module vectorUnit 
     import RS5_pkg::*;
 #(
-    parameter environment_e Environment = ASIC,
-    parameter rv32_e        RV32        = RV32I,
     parameter int           VLEN        = 64
 )
 (
     input   logic           clk,
-    input   logic           reset,
+    input   logic           reset_n,
 
     input   logic [31:0]    instruction_i,
     input   iType_e         instruction_operation_i,
@@ -132,8 +130,8 @@ module VectorUnit
     //logic   widening;
     //vew_e   vsew_effective;
 
-    always_ff @(posedge clk) begin
-        if (reset == 1'b1) begin
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
             state <= V_IDLE;
         end
         else begin
@@ -177,8 +175,8 @@ module VectorUnit
         end
     end
 */
-    always_ff @(posedge clk) begin
-        if (reset == 1'b1)
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
             cycle_count <= 0;
         else if (next_state == V_IDLE)
             cycle_count <= 0;
@@ -234,8 +232,8 @@ module VectorUnit
         end
     end
 
-    always_ff @(posedge clk) begin
-        if (reset == 1'b1) begin
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
             vill  <= 1'b0;
             vma   <= 1'b0; 
             vta   <= 1'b0; 
@@ -302,8 +300,8 @@ module VectorUnit
     assign vd_rd_data  = vregs[vd_addr];
 
     // REGISTER WRITE
-    always_ff @(posedge clk) begin
-        if (reset == 1'b1)
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
             vregs <= '{32{'0}};
         else begin
             // Don't write to v0 (reserved for vector mask)
@@ -562,8 +560,8 @@ module VectorUnit
 // Result Demux
 //////////////////////////////////////////////////////////////////////////////
 
-    always @(posedge clk ) begin
-        if (reset == 1'b1) begin
+    always @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
             result <= '0;
         end        
         else begin
