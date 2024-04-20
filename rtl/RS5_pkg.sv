@@ -109,6 +109,10 @@ package RS5_pkg;
         M_IDLE, M_CALC
     } mult_states_e;
 
+    typedef enum logic [1:0]{
+        ALBL, ALBH, AHBL, AHBH
+    } mul_fsm;
+
     typedef enum logic [1:0] {
         D_IDLE, D_INIT, D_CALC, D_SIGN
     } div_states_e;

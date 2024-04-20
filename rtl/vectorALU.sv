@@ -241,27 +241,88 @@ module vectorALU
     end
 
 //////////////////////////////////////////////////////////////////////////////
+// Multiplication_common
+//////////////////////////////////////////////////////////////////////////////
+
+    logic [1:0]  signed_mode;
+    logic        signed_mult;
+
+    always_comb begin
+        unique case (vector_operation_i)
+            vmulh:    signed_mode = 2'b11;
+            vmulhsu:  signed_mode = 2'b01;
+            default:  signed_mode = 2'b00;
+        endcase
+    end
+
+    assign signed_mult  = (signed_mode != 2'b00);
+
+//////////////////////////////////////////////////////////////////////////////
+// Multiplication 8 bits
+//////////////////////////////////////////////////////////////////////////////
+
+    logic [16:0]      accum_8b    [VLENB-1:0];
+    logic [16:0]      mult_op_a_8b[VLENB-1:0];
+    logic [16:0]      mult_op_b_8b[VLENB-1:0];
+    logic [VLENB-1:0] sign_a_8b;
+    logic [VLENB-1:0] sign_b_8b;
+    logic [16:0]      mac_result_8b[VLENB-1:0];
+    logic [VLEN-1:0]  result_mult;
+
+    always_comb begin
+        for (int i = 0; i < VLENB; i++) begin
+            sign_a_8b[i] = (first_operand [(8*(i+1))-1] & signed_mode[0]);
+            sign_b_8b[i] = (second_operand[(8*(i+1))-1] & signed_mode[1]);
+        end
+    end
+
+    always_comb begin
+        for (int i = 0; i < VLENB; i++) begin
+            accum_8b[i]     = '0;
+            mult_op_a_8b[i] = {{9{sign_a_8b[i]}}, first_operand[(8*(i+1))-1-:8]};
+            mult_op_b_8b[i] = {{9{sign_b_8b[i]}}, second_operand[(8*(i+1))-1-:8]};
+        end
+    end
+
+    always_comb begin
+        for (int i = 0; i < VLENB; i++) begin
+            mac_result_8b[i] = $signed(mult_op_a_8b[i]) * $signed(mult_op_b_8b[i]) + $signed(accum_8b[i]);
+        end
+    end
+
+    always_comb begin
+        for (int i = 0; i < VLENB; i++) begin
+            if (vector_operation_i == vmul)
+                result_mult[(8*(i+1))-1-:8] = mac_result_8b[i][7:0];
+            else
+                result_mult[(8*(i+1))-1-:8] = mac_result_8b[i][15:8];
+        end
+    end
+
+//////////////////////////////////////////////////////////////////////////////
 // Result Demux
 //////////////////////////////////////////////////////////////////////////////
 
     always @(posedge clk) begin
         unique case(vector_operation_i)
-            vand:           result_o <= result_and;
-            vor:            result_o <= result_or;
-            vxor:           result_o <= result_xor;
-            vsll:           result_o <= result_sll;
-            vsrl:           result_o <= result_srl;
-            vsra:           result_o <= result_sra;
+            vand:            result_o <= result_and;
+            vor:             result_o <= result_or;
+            vxor:            result_o <= result_xor;
+            vsll:            result_o <= result_sll;
+            vsrl:            result_o <= result_srl;
+            vsra:            result_o <= result_sra;
             /*
             vmseq,  vmsne,
             vmsltu, vmslt,
             vmsleu, vmsle,
-            vmsgtu, vmsgt:  result_o <= result_comparison;*/
-            vmin:           result_o <= result_min;
-            vminu:          result_o <= result_minu;
-            vmax:           result_o <= result_max;
-            vmaxu:          result_o <= result_maxu;
-            default:        result_o <= result_add;
+            vmsgtu, vmsgt:   result_o <= result_comparison;*/
+            vmin:            result_o <= result_min;
+            vminu:           result_o <= result_minu;
+            vmax:            result_o <= result_max;
+            vmaxu:           result_o <= result_maxu;
+            vmul, vmulh,
+            vmulhu, vmulhsu: result_o <= result_mult;
+            default:         result_o <= result_add;
         endcase
     end
 
