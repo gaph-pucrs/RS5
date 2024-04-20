@@ -175,7 +175,7 @@ package RS5_pkg;
         vnop,
         vadd,
         vsub,
-        //vrsub,
+        vrsub,
         vand,
         vor,
         vxor,

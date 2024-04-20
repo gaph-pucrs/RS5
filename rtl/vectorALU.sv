@@ -39,13 +39,14 @@ module vectorALU
 // Adder
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [VLEN-1:0] subtraend_neg;
+    logic [VLEN-1:0] subtraend_int, subtraend_neg;
     logic [VLEN-1:0] subtraend_8b, subtraend_16b, subtraend_32b;
     logic [VLEN-1:0] summand_1, summand_2_8b, summand_2_16b, summand_2_32b;
     logic [VLEN-1:0] result_add_8b, result_add_16b, result_add_32b;
     logic [VLEN-1:0] result_add;
 
-    assign subtraend_neg = ~second_operand;
+    assign subtraend_int = (vector_operation_i == vrsub) ? first_operand : second_operand;
+    assign subtraend_neg = ~subtraend_int;
 
     always_comb begin
         for (int i = 0; i < VLENB; i++)
@@ -56,14 +57,14 @@ module vectorALU
             subtraend_32b[(32*(i+1))-1-:32] = subtraend_neg[(32*(i+1))-1-:32] + 1'b1;
     end
 
-    assign summand_1 = first_operand;
-    assign summand_2_8b = (vector_operation_i == vsub)  ? subtraend_8b : second_operand;
-    assign summand_2_16b = (vector_operation_i == vsub)  ? subtraend_16b : second_operand;
-    assign summand_2_32b = (vector_operation_i == vsub)  ? subtraend_32b : second_operand;
+    assign summand_1     = (vector_operation_i inside {vrsub})        ? second_operand : first_operand;
+    assign summand_2_8b  = (vector_operation_i inside {vsub, vrsub})  ? subtraend_8b   : second_operand;
+    assign summand_2_16b = (vector_operation_i inside {vsub, vrsub})  ? subtraend_16b  : second_operand;
+    assign summand_2_32b = (vector_operation_i inside {vsub, vrsub})  ? subtraend_32b  : second_operand;
 
     always_comb begin
         for (int i = 0; i < VLENB; i++)
-            result_add_8b[(8*(i+1))-1-:8]    = summand_1[(8*(i+1))-1-:8] + summand_2_8b[(8*(i+1))-1-:8];
+            result_add_8b[(8*(i+1))-1-:8]    = summand_1[(8*(i+1))-1-:8]   + summand_2_8b[(8*(i+1))-1-:8];
         for (int i = 0; i < VLENB/2; i++)
             result_add_16b[(16*(i+1))-1-:16] = summand_1[(16*(i+1))-1-:16] + summand_2_16b[(16*(i+1))-1-:16];
         for (int i = 0; i < VLENB/4; i++)
@@ -123,21 +124,22 @@ module vectorALU
 // Compare
 //////////////////////////////////////////////////////////////////////////////
 
+    logic [VLENB-1:0]     result_comparison;
     logic [VLENB-1:0]     equal_8b,  greater_than_8b,  greater_than_signed_8b,  result_comparison_8b;
     logic [(VLENB/2)-1:0] equal_16b, greater_than_16b, greater_than_signed_16b, result_comparison_16b;
     logic [(VLENB/4)-1:0] equal_32b, greater_than_32b, greater_than_signed_32b, result_comparison_32b;
 
     always_comb begin
         for (int i = 0; i < VLENB; i++) begin
-            equal_8b[i]                 = first_operand[(8*(i+1))-1-:8] == second_operand[(8*(i+1))-1-:8];
-            greater_than_8b[i]          = first_operand[(8*(i+1))-1-:8] >  second_operand[(8*(i+1))-1-:8];
-            greater_than_signed_8b[i]   = first_operand_signed[(8*(i+1))-1-:8] > second_operand_signed[(8*(i+1))-1-:8];
+            equal_8b[i]                = first_operand[(8*(i+1))-1-:8] == second_operand[(8*(i+1))-1-:8];
+            greater_than_8b[i]         = first_operand[(8*(i+1))-1-:8] >  second_operand[(8*(i+1))-1-:8];
+            greater_than_signed_8b[i]  = first_operand_signed[(8*(i+1))-1-:8] > second_operand_signed[(8*(i+1))-1-:8];
         end
 
         for (int i = 0; i < VLENB/2; i++) begin
-            equal_16b[i]                 = first_operand[(16*(i+1))-1-:16] == second_operand[(16*(i+1))-1-:16];
-            greater_than_16b[i]          = first_operand[(16*(i+1))-1-:16] >  second_operand[(16*(i+1))-1-:16];
-            greater_than_signed_16b[i]   = first_operand_signed[(16*(i+1))-1-:16] > second_operand_signed[(16*(i+1))-1-:16];
+            equal_16b[i]               = first_operand[(16*(i+1))-1-:16] == second_operand[(16*(i+1))-1-:16];
+            greater_than_16b[i]        = first_operand[(16*(i+1))-1-:16] >  second_operand[(16*(i+1))-1-:16];
+            greater_than_signed_16b[i] = first_operand_signed[(16*(i+1))-1-:16] > second_operand_signed[(16*(i+1))-1-:16];
         end
 
         for (int i = 0; i < VLENB/4; i++) begin
@@ -192,6 +194,14 @@ module vectorALU
         endcase
     end
 
+    always_comb begin
+        unique case (vsew)
+            EW8:    result_comparison = {'0, result_comparison_8b};
+            EW16:   result_comparison = {'0, result_comparison_16b};
+            default:result_comparison = {'0, result_comparison_32b};
+        endcase
+    end
+
 //////////////////////////////////////////////////////////////////////////////
 // Min/Max
 //////////////////////////////////////////////////////////////////////////////
@@ -236,20 +246,22 @@ module vectorALU
 
     always @(posedge clk) begin
         unique case(vector_operation_i)
-            vand:       result_o <= result_and;
-            vor:        result_o <= result_or;
-            vxor:       result_o <= result_xor;
-            vadd, 
-            //vrsub,
-            vsub:       result_o <= result_add;
-            vsll:       result_o <= result_sll;
-            vsrl:       result_o <= result_srl;
-            vsra:       result_o <= result_sra;
-            vmin:       result_o <= result_min;
-            vminu:      result_o <= result_minu;
-            vmax:       result_o <= result_max;
-            vmaxu:      result_o <= result_maxu;
-            default:    result_o <= '0;
+            vand:           result_o <= result_and;
+            vor:            result_o <= result_or;
+            vxor:           result_o <= result_xor;
+            vsll:           result_o <= result_sll;
+            vsrl:           result_o <= result_srl;
+            vsra:           result_o <= result_sra;
+            /*
+            vmseq,  vmsne,
+            vmsltu, vmslt,
+            vmsleu, vmsle,
+            vmsgtu, vmsgt:  result_o <= result_comparison;*/
+            vmin:           result_o <= result_min;
+            vminu:          result_o <= result_minu;
+            vmax:           result_o <= result_max;
+            vmaxu:          result_o <= result_maxu;
+            default:        result_o <= result_add;
         endcase
     end
 

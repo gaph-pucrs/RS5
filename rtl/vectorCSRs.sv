@@ -86,7 +86,7 @@ module vectorCSRs
             vta   <= vta_next; 
             vsew  <= vsew_next; 
             vlmul <= vlmul_next;
-            vl <= vl_next;
+            vl    <= vl_next;
 
             $display("[%0t] Set VSEW = %s, VLMUL = %s, VL = %d\n", $time/1000, vsew_next, vlmul_next, vl_next);
         end
