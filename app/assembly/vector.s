@@ -9,13 +9,13 @@
     li a0, 8
     vsetvli t0, a0, e8, m1, ta, ma          # SEW= 8, LMUL=1
     nop
-    vor.vi v1, v1, 15
+    vor.vi v1, v1, 15   // 0x0F
     nop
-    addi a7, a7, -9
+    addi a7, a7, -9     // 0xF7
     nop
     vor.vx v2, v2, a7
     nop
-    vand.vv v1, v1, v2
+    vand.vv v1, v1, v2  // 0x07
 
     nop
     nop
@@ -24,13 +24,13 @@
     li a0, 16
     vsetvli t0, a0, e8, m2, ta, ma          # SEW= 8, LMUL=2
     nop
-    vor.vi v4, v4, 15
+    vor.vi v4, v4, 15     // 0x0F
     nop
-    addi a7, a7, -9
+    addi a7, a7, -9       // 0xEE
     nop
     vor.vx v6, v6, a7
     nop
-    vand.vv v1, v4, v6
+    vand.vv v1, v4, v6    // 0x0E
 
     nop
     nop
@@ -38,13 +38,13 @@
 
     vsetvli t0, x0, e8, m4, ta, ma          # SEW= 8, LMUL=4, VL=32
     nop
-    vor.vi v8, v8, 15
+    vor.vi v8, v8, 15       # 0x0F
     nop
-    addi a7, a7, -9
+    addi a7, a7, -9         # 0xE5
     nop
     vor.vx v12, v12, a7
     nop
-    vand.vv v1, v8, v12
+    vand.vv v1, v8, v12     # 0x05
 
     nop
     nop
@@ -52,13 +52,13 @@
 
     vsetvli t0, x0, e8, m8, ta, ma          # SEW= 8, LMUL=8, VL=64
     nop
-    vor.vi v16, v16, 15
+    vor.vi v16, v16, 15     # 0x0F
     nop
-    addi a7, a7, -9
+    addi a7, a7, -9         # 0xDC
     nop
     vor.vx v24, v24, a7
     nop
-    vand.vv v1, v16, v24
+    vand.vv v1, v16, v24    # 0x0C
 
     nop
     nop
@@ -74,19 +74,19 @@
     # Test 8 Bits Adds
     vsetvli t0, x0, e8, m1, ta, ma          # SEW= 8, LMUL=1, VL=VLMAX
     li a0, 255                              # Loads 0xFF to a0
-    vor.vx  v1, v1, a0
-    vor.vx  v2, v2, a0
-    vadd.vv v3, v1, v2
+    vor.vx  v1, v1, a0                      # 0xFF
+    vor.vx  v2, v2, a0                      # 0xFF
+    vadd.vv v3, v1, v2                      # 0xFE
 
     nop
     li a0, 154                              # Loads 0x9A to a0
     vadd.vx v4, v4, a0
     li a0, 91                               # Loads 0x5B to a0
-    vadd.vx v5, v4, a0
+    vadd.vx v5, v4, a0                      # Results in 0xF5
 
     nop
-    vadd.vi v6, v6, 15
-    vadd.vi v7, v6, 12
+    vadd.vi v6, v6, 15                      # Results in 0x0F (0x00 + 0x0F)
+    vadd.vi v7, v6, 12                      # Results in 0x1B (0x0F + 0x0C)
 
     # Test VADD For LMUL > 1
     nop

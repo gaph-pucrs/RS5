@@ -294,13 +294,11 @@ end
     logic        vector_wr_en;
     logic        hold_vector;
 
-    VectorUnit #(
-        .Environment(Environment),
-        .RV32       (RV32       ), 
+    vectorUnit #(
         .VLEN       (64         )
     ) vector (
         .clk                    (clk),
-        .reset                  (reset),
+        .reset_n                (!reset),
         .instruction_i          (instruction_i),
         .instruction_operation_i(instruction_operation_i),
         .vector_operation_i     (vector_operation_i),
