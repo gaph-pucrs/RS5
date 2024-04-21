@@ -261,12 +261,12 @@ module vectorALU
 // Multiplication 8 bits
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [16:0]      accum_8b    [VLENB-1:0];
-    logic [16:0]      mult_op_a_8b[VLENB-1:0];
-    logic [16:0]      mult_op_b_8b[VLENB-1:0];
+    logic [7:0]       accum_8b    [VLENB-1:0];
+    logic [8:0]       mult_op_a_8b[VLENB-1:0];
+    logic [8:0]       mult_op_b_8b[VLENB-1:0];
     logic [VLENB-1:0] sign_a_8b;
     logic [VLENB-1:0] sign_b_8b;
-    logic [16:0]      mac_result_8b[VLENB-1:0];
+    logic [17:0]      mac_result_8b[VLENB-1:0];
     logic [VLEN-1:0]  result_mult;
 
     always_comb begin
@@ -279,8 +279,8 @@ module vectorALU
     always_comb begin
         for (int i = 0; i < VLENB; i++) begin
             accum_8b[i]     = '0;
-            mult_op_a_8b[i] = {{9{sign_a_8b[i]}}, first_operand[(8*(i+1))-1-:8]};
-            mult_op_b_8b[i] = {{9{sign_b_8b[i]}}, second_operand[(8*(i+1))-1-:8]};
+            mult_op_a_8b[i] = {sign_a_8b[i], first_operand[(8*(i+1))-1-:8]};
+            mult_op_b_8b[i] = {sign_b_8b[i], second_operand[(8*(i+1))-1-:8]};
         end
     end
 

@@ -9,13 +9,66 @@
     li a0, 8
     vsetvli t0, a0, e8, m1, ta, ma          # SEW= 8, LMUL=1
     nop
-    vor.vi v1, v1, 15   // 0x0F
+    vor.vi v1, v1, 5    # 0x05
     nop
-    addi a7, a7, -9     // 0xF7
+    vor.vi v2, v2, 2    # 0x02
+    nop
+    vmul.vv v3, v1, v2  # 0x0A
+
+    nop
+    vor.vi v4, v4, 5    # 0x05
+    nop
+    addi a2, a2, 4      # 0x04
+    nop
+    vmul.vx v5, v4, a2  # 0x14
+
+    nop
+    li a1, 100
+    vor.vx v6, v6, a1     # 0x64
+    nop
+    li a2, 11             # 0x0B
+    nop
+    vmul.vx v7, v6, a2    # 0x044C (4C)
+    nop
+    vmulhu.vx v8, v6, a2  # 0x044C (04)
+
+    #signed-unsigned
+    nop
+    li a1, -9
+    vor.vx v9, v9, a1      # 0xF7
+    nop
+    li a2, 33              # 0x21
+    nop
+    vmul.vx v10, v9, a2    # 0xFED7 (D7)
+    nop
+    vmulhsu.vx v11, v9, a2 # 0xFED7 (FE)
+
+    #signed
+    nop
+    li a1, -9
+    vor.vx v12, v12, a1    # 0xF7
+    nop
+    li a2, -33             # 0xDF
+    nop
+    vmul.vx v13, v12, a2   # 0x0129 (29)
+    nop
+    vmulh.vx v14, v12, a2  # 0x0129 (01)
+
+    #######################################
+    # Logicals
+    #######################################
+    jal ra, clear_vreg_bank
+
+    li a0, 8
+    vsetvli t0, a0, e8, m1, ta, ma          # SEW= 8, LMUL=1
+    nop
+    vor.vi v1, v1, 15   # 0x0F
+    nop
+    addi a7, a7, -9     # 0xF7
     nop
     vor.vx v2, v2, a7
     nop
-    vand.vv v1, v1, v2  // 0x07
+    vand.vv v1, v1, v2  # 0x07
 
     nop
     nop
@@ -24,13 +77,13 @@
     li a0, 16
     vsetvli t0, a0, e8, m2, ta, ma          # SEW= 8, LMUL=2
     nop
-    vor.vi v4, v4, 15     // 0x0F
+    vor.vi v4, v4, 15     # 0x0F
     nop
-    addi a7, a7, -9       // 0xEE
+    addi a7, a7, -9       # 0xEE
     nop
     vor.vx v6, v6, a7
     nop
-    vand.vv v1, v4, v6    // 0x0E
+    vand.vv v1, v4, v6    # 0x0E
 
     nop
     nop
