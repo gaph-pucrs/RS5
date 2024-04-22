@@ -30,7 +30,7 @@ module testbench
 )
 (
     input logic clk_i,
-    input logic rst_n_i
+    input logic reset_n
 );
 
 //////////////////////////////////////////////////////////////////////////////
@@ -142,7 +142,7 @@ module testbench
         .ZIHPMEnable(USE_ZIHPM)
     ) dut (
         .clk                    (clk_i), 
-        .reset_n                (rst_n_i), 
+        .reset_n                (reset_n), 
         .stall                  (1'b0),
         .instruction_i          (instruction), 
         .mem_data_i             (mem_data_read), 
@@ -192,7 +192,7 @@ module testbench
         .i_cnt(i_cnt)
     ) plic1 (
         .clk     (clk_i),
-        .reset_n (rst_n_i),
+        .reset_n (reset_n),
         .en_i    (enable_plic),
         .we_i    (mem_write_enable),
         .addr_i  (mem_address[23:0]),
@@ -210,7 +210,7 @@ module testbench
 
     rtc rtc(
         .clk        (clk_i),
-        .reset_n    (rst_n_i), 
+        .reset_n    (reset_n), 
         .en_i       (enable_rtc),
         .addr_i     (mem_address[3:0]),
         .we_i       ({4'h0, mem_write_enable}),

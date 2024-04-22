@@ -6,7 +6,7 @@ module tb_top
     import RS5_pkg::*;
 ;
 
-    logic        clk=1, rstCPU;
+    logic        clk=1, reset_n;
     
     testbench #(
         .INSTRUCTION_SET(RV32M),
@@ -14,7 +14,7 @@ module tb_top
         .USE_ZIHPM(1'b1)
     ) tb (
         .clk_i(clk),
-        .rst_n_i(rstCPU)
+        .reset_n(reset_n)
     );
 
 ///////////////////////////////////////// Clock generator //////////////////////////////
@@ -27,9 +27,9 @@ module tb_top
 ////////////////////////////////////////////////////// RESET CPU ////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     initial begin
-        rstCPU = 0;                                          // RESET for CPU initialization
+        reset_n = 0;                                          // RESET for CPU initialization
         
-        #100 rstCPU = 1;                                     // Hold state for 100 ns
+        #100 reset_n = 1;                                     // Hold state for 100 ns
     end
 
 endmodule
