@@ -244,61 +244,133 @@ module vectorALU
 // Multiplication_common
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [1:0]  signed_mode;
-    logic        signed_mult;
+    logic [VLEN-1:0] result_mult;
+    logic [1:0]      mult_signed_mode;
 
     always_comb begin
         unique case (vector_operation_i)
-            vmulh:    signed_mode = 2'b11;
-            vmulhsu:  signed_mode = 2'b01;
-            default:  signed_mode = 2'b00;
+            vmulh:    mult_signed_mode = 2'b11;
+            vmulhsu:  mult_signed_mode = 2'b01;
+            default:  mult_signed_mode = 2'b00;
         endcase
     end
-
-    assign signed_mult  = (signed_mode != 2'b00);
 
 //////////////////////////////////////////////////////////////////////////////
 // Multiplication 8 bits
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [7:0]       accum_8b    [VLENB-1:0];
-    logic [8:0]       mult_op_a_8b[VLENB-1:0];
-    logic [8:0]       mult_op_b_8b[VLENB-1:0];
-    logic [VLENB-1:0] sign_a_8b;
-    logic [VLENB-1:0] sign_b_8b;
-    logic [17:0]      mac_result_8b[VLENB-1:0];
-    logic [VLEN-1:0]  result_mult;
+    logic [ 7:0] mult_op_a_8b  [VLENB-1:0];
+    logic [ 7:0] mult_op_b_8b  [VLENB-1:0];
+    logic [15:0] mac_result_8b [VLENB-1:0];
 
     always_comb begin
         for (int i = 0; i < VLENB; i++) begin
-            sign_a_8b[i] = (first_operand [(8*(i+1))-1] & signed_mode[0]);
-            sign_b_8b[i] = (second_operand[(8*(i+1))-1] & signed_mode[1]);
+            mult_op_a_8b[i] = {first_operand [(8*(i+1))-1-:8]};
+            mult_op_b_8b[i] = {second_operand[(8*(i+1))-1-:8]};
         end
     end
+
+    genvar i_mul8b;
+    generate
+        for (i_mul8b = 0; i_mul8b < VLENB; i_mul8b++) begin : MUL8B_LOOP
+            mulNbits #(
+                .N(8)
+            ) mul8b (
+                .first_operand_i (mult_op_a_8b[i_mul8b]),
+                .second_operand_i(mult_op_b_8b[i_mul8b]),
+                .signed_mode_i   (mult_signed_mode),
+                .result_o        (mac_result_8b[i_mul8b])
+            );
+        end
+    endgenerate
+
+//////////////////////////////////////////////////////////////////////////////
+// Multiplication 16 bits
+//////////////////////////////////////////////////////////////////////////////
+
+    logic [15:0] mult_op_a_16b [(VLENB/2)-1:0];
+    logic [15:0] mult_op_b_16b [(VLENB/2)-1:0];
+    logic [31:0] mac_result_16b[(VLENB/2)-1:0];
 
     always_comb begin
-        for (int i = 0; i < VLENB; i++) begin
-            accum_8b[i]     = '0;
-            mult_op_a_8b[i] = {sign_a_8b[i], first_operand[(8*(i+1))-1-:8]};
-            mult_op_b_8b[i] = {sign_b_8b[i], second_operand[(8*(i+1))-1-:8]};
+        for (int i = 0; i < VLENB/2; i++) begin
+            mult_op_a_16b[i] = {first_operand [(16*(i+1))-1-:16]};
+            mult_op_b_16b[i] = {second_operand[(16*(i+1))-1-:16]};
         end
     end
+
+    genvar i_mul16b;
+    generate
+        for (i_mul16b = 0; i_mul16b < VLENB/2; i_mul16b++) begin : MUL16B_LOOP
+            mulNbits #(
+                .N(16)
+            ) mul16b (
+                .first_operand_i (mult_op_a_16b[i_mul16b]),
+                .second_operand_i(mult_op_b_16b[i_mul16b]),
+                .signed_mode_i   (mult_signed_mode),
+                .result_o        (mac_result_16b[i_mul16b])
+            );
+        end
+    endgenerate
+
+//////////////////////////////////////////////////////////////////////////////
+// Multiplication 32 bits
+//////////////////////////////////////////////////////////////////////////////
+
+    logic [31:0] mult_op_a_32b [(VLENB/4)-1:0];
+    logic [31:0] mult_op_b_32b [(VLENB/4)-1:0];
+    logic [63:0] mac_result_32b[(VLENB/4)-1:0];
 
     always_comb begin
-        for (int i = 0; i < VLENB; i++) begin
-            mac_result_8b[i] = $signed(mult_op_a_8b[i]) * $signed(mult_op_b_8b[i]) + $signed(accum_8b[i]);
+        for (int i = 0; i < VLENB/4; i++) begin
+            mult_op_a_32b[i] = {first_operand [(32*(i+1))-1-:32]};
+            mult_op_b_32b[i] = {second_operand[(32*(i+1))-1-:32]};
         end
     end
 
+    genvar i_mul32b;
+    generate
+        for (i_mul32b = 0; i_mul32b < VLENB/4; i_mul32b++) begin : MUL32B_LOOP
+            mulNbits #(
+                .N(32)
+            ) mul32b (
+                .first_operand_i (mult_op_a_32b[i_mul32b]),
+                .second_operand_i(mult_op_b_32b[i_mul32b]),
+                .signed_mode_i   (mult_signed_mode),
+                .result_o        (mac_result_32b[i_mul32b])
+            );
+        end
+    endgenerate
+
+//////////////////////////////////////////////////////////////////////////////
+// Multiplication Demux
+//////////////////////////////////////////////////////////////////////////////
     always_comb begin
-        for (int i = 0; i < VLENB; i++) begin
-            if (vector_operation_i == vmul)
-                result_mult[(8*(i+1))-1-:8] = mac_result_8b[i][7:0];
-            else
-                result_mult[(8*(i+1))-1-:8] = mac_result_8b[i][15:8];
-        end
-    end
 
+        unique case (vsew)
+            EW8: begin
+                for (int i = 0; i < VLENB; i++)
+                    if (vector_operation_i == vmul)
+                        result_mult[(8*(i+1))-1-:8] = mac_result_8b[i][7:0];
+                    else
+                        result_mult[(8*(i+1))-1-:8] = mac_result_8b[i][15:8];
+            end
+            EW16: begin
+                for (int i = 0; i < VLENB/2; i++)
+                    if (vector_operation_i == vmul)
+                        result_mult[(16*(i+1))-1-:16] = mac_result_16b[i][15:0];
+                    else
+                        result_mult[(16*(i+1))-1-:16] = mac_result_16b[i][31:16];
+            end
+            default: begin
+                for (int i = 0; i < VLENB/4; i++)
+                    if (vector_operation_i == vmul)
+                        result_mult[(32*(i+1))-1-:32] = mac_result_32b[i][31:0];
+                    else
+                        result_mult[(32*(i+1))-1-:32] = mac_result_32b[i][63:32];
+            end
+        endcase
+    end
 //////////////////////////////////////////////////////////////////////////////
 // Result Demux
 //////////////////////////////////////////////////////////////////////////////
