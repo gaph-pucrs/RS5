@@ -341,10 +341,13 @@ end
 // Output Registers
 //////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk) begin
-        if (
-            stall == 1'b0 & hold_o == 1'b0
-        ) begin
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            write_enable_o          <= 1'b0;
+            instruction_operation_o <= NOP;
+            result_o                <= '0;       
+        end
+        else if (stall == 1'b0 & hold_o == 1'b0) begin
             write_enable_o          <= write_enable;
             instruction_operation_o <= instruction_operation_i;
             result_o                <= result;             

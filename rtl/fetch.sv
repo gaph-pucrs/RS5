@@ -69,8 +69,11 @@ module fetch  #(parameter start_address = 32'b0)(
 // Sensitive Outputs 
 //////////////////////////////////////////////////////////////////////////////
     
-    always_ff @(posedge clk) begin
-        if (enable == 1'b1) begin
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            pc_o <= '0;
+        end
+        else if (enable == 1'b1) begin
             pc_o <= pc;
         end
     end

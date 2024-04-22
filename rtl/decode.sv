@@ -69,10 +69,17 @@ module decode
 // Re-Decode isntruction on hazard or stall
 //////////////////////////////////////////////////////////////////////////////
 
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            last_instruction <= 32'h00000013;
+        end else begin
+            last_instruction <= instruction;
+        end
+    end
+
     always_ff @(posedge clk) begin
-        last_instruction <= instruction;
-        last_hazard      <= hazard_o;
-        last_stall       <= ~enable;
+        last_hazard <= hazard_o;
+        last_stall  <= ~enable;
     end
 
     always_comb begin
