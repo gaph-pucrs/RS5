@@ -10,7 +10,7 @@ module RS5_FPGA_Platform
 )
 (
     input  logic       clk,
-    input  logic       reset,
+    input  logic       reset_n,
     input  logic       BTND,
     input  logic       UART_RX,
     output logic       UART_TX
@@ -102,7 +102,7 @@ module RS5_FPGA_Platform
         .ZIHPMEnable    (ZIHPMEnable)
     ) dut (
         .clk                    (clk), 
-        .reset                  (!reset),
+        .reset_n                (reset_n),
         .stall                  (stall),
         .instruction_i          (cpu_instruction), 
         .mem_data_i             (cpu_data_in), 
@@ -142,7 +142,7 @@ module RS5_FPGA_Platform
 
     rtc rtc(
         .clk        (clk),
-        .reset      (!reset),
+        .reset_n    (reset_n),
         .en_i       (enable_rtc),
         .addr_i     (cpu_data_address[3:0]),
         .we_i       ({4'h0, cpu_write_enable}),
@@ -159,17 +159,17 @@ module RS5_FPGA_Platform
     plic #(
         .i_cnt(i_cnt)
     ) plic1 (
-        .clk    (clk),
-        .reset  (!reset),
-        .en_i   (enable_plic),
-        .we_i   (cpu_write_enable),
-        .addr_i (cpu_data_address[23:0]),
-        .data_i (cpu_data_out),
-        .data_o (data_plic),     
-        .irq_i  (irq_peripherals),
-        .iack_i (interrupt_ack),
-        .irq_o  (mei),
-        .iack_o (iack_peripherals)
+        .clk     (clk),
+        .reset_n (reset_n),
+        .en_i    (enable_plic),
+        .we_i    (cpu_write_enable),
+        .addr_i  (cpu_data_address[23:0]),
+        .data_i  (cpu_data_out),
+        .data_o  (data_plic),     
+        .irq_i   (irq_peripherals),
+        .iack_i  (interrupt_ack),
+        .irq_o   (mei),
+        .iack_o  (iack_peripherals)
     );
 
 //////////////////////////////////////////////////////////////////////////////
@@ -181,7 +181,7 @@ module RS5_FPGA_Platform
         .CLKS_PER_BIT_UART(CLKS_PER_BIT_UART)
     ) Peripherals1 (
         .clk            (clk), 
-        .reset          (!reset), 
+        .reset_n        (reset_n), 
         .stall_o        (stall),
         .enable_i       (enable_peripherals), 
         .write_enable_i (cpu_write_enable),

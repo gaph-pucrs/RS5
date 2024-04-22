@@ -7,7 +7,7 @@ module plic
 )
 (
     input   logic                   clk,
-    input   logic                   reset,
+    input   logic                   reset_n,
 
     input   logic                   en_i,
     input   logic  [3:0]            we_i,
@@ -33,8 +33,8 @@ module plic
     logic [i_cnt:1] ip;
     logic [i_cnt:1] interrupt;
 
-    always_ff @(posedge clk) begin
-        if (reset == 1'b1) begin
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
             ip <= '0;
         end
         else begin
@@ -54,15 +54,15 @@ module plic
 		end
 	end
 
-    always_ff @(posedge clk) begin
-        if (reset == 1'b1)
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
             id_r <= '0;
         else
             id_r <= id_int;
     end
 
-    always_ff @(posedge clk) begin
-        if (reset == 1'b1) begin
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
             iack_o <= '0;
         end
         else begin
@@ -78,8 +78,8 @@ module plic
 // Memory Mapped Regs
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    always_ff @( posedge clk ) begin
-        if (reset == 1'b1) begin
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
             ie      <= '0;
             data_o  <= '0;
         end  

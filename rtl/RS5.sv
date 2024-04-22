@@ -30,7 +30,7 @@ module RS5
 )
 (
     input  logic                    clk,
-    input  logic                    reset,
+    input  logic                    reset_n,
     input  logic                    stall,
 
     input  logic [31:0]             instruction_i,
@@ -166,7 +166,7 @@ module RS5
 
     fetch fetch1 (
         .clk                    (clk), 
-        .reset                  (reset), 
+        .reset_n                (reset_n), 
         .enable                 (enable_fetch),
         .jump_i                 (jump), 
         .jump_target_i          (jump_target),
@@ -203,7 +203,7 @@ module RS5
 
     decode decoder1 (
         .clk                        (clk), 
-        .reset                      (reset),
+        .reset_n                    (reset_n),
         .enable                     (enable_decode),
         .instruction_i              (instruction_i), 
         .pc_i                       (pc_decode), 
@@ -253,7 +253,7 @@ module RS5
     else begin : RegFileFF_blk
         regbank regbankff (
             .clk        (clk),
-            .reset      (reset),
+            .reset_n    (reset_n),
             .rs1        (rs1), 
             .rs2        (rs2),
             .rd         (rd), 
@@ -272,7 +272,7 @@ module RS5
         .RV32        (RV32)
     ) execute1 (
         .clk                    (clk), 
-        .reset                  (reset), 
+        .reset_n                (reset_n), 
         .stall                  (stall),
         .instruction_i          (instruction_execute), 
         .pc_i                   (pc_execute), 
@@ -329,7 +329,7 @@ module RS5
       .RV32         (RV32       )
     ) CSRBank1 (
         .clk                        (clk), 
-        .reset                      (reset), 
+        .reset_n                    (reset_n), 
         .read_enable_i              (csr_read_enable), 
         .write_enable_i             (csr_write_enable), 
         .operation_i                (csr_operation), 
