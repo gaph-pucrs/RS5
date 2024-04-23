@@ -43,6 +43,7 @@ module vectorUnit
     logic [4:0]       vs1_addr, vs2_addr, vs3_addr;
     logic [VLEN-1:0]  vs1_data, vs2_data, vs3_data;
     logic [4:0]       cycle_count;
+    logic             hold;
 
     logic [VLEN-1:0]  first_operand, second_operand, third_operand;
     
@@ -98,7 +99,7 @@ module vectorUnit
         if (!reset_n) begin
             state <= V_IDLE;
         end
-        else begin
+        else if (!hold) begin
             state <= next_state;
         end
     end
@@ -147,7 +148,7 @@ module vectorUnit
             cycle_count <= 0;
         else if (next_state == V_IDLE)
             cycle_count <= 0;
-        else if (next_state == V_EXEC)
+        else if (next_state == V_EXEC && hold == 1'b0)
             cycle_count <= cycle_count + 1;
     end
 
@@ -163,13 +164,15 @@ module vectorUnit
     end
 
     always_ff @(posedge clk) begin
-        vd_addr_int <= vs3_addr;
-        vd_addr     <= vd_addr_int;
+        if (!hold) begin
+            vd_addr_int <= vs3_addr;
+            vd_addr     <= vd_addr_int;
+        end
     end
 
     // WRITE ENABLE GENERATION
     always_ff @(posedge clk) begin
-        if (state == V_EXEC && vl > 0) begin
+        if ((state == V_EXEC) && (vl > 0) && (hold != 1'b1)) begin
             unique case (vsew)
                 EW8: begin
                     for (int i = 0; i < VLENB; i++) begin
@@ -250,16 +253,20 @@ module vectorUnit
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk) begin
-        first_operand  <= vs2_data;
-        third_operand  <= vs3_data;
+        if (!hold) begin
+            first_operand  <= vs2_data;
+            third_operand  <= vs3_data;
+        end
     end
 
     always_ff @(posedge clk) begin
-        unique case (opCat)
-            OPIVX, OPFVF, OPMVX: second_operand <= scalar_replicated;
-            OPIVI:               second_operand <= imm_replicated;
-            default:             second_operand <= vs1_data;
-        endcase
+        if (!hold) begin
+            unique case (opCat)
+                OPIVX, OPFVF, OPMVX: second_operand <= scalar_replicated;
+                OPIVI:               second_operand <= imm_replicated;
+                default:             second_operand <= vs1_data;
+            endcase
+        end
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -276,7 +283,9 @@ module vectorUnit
         .second_operand     (second_operand),
         .third_operand      (third_operand),
         .vector_operation_i (vector_operation_i),
+        .current_state      (state),
         .vsew               (vsew),
+        .hold_o             (hold),
         .result_o           (result)
     );
 

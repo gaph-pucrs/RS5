@@ -22,6 +22,8 @@
 `include "../rtl/fetch.sv"
 `include "../rtl/decode.sv"
 `include "../rtl/muldiv.sv"
+`include "../rtl/mulNbits.sv"
+`include "../rtl/mul.sv"
 `include "../rtl/vectorCSRs.sv"
 `include "../rtl/vectorRegbank.sv"
 `include "../rtl/vectorALU.sv"

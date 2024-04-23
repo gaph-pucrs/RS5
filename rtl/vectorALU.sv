@@ -10,10 +10,12 @@ module vectorALU
     input  logic [VLEN-1:0] first_operand,
     input  logic [VLEN-1:0] second_operand,
     input  logic [VLEN-1:0] third_operand,
+    input vector_states_e   current_state,
 
     input  iTypeVector_e    vector_operation_i,
     input  vew_e            vsew,
 
+    output logic            hold_o,
     output logic [VLEN-1:0] result_o
 );
 
@@ -35,6 +37,22 @@ module vectorALU
         result_xor = first_operand ^ second_operand;
     end
 
+//////////////////////////////////////////////////////////////////////////////
+// Reductions
+//////////////////////////////////////////////////////////////////////////////
+/*
+    logic [31:0] op1_redLog_32, op2_redLog_32;
+    logic [VLEN-1:0] result_redAnd_32, result_redOr_32, result_redXor_32;
+
+    assign op1_redLog_32 = first_operand[31:0];
+    assign op2_redLog_32 = second_operand[63:32];
+
+    always_comb begin
+        result_redAnd_32 = op1_redLog_32 & op2_redLog_32;
+        result_redOr_32  = op1_redLog_32 | op2_redLog_32;
+        result_redXor_32 = op1_redLog_32 ^ op2_redLog_32;
+    end
+*/
 //////////////////////////////////////////////////////////////////////////////
 // Adder
 //////////////////////////////////////////////////////////////////////////////
@@ -327,7 +345,7 @@ module vectorALU
             mult_op_b_32b[i] = {second_operand[(32*(i+1))-1-:32]};
         end
     end
-
+/*
     genvar i_mul32b;
     generate
         for (i_mul32b = 0; i_mul32b < VLENB/4; i_mul32b++) begin : MUL32B_LOOP
@@ -341,6 +359,33 @@ module vectorALU
             );
         end
     endgenerate
+*/
+
+    logic                 mult_enable, mult_low;
+    logic [(VLENB/4)-1:0] mult_hold_int;
+    logic                 mult_hold;
+
+    assign mult_enable = ((vector_operation_i inside {vmul, vmulh, vmulhsu, vmulhu}) && (current_state == V_EXEC) && (vsew==EW32));
+    assign mult_low    = (vector_operation_i == vmul);
+    assign mult_hold   = |mult_hold_int;
+
+    genvar i_mul32b;
+    generate
+        for (i_mul32b = 0; i_mul32b < VLENB/4; i_mul32b++) begin : MUL32B_LOOP
+            mul mul32b (
+                .clk             (clk),
+                .reset_n         (reset_n),
+                .first_operand_i (mult_op_a_32b[i_mul32b]),
+                .second_operand_i(mult_op_b_32b[i_mul32b]),
+                .signed_mode_i   (mult_signed_mode),
+                .enable_i        (mult_enable),
+                .mul_low_i       (mult_low),
+                .hold_o          (mult_hold_int[i_mul32b]),
+                .result_o        (mac_result_32b[i_mul32b])
+            );
+        end
+    endgenerate
+
 
 //////////////////////////////////////////////////////////////////////////////
 // Multiplication Demux
@@ -371,6 +416,13 @@ module vectorALU
             end
         endcase
     end
+
+//////////////////////////////////////////////////////////////////////////////
+// Hold generation
+//////////////////////////////////////////////////////////////////////////////
+
+    assign hold_o = mult_hold;
+
 //////////////////////////////////////////////////////////////////////////////
 // Result Demux
 //////////////////////////////////////////////////////////////////////////////
@@ -394,6 +446,11 @@ module vectorALU
             vmaxu:           result_o <= result_maxu;
             vmul, vmulh,
             vmulhu, vmulhsu: result_o <= result_mult;
+            /*
+            vredand:         result_o <= {'0, result_redAnd_32};
+            vredor:          result_o <= {'0, result_redOr_32};
+            vredxor:         result_o <= {'0, result_redXor_32};
+            */
             default:         result_o <= result_add;
         endcase
     end
