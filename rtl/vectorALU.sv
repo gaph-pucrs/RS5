@@ -17,7 +17,7 @@ module vectorALU
     input  vew_e            vsew,
 
     output logic            hold_o,
-    output logic            widening_hold_o,
+    output logic            hold_widening_o,
     output logic [VLEN-1:0] result_o
 );
 
@@ -46,7 +46,7 @@ module vectorALU
         end
     end
 
-    assign widening_hold_o = widening_i & !widening_counter && current_state == V_EXEC;
+    assign hold_widening_o = widening_i & !widening_counter && current_state == V_EXEC;
 
 //////////////////////////////////////////////////////////////////////////////
 // Logical
@@ -359,12 +359,12 @@ module vectorALU
 //////////////////////////////////////////////////////////////////////////////
 
     logic                 mult_enable, mult_low;
-    logic [(VLENB/4)-1:0] mult_hold_int;
-    logic                 mult_hold;
+    logic [(VLENB/4)-1:0] hold_mult_int;
+    logic                 hold_mult;
 
     logic [31:0] mult_op_a_32b [(VLENB/4)-1:0];
     logic [31:0] mult_op_b_32b [(VLENB/4)-1:0];
-    logic [63:0] mac_result_32b[(VLENB/4)-1:0];
+    logic [31:0] mac_result_32b[(VLENB/4)-1:0];
 
     always_comb begin
         for (int i = 0; i < VLENB/4; i++) begin
@@ -375,7 +375,7 @@ module vectorALU
 
     assign mult_enable = ((vector_operation_i inside {vmul, vmulh, vmulhsu, vmulhu}) && (current_state == V_EXEC) && (vsew==EW32));
     assign mult_low    = (vector_operation_i == vmul);
-    assign mult_hold   = |mult_hold_int;
+    assign hold_mult   = |hold_mult_int;
 
     genvar i_mul32b;
     generate
@@ -388,7 +388,7 @@ module vectorALU
                 .signed_mode_i   (mult_signed_mode),
                 .enable_i        (mult_enable),
                 .mul_low_i       (mult_low),
-                .hold_o          (mult_hold_int[i_mul32b]),
+                .hold_o          (hold_mult_int[i_mul32b]),
                 .result_o        (mac_result_32b[i_mul32b])
             );
         end
@@ -431,8 +431,8 @@ module vectorALU
 // Hold generation
 //////////////////////////////////////////////////////////////////////////////
 
-    assign hold   = mult_hold;
-    assign hold_o = hold | widening_hold_o;
+    assign hold   = hold_mult;
+    assign hold_o = hold | hold_widening_o;
 
 //////////////////////////////////////////////////////////////////////////////
 // Result Demux

@@ -44,7 +44,7 @@ module vectorUnit
     logic [4:0]       vs1_addr, vs2_addr, vs3_addr;
     logic [VLEN-1:0]  vs1_data, vs2_data, vs3_data;
     logic [4:0]       cycle_count;
-    logic             hold, widening_hold;
+    logic             hold, hold_widening;
 
     logic [VLEN-1:0]  first_operand, second_operand, third_operand;
     
@@ -176,7 +176,7 @@ module vectorUnit
         else begin
             if (state == V_IDLE && next_state == V_EXEC)
                 vd_addr <= rd;
-            else if (next_state inside {V_EXEC, V_END} && ((hold == 1'b0) || (hold == 1'b1 && widening_hold)) )
+            else if (next_state inside {V_EXEC, V_END} && ((hold == 1'b0) || (hold == 1'b1 && hold_widening)) )
                 vd_addr <= vd_addr + 1'b1;
         end 
     end
@@ -188,7 +188,7 @@ module vectorUnit
 
     // WRITE ENABLE GENERATION
     always_ff @(posedge clk) begin
-        if ((state == V_EXEC) && (vl > 0) && (!hold || widening_hold)) begin
+        if ((state == V_EXEC) && (vl > 0) && (!hold || hold_widening)) begin
             unique case (vsew_effective)
                 EW8: begin
                     for (int i = 0; i < VLENB; i++) begin
@@ -303,7 +303,7 @@ module vectorUnit
         .vsew               (vsew),
         .widening_i         (widening),
         .hold_o             (hold),
-        .widening_hold_o    (widening_hold),
+        .hold_widening_o    (hold_widening),
         .result_o           (result)
     );
 
