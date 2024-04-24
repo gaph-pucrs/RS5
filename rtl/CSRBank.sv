@@ -93,14 +93,14 @@ module CSRBank
         6'b0,
         XOSVMEnable,    // X - Non-standard extensions present
         1'b0,
-        1'b0,           // V - Vector extension //different ? 
+        1'b0,           // V - Vector extension 
         1'b1,           // U - User mode implemented
         1'b0,
         1'b0,           // S - Supervisor mode implemented
         2'b0,
         1'b0,           // P - Packed-SIMD extension
         1'b0,
-        1'b0,           // N - User level interrupts supported //different ? 
+        1'b0,           // N - User level interrupts supported 
         (RV32==RV32M),  // M - Integer Multiply/Divide extension
         3'b0,
         1'b1,           // I - RV32I/64I/128I base ISA
@@ -197,7 +197,7 @@ module CSRBank
         wmask = '1;
         case (CSR)
             MSTATUS:    begin current_val = mstatus;         wmask = 32'h007E19AA; end
-            MISA:       begin current_val = misa;            wmask = 32'h00081000; end
+            MISA:       begin current_val = misa;            wmask = 32'h00301000; end
             // MEDELEG:    begin current_val = medeleg;         wmask = '1; end
             // MIDELEG:    begin current_val = mideleg;         wmask = '1; end
             MIE:        begin current_val = mie;             wmask = 32'h00000888; end
