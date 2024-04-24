@@ -10,20 +10,43 @@ module vectorALU
     input  logic [VLEN-1:0] first_operand,
     input  logic [VLEN-1:0] second_operand,
     input  logic [VLEN-1:0] third_operand,
-    input vector_states_e   current_state,
+    input  vector_states_e  current_state,
+    input  logic            widening_i,
 
     input  iTypeVector_e    vector_operation_i,
     input  vew_e            vsew,
 
     output logic            hold_o,
+    output logic            widening_hold_o,
     output logic [VLEN-1:0] result_o
 );
+
+    logic hold;
 
     logic signed [VLEN-1:0] first_operand_signed, second_operand_signed, third_operand_signed;
 
     assign first_operand_signed  = first_operand;
     assign second_operand_signed = second_operand;
     assign third_operand_signed  = third_operand;
+
+//////////////////////////////////////////////////////////////////////////////
+// Widening Control
+//////////////////////////////////////////////////////////////////////////////
+    logic widening_counter;
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            widening_counter <= 1'b0;
+        end
+        else if (widening_i == 1'b1 && hold == 1'b0 && current_state == V_EXEC) begin
+            widening_counter <= widening_counter + 1'b1;
+        end
+        else begin
+            widening_counter <= 1'b0;
+        end
+    end
+
+    assign widening_hold_o = widening_i & !widening_counter && current_state == V_EXEC;
 
 //////////////////////////////////////////////////////////////////////////////
 // Logical
@@ -262,7 +285,7 @@ module vectorALU
 // Multiplication_common
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [VLEN-1:0] result_mult;
+    logic [(2*VLEN)-1:0]  result_mult;
     logic [1:0]      mult_signed_mode;
 
     always_comb begin
@@ -335,6 +358,10 @@ module vectorALU
 // Multiplication 32 bits
 //////////////////////////////////////////////////////////////////////////////
 
+    logic                 mult_enable, mult_low;
+    logic [(VLENB/4)-1:0] mult_hold_int;
+    logic                 mult_hold;
+
     logic [31:0] mult_op_a_32b [(VLENB/4)-1:0];
     logic [31:0] mult_op_b_32b [(VLENB/4)-1:0];
     logic [63:0] mac_result_32b[(VLENB/4)-1:0];
@@ -345,25 +372,6 @@ module vectorALU
             mult_op_b_32b[i] = {second_operand[(32*(i+1))-1-:32]};
         end
     end
-/*
-    genvar i_mul32b;
-    generate
-        for (i_mul32b = 0; i_mul32b < VLENB/4; i_mul32b++) begin : MUL32B_LOOP
-            mulNbits #(
-                .N(32)
-            ) mul32b (
-                .first_operand_i (mult_op_a_32b[i_mul32b]),
-                .second_operand_i(mult_op_b_32b[i_mul32b]),
-                .signed_mode_i   (mult_signed_mode),
-                .result_o        (mac_result_32b[i_mul32b])
-            );
-        end
-    endgenerate
-*/
-
-    logic                 mult_enable, mult_low;
-    logic [(VLENB/4)-1:0] mult_hold_int;
-    logic                 mult_hold;
 
     assign mult_enable = ((vector_operation_i inside {vmul, vmulh, vmulhsu, vmulhu}) && (current_state == V_EXEC) && (vsew==EW32));
     assign mult_low    = (vector_operation_i == vmul);
@@ -386,23 +394,25 @@ module vectorALU
         end
     endgenerate
 
-
 //////////////////////////////////////////////////////////////////////////////
 // Multiplication Demux
 //////////////////////////////////////////////////////////////////////////////
     always_comb begin
-
         unique case (vsew)
             EW8: begin
                 for (int i = 0; i < VLENB; i++)
-                    if (vector_operation_i == vmul)
+                    if (widening_i)
+                        result_mult[(16*(i+1))-1-:16] = mac_result_8b[i][15:0];
+                    else if (vector_operation_i == vmul)
                         result_mult[(8*(i+1))-1-:8] = mac_result_8b[i][7:0];
                     else
                         result_mult[(8*(i+1))-1-:8] = mac_result_8b[i][15:8];
             end
             EW16: begin
                 for (int i = 0; i < VLENB/2; i++)
-                    if (vector_operation_i == vmul)
+                    if (widening_i)
+                        result_mult[(32*(i+1))-1-:32] = mac_result_16b[i][31:0];
+                    else if (vector_operation_i == vmul)
                         result_mult[(16*(i+1))-1-:16] = mac_result_16b[i][15:0];
                     else
                         result_mult[(16*(i+1))-1-:16] = mac_result_16b[i][31:16];
@@ -421,7 +431,8 @@ module vectorALU
 // Hold generation
 //////////////////////////////////////////////////////////////////////////////
 
-    assign hold_o = mult_hold;
+    assign hold   = mult_hold;
+    assign hold_o = hold | widening_hold_o;
 
 //////////////////////////////////////////////////////////////////////////////
 // Result Demux
@@ -446,6 +457,8 @@ module vectorALU
             vmaxu:           result_o <= result_maxu;
             vmul, vmulh,
             vmulhu, vmulhsu: result_o <= result_mult;
+            vwmul, vwmulu, 
+            vwmulsu:         result_o <= (widening_counter == 1'b1) ? result_mult[VLEN-1:0] : result_mult[(2*VLEN)-1:VLEN];
             /*
             vredand:         result_o <= {'0, result_redAnd_32};
             vredor:          result_o <= {'0, result_redOr_32};

@@ -287,6 +287,9 @@ module decode
                 6'b101111:     vector_operation = vnmsac;
                 6'b101001:     vector_operation = vmadd;
                 6'b101011:     vector_operation = vnmsub;
+                6'b111000:     vector_operation = vwmulu;
+                6'b111010:     vector_operation = vwmulsu;
+                6'b111011:     vector_operation = vwmul;
                 default:       vector_operation = vnop;
             endcase
         end else begin

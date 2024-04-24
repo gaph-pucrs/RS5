@@ -6,6 +6,9 @@
     nop
     nop
 
+    #######################################
+    # 8 bits multiplications
+    #######################################
     li a0, 8
     vsetvli t0, a0, e8, m1, ta, ma          # SEW= 8, LMUL=1
     nop
@@ -53,6 +56,90 @@
     vmul.vx v13, v12, a2   # 0x0129 (29)
     nop
     vmulh.vx v14, v12, a2  # 0x0129 (01)
+
+    vsetvli t0, x0, e8, m2, ta, ma          # SEW=8, LMUL=2, VL=16
+    nop
+    vor.vi v15, v15, 8     # 0x08
+    nop
+    li a2, 255             # 0xFF
+    vor.vx v17, v17, a2    # 0xFF
+    nop
+    vmul.vv v19, v15, v17  # 0x07F8
+    nop
+    vmulhu.vv v21, v15, v17 # 0x07F8
+
+    jal ra, clear_vreg_bank
+
+    #######################################
+    # 16 bits multiplications
+    #######################################
+    # Positive 16-bit multiplication
+    vsetvli t0, a0, e16, m1, ta, ma          # SEW= 16, LMUL=1
+    nop
+    li a1, 100          # Load 16-bit value 0x0064
+    vor.vx v6, v6, a1   # Bitwise OR with 16-bit immediate
+    nop
+    li a2, 11           # Load 16-bit value 0x000B
+    nop
+    vmul.vx v7, v6, a2  # 0x044C
+
+    # Signed-Unsigned 16-bit multiplication
+    nop
+    li a1, -9           # Load 16-bit signed value 0xFFF7
+    vor.vx v9, v9, a1   # Bitwise OR with 16-bit immediate
+    nop
+    li a2, 33           # Load 16-bit unsigned value 0x0021
+    nop
+    vmul.vx v10, v9, a2  # 0xFED7
+    nop
+    vmulhsu.vx v11, v9, a2  # 0xFFFFED7
+
+    # Zero-extended 16-bit multiplication
+    nop
+    li a1, 0            # Load 16-bit value 0x0000
+    vor.vx v12, v12, a1  # Bitwise OR with 16-bit immediate
+    nop
+    li a2, -1           # Load 16-bit signed value 0xFFFF
+    nop
+    vmul.vx v13, v12, a2 # Multiply zero-extended 16-bit with signed, result stored in v13
+    nop
+    vmulhu.vx v14, v12, a2 # Unsigned multiply high with zero-extended, result stored in v14
+
+    # High 16-bit multiplication
+    nop
+    li a1, -100         # Load 16-bit signed value 0xFF9C
+    vor.vx v15, v15, a1 # Bitwise OR with 16-bit immediate
+    nop
+    li a2, 100          # Load 16-bit unsigned value 0x0064
+    nop
+    vmul.vx v16, v15, a2 # D8f0
+    nop
+    vmulh.vx v17, v15, a2 # FFFF
+
+    #######################################
+    # Widening Multiplication 8 bits
+    #######################################
+    jal ra, clear_vreg_bank
+
+    li a0, 8
+    vsetvli t0, a0, e8, m1, ta, ma          # SEW= 8, LMUL=1
+    nop
+    li a1, 100
+    vor.vx v1, v1, a1     # 0x64
+    nop
+    li a2, 11             # 0x0B
+    nop
+    vwmulu.vx v2, v1, a2  # 0x044C
+
+    li a0, 16
+    vsetvli t0, a0, e8, m2, ta, ma          # SEW= 8, LMUL=2
+    nop
+    li a1, 100
+    vor.vx v4, v4, a1     # 0x64
+    nop
+    li a2, 11             # 0x0B
+    nop
+    vwmul.vx v6, v4, a2   # 0x044C
 
     #######################################
     # Logicals

@@ -32,8 +32,9 @@ module vectorUnit
     opCat_e      opCat;
     addrModes_e  addrMode;
     logic        reduction_instruction;
-
-    vew_e   vsew;
+    logic        widening;
+    
+    vew_e   vsew, vsew_effective;
     vlmul_e vlmul;
     logic[$bits(VLEN)-1:0] vl, vl_next;
 
@@ -43,11 +44,11 @@ module vectorUnit
     logic [4:0]       vs1_addr, vs2_addr, vs3_addr;
     logic [VLEN-1:0]  vs1_data, vs2_data, vs3_data;
     logic [4:0]       cycle_count;
-    logic             hold;
+    logic             hold, widening_hold;
 
     logic [VLEN-1:0]  first_operand, second_operand, third_operand;
     
-    logic [4:0]       vd_addr_int, vd_addr;
+    logic [4:0]       vd_addr, vd_addr_r;
     logic [VLEN-1:0]  result;
     logic [VLENB-1:0] write_enable;
 
@@ -65,6 +66,7 @@ module vectorUnit
     assign addrMode = addrModes_e'(instruction_i[27:26]);
 
     assign reduction_instruction = (vector_operation_i inside {vredsum, vredmaxu, vredmax, vredminu, vredmin, vredand, vredor, vredxor});
+    assign widening = (vector_operation_i inside {vwmul, vwmulu, vwmulsu});
 
 //////////////////////////////////////////////////////////////////////////////
 // CSRs
@@ -113,7 +115,11 @@ module vectorUnit
                     next_state = V_IDLE;
 
             V_EXEC:
-                if ((vlmul == LMUL_2 && cycle_count < 2) || (vlmul == LMUL_4 && cycle_count < 4) || (vlmul == LMUL_8 && cycle_count < 8))
+                if (
+                    (vlmul == LMUL_2  && cycle_count < 2) 
+                ||  (vlmul == LMUL_4  && cycle_count < 4) 
+                ||  (vlmul == LMUL_8  && cycle_count < 8) 
+                )
                     next_state = V_EXEC;
                 else
                     next_state = V_END;
@@ -125,24 +131,23 @@ module vectorUnit
                 next_state = V_IDLE;
         endcase
     end
-/*
-    //logic   widening;
-    //vew_e   vsew_effective;
 
     always_comb begin
         if (widening) begin
             unique case (vsew)
                 EW8:  vsew_effective = EW16;
                 EW16: vsew_effective = EW32;
-                EW32: vsew_effective = EW64;
-                EW64: vsew_effective = EW128;
-                default: vsew_effective = vsew;
+                default: begin
+                    vsew_effective = vsew;
+                    $error("Widening operations with VSEW=32b are not supported");
+                end
             endcase
-        end begin
+        end 
+        else begin
             vsew_effective = vsew;
         end
     end
-*/
+
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             cycle_count <= 0;
@@ -163,17 +168,28 @@ module vectorUnit
         vs3_addr = rd  + cycle_count;
     end
 
-    always_ff @(posedge clk) begin
-        if (!hold) begin
-            vd_addr_int <= vs3_addr;
-            vd_addr     <= vd_addr_int;
-        end
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            vd_addr <= '0;
+        else if (!widening)
+            vd_addr <= vs3_addr;
+        else begin
+            if (state == V_IDLE && next_state == V_EXEC)
+                vd_addr <= rd;
+            else if (next_state inside {V_EXEC, V_END} && ((hold == 1'b0) || (hold == 1'b1 && widening_hold)) )
+                vd_addr <= vd_addr + 1'b1;
+        end 
     end
+
+    always_ff @(posedge clk) begin
+        vd_addr_r <= vd_addr;
+    end
+
 
     // WRITE ENABLE GENERATION
     always_ff @(posedge clk) begin
-        if ((state == V_EXEC) && (vl > 0) && (hold != 1'b1)) begin
-            unique case (vsew)
+        if ((state == V_EXEC) && (vl > 0) && (!hold || widening_hold)) begin
+            unique case (vsew_effective)
                 EW8: begin
                     for (int i = 0; i < VLENB; i++) begin
                         write_enable[i] <= (i < vl) ? 1'b1 : 1'b0;
@@ -210,7 +226,7 @@ module vectorUnit
         .vs2_addr (vs2_addr),
         .vs3_addr (vs3_addr),
         .enable   (write_enable),
-        .vd_addr  (vd_addr),
+        .vd_addr  (vd_addr_r),
         .result   (result),
         .vs1_data (vs1_data),
         .vs2_data (vs2_data),
@@ -285,7 +301,9 @@ module vectorUnit
         .vector_operation_i (vector_operation_i),
         .current_state      (state),
         .vsew               (vsew),
+        .widening_i         (widening),
         .hold_o             (hold),
+        .widening_hold_o    (widening_hold),
         .result_o           (result)
     );
 
