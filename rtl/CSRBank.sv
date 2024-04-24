@@ -197,7 +197,7 @@ module CSRBank
         wmask = '1;
         case (CSR)
             MSTATUS:    begin current_val = mstatus;         wmask = 32'h007E19AA; end
-            MISA:       begin current_val = misa;            wmask = 32'h8C000000; end
+            MISA:       begin current_val = misa;            wmask = 32'h00081000; end
             // MEDELEG:    begin current_val = medeleg;         wmask = '1; end
             // MIDELEG:    begin current_val = mideleg;         wmask = '1; end
             MIE:        begin current_val = mie;             wmask = 32'h00000888; end
@@ -233,7 +233,7 @@ module CSRBank
         case (operation_i)
             SET:     wr_data = (current_val | (data_i & wmask));
             CLEAR:   wr_data = (current_val & ~(data_i & wmask));
-            default: wr_data = data_i & wmask; // WRITE
+            default: wr_data = (current_val & ~wmask) | (data_i & wmask); // WRITE
         endcase
     end
 
