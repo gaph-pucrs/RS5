@@ -10,7 +10,6 @@ module mulNbits
     output  logic [(2*N)-1:0] result_o
 );
 
-    logic [N-1:0]     accum;
     logic [N:0]       op_a;
     logic [N:0]       op_b;
     logic             sign_a;
@@ -22,10 +21,9 @@ module mulNbits
             sign_b = (second_operand_i[N-1] & signed_mode_i[1]);
 
     assign  op_a  = {sign_a, first_operand_i},
-            op_b  = {sign_b, second_operand_i},
-            accum = '0;
+            op_b  = {sign_b, second_operand_i};
 
-    assign mac_result  = $signed(op_a) * $signed(op_b) + $signed(accum);  
+    assign mac_result  = $signed(op_a) * $signed(op_b);  
 
     assign result_o = mac_result[(2*N)-1:0];
 

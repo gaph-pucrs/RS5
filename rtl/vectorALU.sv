@@ -419,10 +419,7 @@ module vectorALU
             end
             default: begin
                 for (int i = 0; i < VLENB/4; i++)
-                    if (vector_operation_i == vmul)
-                        result_mult[(32*(i+1))-1-:32] = mac_result_32b[i][31:0];
-                    else
-                        result_mult[(32*(i+1))-1-:32] = mac_result_32b[i][63:32];
+                    result_mult[(32*(i+1))-1-:32] = mac_result_32b[i][31:0];
             end
         endcase
     end
@@ -458,7 +455,7 @@ module vectorALU
             vmul, vmulh,
             vmulhu, vmulhsu: result_o <= result_mult;
             vwmul, vwmulu, 
-            vwmulsu:         result_o <= (widening_counter == 1'b1) ? result_mult[VLEN-1:0] : result_mult[(2*VLEN)-1:VLEN];
+            vwmulsu:         result_o <= (widening_counter == 1'b1) ? result_mult[VLEN-1:0] : result_mult[VLEN-1:0];
             /*
             vredand:         result_o <= {'0, result_redAnd_32};
             vredor:          result_o <= {'0, result_redOr_32};
