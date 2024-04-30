@@ -305,10 +305,14 @@ module CSRBank
                 mstatus_mpie    <= mstatus_mie;
                 mstatus_mie     <= 0;
 
+                /* Interrupted instruction is in fact the next instruction,
+                 * because this one will be retired completely beforing taking
+                 * the trap
+                 */
                 if(jump_i)
                     mepc_r      <= jump_target_i;
                 else
-                    mepc_r      <= pc_i;                // Return address
+                    mepc_r      <= pc_i + 32'd4;
             end 
         //////////////////////////////////////////////////////////////////////////////
         // CSR Write
