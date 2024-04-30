@@ -23,10 +23,13 @@
 module RS5
     import RS5_pkg::*;
 #(
-    parameter environment_e Environment = ASIC,
-    parameter rv32_e        RV32        = RV32I,
-    parameter bit           XOSVMEnable = 1'b0,
-    parameter bit           ZIHPMEnable = 1'b0
+    parameter environment_e Environment  = ASIC,
+    parameter rv32_e        RV32         = RV32I,
+    parameter bit           XOSVMEnable  = 1'b0,
+    parameter bit           ZIHPMEnable  = 1'b0,
+    parameter bit           DEBUG        = 1'b0,
+    parameter string        DBG_REG_FILE = "./debug/regBank.txt",
+    parameter string        DBG_CSR_FILE = "./debug/Report.txt"
 )
 (
     input  logic                    clk,
@@ -251,7 +254,10 @@ module RS5
         );
     end
     else begin : RegFileFF_blk
-        regbank regbankff (
+        regbank #(
+            .DEBUG      (DEBUG       ),
+            .DBG_FILE   (DBG_REG_FILE)
+        ) regbankff (
             .clk        (clk),
             .reset_n    (reset_n),
             .rs1        (rs1), 
@@ -324,9 +330,11 @@ module RS5
 /////////////////////////////////////////////////////////// CSRs BANK ///////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     CSRBank #(
-      .XOSVMEnable  (XOSVMEnable),
-      .ZIHPMEnable  (ZIHPMEnable),
-      .RV32         (RV32       )
+      .XOSVMEnable(XOSVMEnable ),
+      .ZIHPMEnable(ZIHPMEnable ),
+      .RV32       (RV32        ),
+      .DEBUG      (DEBUG       ),
+      .DBG_FILE   (DBG_CSR_FILE)
     ) CSRBank1 (
         .clk                        (clk), 
         .reset_n                    (reset_n), 

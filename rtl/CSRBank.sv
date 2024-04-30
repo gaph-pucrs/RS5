@@ -30,7 +30,9 @@ module CSRBank
 #( 
     parameter bit       XOSVMEnable = 1'b0,
     parameter bit       ZIHPMEnable = 1'b0,
-    parameter rv32_e    RV32        = RV32I
+    parameter rv32_e    RV32        = RV32I,
+    parameter bit       DEBUG       = 1'b0,
+    parameter string    DBG_FILE    = "./debug/Report.txt"
 )
 (
     input   logic               clk,
@@ -580,35 +582,40 @@ module CSRBank
             end
         end
 
-        initial begin
-            fd = $fopen ("./debug/Report.txt", "w");
-        end
+        if (DEBUG) begin : gen_csr_dbg
+            initial begin
+                fd = $fopen (DBG_FILE, "w");
+                if (fd == 0) begin
+                    $display("Error opening file %s", DBG_FILE);
+                end
+            end
 
-        final begin
-            $fwrite(fd,"Clock Cycles:           %0d\n", mcycle);
-            $fwrite(fd,"Instructions Retired:   %0d\n", minstret);
-            $fwrite(fd,"Instructions Killed:    %0d\n", instructions_killed_counter);
-            $fwrite(fd,"Context Switches:       %0d\n", context_switch_counter);
-            $fwrite(fd,"Exceptions Raised:      %0d\n", raise_exception_counter);
-            $fwrite(fd,"Interrupts Acked:       %0d\n", interrupt_ack_counter);
+            final begin
+                $fwrite(fd,"Clock Cycles:           %0d\n", mcycle);
+                $fwrite(fd,"Instructions Retired:   %0d\n", minstret);
+                $fwrite(fd,"Instructions Killed:    %0d\n", instructions_killed_counter);
+                $fwrite(fd,"Context Switches:       %0d\n", context_switch_counter);
+                $fwrite(fd,"Exceptions Raised:      %0d\n", raise_exception_counter);
+                $fwrite(fd,"Interrupts Acked:       %0d\n", interrupt_ack_counter);
 
-            $fwrite(fd,"\nCYCLES WITH::\n");
-            $fwrite(fd,"HAZARDS:                %0d\n", hazard_counter);
-            $fwrite(fd,"STALL:                  %0d\n", stall_counter);
+                $fwrite(fd,"\nCYCLES WITH::\n");
+                $fwrite(fd,"HAZARDS:                %0d\n", hazard_counter);
+                $fwrite(fd,"STALL:                  %0d\n", stall_counter);
 
-            $fwrite(fd,"\nINSTRUCTION COUNTERS:\n");
-            $fwrite(fd,"NOP:                    %0d\n", nop_counter);
-            $fwrite(fd,"LOGIC:                  %0d\n", logic_counter);
-            $fwrite(fd,"ARITH:                  %0d\n", arithmetic_counter);
-            $fwrite(fd,"SHIFT:                  %0d\n", shift_counter);
-            $fwrite(fd,"BRANCH:                 %0d\n", branch_counter);
-            $fwrite(fd,"JUMP:                   %0d\n", jump_counter);
-            $fwrite(fd,"LOAD:                   %0d\n", load_counter);
-            $fwrite(fd,"STORE:                  %0d\n", store_counter);
-            $fwrite(fd,"SYS:                    %0d\n", sys_counter);
-            $fwrite(fd,"CSR:                    %0d\n", csr_counter);
-            $fwrite(fd,"MUL:                    %0d\n", mul_counter);
-            $fwrite(fd,"DIV:                    %0d\n", div_counter);
+                $fwrite(fd,"\nINSTRUCTION COUNTERS:\n");
+                $fwrite(fd,"NOP:                    %0d\n", nop_counter);
+                $fwrite(fd,"LOGIC:                  %0d\n", logic_counter);
+                $fwrite(fd,"ARITH:                  %0d\n", arithmetic_counter);
+                $fwrite(fd,"SHIFT:                  %0d\n", shift_counter);
+                $fwrite(fd,"BRANCH:                 %0d\n", branch_counter);
+                $fwrite(fd,"JUMP:                   %0d\n", jump_counter);
+                $fwrite(fd,"LOAD:                   %0d\n", load_counter);
+                $fwrite(fd,"STORE:                  %0d\n", store_counter);
+                $fwrite(fd,"SYS:                    %0d\n", sys_counter);
+                $fwrite(fd,"CSR:                    %0d\n", csr_counter);
+                $fwrite(fd,"MUL:                    %0d\n", mul_counter);
+                $fwrite(fd,"DIV:                    %0d\n", div_counter);
+            end
         end
     end
     else begin : gen_zihpm_csr_off
