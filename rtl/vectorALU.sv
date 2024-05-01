@@ -11,6 +11,7 @@ module vectorALU
     input  logic [VLEN-1:0] second_operand,
     input  logic [VLEN-1:0] third_operand,
     input  vector_states_e  current_state,
+    input  logic [4:0]      cycle_count,
     input  logic            widening_i,
 
     input  iTypeVector_e    vector_operation_i,
@@ -21,6 +22,7 @@ module vectorALU
     output logic [VLEN-1:0] result_o
 );
 
+    logic hold_mult;
     logic hold;
 
     logic signed [VLEN-1:0] first_operand_signed, second_operand_signed, third_operand_signed;
@@ -28,6 +30,24 @@ module vectorALU
     assign first_operand_signed  = first_operand;
     assign second_operand_signed = second_operand;
     assign third_operand_signed  = third_operand;
+
+    logic [VLEN-1:0] result_mult_r;
+
+//////////////////////////////////////////////////////////////////////////////
+// Accumulate Control
+//////////////////////////////////////////////////////////////////////////////
+    logic hold_acc, hold_acc_r;
+    logic accumulate_instruction;
+
+    assign accumulate_instruction = (vector_operation_i inside {vmacc, vnmsac, vmadd, vnmsub});
+
+    always_ff @(posedge clk or negedge reset_n)
+        if (!reset_n)
+            hold_acc_r <= 1'b0;
+        else 
+            hold_acc_r <= hold_acc;
+
+    assign hold_acc = (accumulate_instruction == 1'b1 && hold_acc_r == 1'b0 && current_state == V_EXEC && cycle_count == 1 && hold_mult == 1'b0);
 
 //////////////////////////////////////////////////////////////////////////////
 // Widening Control
@@ -80,14 +100,22 @@ module vectorALU
 // Adder
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [VLEN-1:0] subtraend_int, subtraend_neg;
+    logic [VLEN-1:0] subtraend, subtraend_neg;
     logic [VLEN-1:0] subtraend_8b, subtraend_16b, subtraend_32b;
-    logic [VLEN-1:0] summand_1, summand_2_8b, summand_2_16b, summand_2_32b;
+    logic [VLEN-1:0] summand_1, summand_2, summand_2_8b, summand_2_16b, summand_2_32b;
     logic [VLEN-1:0] result_add_8b, result_add_16b, result_add_32b;
     logic [VLEN-1:0] result_add;
 
-    assign subtraend_int = (vector_operation_i == vrsub) ? first_operand : second_operand;
-    assign subtraend_neg = ~subtraend_int;
+    always_comb begin
+        unique case (vector_operation_i)
+            vrsub:   subtraend = first_operand;
+            vnmsac,
+            vnmsub:  subtraend = result_mult_r;
+            default: subtraend = second_operand;
+        endcase
+    end
+
+    assign subtraend_neg = ~subtraend;
 
     always_comb begin
         for (int i = 0; i < VLENB; i++)
@@ -98,10 +126,22 @@ module vectorALU
             subtraend_32b[(32*(i+1))-1-:32] = subtraend_neg[(32*(i+1))-1-:32] + 1'b1;
     end
 
-    assign summand_1     = (vector_operation_i inside {vrsub})        ? second_operand : first_operand;
-    assign summand_2_8b  = (vector_operation_i inside {vsub, vrsub})  ? subtraend_8b   : second_operand;
-    assign summand_2_16b = (vector_operation_i inside {vsub, vrsub})  ? subtraend_16b  : second_operand;
-    assign summand_2_32b = (vector_operation_i inside {vsub, vrsub})  ? subtraend_32b  : second_operand;
+    always_comb begin
+        unique case (vector_operation_i)
+            vrsub:   summand_1 = second_operand;
+            vnmsac,
+            vmacc,
+            vmadd,
+            vnmsub:  summand_1 = third_operand;
+            default: summand_1 = first_operand;
+        endcase
+    end
+
+    assign summand_2 = (vector_operation_i inside {vmacc, vmadd}) ? result_mult_r : second_operand;
+
+    assign summand_2_8b  = (vector_operation_i inside {vsub, vrsub, vnmsac, vnmsub}) ? subtraend_8b  : summand_2;
+    assign summand_2_16b = (vector_operation_i inside {vsub, vrsub, vnmsac, vnmsub}) ? subtraend_16b : summand_2;
+    assign summand_2_32b = (vector_operation_i inside {vsub, vrsub, vnmsac, vnmsub}) ? subtraend_32b : summand_2;
 
     always_comb begin
         for (int i = 0; i < VLENB; i++)
@@ -285,7 +325,7 @@ module vectorALU
 // Multiplication_common
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [(2*VLEN)-1:0]  result_mult;
+    logic [(2*VLEN)-1:0] result_mult;
     logic [1:0]      mult_signed_mode;
 
     always_comb begin
@@ -302,12 +342,15 @@ module vectorALU
 
     logic [ 7:0] mult_op_a_8b  [VLENB-1:0];
     logic [ 7:0] mult_op_b_8b  [VLENB-1:0];
-    logic [15:0] mac_result_8b [VLENB-1:0];
+    logic [15:0] mult_result_8b [VLENB-1:0];
 
     always_comb begin
         for (int i = 0; i < VLENB; i++) begin
-            mult_op_a_8b[i] = {first_operand [(8*(i+1))-1-:8]};
-            mult_op_b_8b[i] = {second_operand[(8*(i+1))-1-:8]};
+            //mult_op_a_8b[i] = (vector_operation_i inside {vmadd, vnmsub}) 
+            //                ? third_operand [(8*(i+1))-1-:8] 
+            //                : first_operand [(8*(i+1))-1-:8];
+            mult_op_a_8b[i] = first_operand [(8*(i+1))-1-:8];
+            mult_op_b_8b[i] = second_operand[(8*(i+1))-1-:8];
         end
     end
 
@@ -320,7 +363,7 @@ module vectorALU
                 .first_operand_i (mult_op_a_8b[i_mul8b]),
                 .second_operand_i(mult_op_b_8b[i_mul8b]),
                 .signed_mode_i   (mult_signed_mode),
-                .result_o        (mac_result_8b[i_mul8b])
+                .result_o        (mult_result_8b[i_mul8b])
             );
         end
     endgenerate
@@ -331,12 +374,15 @@ module vectorALU
 
     logic [15:0] mult_op_a_16b [(VLENB/2)-1:0];
     logic [15:0] mult_op_b_16b [(VLENB/2)-1:0];
-    logic [31:0] mac_result_16b[(VLENB/2)-1:0];
+    logic [31:0] mult_result_16b[(VLENB/2)-1:0];
 
     always_comb begin
         for (int i = 0; i < VLENB/2; i++) begin
-            mult_op_a_16b[i] = {first_operand [(16*(i+1))-1-:16]};
-            mult_op_b_16b[i] = {second_operand[(16*(i+1))-1-:16]};
+            //mult_op_a_16b[i] = (vector_operation_i inside {vmadd, vnmsub}) 
+            //                    ? third_operand [(16*(i+1))-1-:16] 
+            //                    : first_operand [(16*(i+1))-1-:16];
+            mult_op_a_16b[i] =    first_operand [(16*(i+1))-1-:16];
+            mult_op_b_16b[i] =    second_operand[(16*(i+1))-1-:16];
         end
     end
 
@@ -349,7 +395,7 @@ module vectorALU
                 .first_operand_i (mult_op_a_16b[i_mul16b]),
                 .second_operand_i(mult_op_b_16b[i_mul16b]),
                 .signed_mode_i   (mult_signed_mode),
-                .result_o        (mac_result_16b[i_mul16b])
+                .result_o        (mult_result_16b[i_mul16b])
             );
         end
     endgenerate
@@ -360,21 +406,27 @@ module vectorALU
 
     logic                 mult_enable, mult_low;
     logic [(VLENB/4)-1:0] hold_mult_int;
-    logic                 hold_mult;
 
     logic [31:0] mult_op_a_32b [(VLENB/4)-1:0];
     logic [31:0] mult_op_b_32b [(VLENB/4)-1:0];
-    logic [31:0] mac_result_32b[(VLENB/4)-1:0];
+    logic [31:0] mult_result_32b[(VLENB/4)-1:0];
 
     always_comb begin
         for (int i = 0; i < VLENB/4; i++) begin
-            mult_op_a_32b[i] = {first_operand [(32*(i+1))-1-:32]};
-            mult_op_b_32b[i] = {second_operand[(32*(i+1))-1-:32]};
+            //mult_op_a_32b[i] = (vector_operation_i inside {vmadd, vnmsub}) 
+            //                    ? third_operand [(32*(i+1))-1-:32] 
+            //                    : first_operand [(32*(i+1))-1-:32];
+            mult_op_a_32b[i] =    first_operand [(32*(i+1))-1-:32];
+            mult_op_b_32b[i] =    second_operand[(32*(i+1))-1-:32];
         end
     end
 
-    assign mult_enable = ((vector_operation_i inside {vmul, vmulh, vmulhsu, vmulhu}) && (current_state == V_EXEC) && (vsew==EW32));
-    assign mult_low    = (vector_operation_i == vmul);
+    assign mult_enable = (
+                            (vector_operation_i inside {vmul, vmulh, vmulhsu, vmulhu, vmacc, vnmsac, vmadd, vnmsub})
+                        &&  (current_state == V_EXEC) 
+                        &&  (vsew==EW32)
+                        );
+    assign mult_low    = (vector_operation_i inside {vmul, vmacc, vnmsac, vmadd, vnmsub});
     assign hold_mult   = |hold_mult_int;
 
     genvar i_mul32b;
@@ -389,7 +441,7 @@ module vectorALU
                 .enable_i        (mult_enable),
                 .mul_low_i       (mult_low),
                 .hold_o          (hold_mult_int[i_mul32b]),
-                .result_o        (mac_result_32b[i_mul32b])
+                .result_o        (mult_result_32b[i_mul32b])
             );
         end
     endgenerate
@@ -402,26 +454,31 @@ module vectorALU
             EW8: begin
                 for (int i = 0; i < VLENB; i++)
                     if (widening_i)
-                        result_mult[(16*(i+1))-1-:16] = mac_result_8b[i][15:0];
-                    else if (vector_operation_i == vmul)
-                        result_mult[(8*(i+1))-1-:8] = mac_result_8b[i][7:0];
+                        result_mult[(16*(i+1))-1-:16] = mult_result_8b[i][15:0];
+                    else if (vector_operation_i inside {vmul, vmacc, vnmsac, vmadd, vnmsub})
+                        result_mult[(8*(i+1))-1-:8] = mult_result_8b[i][7:0];
                     else
-                        result_mult[(8*(i+1))-1-:8] = mac_result_8b[i][15:8];
+                        result_mult[(8*(i+1))-1-:8] = mult_result_8b[i][15:8];
             end
             EW16: begin
                 for (int i = 0; i < VLENB/2; i++)
                     if (widening_i)
-                        result_mult[(32*(i+1))-1-:32] = mac_result_16b[i][31:0];
-                    else if (vector_operation_i == vmul)
-                        result_mult[(16*(i+1))-1-:16] = mac_result_16b[i][15:0];
+                        result_mult[(32*(i+1))-1-:32] = mult_result_16b[i][31:0];
+                    else if (vector_operation_i inside {vmul, vmacc, vnmsac, vmadd, vnmsub})
+                        result_mult[(16*(i+1))-1-:16] = mult_result_16b[i][15:0];
                     else
-                        result_mult[(16*(i+1))-1-:16] = mac_result_16b[i][31:16];
+                        result_mult[(16*(i+1))-1-:16] = mult_result_16b[i][31:16];
             end
             default: begin
                 for (int i = 0; i < VLENB/4; i++)
-                    result_mult[(32*(i+1))-1-:32] = mac_result_32b[i][31:0];
+                    result_mult[(32*(i+1))-1-:32] = mult_result_32b[i][31:0];
             end
         endcase
+    end
+
+    always @(posedge clk) begin
+        if (!hold_mult)
+            result_mult_r <= result_mult;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -429,7 +486,7 @@ module vectorALU
 //////////////////////////////////////////////////////////////////////////////
 
     assign hold   = hold_mult;
-    assign hold_o = hold | hold_widening_o;
+    assign hold_o = hold | hold_widening_o | hold_acc;
 
 //////////////////////////////////////////////////////////////////////////////
 // Result Demux

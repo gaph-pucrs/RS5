@@ -32,6 +32,7 @@ module vectorUnit
     opCat_e      opCat;
     addrModes_e  addrMode;
     logic        reduction_instruction;
+    logic        accumulate_instruction;
     logic        widening;
     
     vew_e   vsew, vsew_effective;
@@ -65,7 +66,8 @@ module vectorUnit
     assign opCat    = opCat_e'(funct3);
     assign addrMode = addrModes_e'(instruction_i[27:26]);
 
-    assign reduction_instruction = (vector_operation_i inside {vredsum, vredmaxu, vredmax, vredminu, vredmin, vredand, vredor, vredxor});
+    assign accumulate_instruction = (vector_operation_i inside {vmacc, vnmsac, vmadd, vnmsub});
+    assign reduction_instruction  = (vector_operation_i inside {vredsum, vredmaxu, vredmax, vredminu, vredmin, vredand, vredor, vredxor});
     assign widening = (vector_operation_i inside {vwmul, vwmulu, vwmulsu});
 
 //////////////////////////////////////////////////////////////////////////////
@@ -171,13 +173,13 @@ module vectorUnit
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             vd_addr <= '0;
-        else if (!widening)
+        else if (!widening && !hold)
             vd_addr <= vs3_addr;
         else begin
             if (state == V_IDLE && next_state == V_EXEC)
                 vd_addr <= rd;
-            else if (next_state inside {V_EXEC, V_END} && ((hold == 1'b0) || (hold == 1'b1 && hold_widening)) )
-                vd_addr <= vd_addr + 1'b1;
+            else if ((next_state inside {V_EXEC, V_END}) && ((hold == 1'b0) || (hold == 1'b1 && hold_widening == 1'b1)))
+                vd_addr <= vd_addr + 2;
         end 
     end
 
@@ -270,8 +272,8 @@ module vectorUnit
 
     always_ff @(posedge clk) begin
         if (!hold) begin
-            first_operand  <= vs2_data;
-            third_operand  <= vs3_data;
+            first_operand  <= (vector_operation_i inside {vmadd, vnmsub})  ? vs3_data : vs2_data;
+            third_operand  <= (vector_operation_i inside {vmadd, vnmsub})  ? vs2_data : vs3_data;
         end
     end
 
@@ -299,6 +301,7 @@ module vectorUnit
         .second_operand     (second_operand),
         .third_operand      (third_operand),
         .vector_operation_i (vector_operation_i),
+        .cycle_count        (cycle_count),
         .current_state      (state),
         .vsew               (vsew),
         .widening_i         (widening),
