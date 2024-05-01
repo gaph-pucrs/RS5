@@ -36,7 +36,7 @@ module vectorUnit
     logic        widening;
     
     vew_e   vsew, vsew_effective;
-    vlmul_e vlmul;
+    vlmul_e vlmul, vlmul_effective;
     logic[$bits(VLEN)-1:0] vl, vl_next;
 
     vector_states_e  state, next_state;
@@ -44,7 +44,7 @@ module vectorUnit
     logic [VLEN-1:0]  scalar_replicated, imm_replicated;
     logic [4:0]       vs1_addr, vs2_addr, vs3_addr;
     logic [VLEN-1:0]  vs1_data, vs2_data, vs3_data;
-    logic [4:0]       cycle_count;
+    logic [4:0]       cycle_count, cycle_count_vd;
     logic             hold, hold_widening;
 
     logic [VLEN-1:0]  first_operand, second_operand, third_operand;
@@ -118,9 +118,10 @@ module vectorUnit
 
             V_EXEC:
                 if (
-                    (vlmul == LMUL_2  && cycle_count < 2) 
-                ||  (vlmul == LMUL_4  && cycle_count < 4) 
-                ||  (vlmul == LMUL_8  && cycle_count < 8) 
+                    (vlmul_effective == LMUL_1  && cycle_count_vd < 1) 
+                ||  (vlmul_effective == LMUL_2  && cycle_count_vd < 2) 
+                ||  (vlmul_effective == LMUL_4  && cycle_count_vd < 4) 
+                ||  (vlmul_effective == LMUL_8  && cycle_count_vd < 8) 
                 )
                     next_state = V_EXEC;
                 else
@@ -150,6 +151,23 @@ module vectorUnit
         end
     end
 
+    always_comb begin
+        if (widening) begin
+            unique case (vlmul)
+                LMUL_1: vlmul_effective = LMUL_2;
+                LMUL_2: vlmul_effective = LMUL_4;
+                LMUL_8: vlmul_effective = LMUL_8;
+                default: begin
+                    vlmul_effective = vlmul;
+                    $error("Widening operations with LMUL=8 are not supported");
+                end
+            endcase
+        end 
+        else begin
+            vlmul_effective = vlmul;
+        end
+    end
+
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             cycle_count <= 0;
@@ -157,6 +175,17 @@ module vectorUnit
             cycle_count <= 0;
         else if (next_state == V_EXEC && hold == 1'b0)
             cycle_count <= cycle_count + 1;
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            cycle_count_vd <= 0;
+        else if (next_state == V_IDLE)
+            cycle_count_vd <= 0;
+        else if (accumulate_instruction == 1'b1 && state == V_IDLE && next_state == V_EXEC)
+            cycle_count_vd <= 0;
+        else if (next_state == V_EXEC && ((hold == 1'b0) || (hold == 1'b1 && hold_widening == 1'b1)))
+            cycle_count_vd <= cycle_count_vd + 1;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -170,23 +199,10 @@ module vectorUnit
         vs3_addr = rd  + cycle_count;
     end
 
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            vd_addr <= '0;
-        else if (!widening && !hold)
-            vd_addr <= vs3_addr;
-        else begin
-            if (state == V_IDLE && next_state == V_EXEC)
-                vd_addr <= rd;
-            else if ((next_state inside {V_EXEC, V_END}) && ((hold == 1'b0) || (hold == 1'b1 && hold_widening == 1'b1)))
-                vd_addr <= vd_addr + 2;
-        end 
-    end
-
     always_ff @(posedge clk) begin
+        vd_addr   <= rd + cycle_count_vd;
         vd_addr_r <= vd_addr;
     end
-
 
     // WRITE ENABLE GENERATION
     always_ff @(posedge clk) begin

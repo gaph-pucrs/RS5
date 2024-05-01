@@ -76,19 +76,19 @@
     # Positive 16-bit multiplication
     vsetvli t0, a0, e16, m1, ta, ma          # SEW= 16, LMUL=1
     nop
-    li a1, 100          # Load 16-bit value 0x0064
-    vor.vx v6, v6, a1   # Bitwise OR with 16-bit immediate
+    li a1, 100          # 0x0064
+    vor.vx v6, v6, a1
     nop
-    li a2, 11           # Load 16-bit value 0x000B
+    li a2, 11           # 0x000B
     nop
     vmul.vx v7, v6, a2  # 0x044C
 
     # Signed-Unsigned 16-bit multiplication
     nop
-    li a1, -9           # Load 16-bit signed value 0xFFF7
-    vor.vx v9, v9, a1   # Bitwise OR with 16-bit immediate
+    li a1, -9           # 0xFFF7
+    vor.vx v9, v9, a1
     nop
-    li a2, 33           # Load 16-bit unsigned value 0x0021
+    li a2, 33           # 0x0021
     nop
     vmul.vx v10, v9, a2  # 0xFED7
     nop
@@ -96,21 +96,21 @@
 
     # Zero-extended 16-bit multiplication
     nop
-    li a1, 0            # Load 16-bit value 0x0000
-    vor.vx v12, v12, a1  # Bitwise OR with 16-bit immediate
+    li a1, 0                # Load 16-bit value 0x0000
+    vor.vx v12, v12, a1
     nop
-    li a2, -1           # Load 16-bit signed value 0xFFFF
+    li a2, -1               # Load 16-bit signed value 0xFFFF
     nop
-    vmul.vx v13, v12, a2 # Multiply zero-extended 16-bit with signed, result stored in v13
+    vmul.vx v13, v12, a2    # 0x00
     nop
-    vmulhu.vx v14, v12, a2 # Unsigned multiply high with zero-extended, result stored in v14
+    vmulhu.vx v14, v12, a2  # 0x00
 
     # High 16-bit multiplication
     nop
     li a1, -100         # Load 16-bit signed value 0xFF9C
-    vor.vx v15, v15, a1 # Bitwise OR with 16-bit immediate
+    vor.vx v15, v15, a1
     nop
-    li a2, 100          # Load 16-bit unsigned value 0x0064
+    li a2, 100          # 0x0064
     nop
     vmul.vx v16, v15, a2 # D8f0
     nop
@@ -140,6 +140,83 @@
     li a2, 11             # 0x0B
     nop
     vwmul.vx v6, v4, a2   # 0x044C
+
+    #######################################
+    # MACCs
+    #######################################
+    jal ra, clear_vreg_bank
+
+    li a0, 8
+    vsetvli t0, a0, e8, m1, ta, ma          # SEW= 8, LMUL=1
+    nop
+    li a1, 02
+    vor.vx v1, v1, a1    # 0x02
+    nop
+    vmacc.vx v2, a1, v1  # 0x04 + 0x00 = 0x04
+
+    nop
+    vmacc.vx v2, a1, v1  # 0x04 + 0x04 = 0x8
+
+    nop
+    vmacc.vv v2, v1, v1  # 0x04 + 0x08 = 0x0C
+
+    nop
+    vmacc.vv v2, v1, v1  # 0x04 + 0x0C = 0x10
+
+    #vnmsac
+    nop
+    vnmsac.vv v2, v1, v1  # 0x10 - 0x04 = 0x0C
+
+    nop
+    vnmsac.vv v2, v1, v1  # 0x0C - 0x04 = 0x08
+
+    #vmadd
+    nop
+    li a2, 04
+    vor.vx v3, v3, a2    # 0x04
+    nop
+    vmadd.vx v1, a2, v1  # 0x02 * 0x04 + 0x2 = 0x0A
+
+    nop
+    vmadd.vx v1, a2, v1  # 0x0A * 0x04 + 0xA = 0x32
+
+    nop
+    li a3, 208            # 0xD0
+    vor.vx v4, v4, a3
+    nop
+    vnmsub.vx v1, a2, v4  # 0xD0 - (0x32 * 0x04) = 0x08
+    nop
+    vnmsub.vx v1, a2, v4  # 0xC8 - (0x08 * 0x04) = 0xB0
+
+    jal ra, clear_vreg_bank
+
+    vsetvli t0, x0, e8, m1, ta, ma          # SEW= 8, LMUL=1, VL=VLMAX
+    nop
+    li a1, 02
+    vor.vx v1, v1, a1    # 0x02
+    li a1, 04
+    vor.vx v2, v2, a2    # 0x04
+
+    vsetvli t0, x0, e8, m2, ta, ma          # SEW= 8, LMUL=2
+    nop
+    vmacc.vx v3, a1, v1  # (0x04*0x02)0x08 + 0x00 = 0x04 and (0x04*0x04)0x10 + 0x00 = 0x10
+
+    nop
+    vmacc.vx v3, a1, v1  # (0x04*0x02)0x08 + 0x08 = 0x10 and (0x04*0x04)0x10 + 0x10 = 0x20
+
+    nop
+    vmacc.vv v3, v1, v1  # (0x02*0x02)0x04 + 0x10 = 0x14 and (0x04*0x04)0x10 + 0x20 = 0x30
+
+    nop
+    vmacc.vv v3, v1, v1  # (0x02*0x02)0x04 + 0x14 = 0x18 and (0x04*0x04)0x10 + 0x30 = 0x40
+
+    #vnmsac
+    nop
+    vnmsac.vv v3, v1, v1  # 0x18 - (0x02*0x02)0x04 = 0x14 and 0x40 -(0x04*0x04)0x10 = 0x30
+
+    nop
+    vnmsac.vv v3, v1, v1  # 0x0C - 0x04 = 0x08
+
 
     #######################################
     # Logicals

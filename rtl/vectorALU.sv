@@ -31,23 +31,7 @@ module vectorALU
     assign second_operand_signed = second_operand;
     assign third_operand_signed  = third_operand;
 
-    logic [VLEN-1:0] result_mult_r;
-
-//////////////////////////////////////////////////////////////////////////////
-// Accumulate Control
-//////////////////////////////////////////////////////////////////////////////
-    logic hold_acc, hold_acc_r;
-    logic accumulate_instruction;
-
-    assign accumulate_instruction = (vector_operation_i inside {vmacc, vnmsac, vmadd, vnmsub});
-
-    always_ff @(posedge clk or negedge reset_n)
-        if (!reset_n)
-            hold_acc_r <= 1'b0;
-        else 
-            hold_acc_r <= hold_acc;
-
-    assign hold_acc = (accumulate_instruction == 1'b1 && hold_acc_r == 1'b0 && current_state == V_EXEC && cycle_count == 1 && hold_mult == 1'b0);
+    logic [VLEN-1:0] result_mult_r, third_operand_r;
 
 //////////////////////////////////////////////////////////////////////////////
 // Widening Control
@@ -132,7 +116,7 @@ module vectorALU
             vnmsac,
             vmacc,
             vmadd,
-            vnmsub:  summand_1 = third_operand;
+            vnmsub:  summand_1 = third_operand_r;
             default: summand_1 = first_operand;
         endcase
     end
@@ -478,7 +462,8 @@ module vectorALU
 
     always @(posedge clk) begin
         if (!hold_mult)
-            result_mult_r <= result_mult;
+            result_mult_r   <= result_mult;
+            third_operand_r <= third_operand;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -486,7 +471,7 @@ module vectorALU
 //////////////////////////////////////////////////////////////////////////////
 
     assign hold   = hold_mult;
-    assign hold_o = hold | hold_widening_o | hold_acc;
+    assign hold_o = hold | hold_widening_o;
 
 //////////////////////////////////////////////////////////////////////////////
 // Result Demux
