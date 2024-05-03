@@ -256,19 +256,37 @@ end
     assign hold_o = (hold_mul | hold_div);
 
     if (RV32 == RV32M || RV32 == RV32ZMMUL) begin : gen_zmmul_on
+
+        logic [1:0] signed_mode_mul;
+        logic       enable_mul;
+        logic       mul_low;
+
+        always_comb begin
+            unique case (instruction_operation_i)
+                MULH:    signed_mode_mul = 2'b11;
+                MULHSU:  signed_mode_mul = 2'b01;
+                default: signed_mode_mul = 2'b00;
+            endcase
+        end
+
+        assign enable_mul = (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU});
+        assign mul_low    = (instruction_operation_i == MUL);
+
         mul mul1 (
-            .clk                        (clk),
-            .reset_n                    (reset_n),
-            .first_operand_i            (first_operand_i),
-            .second_operand_i           (second_operand_i),
-            .instruction_operation_i    (instruction_operation_i),
-            .hold_o                     (hold_mul),
-            .mul_result_o               (mul_result)
+            .clk              (clk),
+            .reset_n          (reset_n),
+            .first_operand_i  (first_operand_i),
+            .second_operand_i (second_operand_i),
+            .signed_mode_i    (signed_mode_mul),
+            .enable_i         (enable_mul),
+            .mul_low_i        (mul_low),
+            .hold_o           (hold_mul),
+            .result_o         (mul_result)
         );
     end
     else begin : gen_zmmul_off
-        assign hold_mul       = 1'b0;
-        assign mul_result     = '0;
+        assign hold_mul   = 1'b0;
+        assign mul_result = '0;
     end
 
 /////////////////////////////////////////////////////////////////////////////
