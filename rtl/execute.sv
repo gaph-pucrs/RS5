@@ -248,6 +248,7 @@ end
 /////////////////////////////////////////////////////////////////////////////
 // Multiplication signals
 //////////////////////////////////////////////////////////////////////////////
+
     logic [31:0] mul_result;
     logic        hold_mul;
     logic        hold_div;
@@ -269,23 +270,31 @@ end
         assign hold_mul       = 1'b0;
         assign mul_result     = '0;
     end
-    /////////////////////////////////////////////////////////////////////////////
-    // Division
-    //////////////////////////////////////////////////////////////////////////////
-    
+
+/////////////////////////////////////////////////////////////////////////////
+// Division
+//////////////////////////////////////////////////////////////////////////////
+
     logic [31:0] div_result;
     logic [31:0] rem_result;
-    
+
     if (RV32 == RV32M) begin : gen_div_on
+        logic enable_div;
+        logic signed_div;
+
+        assign enable_div = (instruction_operation_i inside {DIV, DIVU, REM, REMU});
+        assign signed_div = (instruction_operation_i inside {DIV, REM});
+
         div div1 (
-            .clk                        (clk),
-            .reset_n                    (reset_n),
-            .first_operand_i            (first_operand_i),
-            .second_operand_i           (second_operand_i),
-            .instruction_operation_i    (instruction_operation_i),
-            .hold_o                     (hold_div),
-            .div_result_o               (div_result),
-            .rem_result_o               (rem_result)
+            .clk              (clk),
+            .reset_n          (reset_n),
+            .first_operand_i  (first_operand_i),
+            .second_operand_i (second_operand_i),
+            .enable_i         (enable_div),
+            .signed_i         (signed_div),
+            .hold_o           (hold_div),
+            .div_result_o     (div_result),
+            .rem_result_o     (rem_result)
         );
     end 
     else begin : gen_div_off
