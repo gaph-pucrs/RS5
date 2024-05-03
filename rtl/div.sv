@@ -21,7 +21,6 @@ module div
 );
 
     logic [$clog2(N)-1:0] counter;
-    div_states_e    state;
 
     logic           sign_a, sign_b;
     logic           change_sign;
@@ -31,6 +30,7 @@ module div
     logic [N-1:0]   quo, next_quo;
     logic [N:0]     acc, next_acc;
 
+    div_states_e    state;
     logic           start, busy, valid_result;
     logic           divide_by_zero, divide_by_one, overflow;
 
