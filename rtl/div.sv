@@ -1,6 +1,6 @@
 `include "RS5_pkg.sv"
 
-module div 
+module div
     import RS5_pkg::*;
 (
     input   logic        clk,
@@ -13,212 +13,161 @@ module div
     output  logic        hold_o,
 
     output  logic [31:0] div_result_o, 
-    output  logic [31:0] divu_result_o, 
-    output  logic [31:0] rem_result_o, 
-    output  logic [31:0] remu_result_o
+    output  logic [31:0] rem_result_o
+);
 
-    
-);  
-//////////////////////////////////////////////////////////////////////////////
-// Div Operations Control
-//////////////////////////////////////////////////////////////////////////////
+    div_states_e    state;
+    logic [ 4:0]    counter;
 
-    div_states_e    div_state;
-    logic           a_signal, b_signal, signal_diff;
-    logic [30:0]    a_unsig, b_unsig;
-    logic [31:0]    divisor;
-    logic [30:0]    quo_sig_div, quo_next_sig_div;
-    logic [31:0]    acc_sig_div, acc_next_sig_div;
-    logic [31:0]    quo_unsig_div, quo_next_unsig_div;
-    logic [32:0]    acc_unsig_div, acc_next_unsig_div;
-    logic           start_sig_div, busy_sig_div, valid_sig_div;
-    logic           start_unsig_div, busy_unsig_div, valid_unsig_div;
+    logic           sign_a, sign_b;
+    logic [ 1:0]    signed_mode;
+    logic           change_sign;
+
+    logic [31:0]    a_unsig, b_unsig;
+
+    logic [31:0]    quo, next_quo;
+    logic [32:0]    acc, next_acc;
+
+    logic           start, busy, valid_result;
     logic           divide_by_zero, divide_by_one, overflow;
+
     logic [31:0]    div_result;
 
-    assign divide_by_zero   = second_operand_i == '0;
-    assign divide_by_one    = second_operand_i == 32'h00000001;
-    assign overflow         = second_operand_i == 32'hFFFFFFFF && first_operand_i == 32'h80000000;
-    assign start_sig_div    = instruction_operation_i inside {DIV, REM}   && busy_sig_div   == 1'b0 && valid_sig_div   == 1'b0;
-    assign start_unsig_div  = instruction_operation_i inside {DIVU, REMU} && busy_unsig_div == 1'b0 && valid_unsig_div == 1'b0;
+//////////////////////////////////////////////////////////////////////////////
+// Control
+//////////////////////////////////////////////////////////////////////////////
 
-    assign hold_o = (start_unsig_div | busy_unsig_div) || (start_sig_div | busy_sig_div);
-
-    always_comb begin
-        if (divide_by_zero == 1'b1) begin
-            div_result_o  = 32'hFFFFFFFF;
-            divu_result_o = 32'hFFFFFFFF;
-            remu_result_o = first_operand_i;
-        end
-        else if (divide_by_one == 1'b1) begin
-            div_result_o  = first_operand_i;
-            divu_result_o = first_operand_i;
-            remu_result_o = '0;
-        end
-        else begin
-            div_result_o  = overflow == 1'b1 ? first_operand_i : div_result;
-            divu_result_o = quo_next_unsig_div;
-            remu_result_o = acc_next_unsig_div[32:1];
-        end
-    end
-
-    always_comb begin
-        if (divide_by_zero == 1'b1) begin
-            rem_result_o = first_operand_i;
-        end
-        else if (overflow == 1'b1 || divide_by_one == 1'b1) begin
-            rem_result_o = '0;
-        end
-        else if (a_signal == 1'b1) begin
-            rem_result_o = {1'b1, -acc_sig_div[31:1]};
-        end
-        else begin
-            rem_result_o = {1'b0, acc_sig_div[31:1]};
-        end
-    end
+    assign divide_by_zero   = (second_operand_i == '0);
+    assign divide_by_one    = (second_operand_i ==  1);
+    assign overflow         = (second_operand_i == '1 && first_operand_i == 32'h80000000 && signed_mode == 2'b11);
+    
+    assign start            = (instruction_operation_i inside {DIV, DIVU, REM, REMU} && busy == 1'b0 && valid_result == 1'b0);
 
 //////////////////////////////////////////////////////////////////////////////
-// Unsigned Div Operations
+// Sign Control
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        if (acc_unsig_div >= {1'b0, divisor}) begin
-            acc_next_unsig_div = acc_unsig_div - divisor;
-            {acc_next_unsig_div, quo_next_unsig_div} = {acc_next_unsig_div[31:0], quo_unsig_div, 1'b1};
+        unique case (instruction_operation_i)
+            DIV, REM: signed_mode = 2'b11;
+            default:  signed_mode = 2'b00;
+        endcase
+    end
+
+    assign sign_a = first_operand_i [31] & signed_mode[0];
+    assign sign_b = second_operand_i[31] & signed_mode[1];
+
+    assign change_sign = (sign_a ^ sign_b);
+
+//////////////////////////////////////////////////////////////////////////////
+// Div Operations
+//////////////////////////////////////////////////////////////////////////////
+
+    always_comb begin
+        if (acc >= {1'b0, b_unsig}) begin
+            next_acc = acc - b_unsig;
+            {next_acc, next_quo} = {next_acc[31:0], quo, 1'b1};
         end else begin
-            {acc_next_unsig_div, quo_next_unsig_div} = {acc_unsig_div, quo_unsig_div} << 1;
+            {next_acc, next_quo} = {acc, quo} << 1;
         end
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
-        logic [4:0] i;
-
         if (!reset_n) begin
-            busy_unsig_div    <= 1'b0;
-            valid_unsig_div   <= 1'b0;
-            acc_unsig_div     <= '0;
-            quo_unsig_div     <= '0;
-            divisor           <= second_operand_i;
-
+            state       <= D_IDLE; 
+            busy        <= 1'b0;
+            valid_result<= 1'b0;
+            acc         <= '0;
+            quo         <= '0;
+            div_result  <= '0;
+            a_unsig     <= '0;
+            b_unsig     <= '0;
+            counter     <= '0;
         end 
-        else if (!(instruction_operation_i inside {DIVU, REMU})) begin
-            valid_unsig_div <= 1'b0;
-        end 
-        else if (start_unsig_div == 1'b1) begin
-            valid_unsig_div                     <= 1'b0;
-            i                                   <= '0;
-            if ((divide_by_zero | divide_by_one) == 1'b1) begin
-                busy_unsig_div                  <= 1'b0;
-                valid_unsig_div                 <= 1'b1;
-            end else begin
-                busy_unsig_div                  <= 1'b1;
-                divisor                         <= second_operand_i;
-                {acc_unsig_div, quo_unsig_div}  <= {{32{1'b0}}, first_operand_i, 1'b0};
-            end
-        end 
-        else if (busy_unsig_div == 1'b1) begin
-            if (i == 5'd31) begin
-                busy_unsig_div    <= 1'b0;
-                valid_unsig_div   <= 1'b1;
-            end 
-            else begin
-                i                 <= i + 1'b1;
-                acc_unsig_div     <= acc_next_unsig_div;
-                quo_unsig_div     <= quo_next_unsig_div;
-            end
-        end
-    end
-
-//////////////////////////////////////////////////////////////////////////////
-// Signed Div Operations
-//////////////////////////////////////////////////////////////////////////////
-
-    assign  a_signal = first_operand_i[31],
-            b_signal = second_operand_i[31];
-
-    always_comb begin
-        if (acc_sig_div >= {1'b0, b_unsig}) begin
-            acc_next_sig_div = acc_sig_div - b_unsig;
-            {acc_next_sig_div, quo_next_sig_div} = {acc_next_sig_div[30:0], quo_sig_div, 1'b1};
-        end else begin
-            {acc_next_sig_div, quo_next_sig_div} = {acc_sig_div[30:0], quo_sig_div, 1'b0};
-        end
-    end
-
-    always_ff @(posedge clk or negedge reset_n) begin
-        logic [4:0] i;
-
-        if (!reset_n) begin
-            div_state       <= D_IDLE; 
-            busy_sig_div    <= 1'b0;
-            valid_sig_div   <= 1'b0;
-            acc_sig_div     <= '0;
-            quo_sig_div     <= '0;
-            div_result      <= '0;
-            a_unsig         <= '0;
-            b_unsig         <= '0;
-            signal_diff     <= 1'b0;
-        end 
-        else if (!(instruction_operation_i inside {DIV, REM})) begin
-            valid_sig_div   <= 1'b0;
+        else if (!(instruction_operation_i inside {DIV, DIVU, REM, REMU})) begin
+            valid_result   <= 1'b0;
         end
         else begin
-            case (div_state)
+            case (state)
+
+                D_IDLE: begin
+                    if (start == 1'b1) begin
+                        if (divide_by_zero | divide_by_one | overflow) begin
+                            state        <= D_IDLE;
+                            busy         <= 1'b0;
+                            valid_result <= 1'b1;
+                        end
+                        else begin
+                            state        <= D_INIT;
+                            busy         <= 1'b1;
+                            valid_result <= 1'b0;
+                            a_unsig      <= (sign_a) 
+                                            ? -first_operand_i[31:0] 
+                                            :  first_operand_i[31:0];
+                            b_unsig      <= (sign_b) 
+                                            ? -second_operand_i[31:0] 
+                                            :  second_operand_i[31:0];
+                        end
+                    end
+                end
 
                 D_INIT: begin
-                    div_state                   <= D_CALC;
-                    i                           <= '0;
-                    {acc_sig_div, quo_sig_div}  <= {{31{1'b0}}, a_unsig, 1'b0};
+                    state       <= D_CALC;
+                    counter     <= '0;
+                    {acc, quo}  <= {32'h0, a_unsig, 1'b0};
                 end
 
                 D_CALC: begin
-                    if (i == 5'd30) begin
-                        div_state   <= D_SIGN;
-                    end 
-                    i           <= i + 1'b1;
-                    acc_sig_div <= acc_next_sig_div;
-                    quo_sig_div <= quo_next_sig_div;
+                    counter <= counter + 1'b1;
+                    acc     <= next_acc;
+                    quo     <= next_quo;
+                    if (counter == 5'd31) state <= D_SIGN;
                 end
 
                 D_SIGN: begin
-                    div_state       <= D_IDLE;
-                    busy_sig_div    <= 1'b0;
-                    valid_sig_div   <= 1'b1;
+                    state        <= D_IDLE;
+                    busy         <= 1'b0;
+                    valid_result <= 1'b1;
                     
-                    if (quo_sig_div != 0) begin
-                        div_result  <= (signal_diff) 
-                                        ? {1'b1, -quo_sig_div} 
-                                        : {1'b0, quo_sig_div};
-                    end
-                    else begin
+                    if (quo != 0)
+                        div_result  <=  (change_sign) 
+                                        ? {1'b1, -quo} 
+                                        : {1'b0, quo};
+                    else
                         div_result  <= '0;
-                    end
                 end
 
-                default: begin
-                    if (start_sig_div == 1'b1) begin
-                        valid_sig_div       <= 1'b0;
-                        if ((divide_by_zero | divide_by_one | overflow) == 1'b1) begin
-                            div_state       <= D_IDLE;
-                            busy_sig_div    <= 1'b0;
-                            valid_sig_div   <= 1'b1;
-                        end
-                        else begin
-                            div_state                   <= D_INIT;
-                            busy_sig_div                <= 1'b1;
-                            signal_diff                 <= (a_signal ^ b_signal);
-                            a_unsig                     <=  (a_signal) 
-                                                            ? -first_operand_i[30:0] 
-                                                            : first_operand_i[30:0];
-                            b_unsig                     <= (b_signal) 
-                                                            ? -second_operand_i[30:0] 
-                                                            : second_operand_i[30:0];
-                            {acc_sig_div, quo_sig_div}  <= {{30{1'b0}}, first_operand_i, 1'b0};
-                        end
-                    end
-                end
+                default: state <= state;
             endcase
         end
     end
+
+//////////////////////////////////////////////////////////////////////////////
+// Outputs
+//////////////////////////////////////////////////////////////////////////////
+
+    always_comb begin
+        if (divide_by_zero)
+            div_result_o  = 32'hFFFFFFFF;
+        else if (divide_by_one)
+            div_result_o  = first_operand_i;
+        else
+            div_result_o  = (overflow) ? first_operand_i : div_result;
+    end
+
+    always_comb begin
+        if (divide_by_zero) 
+            rem_result_o = first_operand_i;
+        else if (overflow || divide_by_one)
+            rem_result_o = 32'h0;
+        else if (sign_a)
+            rem_result_o = {1'b1, -acc[31:1]};
+        else if (div_result == 32'h0)
+            rem_result_o = first_operand_i;
+        else
+            rem_result_o = {1'b0, acc[31:1]};
+    end
+
+    assign hold_o = (start | busy);
 
 endmodule
