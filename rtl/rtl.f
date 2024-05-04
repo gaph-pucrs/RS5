@@ -1,3 +1,5 @@
+./aes_sbox.sv
+./aes_unit.sv
 ./mmu.sv
 ./fetch.sv
 ./decode.sv

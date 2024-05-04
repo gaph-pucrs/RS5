@@ -14,14 +14,14 @@
  *
  * \detailed
  * Execute Unit is the third stage of the RS5 processor core. It implements
- * an Arithmetic Logic Unit (ALU) responsible for calculations, it also have 
- * a Branch Unit that makes the decision of branching based on instruction 
+ * an Arithmetic Logic Unit (ALU) responsible for calculations, it also have
+ * a Branch Unit that makes the decision of branching based on instruction
  * operation and operands. Also implements the Memory Load and Store mechanism.
  * Lastly it implements the CSR access logic.
  * The operations are performed based on Tag comparisons between this unit's tag
- * and the instruction tag, if they mismatch the instruction is killed and its 
+ * and the instruction tag, if they mismatch the instruction is killed and its
  * operation is not performed. A performed branch causes the internal tag to be
- * increased, causing the tag mismatch on the following instructions until an 
+ * increased, causing the tag mismatch on the following instructions until an
  * instruction fetched from the new flow arrives with the updated tag.
  */
 
@@ -30,7 +30,8 @@
 module execute
     import RS5_pkg::*;
 #(
-    parameter rv32_e        RV32        = RV32I
+    parameter rv32_e        RV32        = RV32I,
+    parameter bit           ZKNEEnable  = 1'b1
 )
 (
     input   logic               clk,
@@ -173,8 +174,8 @@ module execute
                     2'b01:   mem_write_enable_o = 4'b0010;
                     default: mem_write_enable_o = 4'b0001;
                 endcase
-            SH:              mem_write_enable_o = (sum_result[1]) 
-                                                ? 4'b1100 
+            SH:              mem_write_enable_o = (sum_result[1])
+                                                ? 4'b1100
                                                 : 4'b0011;
             SW:              mem_write_enable_o = 4'b1111;
             default:         mem_write_enable_o = 4'b0000;
@@ -229,7 +230,7 @@ end
         endcase
     end
 
-    
+
     always_comb begin
         // Raise exeption if CSR is read only and write enable is true
         if (csr_address_o[11:10] == 2'b11 && csr_write_enable == 1'b1) begin
@@ -314,7 +315,7 @@ end
             .div_result_o     (div_result),
             .rem_result_o     (rem_result)
         );
-    end 
+    end
     else begin : gen_div_off
         assign hold_div         = 1'b0;
         assign div_result       = '0;
@@ -322,10 +323,33 @@ end
     end
 
 //////////////////////////////////////////////////////////////////////////////
+// AES
+//////////////////////////////////////////////////////////////////////////////
+
+    logic [31:0] aes_result;
+
+    if (ZKNEEnable) begin: zkne_gen
+
+        aes_unit #(
+            .LOGIC_GATING(1'b1)  // Gate sub-module inputs to save toggling
+        ) u_aes_unit (
+            .rs1_in(first_operand_i),      // Source register 1
+            .rs2_in(second_operand_i),     // Source register 2
+            .bs_in(instruction_i[31:30]),  // Byte select immediate
+
+            .rd_out(aes_result),  // Output destination register value
+
+            .mix_in(instruction_operation_i == AES32ESMI),                   // SubBytes + MixColumn or just SubBytes
+            .valid_in(instruction_operation_i inside {AES32ESMI, AES32ESI})  // Are the inputs valid?
+        );
+
+    end
+
+//////////////////////////////////////////////////////////////////////////////
 // Demux
 //////////////////////////////////////////////////////////////////////////////
 
-    always_comb begin 
+    always_comb begin
         unique case (instruction_operation_i)
             CSRRW, CSRRS, CSRRC,
             CSRRWI,CSRRSI,CSRRCI:   result = csr_data_read_i;
@@ -342,6 +366,7 @@ end
             DIV,DIVU:               result = div_result;
             REM,REMU:               result = rem_result;
             MUL,MULH,MULHU,MULHSU:  result = mul_result;
+            AES32ESI, AES32ESMI:    result = aes_result;
             default:                result = sum_result;
         endcase
     end
@@ -354,7 +379,7 @@ end
             BGE,BGEU:  write_enable = 1'b0;
             default:   write_enable = ~(killed | raise_exception_o);
         endcase
-    end 
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 // Output Registers
@@ -364,12 +389,12 @@ end
         if (!reset_n) begin
             write_enable_o          <= 1'b0;
             instruction_operation_o <= NOP;
-            result_o                <= '0;       
+            result_o                <= '0;
         end
         else if (stall == 1'b0 & hold_o == 1'b0) begin
             write_enable_o          <= write_enable;
             instruction_operation_o <= instruction_operation_i;
-            result_o                <= result;             
+            result_o                <= result;
         end
     end
 
@@ -442,21 +467,21 @@ end
                 interrupt_ack_o   = 1'b0;
                 exception_code_o  = ILLEGAL_INSTRUCTION;
                 // $write("[%0d] EXCEPTION - ILLEGAL INSTRUCTION: %8h %8h\n", $time, pc_i, instruction_i);
-            end 
+            end
             else if (exc_misaligned_fetch_i == 1'b1) begin
                 raise_exception_o = 1'b1;
                 machine_return_o  = 1'b0;
                 interrupt_ack_o   = 1'b0;
                 exception_code_o  = INSTRUCTION_ADDRESS_MISALIGNED;
                 // $write("[%0d] EXCEPTION - INSTRUCTION ADDRESS MISALIGNED: %8h %8h\n", $time, pc_i, instruction_i);
-            end 
+            end
             else if (instruction_operation_i == ECALL) begin
                 raise_exception_o = 1'b1;
                 machine_return_o  = 1'b0;
                 interrupt_ack_o   = 1'b0;
                 exception_code_o  = (privilege_i == USER) ? ECALL_FROM_UMODE : ECALL_FROM_MMODE;
                 // $write("[%0d] EXCEPTION - ECALL_FROM_MMODE: %8h %8h\n", $time, pc_i, instruction_i);
-            end 
+            end
             else if (instruction_operation_i == EBREAK) begin
                 raise_exception_o = 1'b1;
                 machine_return_o  = 1'b0;
@@ -470,14 +495,14 @@ end
                 interrupt_ack_o   = 1'b0;
                 exception_code_o  = LOAD_ACCESS_FAULT;
                 // $write("[%0d] EXCEPTION - LOAD ACCESS FAULT: %8h %8h %8h\n", $time, pc_i, instruction_i, mem_address_o);
-            end 
+            end
             else if (instruction_operation_i == MRET) begin
                 raise_exception_o = 1'b0;
                 machine_return_o  = 1'b1;
                 interrupt_ack_o   = 1'b0;
                 exception_code_o  = NE;
                 // $write("[%0d] MRET: %8h %8h\n", $time, pc_i, instruction_i);
-            end 
+            end
             else if (interrupt_pending_i == 1'b1 && instruction_operation_i != NOP) begin
                 raise_exception_o = 1'b0;
                 machine_return_o  = 1'b0;

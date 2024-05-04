@@ -21,7 +21,7 @@
 
 `include "../rtl/RS5_pkg.sv"
 
-module RAM_mem 
+module RAM_mem
     import RS5_pkg::*;
 #(
     parameter int    MEM_WIDTH  = 65536,
@@ -56,8 +56,8 @@ module RAM_mem
             $finish();
         end
 
-        $fread(RAM, fd);
-        
+        void'($fread(RAM, fd));
+
         if (DEBUG) begin
             fd_r_a = $fopen ({DEBUG_FILE, "_A_reads.txt"}, "w");
             fd_r_b = $fopen ({DEBUG_FILE, "_B_reads.txt"}, "w");
@@ -71,7 +71,7 @@ module RAM_mem
         if (enA_i == 1'b1) begin
             if (weA_i[3] == 1'b1) begin                                 // Store Word(4 bytes)
                 RAM[addrA_i+3] <= dataA_i[31:24];
-            end 
+            end
             if (weA_i[2] == 1'b1) begin                                 // Store Word(4 bytes)
                 RAM[addrA_i+2] <= dataA_i[23:16];
             end
@@ -97,7 +97,7 @@ module RAM_mem
         if (enB_i == 1'b1) begin
             if (weB_i[3] == 1'b1) begin                                 // Store Word(4 bytes)
                 RAM[addrB_i+3] <= dataB_i[31:24];
-            end 
+            end
             if (weB_i[2] == 1'b1) begin                                 // Store Word(4 bytes)
                 RAM[addrB_i+2] <= dataB_i[23:16];
             end
@@ -118,7 +118,7 @@ module RAM_mem
                     $fwrite(fd_w_b," --> 0x%4h\n", addrB_i);
                 end
             end
-        end 
+        end
     end
 
     /* Read */
@@ -132,12 +132,12 @@ module RAM_mem
 
                 if (DEBUG) begin
                     if (addrA_i != '0) begin
-                        $fwrite(fd_r_a,"[%0d] %h %h %h %h <-- 0x%4h\n", 
+                        $fwrite(fd_r_a,"[%0d] %h %h %h %h <-- 0x%4h\n",
                             $time, RAM[addrA_i+3], RAM[addrA_i+2], RAM[addrA_i+1], RAM[addrA_i], addrA_i);
                     end
                 end
             end
-        end 
+        end
 
         if (enB_i == 1'b1) begin
             if (weB_i == '0) begin
@@ -148,7 +148,7 @@ module RAM_mem
 
                 if (DEBUG) begin
                     if (addrB_i != '0) begin
-                        $fwrite(fd_r_b,"[%0d] %h %h %h %h <-- 0x%4h\n", 
+                        $fwrite(fd_r_b,"[%0d] %h %h %h %h <-- 0x%4h\n",
                             $time, RAM[addrB_i+3], RAM[addrB_i+2], RAM[addrB_i+1], RAM[addrB_i], addrB_i);
                     end
                 end
