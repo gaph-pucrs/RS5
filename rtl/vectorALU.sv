@@ -433,6 +433,7 @@ module vectorALU
 //////////////////////////////////////////////////////////////////////////////
 // Multiplication Demux
 //////////////////////////////////////////////////////////////////////////////
+    
     always_comb begin
         unique case (vsew)
             EW8: begin
@@ -467,10 +468,172 @@ module vectorALU
     end
 
 //////////////////////////////////////////////////////////////////////////////
+// Division Common
+//////////////////////////////////////////////////////////////////////////////
+
+    logic [VLEN-1:0] result_div;
+    logic [VLEN-1:0] result_rem;
+    logic            div_signed;
+    logic            div_enable;
+
+    logic [VLENB-1:0]     hold_div_8b;
+    logic [(VLENB/2)-1:0] hold_div_16b;
+    logic [(VLENB/4)-1:0] hold_div_32b;
+
+    logic hold_div;
+
+    assign div_enable = (vector_operation_i inside {vdiv, vdivu, vrem, vremu} && current_state == V_EXEC);
+    assign div_signed = (vector_operation_i inside {vdiv, vrem});
+
+    assign hold_div = (|hold_div_8b) | (|hold_div_16b) | (|hold_div_32b);
+
+//////////////////////////////////////////////////////////////////////////////
+// Division 8 bits
+//////////////////////////////////////////////////////////////////////////////
+
+    logic       div_enable_8b;
+    logic [7:0] div_op_a_8b   [VLENB-1:0];
+    logic [7:0] div_op_b_8b   [VLENB-1:0];
+    logic [7:0] div_result_8b [VLENB-1:0];
+    logic [7:0] rem_result_8b [VLENB-1:0];
+
+    assign div_enable_8b = (div_enable == 1'b1 && vsew == EW8);
+
+    always_comb begin
+        for (int i = 0; i < VLENB; i++) begin
+            div_op_a_8b[i] = first_operand [(8*(i+1))-1-:8];
+            div_op_b_8b[i] = second_operand[(8*(i+1))-1-:8];
+        end
+    end
+
+    genvar i_div8b;
+    generate
+        for (i_div8b = 0; i_div8b < VLENB; i_div8b++) begin : DIV8B_LOOP
+            div #(
+                .N(8)
+            ) div8b (
+                .clk              (clk),
+                .reset_n          (reset_n),
+                .first_operand_i  (div_op_a_8b[i_div8b]),
+                .second_operand_i (div_op_b_8b[i_div8b]),
+                .enable_i         (div_enable_8b),
+                .signed_i         (div_signed),
+                .hold_o           (hold_div_8b[i_div8b]),
+                .div_result_o     (div_result_8b[i_div8b]),
+                .rem_result_o     (rem_result_8b[i_div8b])
+            );
+        end
+    endgenerate
+
+//////////////////////////////////////////////////////////////////////////////
+// Division 16 bits
+//////////////////////////////////////////////////////////////////////////////
+
+    logic        div_enable_16b;
+    logic [15:0] div_op_a_16b   [(VLENB/2)-1:0];
+    logic [15:0] div_op_b_16b   [(VLENB/2)-1:0];
+    logic [15:0] div_result_16b [(VLENB/2)-1:0];
+    logic [15:0] rem_result_16b [(VLENB/2)-1:0];
+
+    assign div_enable_16b = (div_enable == 1'b1 && vsew == EW16);
+
+    always_comb begin
+        for (int i = 0; i < VLENB/2; i++) begin
+            div_op_a_16b[i] = first_operand [(16*(i+1))-1-:16];
+            div_op_b_16b[i] = second_operand[(16*(i+1))-1-:16];
+        end
+    end
+
+    genvar i_div16b;
+    generate
+        for (i_div16b = 0; i_div16b < VLENB/2; i_div16b++) begin : DIV16B_LOOP
+            div #(
+                .N(16)
+            ) div16b (
+                .clk              (clk),
+                .reset_n          (reset_n),
+                .first_operand_i  (div_op_a_16b[i_div16b]),
+                .second_operand_i (div_op_b_16b[i_div16b]),
+                .enable_i         (div_enable_16b),
+                .signed_i         (div_signed),
+                .hold_o           (hold_div_16b[i_div16b]),
+                .div_result_o     (div_result_16b[i_div16b]),
+                .rem_result_o     (rem_result_16b[i_div16b])
+            );
+        end
+    endgenerate
+
+//////////////////////////////////////////////////////////////////////////////
+// Division 32 bits
+//////////////////////////////////////////////////////////////////////////////
+
+    logic        div_enable_32b;
+    logic [31:0] div_op_a_32b   [(VLENB/4)-1:0];
+    logic [31:0] div_op_b_32b   [(VLENB/4)-1:0];
+    logic [31:0] div_result_32b [(VLENB/4)-1:0];
+    logic [31:0] rem_result_32b [(VLENB/4)-1:0];
+
+    assign div_enable_32b = (div_enable == 1'b1 && vsew == EW32);
+
+    always_comb begin
+        for (int i = 0; i < VLENB/4; i++) begin
+            div_op_a_32b[i] = first_operand [(32*(i+1))-1-:32];
+            div_op_b_32b[i] = second_operand[(32*(i+1))-1-:32];
+        end
+    end
+
+    genvar i_div32b;
+    generate
+        for (i_div32b = 0; i_div32b < VLENB/4; i_div32b++) begin : DIV32B_LOOP
+            div #(
+                .N(32)
+            ) div32b (
+                .clk              (clk),
+                .reset_n          (reset_n),
+                .first_operand_i  (div_op_a_32b[i_div32b]),
+                .second_operand_i (div_op_b_32b[i_div32b]),
+                .enable_i         (div_enable_32b),
+                .signed_i         (div_signed),
+                .hold_o           (hold_div_32b[i_div32b]),
+                .div_result_o     (div_result_32b[i_div32b]),
+                .rem_result_o     (rem_result_32b[i_div32b])
+            );
+        end
+    endgenerate
+
+//////////////////////////////////////////////////////////////////////////////
+// Division Demux
+//////////////////////////////////////////////////////////////////////////////
+
+    always_comb begin
+        unique case (vsew)
+            EW8: begin
+                for (int i = 0; i < VLENB; i++) begin
+                    result_div[(8*(i+1))-1-:8] = div_result_8b[i];
+                    result_rem[(8*(i+1))-1-:8] = rem_result_8b[i];
+                end
+            end
+            EW16: begin
+                for (int i = 0; i < VLENB/2; i++) begin
+                    result_div[(16*(i+1))-1-:16] = div_result_16b[i];
+                    result_rem[(16*(i+1))-1-:16] = rem_result_16b[i];
+                end
+            end
+            default: begin
+                for (int i = 0; i < VLENB/4; i++)begin
+                    result_div[(32*(i+1))-1-:32] = div_result_32b[i];
+                    result_rem[(32*(i+1))-1-:32] = rem_result_32b[i];
+                end
+            end
+        endcase
+    end
+
+//////////////////////////////////////////////////////////////////////////////
 // Hold generation
 //////////////////////////////////////////////////////////////////////////////
 
-    assign hold   = hold_mult;
+    assign hold   = hold_mult | hold_div;
+
     assign hold_o = hold | hold_widening_o;
 
 //////////////////////////////////////////////////////////////////////////////
@@ -498,6 +661,8 @@ module vectorALU
             vmulhu, vmulhsu: result_o <= result_mult;
             vwmul, vwmulu, 
             vwmulsu:         result_o <= (widening_counter == 1'b1) ? result_mult[VLEN-1:0] : result_mult[VLEN-1:0];
+            vdiv, vdivu:     result_o <= result_div;
+            vrem, vremu:     result_o <= result_rem;
             /*
             vredand:         result_o <= {'0, result_redAnd_32};
             vredor:          result_o <= {'0, result_redOr_32};

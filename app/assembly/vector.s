@@ -219,6 +219,86 @@
 
 
     #######################################
+    # Divisions
+    #######################################
+    jal ra, clear_vreg_bank
+
+    vsetvli t0, x0, e8, m1, ta, ma          # SEW=8, LMUL=1, VL=8
+
+    nop
+    vor.vi v1, v1, 13   # 0x0D
+    li a4, 5            # 0x05
+    vdiv.vx v2, v1, a4  # 0x02
+    nop
+    vrem.vx v3, v1, a4  # 0x03
+
+    nop
+    vor.vi v5, v5, -13  # 0xF3
+    nop
+    vdiv.vx v6, v5, a4  # 0xFE
+    nop
+    vrem.vx v7, v5, a4  # 0xFD
+
+    nop
+    vor.vi v9, v9, 13    # 0x0D
+    li a4, -5            # 0xFB
+    vdiv.vx v10, v9, a4  # 0xFE
+    nop
+    vrem.vx v11, v9, a4  # 0x03
+
+    nop
+    vor.vi v13, v13, -13  # 0xF3
+    nop
+    vdiv.vx v14, v13, a4  # 0x02
+    nop
+    vrem.vx v15, v13, a4  # 0xFD
+
+    # overflow
+    nop
+    li a3, 128
+    vor.vx v17, v17, a3   # 0x80
+    li a4, 1              # 0x01
+    vdiv.vx v18, v17, a4  # 0x80
+    nop
+    vrem.vx v19, v17, a4  # 0x00
+
+    li a5, -1             # 0xFF
+    vdiv.vx v20, v17, a5  # 0x80
+    nop
+    vrem.vx v21, v17, a5  # 0x00
+
+    # divide by zero
+    vdiv.vx v23, v17, x0  # 0xFF
+    nop
+    vrem.vx v24, v17, x0  # 0x80
+
+    vor.vi v22, v22, 1    # 0x01
+    nop
+    vdiv.vx v25, v22, x0  # 0xFF
+    nop
+    vrem.vx v26, v22, x0  # 0x01
+
+    nop
+    vdiv.vx v27, v31, x0  # 0xFF
+    nop
+    vrem.vx v28, v31, x0  # 0x00
+
+    # LMUL > 1
+    jal ra, clear_vreg_bank
+
+    vsetvli t0, x0, e8, m1, ta, ma          # SEW=8, LMUL=1, VL=8
+    nop
+    vor.vi v1, v1, 13   # 0x0D
+    nop
+    vor.vi v2, v2, -13  # 0xF3
+    li a4, 5            # 0x05
+
+    vsetvli t0, x0, e8, m2, ta, ma          # SEW=8, LMUL=2, VL=16
+    vdiv.vx v4, v1, a4  # 0x02 and 0xFE
+    nop
+    vrem.vx v7, v1, a4  # 0x03 and 0xFD
+
+    #######################################
     # Logicals
     #######################################
     jal ra, clear_vreg_bank

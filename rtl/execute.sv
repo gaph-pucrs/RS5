@@ -343,9 +343,10 @@ end
             SB,SH,SW,
             BEQ,BNE,
             BLT,BLTU,
-            BGE,BGEU:                write_enable = 1'b0;
-            VSETVL,VSETVLI,VSETIVLI: write_enable = vector_wr_en;
-            default:                 write_enable = !killed;
+            BGE,BGEU:         write_enable = 1'b0;
+            VSETVL,VSETVLI,
+            VSETIVLI,VECTOR:  write_enable = vector_wr_en;
+            default:          write_enable = !killed;
         endcase
     end 
 

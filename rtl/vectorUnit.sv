@@ -200,6 +200,7 @@ module vectorUnit
     end
 
     always_ff @(posedge clk) begin
+        if ((hold == 1'b0) || (hold == 1'b1 && hold_widening == 1'b1))
         vd_addr   <= rd + cycle_count_vd;
         vd_addr_r <= vd_addr;
     end
