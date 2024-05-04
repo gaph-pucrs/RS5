@@ -105,6 +105,9 @@ module div
                                             :  second_operand_i[N-1:0];
                         end
                     end
+                    else begin
+                        valid_result <= 1'b0;
+                    end
                 end
 
                 D_INIT: begin
