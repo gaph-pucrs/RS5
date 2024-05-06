@@ -44,7 +44,7 @@ int main(int argc, char** argv, char** env) {
     auto then = std::chrono::high_resolution_clock::now();
 
     // Simulate until $finish
-    top->rst_i = 1;
+    top->reset_n = 0;
     while (!contextp->gotFinish()) {
         contextp->timeInc(5);  // 5 timeprecision period passes...
 
@@ -57,7 +57,7 @@ int main(int argc, char** argv, char** env) {
         // reset is not sampled there.
         if(!top->clk_i){
             if (contextp->time() > 100)
-                top->rst_i = 0;
+                top->reset_n = 1;
         }
 
         // Evaluate model

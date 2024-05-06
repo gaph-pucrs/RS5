@@ -39,9 +39,7 @@ module testbench
 //////////////////////////////////////////////////////////////////////////////
 
     localparam int           MEM_WIDTH = 65536;
-    // localparam string        BIN_FILE = "../app/riscv-tests/test.bin";
-    // localparam string        BIN_FILE = "../app/samplecode/helloworld.bin";
-    localparam string        BIN_FILE = "../app/aes-test/aes128_nist_enc_test.bin";
+    localparam string        BIN_FILE = "../app/riscv-tests/test.bin";
 
     localparam int           i_cnt = 1;
 
@@ -140,10 +138,10 @@ module testbench
 
     RS5 #(
         .Environment(ASIC),
-        .RV32(INSTRUCTION_SET),
+        .RV32       (INSTRUCTION_SET),
         .XOSVMEnable(USE_XOSVM),
         .ZIHPMEnable(USE_ZIHPM),
-        .ZKNEEnable(USE_ZKNE)
+        .ZKNEEnable (USE_ZKNE)
     ) dut (
         .clk                    (clk_i),
         .reset_n                (reset_n),

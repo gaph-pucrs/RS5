@@ -16,11 +16,13 @@ module div
 
     output  logic         hold_o,
 
-    output  logic [N-1:0] div_result_o, 
+    output  logic [N-1:0] div_result_o,
     output  logic [N-1:0] rem_result_o
 );
 
-    logic [$clog2(N)-1:0] counter;
+    localparam COUNTER_WIDTH = $clog2(N);
+
+    logic [COUNTER_WIDTH-1:0] counter;
 
     logic           sign_a, sign_b;
     logic           change_sign;
@@ -43,7 +45,7 @@ module div
     assign divide_by_zero   = (second_operand_i == '0);
     assign divide_by_one    = (second_operand_i ==  1);
     assign overflow         = (second_operand_i == '1 && first_operand_i == (1 << 31) && signed_i == 1'b1);
-    
+
     assign start            = (enable_i == 1'b1 && busy == 1'b0 && valid_result == 1'b0);
 
 //////////////////////////////////////////////////////////////////////////////
@@ -70,7 +72,7 @@ module div
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
-            state       <= D_IDLE; 
+            state       <= D_IDLE;
             busy        <= 1'b0;
             valid_result<= 1'b0;
             acc         <= '0;
@@ -79,7 +81,7 @@ module div
             a_unsig     <= '0;
             b_unsig     <= '0;
             counter     <= '0;
-        end 
+        end
         else if (!enable_i) begin
             valid_result   <= 1'b0;
         end
@@ -97,11 +99,11 @@ module div
                             state        <= D_INIT;
                             busy         <= 1'b1;
                             valid_result <= 1'b0;
-                            a_unsig      <= (sign_a) 
-                                            ? -first_operand_i[N-1:0] 
+                            a_unsig      <= (sign_a)
+                                            ? -first_operand_i[N-1:0]
                                             :  first_operand_i[N-1:0];
-                            b_unsig      <= (sign_b) 
-                                            ? -second_operand_i[N-1:0] 
+                            b_unsig      <= (sign_b)
+                                            ? -second_operand_i[N-1:0]
                                             :  second_operand_i[N-1:0];
                         end
                     end
@@ -120,18 +122,18 @@ module div
                     counter <= counter + 1'b1;
                     acc     <= next_acc;
                     quo     <= next_quo;
-                    if (counter == (N-1)) state <= D_SIGN;
+                    if (counter == COUNTER_WIDTH'(N-1)) state <= D_SIGN;
                 end
 
                 D_SIGN: begin
                     state        <= D_IDLE;
                     busy         <= 1'b0;
                     valid_result <= 1'b1;
-                    
+
                     if (quo != 0)
-                        div_result  <=  (change_sign) 
-                                        ? {1'b1, -quo} 
-                                        : {1'b0, quo};
+                        div_result  <=  (change_sign)
+                                        ? {1'b1, -quo[N-2:0]}
+                                        : {1'b0,  quo[N-2:0]};
                     else
                         div_result  <= '0;
                 end
@@ -155,7 +157,7 @@ module div
     end
 
     always_comb begin
-        if (divide_by_zero) 
+        if (divide_by_zero)
             rem_result_o = first_operand_i;
         else if (overflow || divide_by_one)
             rem_result_o = '0;

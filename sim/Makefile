@@ -21,10 +21,10 @@ VERILATOR_INPUT = testbench.sv tb_top_verilator.cpp
 
 default: run
 
-run: 
+run:
 	@echo
 	@echo "-- VERILATE ----------------"
-	@$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_INPUT) --build -j 0 -I../rtl
+	@$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_INPUT) --build -j 0 -I../rtl -I../rtl/aes
 
 	@echo
 	@echo "-- RUN ---------------------"
@@ -36,7 +36,7 @@ run:
 	@echo "-- DONE --------------------"
 
 lint:
-	@$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_INPUT) --lint-only -I../rtl
+	@$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_INPUT) --lint-only -I../rtl -I../rtl/aes
 
 clean:
 	@echo

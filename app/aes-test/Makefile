@@ -1,12 +1,17 @@
+#remove unreferenced functions
+CFLAGS_STRIP = -fdata-sections -ffunction-sections
+LDFLAGS_STRIP = -Wl,--gc-sections
+
 TRIPLET = riscv64-elf
 CC = $(TRIPLET)-gcc
-CFLAGS = -IbareOS/include -Itinycrypt/include -O2 -fno-builtin -march=rv32i_zkne -mabi=ilp32 -mbranch-cost=7 -DAES_RISCV_ASM -DTC_AES_128
+CFLAGS = -IbareOS/include -Itinycrypt/include -O2 -fno-builtin -march=rv32i_zkne -mabi=ilp32 -mbranch-cost=7 -DAES_RISCV_ASM -DTC_AES_128 $(CFLAGS_STRIP)
 AS = $(TRIPLET)-as
 ASFLAGS = -march=rv32i_zicsr_zkne -mabi=ilp32
 CPP = $(TRIPLET)-g++
 CCFLAGS = $(CFLAGS)
 LD = $(TRIPLET)-gcc
-LDFLAGS = -nostdlib -march=rv32i_zkne -mabi=ilp32 -Triscv.ld
+#LD = $(TRIPLET)-ld
+LDFLAGS = $(LDFLAGS_STRIP) -nostdlib -march=rv32i_zkne -mabi=ilp32 -Triscv.ld
 OBJCOPY = $(TRIPLET)-objcopy
 OBJDUMP = $(TRIPLET)-objdump
 

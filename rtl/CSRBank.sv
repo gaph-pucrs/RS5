@@ -19,15 +19,15 @@
  * 1) Write - Writes the given data in the given CRS.
  * 2) Set - Uses the given data as a mask to set bits in the CSR,
  * 3) Clear - Uses the given data as a mask to clear bits in CSR.
- * Each operation applies the CSR mask alongside with the CSR 
+ * Each operation applies the CSR mask alongside with the CSR
  * current content in a determined way to generate the new CSR content.
  */
 
 `include "RS5_pkg.sv"
 
-module CSRBank 
+module CSRBank
     import RS5_pkg::*;
-#( 
+#(
     parameter bit       XOSVMEnable = 1'b0,
     parameter bit       ZIHPMEnable = 1'b0,
     parameter rv32_e    RV32        = RV32I,
@@ -63,7 +63,7 @@ module CSRBank
     input   logic [31:0]        jump_target_i,
 
     input   logic [63:0]        mtime_i,
-    
+
     input   logic [31:0]        irq_i,
     input   logic               interrupt_ack_i,
     output  logic               interrupt_pending_o,
@@ -74,9 +74,9 @@ module CSRBank
     output  logic [31:0]        mtvec,
 
     output  logic               mvmctl_o,
-    output  logic [31:0]        mvmdo_o, 
-    output  logic [31:0]        mvmio_o, 
-    output  logic [31:0]        mvmds_o, 
+    output  logic [31:0]        mvmdo_o,
+    output  logic [31:0]        mvmio_o,
+    output  logic [31:0]        mvmds_o,
     output  logic [31:0]        mvmis_o,
     output  logic [31:0]        mvmim_o,
     output  logic [31:0]        mvmdm_o
@@ -154,26 +154,26 @@ module CSRBank
     logic mstatus_mprv, mstatus_sum, mstatus_mxr, mstatus_tvm, mstatus_tw, mstatus_tsr, mstatus_sd;
 
     assign mstatus = {
-                        mstatus_sd, 
-                        8'b0, 
-                        mstatus_tsr, 
-                        mstatus_tw, 
-                        mstatus_tvm, 
-                        mstatus_mxr, 
-                        mstatus_sum, 
-                        mstatus_mprv, 
-                        mstatus_xs, 
-                        mstatus_fs, 
-                        mstatus_mpp, 
-                        mstatus_vs, 
-                        mstatus_spp, 
-                        mstatus_mpie, 
-                        mstatus_ube, 
-                        mstatus_spie, 
-                        1'b0, 
-                        mstatus_mie, 
-                        1'b0, 
-                        mstatus_sie, 
+                        mstatus_sd,
+                        8'b0,
+                        mstatus_tsr,
+                        mstatus_tw,
+                        mstatus_tvm,
+                        mstatus_mxr,
+                        mstatus_sum,
+                        mstatus_mprv,
+                        mstatus_xs,
+                        mstatus_fs,
+                        mstatus_mpp,
+                        mstatus_vs,
+                        mstatus_spp,
+                        mstatus_mpie,
+                        mstatus_ube,
+                        mstatus_spie,
+                        1'b0,
+                        mstatus_mie,
+                        1'b0,
+                        mstatus_sie,
                         1'b0
                     };
 
@@ -271,8 +271,8 @@ module CSRBank
         //////////////////////////////////////////////////////////////////////////////
         else begin
             mcycle      <= mcycle + 1;
-            minstret    <= (killed) 
-                            ? minstret 
+            minstret    <= (killed)
+                            ? minstret
                             : minstret + 1;
         //////////////////////////////////////////////////////////////////////////////
         // Machine Return
@@ -292,10 +292,10 @@ module CSRBank
                 mstatus_mpie    <= mstatus_mie;
                 mstatus_mie     <= 0;
                 mepc_r          <= pc_i;
-                mtval           <= (exception_code_i == ILLEGAL_INSTRUCTION) 
-                                    ? instruction_i 
+                mtval           <= (exception_code_i == ILLEGAL_INSTRUCTION)
+                                    ? instruction_i
                                     : pc_i;
-            end 
+            end
         //////////////////////////////////////////////////////////////////////////////
         // Interrupt
         //////////////////////////////////////////////////////////////////////////////
@@ -315,7 +315,7 @@ module CSRBank
                     mepc_r      <= jump_target_i;
                 else
                     mepc_r      <= pc_i + 32'd4;
-            end 
+            end
         //////////////////////////////////////////////////////////////////////////////
         // CSR Write
         //////////////////////////////////////////////////////////////////////////////
@@ -338,7 +338,7 @@ module CSRBank
                     MCAUSE: begin
                                     mcause_interrupt    <= wr_data[31];
                                     mcause_exc_code     <= wr_data[30:0];
-                            end    
+                            end
                     MSTATUS:begin
                                     mstatus_sd          <= wr_data[31];
                                     mstatus_tsr         <= wr_data[22];
@@ -423,7 +423,7 @@ module CSRBank
                 CYCLEH:         out = mcycle[63:32];
                 TIMEH:          out = mtime_i[63:32];
                 INSTRETH:       out = minstret[63:32];
-                
+
                 MVMCTL:         out = {31'b0,mvmctl};
                 MVMDO:          out = mvmdo[31:0];
                 MVMDS:          out = mvmds[31:0];
@@ -443,7 +443,7 @@ module CSRBank
 //////////////////////////////////////////////////////////////////////////////
 // XOSVM Extension
 //////////////////////////////////////////////////////////////////////////////
-    
+
     if (XOSVMEnable == 1'b1) begin : gen_xosvm_csr_on
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n) begin
@@ -454,7 +454,7 @@ module CSRBank
                 mvmio       <= '0;
                 mvmis       <= '0;
                 mvmim       <= '0;
-            end 
+            end
             else if (write_allowed == 1'b1) begin
                 case (CSR)
                     MVMCTL:     mvmctl  <= wr_data[0];
@@ -519,8 +519,7 @@ module CSRBank
                 Interruption_Code <= M_SW_INT;
             else if ((MTIP & MTIE) == 1'b1)     // Machine Timer
                 Interruption_Code <= M_TIM_INT;
-
-        end 
+        end
         else begin
             interrupt_pending_o <= 0;
         end
@@ -531,7 +530,6 @@ module CSRBank
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     if (ZIHPMEnable == 1'b1) begin : gen_zihpm_csr_on
-        int fd;
 
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n) begin
@@ -583,6 +581,8 @@ module CSRBank
         end
 
         if (DEBUG) begin : gen_csr_dbg
+            int fd;
+
             initial begin
                 fd = $fopen (DBG_FILE, "w");
                 if (fd == 0) begin

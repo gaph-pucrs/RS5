@@ -7,7 +7,7 @@ module tb_top
 ;
 
     logic        clk=1, reset_n;
-    
+
     testbench #(
         .INSTRUCTION_SET(RV32M),
         .USE_XOSVM(1'b1),
@@ -28,7 +28,7 @@ module tb_top
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     initial begin
         reset_n = 0;                                          // RESET for CPU initialization
-        
+
         #100 reset_n = 1;                                     // Hold state for 100 ns
     end
 

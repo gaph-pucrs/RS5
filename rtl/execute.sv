@@ -328,21 +328,26 @@ end
 
     logic [31:0] aes_result;
 
-    if (ZKNEEnable) begin: zkne_gen
+    if (ZKNEEnable) begin: zkne_gen_on
+        logic aes_mix;
+        logic aes_valid;
+
+        assign aes_mix = (instruction_operation_i == AES32ESMI);
+        assign aes_valid = (instruction_operation_i inside {AES32ESMI, AES32ESI});
 
         aes_unit #(
             .LOGIC_GATING(1'b1)  // Gate sub-module inputs to save toggling
         ) u_aes_unit (
-            .rs1_in(first_operand_i),      // Source register 1
-            .rs2_in(second_operand_i),     // Source register 2
-            .bs_in(instruction_i[31:30]),  // Byte select immediate
-
-            .rd_out(aes_result),  // Output destination register value
-
-            .mix_in(instruction_operation_i == AES32ESMI),                   // SubBytes + MixColumn or just SubBytes
-            .valid_in(instruction_operation_i inside {AES32ESMI, AES32ESI})  // Are the inputs valid?
+            .rs1_in   (first_operand_i),      // Source register 1
+            .rs2_in   (second_operand_i),     // Source register 2
+            .bs_in    (instruction_i[31:30]), // Byte select immediate
+            .mix_in   (aes_mix),              // SubBytes + MixColumn or just SubBytes
+            .valid_in (aes_valid),            // Are the inputs valid?
+            .rd_out   (aes_result)            // Output destination register value
         );
-
+    end
+    else begin : zkne_gen_off
+        assign aes_result = '0;
     end
 
 //////////////////////////////////////////////////////////////////////////////

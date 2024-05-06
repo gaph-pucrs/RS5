@@ -39,14 +39,14 @@ module mul
 
     assign signed_mult  = (signed_mode_i != 2'b00);
     assign result_o = mac_result_partial[31:0];
-    assign start        = (mul_state == ALBL && enable_i == 1'b1);        
-    
-    assign mac_result   = $signed({sign_a, op_a}) * $signed({sign_b, op_b}) + $signed(accum);     
+    assign start        = (mul_state == ALBL && enable_i == 1'b1);
+
+    assign mac_result   = $signed({sign_a, op_a}) * $signed({sign_b, op_b}) + $signed(accum);
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             mac_result_reg <= 0;
-        end 
+        end
         else begin
             mac_result_reg <= mac_result_partial;
         end
@@ -68,7 +68,7 @@ module mul
                 sign_b         = 1'b0;
                 accum          = '0;
                 mac_result_partial = mac_result;
-                if (start == 1'b1) begin 
+                if (start == 1'b1) begin
                     next_state = ALBH;
                     hold_o     = 1'b1;
                 end else begin
@@ -86,7 +86,7 @@ module mul
 
                 if (mul_low_i) begin
                     mac_result_partial = {3'b0, mac_result[15:0], mac_result_reg[15:0]};
-                end 
+                end
                 else begin
                     mac_result_partial = mac_result;
                 end
