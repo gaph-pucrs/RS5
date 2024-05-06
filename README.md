@@ -1,6 +1,6 @@
 # RS5
 
-### Description
+## Description
 
 RS5 is a processor that implements the RISC-V 32 bits integer Module (RV32I) alongside the Zicsr Extension and the Machine Mode of the RISC-V Privileged Architecture. It is written in the SystemVerilog Hardware Description Language (HDL) and implements the following interface:
 
@@ -128,3 +128,7 @@ For Verilator you can run the commands: `verilator --cc testbench.sv --exe tb_to
 The [Proto Folder](https://github.com/gaph-pucrs/RS5/blob/master/proto/) provides all the files needed for the FPGA prototype. To load the application on the Block RAM (BRAM) run you will need the application binary file as described in the previous section. The BRAM is loaded using a ".coe" file. To generate the coe file a python script is provided in the [init_mem.py](https://github.com/gaph-pucrs/RS5/blob/master/proto/init_mem.py) file. The script input file path should point to the application binary file, after running the script via the `python3 init_mem.py` command it will generate the ".coe" file for the given application, you can also edit the output ".coe" file name.
 
 A Vivado project is provided in the [RS5.xpr](https://github.com/gaph-pucrs/RS5/blob/master/proto/RS5/RS5.xpr) file that can be imported into VIVADO. This project already points to all the processor, environment and FPGA IP files. After opening the project the processor should be ready for synthesis and implementation in a Xilinx Nexys A7 FPGA board. The ".coe" file should be loaded to the BRAM by editing the BRAM IP. After running the synthesis you can generate the bitstream and then you should connect the FPGA board to your computer and then program the device, after these steps then the processor will be running in the FPGA board. To be able to capture the processor output you can either use VIVADO tools or use a serial port emulator such as Teraterm or PUTTY on Windows or running the `sudo tio /dev/ttyUSB1 -b 9600 --map ICRNL,INLCRNL` command on Linux.
+
+## References
+
+1. [W. A. Nunes, A. E. Dal Zotto, C. da Silva Borges and F. G. Moraes, "RS5: An Integrated Hardware and Software Ecosystem for RISC- V Embedded Systems," 2024 IEEE 15th Latin America Symposium on Circuits and Systems (LASCAS), Punta del Este, Uruguay, 2024, pp. 1-5](https://ieeexplore.ieee.org/abstract/document/10506171)
