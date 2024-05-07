@@ -17,14 +17,14 @@ VERILATOR_FLAGS += -Wall
 #VERILATOR_FLAGS += --gdbbt
 
 # Input files for Verilator
-VERILATOR_INPUT = testbench.sv tb_top_verilator.cpp
+VERILATOR_INPUT = testbench.sv
 
 default: run
 
 run:
 	@echo
 	@echo "-- VERILATE ----------------"
-	@$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_INPUT) --build -j 0 -I../rtl -I../rtl/aes
+	@$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_INPUT) --binary -j 0 -I../rtl -I../rtl/aes --timescale 1ns/1ns
 
 	@echo
 	@echo "-- RUN ---------------------"

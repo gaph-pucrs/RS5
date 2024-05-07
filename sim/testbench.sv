@@ -23,25 +23,42 @@
 
 module testbench
     import RS5_pkg::*;
-#(
-    parameter rv32_e INSTRUCTION_SET = RV32M,
-    parameter bit    USE_XOSVM       = 1'b1,
-    parameter bit    USE_ZIHPM       = 1'b1,
-    parameter bit    USE_ZKNE        = 1'b1
-)
 (
-    input logic clk_i,
-    input logic reset_n
 );
 
 //////////////////////////////////////////////////////////////////////////////
 // PARAMETERS FOR CORE INSTANTIATION
 //////////////////////////////////////////////////////////////////////////////
 
-    localparam int           MEM_WIDTH = 65536;
-    localparam string        BIN_FILE = "../app/riscv-tests/test.bin";
+    localparam rv32_e        INSTRUCTION_SET = RV32M;
+    localparam bit           USE_XOSVM       = 1'b1;
+    localparam bit           USE_ZIHPM       = 1'b1;
+    localparam bit           USE_ZKNE        = 1'b1;
+    localparam int           MEM_WIDTH       = 65536;
+    localparam string        BIN_FILE        = "../app/riscv-tests/test.bin";
 
     localparam int           i_cnt = 1;
+
+///////////////////////////////////////// Clock generator //////////////////////////////
+
+    logic        clk=1;
+
+    always begin
+        #5.0 clk <= 0;
+        #5.0 clk <= 1;
+    end
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////// RESET CPU ////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    logic reset_n;
+
+    initial begin
+        reset_n = 0;                                          // RESET for CPU initialization
+
+        #100 reset_n = 1;                                     // Hold state for 100 ns
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 // TB SIGNALS
@@ -111,7 +128,7 @@ module testbench
         end
     end
 
-    always_ff @(posedge clk_i) begin
+    always_ff @(posedge clk) begin
         enable_tb_r     <= enable_tb;
         enable_rtc_r    <= enable_rtc;
         enable_plic_r   <= enable_plic;
@@ -143,7 +160,7 @@ module testbench
         .ZIHPMEnable(USE_ZIHPM),
         .ZKNEEnable (USE_ZKNE)
     ) dut (
-        .clk                    (clk_i),
+        .clk                    (clk),
         .reset_n                (reset_n),
         .stall                  (1'b0),
         .instruction_i          (instruction),
@@ -166,7 +183,7 @@ module testbench
         .MEM_WIDTH(MEM_WIDTH),
         .BIN_FILE(BIN_FILE)
     ) RAM_MEM (
-        .clk        (clk_i),
+        .clk        (clk),
 
         .enA_i      (1'b1),
         .weA_i      (4'h0),
@@ -193,7 +210,7 @@ module testbench
     plic #(
         .i_cnt(i_cnt)
     ) plic1 (
-        .clk     (clk_i),
+        .clk     (clk),
         .reset_n (reset_n),
         .en_i    (enable_plic),
         .we_i    (mem_write_enable),
@@ -211,7 +228,7 @@ module testbench
 //////////////////////////////////////////////////////////////////////////////
 
     rtc rtc(
-        .clk        (clk_i),
+        .clk        (clk),
         .reset_n    (reset_n),
         .en_i       (enable_rtc),
         .addr_i     (mem_address[3:0]),
@@ -226,7 +243,7 @@ module testbench
 // Memory Mapped regs
 //////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk_i) begin
+    always_ff @(posedge clk) begin
         if (enable_tb) begin
             // OUTPUT REG
             if ((mem_address == 32'h80004000 || mem_address == 32'h80001000) && mem_write_enable != '0) begin
