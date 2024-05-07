@@ -59,14 +59,13 @@ module regbank
 // Reset and Write control
 //////////////////////////////////////////////////////////////////////////////
 
-    for (genvar i = 1; i < 32 ; i++) begin : gen_regfile
-        always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n) begin
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            for (int i = 1; i < 32; i++)
                 regfile[i] <= '0;
-            end
-            else if (rd == i && enable == 1'b1) begin
-                regfile[i] <= data_i;
-            end
+        end
+        else if (enable == 1'b1 && rd != '0) begin
+            regfile[rd] <= data_i;
         end
     end
 
