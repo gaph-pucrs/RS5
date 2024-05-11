@@ -7,7 +7,7 @@ module vectorCSRs
     input   logic                   clk,
     input   logic                   reset_n,
 
-    input   iType_e                 instruction_operation_i,
+    input   iTypeVector_e           vector_operation_i,
     input   logic [31:0]            op1_scalar_i,
     input   logic [31:0]            op2_scalar_i,
     input   logic [10:0]            zimm,
@@ -33,7 +33,7 @@ module vectorCSRs
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        if (instruction_operation_i == VSETVL) begin
+        if (vector_operation_i == VSETVL) begin
             vill_next  = op2_scalar_i[31];
             vma_next   = op2_scalar_i[7];
             vta_next   = op2_scalar_i[6];
@@ -56,7 +56,7 @@ module vectorCSRs
     assign vl_max = elementsPerRegister << vlmul_next;
 
     always_comb begin
-        if (instruction_operation_i == VSETIVLI)
+        if (vector_operation_i == VSETIVLI)
             vl_next = {'0, rs1};
         else if (rd != '0 && rs1 == '0)
             vl_next = vl_max;
@@ -64,7 +64,7 @@ module vectorCSRs
             vl_next = vl;
         else
             vl_next = op1_scalar_i;
-            //vl_next = (instruction_operation_i == VSETVL) ? op1_scalar_i : {'0, op1_scalar_i[4:0]};
+            //vl_next = (vector_operation_i == VSETVL) ? op1_scalar_i : {'0, op1_scalar_i[4:0]};
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -80,7 +80,7 @@ module vectorCSRs
             vlmul <= LMUL_1;
             vl    <= '0;
         end
-        else if (instruction_operation_i inside {VSETVL, VSETVLI, VSETIVLI}) begin
+        else if (vector_operation_i inside {VSETVL, VSETVLI, VSETIVLI}) begin
             vill  <= vill_next;
             vma   <= vma_next; 
             vta   <= vta_next; 
@@ -88,7 +88,7 @@ module vectorCSRs
             vlmul <= vlmul_next;
             vl    <= vl_next;
 
-            $display("[%0t] Set VSEW = %s, VLMUL = %s, VL = %d\n", $time/1000, vsew_next, vlmul_next, vl_next);
+            $display("[%0t] Set VSEW = %s, VLMUL = %s, VL = %d\n", $time, vsew_next, vlmul_next, vl_next);
         end
     end
 

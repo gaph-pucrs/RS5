@@ -66,9 +66,9 @@ module vectorUnit
     assign opCat    = opCat_e'(funct3);
     assign addrMode = addrModes_e'(instruction_i[27:26]);
 
-    assign accumulate_instruction = (vector_operation_i inside {vmacc, vnmsac, vmadd, vnmsub});
-    assign reduction_instruction  = (vector_operation_i inside {vredsum, vredmaxu, vredmax, vredminu, vredmin, vredand, vredor, vredxor});
-    assign widening = (vector_operation_i inside {vwmul, vwmulu, vwmulsu});
+    assign accumulate_instruction = (vector_operation_i inside {VMACC, VNMSAC, VMADD, VNMSUB});
+    assign reduction_instruction  = (vector_operation_i inside {VREDSUM, VREDMAXU, VREDMAX, VREDMINU, VREDMIN, VREDAND, VREDOR, VREDXOR});
+    assign widening = (vector_operation_i inside {VWMUL, VWMULU, VWMULSU});
 
 //////////////////////////////////////////////////////////////////////////////
 // CSRs
@@ -78,19 +78,19 @@ module vectorUnit
         .VLEN   (VLEN),
         .VLENB  (VLENB)
     ) vectorCSRs1 (
-        .clk                    (clk),
-        .reset_n                (reset_n),
-        .instruction_operation_i(instruction_operation_i),
-        .op1_scalar_i           (op1_scalar_i),
-        .op2_scalar_i           (op2_scalar_i),
-        .zimm                   (zimm),
-        .rs1                    (rs1),
-        .rd                     (rd),
-        .vtype                  (vtype_o),
-        .vsew                   (vsew),
-        .vlmul                  (vlmul),
-        .vl                     (vl),
-        .vl_next                (vl_next)
+        .clk                (clk),
+        .reset_n            (reset_n),
+        .vector_operation_i (vector_operation_i),
+        .op1_scalar_i       (op1_scalar_i),
+        .op2_scalar_i       (op2_scalar_i),
+        .zimm               (zimm),
+        .rs1                (rs1),
+        .rd                 (rd),
+        .vtype              (vtype_o),
+        .vsew               (vsew),
+        .vlmul              (vlmul),
+        .vl                 (vl),
+        .vl_next            (vl_next)
     );
 
 //////////////////////////////////////////////////////////////////////////////
@@ -111,7 +111,7 @@ module vectorUnit
     always_comb begin
         unique case (state)
             V_IDLE:
-                if (instruction_operation_i == VECTOR)
+                if (instruction_operation_i == VECTOR && vector_operation_i != VNOP)
                     next_state = V_EXEC;
                 else
                     next_state = V_IDLE;
@@ -266,7 +266,7 @@ module vectorUnit
 
     always_comb begin 
         // unsigned
-        if (vector_operation_i inside {vsrl, vsll, vsra}) begin
+        if (vector_operation_i inside {VSRL, VSLL, VSRA}) begin
             unique case (vsew)
                 EW8:     imm_replicated = {(VLENB  ){ 3'h0, rs1}};
                 EW16:    imm_replicated = {(VLENB/2){11'h0, rs1}};
@@ -289,8 +289,8 @@ module vectorUnit
 
     always_ff @(posedge clk) begin
         if (!hold) begin
-            first_operand  <= (vector_operation_i inside {vmadd, vnmsub})  ? vs3_data : vs2_data;
-            third_operand  <= (vector_operation_i inside {vmadd, vnmsub})  ? vs2_data : vs3_data;
+            first_operand  <= (vector_operation_i inside {VMADD, VNMSUB})  ? vs3_data : vs2_data;
+            third_operand  <= (vector_operation_i inside {VMADD, VNMSUB})  ? vs2_data : vs3_data;
         end
     end
 
@@ -332,7 +332,7 @@ module vectorUnit
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        if (instruction_operation_i inside {VSETVL, VSETVLI, VSETIVLI}) begin
+        if (vector_operation_i inside {VSETVL, VSETVLI, VSETIVLI}) begin
             res_scalar_o   = vl_next;
             wr_en_scalar_o = 1'b1;
         end

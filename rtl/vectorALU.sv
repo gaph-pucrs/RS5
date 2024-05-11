@@ -92,9 +92,9 @@ module vectorALU
 
     always_comb begin
         unique case (vector_operation_i)
-            vrsub:   subtraend = first_operand;
-            vnmsac,
-            vnmsub:  subtraend = result_mult_r;
+            VRSUB:   subtraend = first_operand;
+            VNMSAC,
+            VNMSUB:  subtraend = result_mult_r;
             default: subtraend = second_operand;
         endcase
     end
@@ -112,20 +112,20 @@ module vectorALU
 
     always_comb begin
         unique case (vector_operation_i)
-            vrsub:   summand_1 = second_operand;
-            vnmsac,
-            vmacc,
-            vmadd,
-            vnmsub:  summand_1 = third_operand_r;
+            VRSUB:   summand_1 = second_operand;
+            VNMSAC,
+            VMACC,
+            VMADD,
+            VNMSUB:  summand_1 = third_operand_r;
             default: summand_1 = first_operand;
         endcase
     end
 
-    assign summand_2 = (vector_operation_i inside {vmacc, vmadd}) ? result_mult_r : second_operand;
+    assign summand_2 = (vector_operation_i inside {VMACC, VMADD}) ? result_mult_r : second_operand;
 
-    assign summand_2_8b  = (vector_operation_i inside {vsub, vrsub, vnmsac, vnmsub}) ? subtraend_8b  : summand_2;
-    assign summand_2_16b = (vector_operation_i inside {vsub, vrsub, vnmsac, vnmsub}) ? subtraend_16b : summand_2;
-    assign summand_2_32b = (vector_operation_i inside {vsub, vrsub, vnmsac, vnmsub}) ? subtraend_32b : summand_2;
+    assign summand_2_8b  = (vector_operation_i inside {VSUB, VRSUB, VNMSAC, VNMSUB}) ? subtraend_8b  : summand_2;
+    assign summand_2_16b = (vector_operation_i inside {VSUB, VRSUB, VNMSAC, VNMSUB}) ? subtraend_16b : summand_2;
+    assign summand_2_32b = (vector_operation_i inside {VSUB, VRSUB, VNMSAC, VNMSUB}) ? subtraend_32b : summand_2;
 
     always_comb begin
         for (int i = 0; i < VLENB; i++)
@@ -216,37 +216,37 @@ module vectorALU
 
     always_comb begin
         unique case(vector_operation_i)
-            vmsne:  begin 
+            VMSNE:  begin 
                         result_comparison_8b  = ~equal_8b;
                         result_comparison_16b = ~equal_16b;
                         result_comparison_32b = ~equal_32b;
                     end 
-            vmsltu: begin 
+            VMSLTU: begin 
                         result_comparison_8b  = ~equal_8b  & ~greater_than_8b;
                         result_comparison_16b = ~equal_16b & ~greater_than_16b;
                         result_comparison_32b = ~equal_32b & ~greater_than_32b;
                     end 
-            vmslt:  begin 
+            VMSLT:  begin 
                         result_comparison_8b  = ~equal_8b  & ~greater_than_signed_8b;
                         result_comparison_16b = ~equal_16b & ~greater_than_signed_16b;
                         result_comparison_32b = ~equal_32b & ~greater_than_signed_32b;
                     end 
-            vmsleu: begin 
+            VMSLEU: begin 
                         result_comparison_8b  = equal_8b  | ~greater_than_8b;
                         result_comparison_16b = equal_16b | ~greater_than_16b;
                         result_comparison_32b = equal_32b | ~greater_than_32b;
                     end 
-            vmsle:  begin 
+            VMSLE:  begin 
                         result_comparison_8b  = equal_8b  | ~greater_than_signed_8b;
                         result_comparison_16b = equal_16b | ~greater_than_signed_16b;
                         result_comparison_32b = equal_32b | ~greater_than_signed_32b;
                     end 
-            vmsgtu: begin 
+            VMSGTU: begin 
                         result_comparison_8b  = greater_than_8b;
                         result_comparison_16b = greater_than_16b;
                         result_comparison_32b = greater_than_32b;
                     end 
-            vmsgt : begin 
+            VMSGT : begin 
                         result_comparison_8b  = greater_than_signed_8b;
                         result_comparison_16b = greater_than_signed_16b;
                         result_comparison_32b = greater_than_signed_32b;
@@ -314,8 +314,8 @@ module vectorALU
 
     always_comb begin
         unique case (vector_operation_i)
-            vmulh:    mult_signed_mode = 2'b11;
-            vmulhsu:  mult_signed_mode = 2'b01;
+            VMULH:    mult_signed_mode = 2'b11;
+            VMULHSU:  mult_signed_mode = 2'b01;
             default:  mult_signed_mode = 2'b00;
         endcase
     end
@@ -330,7 +330,7 @@ module vectorALU
 
     always_comb begin
         for (int i = 0; i < VLENB; i++) begin
-            //mult_op_a_8b[i] = (vector_operation_i inside {vmadd, vnmsub}) 
+            //mult_op_a_8b[i] = (vector_operation_i inside {VMADD, VNMSUB}) 
             //                ? third_operand [(8*(i+1))-1-:8] 
             //                : first_operand [(8*(i+1))-1-:8];
             mult_op_a_8b[i] = first_operand [(8*(i+1))-1-:8];
@@ -362,7 +362,7 @@ module vectorALU
 
     always_comb begin
         for (int i = 0; i < VLENB/2; i++) begin
-            //mult_op_a_16b[i] = (vector_operation_i inside {vmadd, vnmsub}) 
+            //mult_op_a_16b[i] = (vector_operation_i inside {VMADD, VNMSUB}) 
             //                    ? third_operand [(16*(i+1))-1-:16] 
             //                    : first_operand [(16*(i+1))-1-:16];
             mult_op_a_16b[i] =    first_operand [(16*(i+1))-1-:16];
@@ -397,7 +397,7 @@ module vectorALU
 
     always_comb begin
         for (int i = 0; i < VLENB/4; i++) begin
-            //mult_op_a_32b[i] = (vector_operation_i inside {vmadd, vnmsub}) 
+            //mult_op_a_32b[i] = (vector_operation_i inside {VMADD, VNMSUB}) 
             //                    ? third_operand [(32*(i+1))-1-:32] 
             //                    : first_operand [(32*(i+1))-1-:32];
             mult_op_a_32b[i] =    first_operand [(32*(i+1))-1-:32];
@@ -406,11 +406,11 @@ module vectorALU
     end
 
     assign mult_enable = (
-                            (vector_operation_i inside {vmul, vmulh, vmulhsu, vmulhu, vmacc, vnmsac, vmadd, vnmsub})
+                            (vector_operation_i inside {VMUL, VMULH, VMULHSU, VMULHU, VMACC, VNMSAC, VMADD, VNMSUB})
                         &&  (current_state == V_EXEC) 
                         &&  (vsew==EW32)
                         );
-    assign mult_low    = (vector_operation_i inside {vmul, vmacc, vnmsac, vmadd, vnmsub});
+    assign mult_low    = (vector_operation_i inside {VMUL, VMACC, VNMSAC, VMADD, VNMSUB});
     assign hold_mult   = |hold_mult_int;
 
     genvar i_mul32b;
@@ -440,7 +440,7 @@ module vectorALU
                 for (int i = 0; i < VLENB; i++)
                     if (widening_i)
                         result_mult[(16*(i+1))-1-:16] = mult_result_8b[i][15:0];
-                    else if (vector_operation_i inside {vmul, vmacc, vnmsac, vmadd, vnmsub})
+                    else if (vector_operation_i inside {VMUL, VMACC, VNMSAC, VMADD, VNMSUB})
                         result_mult[(8*(i+1))-1-:8] = mult_result_8b[i][7:0];
                     else
                         result_mult[(8*(i+1))-1-:8] = mult_result_8b[i][15:8];
@@ -449,7 +449,7 @@ module vectorALU
                 for (int i = 0; i < VLENB/2; i++)
                     if (widening_i)
                         result_mult[(32*(i+1))-1-:32] = mult_result_16b[i][31:0];
-                    else if (vector_operation_i inside {vmul, vmacc, vnmsac, vmadd, vnmsub})
+                    else if (vector_operation_i inside {VMUL, VMACC, VNMSAC, VMADD, VNMSUB})
                         result_mult[(16*(i+1))-1-:16] = mult_result_16b[i][15:0];
                     else
                         result_mult[(16*(i+1))-1-:16] = mult_result_16b[i][31:16];
@@ -482,8 +482,8 @@ module vectorALU
 
     logic hold_div;
 
-    assign div_enable = (vector_operation_i inside {vdiv, vdivu, vrem, vremu} && current_state == V_EXEC);
-    assign div_signed = (vector_operation_i inside {vdiv, vrem});
+    assign div_enable = (vector_operation_i inside {VDIV, VDIVU, VREM, VREMU} && current_state == V_EXEC);
+    assign div_signed = (vector_operation_i inside {VDIV, VREM});
 
     assign hold_div = (|hold_div_8b) | (|hold_div_16b) | (|hold_div_32b);
 
@@ -642,31 +642,31 @@ module vectorALU
 
     always @(posedge clk) begin
         unique case(vector_operation_i)
-            vand:            result_o <= result_and;
-            vor:             result_o <= result_or;
-            vxor:            result_o <= result_xor;
-            vsll:            result_o <= result_sll;
-            vsrl:            result_o <= result_srl;
-            vsra:            result_o <= result_sra;
+            VAND:            result_o <= result_and;
+            VOR:             result_o <= result_or;
+            VXOR:            result_o <= result_xor;
+            VSLL:            result_o <= result_sll;
+            VSRL:            result_o <= result_srl;
+            VSRA:            result_o <= result_sra;
             /*
-            vmseq,  vmsne,
-            vmsltu, vmslt,
-            vmsleu, vmsle,
-            vmsgtu, vmsgt:   result_o <= result_comparison;*/
-            vmin:            result_o <= result_min;
-            vminu:           result_o <= result_minu;
-            vmax:            result_o <= result_max;
-            vmaxu:           result_o <= result_maxu;
-            vmul, vmulh,
-            vmulhu, vmulhsu: result_o <= result_mult;
-            vwmul, vwmulu, 
-            vwmulsu:         result_o <= (widening_counter == 1'b1) ? result_mult[VLEN-1:0] : result_mult[VLEN-1:0];
-            vdiv, vdivu:     result_o <= result_div;
-            vrem, vremu:     result_o <= result_rem;
+            VMSEQ,  VMSNE,
+            VMSLTU, VMSLT,
+            VMSLEU, VMSLE,
+            VMSGTU, VMSGT:   result_o <= result_comparison;*/
+            VMIN:            result_o <= result_min;
+            VMINU:           result_o <= result_minu;
+            VMAX:            result_o <= result_max;
+            VMAXU:           result_o <= result_maxu;
+            VMUL, VMULH,
+            VMULHU, VMULHSU: result_o <= result_mult;
+            VWMUL, VWMULU, 
+            VWMULSU:         result_o <= (widening_counter == 1'b1) ? result_mult[VLEN-1:0] : result_mult[VLEN-1:0];
+            VDIV, VDIVU:     result_o <= result_div;
+            VREM, VREMU:     result_o <= result_rem;
             /*
-            vredand:         result_o <= {'0, result_redAnd_32};
-            vredor:          result_o <= {'0, result_redOr_32};
-            vredxor:         result_o <= {'0, result_redXor_32};
+            VREDAND:         result_o <= {'0, result_redAnd_32};
+            VREDOR:          result_o <= {'0, result_redOr_32};
+            VREDXOR:         result_o <= {'0, result_redXor_32};
             */
             default:         result_o <= result_add;
         endcase
