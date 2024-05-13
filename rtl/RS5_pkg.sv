@@ -114,6 +114,10 @@ package RS5_pkg;
         V_IDLE, V_EXEC, V_END
     } vector_states_e;
 
+    typedef enum logic [1:0] {
+        VLSU_IDLE, VLSU_FIRST_CYCLE, VLSU_EXEC, VLSU_END
+    } vector_lsu_states_e;
+
     typedef enum  logic[1:0] {DIRECT, VECTORED} trapMode_e;
 
     typedef enum  logic[11:0] { 
@@ -140,12 +144,12 @@ package RS5_pkg;
     } exceptionCode_e;
 
     typedef enum  logic[4:0] {
-        S_SW_INT = 1, M_SW_INT = 3, S_TIM_INT = 5, M_TIM_INT = 7, S_EXT_INT = 9, 
+        S_SW_INT = 1, M_SW_INT = 3, S_TIM_INT = 5, M_TIM_INT = 7, S_EXT_INT = 9,
         M_EXT_INT = 11
     } interruptionCode_e;
 
 // Element width
-  typedef enum logic [2:0] {
+    typedef enum logic [2:0] {
         EW8    = 3'b000,
         EW16   = 3'b001,
         EW32   = 3'b010,
@@ -154,10 +158,17 @@ package RS5_pkg;
         EW256  = 3'b101,
         EW512  = 3'b110,
         EW1024 = 3'b111
-  } vew_e;
+    } vew_e;
+
+    typedef enum logic [2:0] {
+        LSU_EW8    = 3'b000,
+        LSU_EW16   = 3'b101,
+        LSU_EW32   = 3'b110,
+        LSU_EW64   = 3'b111
+    } vew_lsu_e;
 
   // Length multiplier
-  typedef enum logic [2:0] {
+    typedef enum logic [2:0] {
         LMUL_1    = 3'b000,
         LMUL_2    = 3'b001,
         LMUL_4    = 3'b010,
@@ -166,9 +177,9 @@ package RS5_pkg;
         LMUL_1_8  = 3'b101,
         LMUL_1_4  = 3'b110,
         LMUL_1_2  = 3'b111
-  } vlmul_e;
+    } vlmul_e;
 
-  typedef enum  logic[7:0] {
+    typedef enum  logic[7:0] {
         VNOP,
         VSETVL,
         VSETVLI,
@@ -217,7 +228,7 @@ package RS5_pkg;
         VREDAND,
         VREDOR,
         VREDXOR
-  } iTypeVector_e;
+    } iTypeVector_e;
 
     typedef enum  logic[2:0] {
         OPIVV = 3'b000,
@@ -231,10 +242,10 @@ package RS5_pkg;
     } opCat_e;
 
     typedef enum logic[1:0] {
-        VLE,
-        VLUXEI,
-        VLSE,
-        VLOXEI
+        UNIT_STRIDED,
+        INDEXED_UNORDERED,
+        STRIDED,
+        INDEXED_RDERED
     } addrModes_e;
 
 endpackage

@@ -58,14 +58,15 @@ module execute
     output  iType_e             instruction_operation_o,
     output  logic [31:0]        result_o,
 
-    output  logic [63:0]        mul_result_o, 
-    output  logic [63:0]        mulh_result_o, 
+    output  logic [63:0]        mul_result_o,
+    output  logic [63:0]        mulh_result_o,
     output  logic [63:0]        mulhsu_result_o,
 
     output  logic [31:0]        mem_address_o,
     output  logic               mem_read_enable_o,
     output  logic  [3:0]        mem_write_enable_o,
     output  logic [31:0]        mem_write_data_o,
+    input   logic [31:0]        mem_read_data_i,
 
     output  logic [11:0]        csr_address_o,
     output  logic               csr_read_enable_o,
@@ -154,31 +155,55 @@ module execute
 // Load/Store signals
 //////////////////////////////////////////////////////////////////////////////
 
-    assign mem_address_o[31:2]  = sum_result[31:2];
-    assign mem_address_o [1:0]  = '0;
-    assign mem_read_enable_o    = instruction_operation_i inside {LB, LBU, LH, LHU, LW};
+    logic [31:0] mem_address_vector;
+    logic [31:0] mem_address;
+    logic        mem_read_enable;
+    logic        mem_read_enable_vector;
+    logic  [3:0] mem_write_enable;
+    logic  [3:0] mem_write_enable_vector;
+    logic [31:0] mem_write_data;
+    logic [31:0] mem_write_data_vector;
+
+    always_comb begin
+        if (instruction_operation_i inside {VLOAD, VSTORE}) begin
+            mem_address_o      = {mem_address_vector[31:2], 2'b00};
+            mem_read_enable_o  = mem_read_enable_vector;
+            mem_write_enable_o = mem_write_enable_vector;
+            mem_write_data_o   = mem_write_data_vector;
+        end
+        else begin
+            mem_address_o      = mem_address;
+            mem_read_enable_o  = mem_read_enable;
+            mem_write_enable_o = mem_write_enable;
+            mem_write_data_o   = mem_write_data;
+        end
+    end
+
+    assign mem_address[31:2]  = sum_result[31:2];
+    assign mem_address [1:0]  = '0;
+    assign mem_read_enable    = instruction_operation_i inside {LB, LBU, LH, LHU, LW};
 
     always_comb begin
         unique case (instruction_operation_i)
-            SB:         mem_write_data_o = {4{third_operand_i[7:0]}};
-            SH:         mem_write_data_o = {2{third_operand_i[15:0]}};
-            default:    mem_write_data_o = third_operand_i;
+            SB:         mem_write_data = {4{third_operand_i[7:0]}};
+            SH:         mem_write_data = {2{third_operand_i[15:0]}};
+            default:    mem_write_data = third_operand_i;
         endcase
     end
 
     always_comb begin
         unique case (instruction_operation_i)
             SB: unique case (sum_result[1:0])
-                    2'b11:   mem_write_enable_o = 4'b1000;
-                    2'b10:   mem_write_enable_o = 4'b0100;
-                    2'b01:   mem_write_enable_o = 4'b0010;
-                    default: mem_write_enable_o = 4'b0001;
+                    2'b11:   mem_write_enable = 4'b1000;
+                    2'b10:   mem_write_enable = 4'b0100;
+                    2'b01:   mem_write_enable = 4'b0010;
+                    default: mem_write_enable = 4'b0001;
                 endcase
-            SH:              mem_write_enable_o = (sum_result[1]) 
-                                                ? 4'b1100 
+            SH:              mem_write_enable = (sum_result[1])
+                                                ? 4'b1100
                                                 : 4'b0011;
-            SW:              mem_write_enable_o = 4'b1111;
-            default:         mem_write_enable_o = 4'b0000;
+            SW:              mem_write_enable = 4'b1111;
+            default:         mem_write_enable = 4'b0000;
         endcase
 end
 
@@ -306,6 +331,11 @@ end
         .op2_scalar_i           (second_operand_i),
         .op3_scalar_i           (third_operand_i),
         .hold_o                 (hold_vector),
+        .mem_address_o          (mem_address_vector),
+        .mem_read_enable_o      (mem_read_enable_vector),
+        .mem_write_enable_o     (mem_write_enable_vector),
+        .mem_write_data_o       (mem_write_data_vector),
+        .mem_read_data_i        (mem_read_data_i),
         .res_scalar_o           (vector_scalar_result),
         .wr_en_scalar_o         (vector_wr_en)
     );
@@ -361,7 +391,7 @@ end
         ) begin
             write_enable_o          <= write_enable;
             instruction_operation_o <= instruction_operation_i;
-            result_o                <= result;             
+            result_o                <= result;
         end
     end
 

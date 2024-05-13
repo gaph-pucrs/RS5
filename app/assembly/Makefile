@@ -10,7 +10,7 @@ LDFLAGS = -nostdlib -march=rv32i -mabi=ilp32 -Triscv.ld
 OBJCOPY = $(TRIPLET)-objcopy
 OBJDUMP = $(TRIPLET)-objdump
 
-PROGNAME = vector
+PROGNAME = vectorlsu
 
 BIN_FILES = $(addsuffix .bin, $(PROGNAME))
 LST_FILES = $(addsuffix .lst, $(PROGNAME))
@@ -36,4 +36,4 @@ all : $(BIN_FILES) $(LST_FILES)
 	$(LD) -o $@ $+ $(LDFLAGS)
 
 clean :
-	rm -f $(BIN_FILES) $(LST_FILES)  $(wildcard *~) $(wildcard *.o) 
+	rm -f $(BIN_FILES) $(LST_FILES)  $(wildcard *~) $(wildcard *.o)

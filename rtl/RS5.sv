@@ -304,6 +304,7 @@ module RS5
         .mem_read_enable_o      (mem_read_enable), 
         .mem_write_enable_o     (mem_write_enable),
         .mem_write_data_o       (mem_data_o),
+        .mem_read_data_i        (mem_data_i),
         .csr_address_o          (csr_addr), 
         .csr_read_enable_o      (csr_read_enable), 
         .csr_data_read_i        (csr_data_read),
@@ -330,7 +331,7 @@ module RS5
         .mul_result_i           (mul_result),
         .mulh_result_i          (mulh_result),
         .mulhsu_result_i        (mulhsu_result),
-        .mem_data_i             (mem_data_i), 
+        .mem_data_i             (mem_data_i),
         .regbank_data_o         (regbank_data_writeback)
     );
 

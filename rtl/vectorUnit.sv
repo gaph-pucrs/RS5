@@ -1,4 +1,4 @@
-module vectorUnit 
+module vectorUnit
     import RS5_pkg::*;
 #(
     parameter int           VLEN        = 64
@@ -19,6 +19,12 @@ module vectorUnit
 
     output  logic [31:0]    vtype_o,
 
+    output logic [31:0]     mem_address_o,
+    output logic            mem_read_enable_o,
+    output logic [ 3:0]     mem_write_enable_o,
+    output logic [31:0]     mem_write_data_o,
+    input  logic [31:0]     mem_read_data_i,
+
     output  logic [31:0]    res_scalar_o,
     output  logic           wr_en_scalar_o
 );
@@ -34,7 +40,7 @@ module vectorUnit
     logic        reduction_instruction;
     logic        accumulate_instruction;
     logic        widening;
-    
+
     vew_e   vsew, vsew_effective;
     vlmul_e vlmul, vlmul_effective;
     logic[$bits(VLEN)-1:0] vl, vl_next;
@@ -45,13 +51,15 @@ module vectorUnit
     logic [4:0]       vs1_addr, vs2_addr, vs3_addr;
     logic [VLEN-1:0]  vs1_data, vs2_data, vs3_data;
     logic [4:0]       cycle_count, cycle_count_vd;
-    logic             hold, hold_widening;
+    logic             hold, hold_widening, hold_alu, hold_lsu;
 
     logic [VLEN-1:0]  first_operand, second_operand, third_operand;
-    
+
     logic [4:0]       vd_addr, vd_addr_r;
-    logic [VLEN-1:0]  result;
+    logic [VLEN-1:0]  result_alu, result_lsu, result;
     logic [VLENB-1:0] write_enable;
+
+    assign hold = hold_alu | hold_lsu;
 
 //////////////////////////////////////////////////////////////////////////////
 // Decoding
@@ -111,17 +119,17 @@ module vectorUnit
     always_comb begin
         unique case (state)
             V_IDLE:
-                if (instruction_operation_i == VECTOR && vector_operation_i != VNOP)
+                if ((instruction_operation_i == VECTOR && !(vector_operation_i inside {VNOP, VSETVL, VSETVLI, VSETIVLI})) || instruction_operation_i inside {VLOAD, VSTORE})
                     next_state = V_EXEC;
                 else
                     next_state = V_IDLE;
 
             V_EXEC:
                 if (
-                    (vlmul_effective == LMUL_1  && cycle_count_vd < 1) 
-                ||  (vlmul_effective == LMUL_2  && cycle_count_vd < 2) 
-                ||  (vlmul_effective == LMUL_4  && cycle_count_vd < 4) 
-                ||  (vlmul_effective == LMUL_8  && cycle_count_vd < 8) 
+                    (vlmul_effective == LMUL_1  && cycle_count_vd < 1)
+                ||  (vlmul_effective == LMUL_2  && cycle_count_vd < 2)
+                ||  (vlmul_effective == LMUL_4  && cycle_count_vd < 4)
+                ||  (vlmul_effective == LMUL_8  && cycle_count_vd < 8)
                 )
                     next_state = V_EXEC;
                 else
@@ -145,7 +153,7 @@ module vectorUnit
                     $error("Widening operations with VSEW=32b are not supported");
                 end
             endcase
-        end 
+        end
         else begin
             vsew_effective = vsew;
         end
@@ -162,7 +170,7 @@ module vectorUnit
                     $error("Widening operations with LMUL=8 are not supported");
                 end
             endcase
-        end 
+        end
         else begin
             vlmul_effective = vlmul;
         end
@@ -207,7 +215,7 @@ module vectorUnit
 
     // WRITE ENABLE GENERATION
     always_ff @(posedge clk) begin
-        if ((state == V_EXEC) && (vl > 0) && (!hold || hold_widening)) begin
+        if ((state == V_EXEC) && (vl > 0) && (!hold || hold_widening) && instruction_operation_i != VSTORE) begin
             unique case (vsew_effective)
                 EW8: begin
                     for (int i = 0; i < VLENB; i++) begin
@@ -232,7 +240,7 @@ module vectorUnit
         end
         else begin
             write_enable <= '0;
-        end                   
+        end
     end
 
     vectorRegbank #(
@@ -256,7 +264,7 @@ module vectorUnit
 // Replicate Immediate and Scalar
 //////////////////////////////////////////////////////////////////////////////
 
-    always_comb begin 
+    always_comb begin
         unique case (vsew)
             EW8:     scalar_replicated = {(VLENB){op1_scalar_i[7:0]}};
             EW16:    scalar_replicated = {(VLENB/2){op1_scalar_i[15:0]}};
@@ -264,7 +272,7 @@ module vectorUnit
         endcase
     end
 
-    always_comb begin 
+    always_comb begin
         // unsigned
         if (vector_operation_i inside {VSRL, VSLL, VSRA}) begin
             unique case (vsew)
@@ -305,6 +313,36 @@ module vectorUnit
     end
 
 //////////////////////////////////////////////////////////////////////////////
+// LOAD AND STORE UNIT
+//////////////////////////////////////////////////////////////////////////////
+
+    logic [VLEN-1:0] lsu_data_read;
+
+    vectorLSU #(
+        .VLEN   (VLEN),
+        .VLENB  (VLENB)
+    ) vectorLSU1 (
+        .clk                    (clk),
+        .reset_n                (reset_n),
+        .instruction_i          (instruction_i),
+        .base_address_i         (op1_scalar_i),
+        .stride_i               (op2_scalar_i),
+        .write_data_i           (third_operand),
+        .current_state          (state),
+        .cycle_count            (cycle_count),
+        .instruction_operation_i(instruction_operation_i),
+        .vsew                   (vsew),
+        .hold_o                 (hold_lsu),
+
+        .mem_address_o          (mem_address_o),
+        .mem_read_enable_o      (mem_read_enable_o),
+        .mem_write_enable_o     (mem_write_enable_o),
+        .mem_write_data_o       (mem_write_data_o),
+        .mem_read_data_i        (mem_read_data_i),
+        .read_data_o            (result_lsu)
+    );
+
+//////////////////////////////////////////////////////////////////////////////
 // ALU
 //////////////////////////////////////////////////////////////////////////////
 
@@ -322,10 +360,12 @@ module vectorUnit
         .current_state      (state),
         .vsew               (vsew),
         .widening_i         (widening),
-        .hold_o             (hold),
+        .hold_o             (hold_alu),
         .hold_widening_o    (hold_widening),
-        .result_o           (result)
+        .result_o           (result_alu)
     );
+
+    assign result = (instruction_operation_i == VLOAD) ? result_lsu : result_alu;
 
 //////////////////////////////////////////////////////////////////////////////
 // Scalar Result

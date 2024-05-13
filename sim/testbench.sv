@@ -27,6 +27,7 @@
 `include "../rtl/vectorCSRs.sv"
 `include "../rtl/vectorRegbank.sv"
 `include "../rtl/vectorALU.sv"
+`include "../rtl/vectorLSU.sv"
 `include "../rtl/vectorUnit.sv"
 `include "../rtl/execute.sv"
 `include "../rtl/retire.sv"
@@ -53,7 +54,7 @@ module testbench
 //////////////////////////////////////////////////////////////////////////////
 
     localparam int           MEM_WIDTH = 65536;
-    localparam string        BIN_FILE = "../app/assembly/vector.bin";
+    localparam string        BIN_FILE = "../app/assembly/vectorlsu.bin";
     
     localparam int           i_cnt = 1;
 
