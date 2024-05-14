@@ -32,11 +32,11 @@ package RS5_pkg;
     } rv32_e;
 
     typedef enum  logic[5:0] {
-        R_TYPE   = 6'b000001, 
-        I_TYPE   = 6'b000010, 
-        S_TYPE   = 6'b000100, 
-        B_TYPE   = 6'b001000, 
-        U_TYPE   = 6'b010000, 
+        R_TYPE   = 6'b000001,
+        I_TYPE   = 6'b000010,
+        S_TYPE   = 6'b000100,
+        B_TYPE   = 6'b001000,
+        U_TYPE   = 6'b010000,
         J_TYPE   = 6'b100000
     } formatType_e;
 
@@ -115,7 +115,7 @@ package RS5_pkg;
     } vector_states_e;
 
     typedef enum logic [1:0] {
-        VLSU_IDLE, VLSU_FIRST_CYCLE, VLSU_EXEC, VLSU_END
+        VLSU_IDLE, VLSU_FIRST_CYCLE, VLSU_EXEC, VLSU_LAST_CYCLE
     } vector_lsu_states_e;
 
     typedef enum  logic[1:0] {DIRECT, VECTORED} trapMode_e;
@@ -159,13 +159,6 @@ package RS5_pkg;
         EW512  = 3'b110,
         EW1024 = 3'b111
     } vew_e;
-
-    typedef enum logic [2:0] {
-        LSU_EW8    = 3'b000,
-        LSU_EW16   = 3'b101,
-        LSU_EW32   = 3'b110,
-        LSU_EW64   = 3'b111
-    } vew_lsu_e;
 
   // Length multiplier
     typedef enum logic [2:0] {

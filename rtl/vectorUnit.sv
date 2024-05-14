@@ -332,6 +332,7 @@ module vectorUnit
         .cycle_count            (cycle_count),
         .instruction_operation_i(instruction_operation_i),
         .vsew                   (vsew),
+        .vlmul                  (vlmul),
         .hold_o                 (hold_lsu),
 
         .mem_address_o          (mem_address_o),
