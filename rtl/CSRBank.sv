@@ -307,7 +307,7 @@ module CSRBank
                 mstatus_mie     <= 0;
 
                 /* Interrupted instruction is in fact the next instruction,
-                 * because this one will be retired completely beforing taking
+                 * because this one will be retired completely before taking
                  * the trap
                  */
                 if(jump_i)
