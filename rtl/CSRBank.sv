@@ -19,18 +19,20 @@
  * 1) Write - Writes the given data in the given CRS.
  * 2) Set - Uses the given data as a mask to set bits in the CSR,
  * 3) Clear - Uses the given data as a mask to clear bits in CSR.
- * Each operation applies the CSR mask alongside with the CSR 
+ * Each operation applies the CSR mask alongside with the CSR
  * current content in a determined way to generate the new CSR content.
  */
 
 `include "RS5_pkg.sv"
 
-module CSRBank 
+module CSRBank
     import RS5_pkg::*;
-#( 
+#(
     parameter bit       XOSVMEnable = 1'b0,
     parameter bit       ZIHPMEnable = 1'b0,
-    parameter rv32_e    RV32        = RV32I
+    parameter rv32_e    RV32        = RV32I,
+    parameter bit       DEBUG       = 1'b0,
+    parameter string    DBG_FILE    = "./debug/Report.txt"
 )
 (
     input   logic               clk,
@@ -61,7 +63,7 @@ module CSRBank
     input   logic [31:0]        jump_target_i,
 
     input   logic [63:0]        mtime_i,
-    
+
     input   logic [31:0]        irq_i,
     input   logic               interrupt_ack_i,
     output  logic               interrupt_pending_o,
@@ -72,9 +74,9 @@ module CSRBank
     output  logic [31:0]        mtvec,
 
     output  logic               mvmctl_o,
-    output  logic [31:0]        mvmdo_o, 
-    output  logic [31:0]        mvmio_o, 
-    output  logic [31:0]        mvmds_o, 
+    output  logic [31:0]        mvmdo_o,
+    output  logic [31:0]        mvmio_o,
+    output  logic [31:0]        mvmds_o,
     output  logic [31:0]        mvmis_o,
     output  logic [31:0]        mvmim_o,
     output  logic [31:0]        mvmdm_o
@@ -147,7 +149,7 @@ module CSRBank
 
     assign mcause = {mcause_interrupt, mcause_exc_code};
 
-    logic mstatus_sie, mstatus_mie, mstatus_spie, mstatus_ube, mstatus_mpie;
+    logic mstatus_mie, mstatus_ube, mstatus_mpie;
     logic [1:0] mstatus_vs, mstatus_mpp, mstatus_fs, mstatus_xs;
     logic mstatus_sum, mstatus_tvm, mstatus_tw, mstatus_tsr, mstatus_sd;
 
@@ -167,11 +169,11 @@ module CSRBank
                         1'b0, // mstatus_spp
                         mstatus_mpie, 
                         mstatus_ube, 
-                        mstatus_spie, 
+                        1'b0, 
                         1'b0, 
                         mstatus_mie, 
                         1'b0, 
-                        mstatus_sie, 
+                        1'b0, 
                         1'b0
                     };
 
@@ -268,8 +270,8 @@ module CSRBank
         //////////////////////////////////////////////////////////////////////////////
         else begin
             mcycle      <= mcycle + 1;
-            minstret    <= (killed) 
-                            ? minstret 
+            minstret    <= (killed)
+                            ? minstret
                             : minstret + 1;
         //////////////////////////////////////////////////////////////////////////////
         // Machine Return
@@ -289,10 +291,10 @@ module CSRBank
                 mstatus_mpie    <= mstatus_mie;
                 mstatus_mie     <= 0;
                 mepc_r          <= pc_i;
-                mtval           <= (exception_code_i == ILLEGAL_INSTRUCTION) 
-                                    ? instruction_i 
+                mtval           <= (exception_code_i == ILLEGAL_INSTRUCTION)
+                                    ? instruction_i
                                     : pc_i;
-            end 
+            end
         //////////////////////////////////////////////////////////////////////////////
         // Interrupt
         //////////////////////////////////////////////////////////////////////////////
@@ -304,11 +306,15 @@ module CSRBank
                 mstatus_mpie    <= mstatus_mie;
                 mstatus_mie     <= 0;
 
+                /* Interrupted instruction is in fact the next instruction,
+                 * because this one will be retired completely beforing taking
+                 * the trap
+                 */
                 if(jump_i)
                     mepc_r      <= jump_target_i;
                 else
-                    mepc_r      <= pc_i;                // Return address
-            end 
+                    mepc_r      <= pc_i + 32'd4;
+            end
         //////////////////////////////////////////////////////////////////////////////
         // CSR Write
         //////////////////////////////////////////////////////////////////////////////
@@ -331,7 +337,7 @@ module CSRBank
                     MCAUSE: begin
                                     mcause_interrupt    <= wr_data[31];
                                     mcause_exc_code     <= wr_data[30:0];
-                            end    
+                            end
                     MSTATUS:begin
                                     mstatus_sd          <= wr_data[31];
                                     mstatus_tsr         <= wr_data[22];
@@ -347,9 +353,9 @@ module CSRBank
                                     //mstatus_spp         <= wr_data[8];
                                     mstatus_mpie        <= wr_data[7];
                                     mstatus_ube         <= wr_data[6];
-                                    mstatus_spie        <= wr_data[5];
+                                    // mstatus_spie        <= wr_data[5];
                                     mstatus_mie         <= wr_data[3];
-                                    mstatus_sie         <= wr_data[1];
+                                    // mstatus_sie         <= wr_data[1];
                             end
 
                     default:    ; // no op
@@ -416,7 +422,7 @@ module CSRBank
                 CYCLEH:         out = mcycle[63:32];
                 TIMEH:          out = mtime_i[63:32];
                 INSTRETH:       out = minstret[63:32];
-                
+
                 MVMCTL:         out = {31'b0,mvmctl};
                 MVMDO:          out = mvmdo[31:0];
                 MVMDS:          out = mvmds[31:0];
@@ -436,7 +442,7 @@ module CSRBank
 //////////////////////////////////////////////////////////////////////////////
 // XOSVM Extension
 //////////////////////////////////////////////////////////////////////////////
-    
+
     if (XOSVMEnable == 1'b1) begin : gen_xosvm_csr_on
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n) begin
@@ -447,7 +453,7 @@ module CSRBank
                 mvmio       <= '0;
                 mvmis       <= '0;
                 mvmim       <= '0;
-            end 
+            end
             else if (write_allowed == 1'b1) begin
                 case (CSR)
                     MVMCTL:     mvmctl  <= wr_data[0];
@@ -512,8 +518,7 @@ module CSRBank
                 Interruption_Code <= M_SW_INT;
             else if ((MTIP & MTIE) == 1'b1)     // Machine Timer
                 Interruption_Code <= M_TIM_INT;
-
-        end 
+        end
         else begin
             interrupt_pending_o <= 0;
         end
@@ -524,7 +529,6 @@ module CSRBank
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     if (ZIHPMEnable == 1'b1) begin : gen_zihpm_csr_on
-        int fd;
 
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n) begin
@@ -575,35 +579,42 @@ module CSRBank
             end
         end
 
-        initial begin
-            fd = $fopen ("./debug/Report.txt", "w");
-        end
+        if (DEBUG) begin : gen_csr_dbg
+            int fd;
 
-        final begin
-            $fwrite(fd,"Clock Cycles:           %0d\n", mcycle);
-            $fwrite(fd,"Instructions Retired:   %0d\n", minstret);
-            $fwrite(fd,"Instructions Killed:    %0d\n", instructions_killed_counter);
-            $fwrite(fd,"Context Switches:       %0d\n", context_switch_counter);
-            $fwrite(fd,"Exceptions Raised:      %0d\n", raise_exception_counter);
-            $fwrite(fd,"Interrupts Acked:       %0d\n", interrupt_ack_counter);
+            initial begin
+                fd = $fopen (DBG_FILE, "w");
+                if (fd == 0) begin
+                    $display("Error opening file %s", DBG_FILE);
+                end
+            end
 
-            $fwrite(fd,"\nCYCLES WITH::\n");
-            $fwrite(fd,"HAZARDS:                %0d\n", hazard_counter);
-            $fwrite(fd,"STALL:                  %0d\n", stall_counter);
+            final begin
+                $fwrite(fd,"Clock Cycles:           %0d\n", mcycle);
+                $fwrite(fd,"Instructions Retired:   %0d\n", minstret);
+                $fwrite(fd,"Instructions Killed:    %0d\n", instructions_killed_counter);
+                $fwrite(fd,"Context Switches:       %0d\n", context_switch_counter);
+                $fwrite(fd,"Exceptions Raised:      %0d\n", raise_exception_counter);
+                $fwrite(fd,"Interrupts Acked:       %0d\n", interrupt_ack_counter);
 
-            $fwrite(fd,"\nINSTRUCTION COUNTERS:\n");
-            $fwrite(fd,"NOP:                    %0d\n", nop_counter);
-            $fwrite(fd,"LOGIC:                  %0d\n", logic_counter);
-            $fwrite(fd,"ARITH:                  %0d\n", arithmetic_counter);
-            $fwrite(fd,"SHIFT:                  %0d\n", shift_counter);
-            $fwrite(fd,"BRANCH:                 %0d\n", branch_counter);
-            $fwrite(fd,"JUMP:                   %0d\n", jump_counter);
-            $fwrite(fd,"LOAD:                   %0d\n", load_counter);
-            $fwrite(fd,"STORE:                  %0d\n", store_counter);
-            $fwrite(fd,"SYS:                    %0d\n", sys_counter);
-            $fwrite(fd,"CSR:                    %0d\n", csr_counter);
-            $fwrite(fd,"MUL:                    %0d\n", mul_counter);
-            $fwrite(fd,"DIV:                    %0d\n", div_counter);
+                $fwrite(fd,"\nCYCLES WITH::\n");
+                $fwrite(fd,"HAZARDS:                %0d\n", hazard_counter);
+                $fwrite(fd,"STALL:                  %0d\n", stall_counter);
+
+                $fwrite(fd,"\nINSTRUCTION COUNTERS:\n");
+                $fwrite(fd,"NOP:                    %0d\n", nop_counter);
+                $fwrite(fd,"LOGIC:                  %0d\n", logic_counter);
+                $fwrite(fd,"ARITH:                  %0d\n", arithmetic_counter);
+                $fwrite(fd,"SHIFT:                  %0d\n", shift_counter);
+                $fwrite(fd,"BRANCH:                 %0d\n", branch_counter);
+                $fwrite(fd,"JUMP:                   %0d\n", jump_counter);
+                $fwrite(fd,"LOAD:                   %0d\n", load_counter);
+                $fwrite(fd,"STORE:                  %0d\n", store_counter);
+                $fwrite(fd,"SYS:                    %0d\n", sys_counter);
+                $fwrite(fd,"CSR:                    %0d\n", csr_counter);
+                $fwrite(fd,"MUL:                    %0d\n", mul_counter);
+                $fwrite(fd,"DIV:                    %0d\n", div_counter);
+            end
         end
     end
     else begin : gen_zihpm_csr_off

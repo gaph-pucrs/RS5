@@ -1,6 +1,6 @@
 # RS5
 
-### Description 
+## Description
 
 RS5 is a processor that implements the RISC-V 32 bits integer Module (RV32I) alongside the Zicsr Extension and the Machine Mode of the RISC-V Privileged Architecture. It is written in the SystemVerilog Hardware Description Language (HDL) and implements the following interface:
 
@@ -15,20 +15,23 @@ The processor is a 4 stage pipeline, synchronized to the rising edge of the cloc
 - Execute: Performs the given operation on the received operands. Holds an Arithmetic and Logic Unit, a CSR access unit, a Memory Load and Store unit and a Branch unit.
 - Retire: Performs the write-back of the results of the instruction, it can be either the result from execute stage or the data read from memory.
 
-<img src="imgs/RS5_Block.png" alt="Block Diagram">
-> RS5 BLOCK DIAGRAM.
+<p align="center">
+    <img src="imgs/RS5_Block.svg" alt="Block Diagram">
+
+    > RS5 BLOCK DIAGRAM.
+</p>
 
 
 ## RTL and Processor Organization
 
 This processor organization is an evolution of an Asynchronous RISC-V High-level Functional Model written in GO language. That can be found in the [ARV Go High-level Functional Model](https://github.com/marlls1989/arv) repository.
 
-- First Stage - Instruction Fetch: 
+- First Stage - Instruction Fetch:
 This stage is the Instruction Fetch Stage and is implemented by the [Fetch Unit](https://github.com/gaph-pucrs/RS5/blob/master/rtl/fetch.sv), this unit contains the Program Counter (PC) logic, the value contained in this register is used to index the instruction memory, at each clock cycle it is updated, it can be updated to the next instruction address (PC+4), or a branch address, it can also maintain the same address in case of a bubble being inserted due to a detection of a data hazard or memory stall. The jump/branch prediction policy is "never taken".
 Each instruction that leaves the first stage is linked to a Tag that will follow the instruction until its retirement. This Tag is a number that indicates the "flow/context" of that instruction. Every time a jump/branch occurs the tag will be increased meaning that the fetched instructions now belong to a new flow.
 
-- Second Stage - Instruction Decode: 
-It comprehends the [Decoder Unit](https://github.com/gaph-pucrs/RS5/blob/master/rtl/decode.sv), It is responsible for the generation of the control signals, based on the instruction object code fetched by the previous stage. It identifies the instruction operation (e.g. addi, bne) that is implemented in a one-hot encoding. It also decodes the instruction format (e.g. Immediate, Branch). Also sends to the register bank the read addresses that are directly extracted from the instruction object code, the object code is also used for the immediate operand extraction, based on the instruction format. The instruction format also determines the operands that will be sent to the next stage. The Data Hazard Detection mechanism is implemented by this unit, it tracks the Destiny register (regD) of the instruction that currently is in execute stage, this register is called the "blocked register", its value is updated every time that an instruction leaves the stage. A Data Hazard is detected when the instruction being processed by the decoding stage has an operator that must be read from the blocked register, this issues a signal called "hazard" that indicates that a bubble must be issued until the data conflict gets resolved. This unit also looks for data memory hazards, cases where a read is performed right after a write in the memory. 
+- Second Stage - Instruction Decode:
+It comprehends the [Decoder Unit](https://github.com/gaph-pucrs/RS5/blob/master/rtl/decode.sv), It is responsible for the generation of the control signals, based on the instruction object code fetched by the previous stage. It identifies the instruction operation (e.g. addi, bne) that is implemented in a one-hot encoding. It also decodes the instruction format (e.g. Immediate, Branch). Also sends to the register bank the read addresses that are directly extracted from the instruction object code, the object code is also used for the immediate operand extraction, based on the instruction format. The instruction format also determines the operands that will be sent to the next stage. The Data Hazard Detection mechanism is implemented by this unit, it tracks the Destiny register (regD) of the instruction that currently is in execute stage, this register is called the "blocked register", its value is updated every time that an instruction leaves the stage. A Data Hazard is detected when the instruction being processed by the decoding stage has an operator that must be read from the blocked register, this issues a signal called "hazard" that indicates that a bubble must be issued until the data conflict gets resolved. This unit also looks for data memory hazards, cases where a read is performed right after a write in the memory.
 The locked register value is used for indexing the register that must receive the write-back data from the retire unit.
 
 - Third Stage - Instruction Execution:
@@ -61,7 +64,7 @@ The installation of the toolchain is only needed if you want to compile new appl
 
 To install the Toolchain a guide and a script are provided inside the folder [tools/riscv-toolchain](https://github.com/gaph-pucrs/RS5/tree/master/tools/riscv-toolchain).
 
-To perform the simulation you must have a HDL simulator (e.g. XCELIUM, MODELSIM). To perform the simulation of a specific application, you must edit the binary input file in the [RAM_mem.sv](https://github.com/gaph-pucrs/RS5/blob/master/sim/RAM_mem.sv). The testbench and the ram implementation are located in the [/sim](https://github.com/gaph-pucrs/RS5/tree/master/sim) folder. Once the desired application is selected and the testbench is pointing to it, then you are able to perform the simulation using the HDL simulator. 
+To perform the simulation you must have a HDL simulator (e.g. XCELIUM, MODELSIM). To perform the simulation of a specific application, you must edit the binary input file in the [RAM_mem.sv](https://github.com/gaph-pucrs/RS5/blob/master/sim/RAM_mem.sv). The testbench and the ram implementation are located in the [/sim](https://github.com/gaph-pucrs/RS5/tree/master/sim) folder. Once the desired application is selected and the testbench is pointing to it, then you are able to perform the simulation using the HDL simulator.
 
 ## Applications
 In this repository, some applications that were used to validate the processor are provided. The source codes of the applications are located in the [app/](https://github.com/gaph-pucrs/RS5/tree/master/app) folder, all of them can be built using their own Makefile, which will generate the output binary of each application.
@@ -118,10 +121,14 @@ For Modelsim/Questa, the [sim.do](https://github.com/gaph-pucrs/RS5/blob/master/
 
 For Xcelium simulator, the [sim.xrun](https://github.com/gaph-pucrs/RS5/blob/master/sim/RAM_mem.sv) script file is provided. To run via Xcelium you can run the command `xrun -f sim.xrun`.
 
-For Verilator you can run the commands: `verilator --cc testbench.sv --exe tb_top_verilator.cpp --build --Wall` followed by `./obj_dir/Vtestbench`. 
+For Verilator you can run the commands: `verilator --cc testbench.sv --exe tb_top_verilator.cpp --build --Wall` followed by `./obj_dir/Vtestbench`.
 
 ## How to Prototype on FPGA
 
 The [Proto Folder](https://github.com/gaph-pucrs/RS5/blob/master/proto/) provides all the files needed for the FPGA prototype. To load the application on the Block RAM (BRAM) run you will need the application binary file as described in the previous section. The BRAM is loaded using a ".coe" file. To generate the coe file a python script is provided in the [init_mem.py](https://github.com/gaph-pucrs/RS5/blob/master/proto/init_mem.py) file. The script input file path should point to the application binary file, after running the script via the `python3 init_mem.py` command it will generate the ".coe" file for the given application, you can also edit the output ".coe" file name.
 
-A Vivado project is provided in the [RS5.xpr](https://github.com/gaph-pucrs/RS5/blob/master/proto/RS5/RS5.xpr) file that can be imported into VIVADO. This project already points to all the processor, environment and FPGA IP files. After opening the project the processor should be ready for synthesis and implementation in a Xilinx Nexys A7 FPGA board. The ".coe" file should be loaded to the BRAM by editing the BRAM IP. After running the synthesis you can generate the bitstream and then you should connect the FPGA board to your computer and then program the device, after these steps then the processor will be running in the FPGA board. To be able to capture the processor output you can either use VIVADO tools or use a serial port emulator such as Teraterm or PUTTY on Windows or running the `sudo tio /dev/ttyUSB1 -b 9600 --map ICRNL,INLCRNL` command on Linux.  
+A Vivado project is provided in the [RS5.xpr](https://github.com/gaph-pucrs/RS5/blob/master/proto/RS5/RS5.xpr) file that can be imported into VIVADO. This project already points to all the processor, environment and FPGA IP files. After opening the project the processor should be ready for synthesis and implementation in a Xilinx Nexys A7 FPGA board. The ".coe" file should be loaded to the BRAM by editing the BRAM IP. After running the synthesis you can generate the bitstream and then you should connect the FPGA board to your computer and then program the device, after these steps then the processor will be running in the FPGA board. To be able to capture the processor output you can either use VIVADO tools or use a serial port emulator such as Teraterm or PUTTY on Windows or running the `sudo tio /dev/ttyUSB1 -b 9600 --map ICRNL,INLCRNL` command on Linux.
+
+## References
+
+1. [W. A. Nunes, A. E. Dal Zotto, C. da Silva Borges and F. G. Moraes, "RS5: An Integrated Hardware and Software Ecosystem for RISC- V Embedded Systems," 2024 IEEE 15th Latin America Symposium on Circuits and Systems (LASCAS), Punta del Este, Uruguay, 2024, pp. 1-5](https://ieeexplore.ieee.org/abstract/document/10506171)

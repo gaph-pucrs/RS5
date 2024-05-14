@@ -13,8 +13,8 @@
  * Decoder Unit is the second stage of RS5 processor core.
  *
  * \detailed
- * The decoder unit is the second stage of the RS5 processor core and 
- * is responsible for identifying the instruction format and operation, 
+ * The decoder unit is the second stage of the RS5 processor core and
+ * is responsible for identifying the instruction format and operation,
  * fetching the operands in the register bank, and calculating the immediate
  * operand. It contains the mechanism of hazard detection, if a hazard is
  * detected (e.g. one operand is a locked register) a bubble is issued, which
@@ -23,8 +23,11 @@
 
 `include "RS5_pkg.sv"
 
-module decode 
+module decode
     import RS5_pkg::*;
+#(
+    parameter bit           ZKNEEnable  = 1'b1
+)
 (
     input   logic           clk,
     input   logic           reset_n,
@@ -55,7 +58,7 @@ module decode
 );
 
     logic [31:0]    first_operand, second_operand, third_operand, immediate;
-    logic [31:0]    instruction; 
+    logic [31:0]    instruction;
     logic [31:0]    last_instruction;
     logic           last_hazard;
     logic           last_stall;
@@ -159,7 +162,7 @@ module decode
     end
 
     always_comb begin
-        unique case ({funct7, funct3})
+        unique case ({funct7, funct3}) inside
             10'b0000000000:     decode_op = ADD;
             10'b0100000000:     decode_op = SUB;
             10'b0000000001:     decode_op = SLL;
@@ -178,6 +181,8 @@ module decode
             10'b0000001101:     decode_op = DIVU;
             10'b0000001110:     decode_op = REM;
             10'b0000001111:     decode_op = REMU;
+            10'b??10001000:     decode_op = ZKNEEnable ? AES32ESI : INVALID;
+            10'b??10011000:     decode_op = ZKNEEnable ? AES32ESMI : INVALID;
             default:            decode_op = INVALID;
         endcase
     end
@@ -206,7 +211,7 @@ module decode
         endcase
     end
 
-    always_comb begin 
+    always_comb begin
         unique case (opcode)
             7'b0110111: instruction_operation = LUI;
             7'b0010111: instruction_operation = ADD;                /* AUIPC */
@@ -221,7 +226,7 @@ module decode
             7'b1110011: instruction_operation = decode_system;      /* SYSTEM */
             default:    instruction_operation = INVALID;
         endcase
-    end        
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 //  Decodes the instruction format
@@ -274,7 +279,7 @@ module decode
         if (!reset_n) begin
             locked_register <= '0;
             locked_memory   <= '0;
-        end 
+        end
         else if (hazard_o == 1'b1) begin
             locked_register <= '0;
             locked_memory   <= '0;
@@ -315,7 +320,7 @@ module decode
 
     always_comb begin
         unique case (instruction_format)
-            R_TYPE, B_TYPE, S_TYPE: 
+            R_TYPE, B_TYPE, S_TYPE:
             /**
              * This does NOT account for SYSTEM (R_TYPE) CSRR_I instructions
              * where funct3[2] is 1, and therefore WILL generate a hazard
@@ -346,7 +351,7 @@ module decode
     assign hazard_o   = (hazard_mem | hazard_rs1 | hazard_rs2) & enable;
 
 //////////////////////////////////////////////////////////////////////////////
-// Exception Detection 
+// Exception Detection
 //////////////////////////////////////////////////////////////////////////////
 
     logic invalid_inst;
@@ -400,7 +405,7 @@ module decode
             exc_ilegal_inst_o       <= 1'b0;
             exc_misaligned_fetch_o  <= 1'b0;
             exc_inst_access_fault_o <= 1'b0;
-        end 
+        end
         else if (hazard_o == 1'b1) begin
             first_operand_o         <= '0;
             second_operand_o        <= '0;
@@ -412,7 +417,7 @@ module decode
             exc_ilegal_inst_o       <= 1'b0;
             exc_misaligned_fetch_o  <= 1'b0;
             exc_inst_access_fault_o <= 1'b0;
-        end 
+        end
         else if (enable == 1'b1) begin
             first_operand_o         <= first_operand;
             second_operand_o        <= second_operand;

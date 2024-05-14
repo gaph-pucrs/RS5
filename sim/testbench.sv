@@ -23,24 +23,42 @@
 
 module testbench
     import RS5_pkg::*;
-#(
-    parameter rv32_e INSTRUCTION_SET = RV32M,
-    parameter bit    USE_XOSVM       = 1'b1,
-    parameter bit    USE_ZIHPM       = 1'b1
-)
 (
-    input logic clk_i,
-    input logic reset_n
 );
 
 //////////////////////////////////////////////////////////////////////////////
 // PARAMETERS FOR CORE INSTANTIATION
 //////////////////////////////////////////////////////////////////////////////
 
-    localparam int           MEM_WIDTH = 65536;
-    localparam string        BIN_FILE = "../app/riscv-tests/test.bin";
-    
+    localparam rv32_e        INSTRUCTION_SET = RV32M;
+    localparam bit           USE_XOSVM       = 1'b1;
+    localparam bit           USE_ZIHPM       = 1'b1;
+    localparam bit           USE_ZKNE        = 1'b1;
+    localparam int           MEM_WIDTH       = 65536;
+    localparam string        BIN_FILE        = "../app/riscv-tests/test.bin";
+
     localparam int           i_cnt = 1;
+
+///////////////////////////////////////// Clock generator //////////////////////////////
+
+    logic        clk=1;
+
+    always begin
+        #5.0 clk <= 0;
+        #5.0 clk <= 1;
+    end
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////// RESET CPU ////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    logic reset_n;
+
+    initial begin
+        reset_n = 0;                                          // RESET for CPU initialization
+
+        #100 reset_n = 1;                                     // Hold state for 100 ns
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 // TB SIGNALS
@@ -109,8 +127,8 @@ module testbench
             enable_tb   = 1'b0;
         end
     end
-    
-    always_ff @(posedge clk_i) begin
+
+    always_ff @(posedge clk) begin
         enable_tb_r     <= enable_tb;
         enable_rtc_r    <= enable_rtc;
         enable_plic_r   <= enable_plic;
@@ -137,19 +155,20 @@ module testbench
 
     RS5 #(
         .Environment(ASIC),
-        .RV32(INSTRUCTION_SET),
+        .RV32       (INSTRUCTION_SET),
         .XOSVMEnable(USE_XOSVM),
-        .ZIHPMEnable(USE_ZIHPM)
+        .ZIHPMEnable(USE_ZIHPM),
+        .ZKNEEnable (USE_ZKNE)
     ) dut (
-        .clk                    (clk_i), 
-        .reset_n                (reset_n), 
+        .clk                    (clk),
+        .reset_n                (reset_n),
         .stall                  (1'b0),
-        .instruction_i          (instruction), 
-        .mem_data_i             (mem_data_read), 
+        .instruction_i          (instruction),
+        .mem_data_i             (mem_data_read),
         .mtime_i                (mtime),
         .irq_i                  (irq),
-        .instruction_address_o  (instruction_address), 
-        .mem_operation_enable_o (mem_operation_enable), 
+        .instruction_address_o  (instruction_address),
+        .mem_operation_enable_o (mem_operation_enable),
         .mem_write_enable_o     (mem_write_enable),
         .mem_address_o          (mem_address),
         .mem_data_o             (mem_data_write),
@@ -164,18 +183,18 @@ module testbench
         .MEM_WIDTH(MEM_WIDTH),
         .BIN_FILE(BIN_FILE)
     ) RAM_MEM (
-        .clk        (clk_i), 
+        .clk        (clk),
 
-        .enA_i      (1'b1), 
-        .weA_i      (4'h0), 
-        .addrA_i    (instruction_address[15:0]), 
-        .dataA_i    (32'h00000000), 
+        .enA_i      (1'b1),
+        .weA_i      (4'h0),
+        .addrA_i    (instruction_address[15:0]),
+        .dataA_i    (32'h00000000),
         .dataA_o    (instruction),
 
-        .enB_i      (enable_ram), 
-        .weB_i      (mem_write_enable), 
-        .addrB_i    (mem_address[15:0]), 
-        .dataB_i    (mem_data_write), 
+        .enB_i      (enable_ram),
+        .weB_i      (mem_write_enable),
+        .addrB_i    (mem_address[15:0]),
+        .dataB_i    (mem_data_write),
         .dataB_o    (data_ram)
     );
 
@@ -191,13 +210,13 @@ module testbench
     plic #(
         .i_cnt(i_cnt)
     ) plic1 (
-        .clk     (clk_i),
+        .clk     (clk),
         .reset_n (reset_n),
         .en_i    (enable_plic),
         .we_i    (mem_write_enable),
         .addr_i  (mem_address[23:0]),
         .data_i  (mem_data_write),
-        .data_o  (data_plic),     
+        .data_o  (data_plic),
         .irq_i   ('0),
         .iack_i  (interrupt_ack),
         .iack_o  (iack_periph),
@@ -209,13 +228,13 @@ module testbench
 //////////////////////////////////////////////////////////////////////////////
 
     rtc rtc(
-        .clk        (clk_i),
-        .reset_n    (reset_n), 
+        .clk        (clk),
+        .reset_n    (reset_n),
         .en_i       (enable_rtc),
         .addr_i     (mem_address[3:0]),
         .we_i       ({4'h0, mem_write_enable}),
         .data_i     ({32'h0, mem_data_write}),
-        .data_o     (data_rtc),     
+        .data_o     (data_rtc),
         .mti_o      (mti),
         .mtime_o    (mtime)
     );
@@ -224,7 +243,7 @@ module testbench
 // Memory Mapped regs
 //////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk_i) begin
+    always_ff @(posedge clk) begin
         if (enable_tb) begin
             // OUTPUT REG
             if ((mem_address == 32'h80004000 || mem_address == 32'h80001000) && mem_write_enable != '0) begin
@@ -237,7 +256,7 @@ module testbench
                 $display("# %t END OF SIMULATION",$time);
                 $finish;
             end
-        end 
+        end
         else begin
             data_tb <= '0;
         end
