@@ -297,8 +297,11 @@ module decode
     assign rs1_o = instruction[19:15];
     assign rs2_o = instruction[24:20];
 
-    always_ff @(posedge clk) begin
-        rd_o <= locked_register;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            rd_o <= '0;
+        else if (enable)
+            rd_o <= locked_register;
     end
 
 //////////////////////////////////////////////////////////////////////////////
