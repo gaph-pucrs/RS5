@@ -121,9 +121,59 @@
     nop
     nop
 
+    #######################################
+    # UNIT STRIDED STORE
+    #######################################
 
+    vsetvli t0, x0, e8, m1, ta, ma          # SEW=8, LMUL=1, VL=8
 
+    li t1, 4096         # 0x1000
+    vse32.v v1, (t1)
 
+    li t2, 4104         # 0x1008
+    vse16.v v3, (t2)
+
+    li t3, 4114         # 0x1012
+    vse16.v v4, (t3)
+
+    li t4, 4128         # 0x1020
+    vse8.v v7, (t4)
+
+    li t5, 4137         # 0x1029
+    vse8.v v7, (t5)
+
+    li t6, 4150         # 0x1036
+    vse8.v v7, (t6)
+
+    li a1, 4163         # 0x1043
+    vse8.v v7, (a1)
+
+    #######################################
+    # UNIT STRIDED STORE - 2 regs
+    #######################################
+
+    vsetvli t0, x0, e8, m2, ta, ma          # SEW=8, LMUL=2, VL=8
+
+    li t1, 0x2000
+    vse32.v v1, (t1)
+
+    li t2, 0x2010
+    vse16.v v3, (t2)
+
+    li t3, 0x2022
+    vse16.v v3, (t3)
+
+    li t4, 0x2030
+    vse8.v v7, (t4)
+
+    li t5, 0x2041
+    vse8.v v7, (t5)
+
+    li t6, 0x2052
+    vse8.v v7, (t6)
+
+    li a1, 0x2053
+    vse8.v v7, (a1)
 
 clear_vreg_bank:
     # CLEARS VREG BANK

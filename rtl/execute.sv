@@ -255,7 +255,6 @@ end
         endcase
     end
 
-    
     always_comb begin
         // Raise exeption if CSR is read only and write enable is true
         if (csr_address_o[11:10] == 2'b11 && csr_write_enable == 1'b1) begin
@@ -274,7 +273,7 @@ end
 /////////////////////////////////////////////////////////////////////////////
 // Multiplication and Division Operations
 //////////////////////////////////////////////////////////////////////////////
-    
+
     logic [31:0] div_result;
     logic [31:0] divu_result;
     logic [31:0] rem_result;
@@ -300,7 +299,7 @@ end
             .mulh_result_o              (mulh_result_o),
             .mulhsu_result_o            (mulhsu_result_o)
         );
-    end 
+    end
     else begin
         assign hold_muldiv      = 1'b0;
         assign mul_result_o     = '0;
@@ -344,7 +343,7 @@ end
 // Demux
 //////////////////////////////////////////////////////////////////////////////
 
-    always_comb begin 
+    always_comb begin
         unique case (instruction_operation_i)
             CSRRW, CSRRS, CSRRC,
             CSRRWI,CSRRSI,CSRRCI:    result = csr_data_read_i;
@@ -362,8 +361,7 @@ end
             DIVU:                    result = divu_result;
             REM:                     result = rem_result;
             REMU:                    result = remu_result;
-            VSETVL,VSETVLI,
-            VSETIVLI, VECTOR:        result = vector_scalar_result;
+            VECTOR:                  result = vector_scalar_result;
             default:                 result = sum_result;
         endcase
     end
@@ -373,12 +371,11 @@ end
             SB,SH,SW,
             BEQ,BNE,
             BLT,BLTU,
-            BGE,BGEU:         write_enable = 1'b0;
-            VSETVL,VSETVLI,
-            VSETIVLI,VECTOR:  write_enable = vector_wr_en;
-            default:          write_enable = !killed;
+            BGE,BGEU:   write_enable = 1'b0;
+            VECTOR:     write_enable = vector_wr_en;
+            default:    write_enable = !killed;
         endcase
-    end 
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 // Output Registers

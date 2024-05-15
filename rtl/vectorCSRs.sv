@@ -74,17 +74,17 @@ module vectorCSRs
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             vill  <= 1'b0;
-            vma   <= 1'b0; 
-            vta   <= 1'b0; 
+            vma   <= 1'b0;
+            vta   <= 1'b0;
             vsew  <= EW8;
             vlmul <= LMUL_1;
             vl    <= '0;
         end
         else if (vector_operation_i inside {VSETVL, VSETVLI, VSETIVLI}) begin
             vill  <= vill_next;
-            vma   <= vma_next; 
-            vta   <= vta_next; 
-            vsew  <= vsew_next; 
+            vma   <= vma_next;
+            vta   <= vta_next;
+            vsew  <= vsew_next;
             vlmul <= vlmul_next;
             vl    <= vl_next;
 

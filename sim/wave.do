@@ -11,3 +11,4 @@ add wave -noupdate -group VECTOR        -color {Blue Violet}    /tb/dut/execute1
 add wave -noupdate -group VECTOR_RB     -color {Cyan}           /tb/dut/execute1/vector/vectorRegbank1/*
 add wave -noupdate -group VECTOR_CSR    -color {Magenta}        /tb/dut/execute1/vector/vectorCSRs1/*
 add wave -noupdate -group VECTOR_ALU    -color {Sienna}         /tb/dut/execute1/vector/vectorALU1/*
+add wave -noupdate -group VECTOR_LSU    -color {Turquoise}      /tb/dut/execute1/vector/vectorLSU1/*

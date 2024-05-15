@@ -37,7 +37,9 @@ module vectorLSU
     logic [$bits(VLENB)-1:0] elementsPerRegister;
     logic [3:0]              reg_count;
 
-    assign hold_o = (state inside {VLSU_FIRST_CYCLE, VLSU_EXEC});
+    assign hold_o = (instruction_operation_i == VSTORE)
+                    ? (state inside {VLSU_FIRST_CYCLE, VLSU_EXEC})
+                    : ((state == VLSU_FIRST_CYCLE && state_r == VLSU_IDLE) || (state_r inside {VLSU_FIRST_CYCLE, VLSU_EXEC}));
 
 //////////////////////////////////////////////////////////////////////////////
 // Decoding
@@ -70,6 +72,8 @@ module vectorLSU
 // FSM
 //////////////////////////////////////////////////////////////////////////////
 
+    logic next_cycle_is_last;
+
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             state <= VLSU_IDLE;
@@ -91,7 +95,7 @@ module vectorLSU
                     next_state = VLSU_EXEC;
 
             VLSU_EXEC:
-                if (nextTotalElementsProcessed >= elementsPerRegister)
+                if (next_cycle_is_last)
                     next_state = VLSU_LAST_CYCLE;
                 else
                     next_state = VLSU_EXEC;
@@ -112,6 +116,19 @@ module vectorLSU
         endcase
     end
 
+    always_comb begin
+        if (addrMode == UNIT_STRIDED) begin
+            unique case(width)
+                EW8:     next_cycle_is_last = ((elementsPerRegister - nextTotalElementsProcessed) <= 4);
+                EW16:    next_cycle_is_last = ((elementsPerRegister - nextTotalElementsProcessed) <= 2);
+                default: next_cycle_is_last = ((elementsPerRegister - nextTotalElementsProcessed) <= 1);
+            endcase
+        end
+        else begin
+            next_cycle_is_last = (nextTotalElementsProcessed >= elementsPerRegister);
+        end
+    end
+
 //////////////////////////////////////////////////////////////////////////////
 // STAGE 1 - Address Control
 //////////////////////////////////////////////////////////////////////////////
@@ -129,7 +146,7 @@ module vectorLSU
             offset <= '0;
         end
         else if (addrMode == UNIT_STRIDED) begin
-            if (next_state == VLSU_LAST_CYCLE || (next_state == VLSU_FIRST_CYCLE && base_address_i[1:0] != 2'b00))
+            if (state == VLSU_LAST_CYCLE)
                 offset <= offset;
             else
                 offset <= offset + 32'h4;
@@ -190,7 +207,7 @@ module vectorLSU
                         default:    elementsProcessed = 2;
                     endcase
                 end
-                else if(state == VLSU_FIRST_CYCLE) begin
+                else if(state == VLSU_LAST_CYCLE) begin
                     unique case(base_address_i[1])
                         1'b1:       elementsProcessed = 1;
                         default:    elementsProcessed = 0;
@@ -217,6 +234,96 @@ module vectorLSU
         else if (next_state == VLSU_LAST_CYCLE)
             reg_count <= reg_count + 1;
     end
+
+//////////////////////////////////////////////////////////////////////////////
+// STAGE 1 - Write Enable Control
+//////////////////////////////////////////////////////////////////////////////
+
+    logic [3:0] mem_write_enable;
+    logic [4:0] shift_amount;
+
+    always_comb begin
+        if (addrMode == UNIT_STRIDED) begin
+            if (width == EW8) begin
+                if(state == VLSU_FIRST_CYCLE) begin
+                    unique case(base_address_i[1:0])
+                        2'b11:   begin mem_write_enable = 4'b1000; shift_amount = 24; end
+                        2'b10:   begin mem_write_enable = 4'b1100; shift_amount = 16; end
+                        2'b01:   begin mem_write_enable = 4'b1110; shift_amount = 8; end
+                        default: begin mem_write_enable = 4'b1111; shift_amount = 0; end
+                    endcase
+                end
+                else if (state == VLSU_LAST_CYCLE) begin
+                    shift_amount = 0;
+                    unique case(base_address_i[1:0])
+                        2'b11:   mem_write_enable = 4'b0111;
+                        2'b10:   mem_write_enable = 4'b0011;
+                        2'b01:   mem_write_enable = 4'b0001;
+                        default: mem_write_enable = 4'b0000;
+                    endcase
+                end
+                else begin
+                    shift_amount = 0;
+                    mem_write_enable = 4'b1111;
+                end
+            end
+            else if (width == EW16) begin
+                if(state == VLSU_FIRST_CYCLE) begin
+                    unique case(base_address_i[1])
+                        1'b1:    begin mem_write_enable = 4'b1100; shift_amount = 16; end
+                        default: begin mem_write_enable = 4'b1111; shift_amount = 0; end
+                    endcase
+                end
+                else if(state == VLSU_LAST_CYCLE) begin
+                    shift_amount = 0;
+                    unique case(base_address_i[1])
+                        1'b1:       mem_write_enable = 4'b0011;
+                        default:    mem_write_enable = 4'b0000;
+                    endcase
+                end
+                else begin
+                    shift_amount     = 0;
+                    mem_write_enable = 4'b1111;
+                end
+            end
+            else begin
+                shift_amount = 0;
+                if(state inside {VLSU_IDLE, VLSU_LAST_CYCLE}) begin
+                    mem_write_enable = 4'b0000;
+                end
+                else begin
+                    mem_write_enable = 4'b1111;
+                end
+            end
+        end
+        else begin
+            shift_amount     = 0;
+            mem_write_enable = 4'b0000;
+        end
+    end
+
+//////////////////////////////////////////////////////////////////////////////
+// STAGE 1 - Write Data Control
+//////////////////////////////////////////////////////////////////////////////
+
+    logic [31:0] write_data;
+
+    always_comb begin
+        if (width == EW8) begin
+            write_data[ 7: 0] = write_data_i[(8*(totalElementsProcessed+1))-1-:8];
+            write_data[15: 8] = write_data_i[(8*(totalElementsProcessed+2))-1-:8];
+            write_data[23:16] = write_data_i[(8*(totalElementsProcessed+3))-1-:8];
+            write_data[31:24] = write_data_i[(8*(totalElementsProcessed+4))-1-:8];
+        end
+        else if (width == EW16) begin
+            write_data[15: 0] = write_data_i[(16*(totalElementsProcessed+1))-1-:16];
+            write_data[31:16] = write_data_i[(16*(totalElementsProcessed+2))-1-:16];
+        end
+        else begin
+            write_data[31:0] = write_data_i[(32*(totalElementsProcessed+1))-1-:32];
+        end
+    end
+
 
 //////////////////////////////////////////////////////////////////////////////
 // Temporal barrier
@@ -256,8 +363,9 @@ module vectorLSU
 // STAGE 2 - Read Data Control
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [ 7:0] read_data_8b  [3:0];
-    logic [15:0] read_data_16b [1:0];
+    logic [ 7:0]     read_data_8b  [3:0];
+    logic [15:0]     read_data_16b [1:0];
+    logic [VLEN-1:0] read_data;
 
     always_comb begin
         if (state_r == VLSU_FIRST_CYCLE) begin
@@ -305,8 +413,6 @@ module vectorLSU
         end
     end
 
-    logic [VLEN-1:0] read_data;
-
     always_comb begin
         if (width == EW8) begin
             read_data[(8*(totalElementsProcessed_r+1))-1-:8] = read_data_8b[0];
@@ -327,7 +433,6 @@ module vectorLSU
         end
     end
 
-
     always @(posedge clk) begin
         if (state_r != VLSU_IDLE)
             read_data_o <= read_data;
@@ -341,10 +446,9 @@ module vectorLSU
 
     assign mem_address_o      = address;
     assign mem_read_enable_o  = 1'b1;
-    assign mem_write_data_o   = '0;
-    assign mem_write_enable_o = (instruction_operation_i == VSTORE)
-                                ? '1
+    assign mem_write_data_o   = write_data << shift_amount;
+    assign mem_write_enable_o = (instruction_operation_i == VSTORE && state inside{VLSU_FIRST_CYCLE, VLSU_EXEC, VLSU_LAST_CYCLE})
+                                ? mem_write_enable
                                 : '0;
-
 
 endmodule
