@@ -151,7 +151,10 @@ module vectorLSU
             else
                 offset <= offset + 32'h4;
         end else if (addrMode == STRIDED) begin
-            offset <= offset + stride_i;
+            if (state == VLSU_LAST_CYCLE)
+                offset <= offset;
+            else
+                offset <= offset + stride_i;
         end
         else begin
             offset <= offset;
@@ -296,6 +299,27 @@ module vectorLSU
                 end
             end
         end
+        else if (addrMode == STRIDED) begin
+            shift_amount = 0;
+            if (width == EW8) begin
+                unique case(address[1:0])
+                    2'b11:   mem_write_enable = 4'b1000;
+                    2'b10:   mem_write_enable = 4'b0100;
+                    2'b01:   mem_write_enable = 4'b0010;
+                    default: mem_write_enable = 4'b0001;
+                endcase
+            end
+            else if (width == EW16) begin
+                unique case(address[1])
+                    1'b1:       mem_write_enable = 4'b1100;
+                    default:    mem_write_enable = 4'b0011;
+                endcase
+            end
+            else begin
+                shift_amount = 0;
+                mem_write_enable = 4'b1111;
+            end
+        end
         else begin
             shift_amount     = 0;
             mem_write_enable = 4'b0000;
@@ -309,18 +333,29 @@ module vectorLSU
     logic [31:0] write_data;
 
     always_comb begin
-        if (width == EW8) begin
-            write_data[ 7: 0] = write_data_i[(8*(totalElementsProcessed+1))-1-:8];
-            write_data[15: 8] = write_data_i[(8*(totalElementsProcessed+2))-1-:8];
-            write_data[23:16] = write_data_i[(8*(totalElementsProcessed+3))-1-:8];
-            write_data[31:24] = write_data_i[(8*(totalElementsProcessed+4))-1-:8];
-        end
-        else if (width == EW16) begin
-            write_data[15: 0] = write_data_i[(16*(totalElementsProcessed+1))-1-:16];
-            write_data[31:16] = write_data_i[(16*(totalElementsProcessed+2))-1-:16];
+        if (addrMode == UNIT_STRIDED) begin
+            unique case (width)
+                EW8: begin
+                    write_data[ 7: 0] = write_data_i[(8*(totalElementsProcessed+1))-1-:8];
+                    write_data[15: 8] = write_data_i[(8*(totalElementsProcessed+2))-1-:8];
+                    write_data[23:16] = write_data_i[(8*(totalElementsProcessed+3))-1-:8];
+                    write_data[31:24] = write_data_i[(8*(totalElementsProcessed+4))-1-:8];
+                end
+                EW16: begin
+                    write_data[15: 0] = write_data_i[(16*(totalElementsProcessed+1))-1-:16];
+                    write_data[31:16] = write_data_i[(16*(totalElementsProcessed+2))-1-:16];
+                end
+                default: begin
+                    write_data[31: 0] = write_data_i[(32*(totalElementsProcessed+1))-1-:32];
+                end
+            endcase
         end
         else begin
-            write_data[31:0] = write_data_i[(32*(totalElementsProcessed+1))-1-:32];
+            unique case (width)
+                EW8:     write_data = {4{write_data_i[( 8*(totalElementsProcessed+1))-1-:8]}};
+                EW16:    write_data = {2{write_data_i[(16*(totalElementsProcessed+1))-1-:16]}};
+                default: write_data =    write_data_i[(32*(totalElementsProcessed+1))-1-:32];
+            endcase
         end
     end
 
@@ -368,7 +403,7 @@ module vectorLSU
     logic [VLEN-1:0] read_data;
 
     always_comb begin
-        if (state_r == VLSU_FIRST_CYCLE) begin
+        if (addrMode == STRIDED || (addrMode == UNIT_STRIDED && state_r == VLSU_FIRST_CYCLE)) begin
             case (address_r[1:0])
                 2'b11: begin
                     read_data_8b[0] = mem_read_data_i[31:24];
@@ -398,9 +433,10 @@ module vectorLSU
         end
     end
 
+    assign read_data_16b[1] = mem_read_data_i[31:16];
+
     always_comb begin
-        read_data_16b[1] = mem_read_data_i[31:16];
-        if (state_r == VLSU_FIRST_CYCLE) begin
+        if (addrMode == STRIDED || (addrMode == UNIT_STRIDED && state_r == VLSU_FIRST_CYCLE)) begin
             case (address_r[1])
                 1'b1:
                     read_data_16b[0] = mem_read_data_i[31:16];
@@ -414,23 +450,25 @@ module vectorLSU
     end
 
     always_comb begin
-        if (width == EW8) begin
-            read_data[(8*(totalElementsProcessed_r+1))-1-:8] = read_data_8b[0];
-            if (elementsProcessed_r > 1)
-                read_data[(8*(totalElementsProcessed_r+2))-1-:8] = read_data_8b[1];
-            if (elementsProcessed_r > 2)
-                read_data[(8*(totalElementsProcessed_r+3))-1-:8] = read_data_8b[2];
-            if (elementsProcessed_r > 3)
-                read_data[(8*(totalElementsProcessed_r+4))-1-:8] = read_data_8b[3];
-        end
-        else if (width == EW16) begin
-            read_data[(16*(totalElementsProcessed_r+1))-1-:16] = read_data_16b[0];
-            if (elementsProcessed_r > 1)
-                read_data[(16*(totalElementsProcessed_r+2))-1-:16] = read_data_16b[1];
-        end
-        else begin
-            read_data[(32*(totalElementsProcessed_r+1))-1-:32] = mem_read_data_i;
-        end
+        unique case (width)
+            EW8: begin
+                read_data[(8*(totalElementsProcessed_r+1))-1-:8] = read_data_8b[0];
+                if (elementsProcessed_r > 1)
+                    read_data[(8*(totalElementsProcessed_r+2))-1-:8] = read_data_8b[1];
+                if (elementsProcessed_r > 2)
+                    read_data[(8*(totalElementsProcessed_r+3))-1-:8] = read_data_8b[2];
+                if (elementsProcessed_r > 3)
+                    read_data[(8*(totalElementsProcessed_r+4))-1-:8] = read_data_8b[3];
+            end
+            EW16: begin
+                read_data[(16*(totalElementsProcessed_r+1))-1-:16] = read_data_16b[0];
+                if (elementsProcessed_r > 1)
+                    read_data[(16*(totalElementsProcessed_r+2))-1-:16] = read_data_16b[1];
+            end
+            default: begin
+                read_data[(32*(totalElementsProcessed_r+1))-1-:32] = mem_read_data_i;
+            end
+        endcase
     end
 
     always @(posedge clk) begin
@@ -447,8 +485,21 @@ module vectorLSU
     assign mem_address_o      = address;
     assign mem_read_enable_o  = 1'b1;
     assign mem_write_data_o   = write_data << shift_amount;
-    assign mem_write_enable_o = (instruction_operation_i == VSTORE && state inside{VLSU_FIRST_CYCLE, VLSU_EXEC, VLSU_LAST_CYCLE})
-                                ? mem_write_enable
-                                : '0;
+
+    always_comb begin
+        if (instruction_operation_i == VSTORE) begin
+            if (addrMode == UNIT_STRIDED)
+                mem_write_enable_o = (state inside{VLSU_FIRST_CYCLE, VLSU_EXEC, VLSU_LAST_CYCLE})
+                                    ? mem_write_enable
+                                    : '0;
+            else
+                mem_write_enable_o = (state inside{VLSU_FIRST_CYCLE, VLSU_EXEC})
+                                    ? mem_write_enable
+                                    : '0;
+        end
+        else begin
+            mem_write_enable_o = '0;
+        end
+    end
 
 endmodule

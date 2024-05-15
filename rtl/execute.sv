@@ -361,7 +361,7 @@ end
             DIVU:                    result = divu_result;
             REM:                     result = rem_result;
             REMU:                    result = remu_result;
-            VECTOR:                  result = vector_scalar_result;
+            VECTOR, VLOAD, VSTORE:   result = vector_scalar_result;
             default:                 result = sum_result;
         endcase
     end
@@ -373,7 +373,9 @@ end
             BEQ,BNE,
             BLT,BLTU,
             BGE,BGEU:   write_enable = 1'b0;
-            VECTOR:     write_enable = vector_wr_en;
+            VECTOR,
+            VLOAD,
+            VSTORE:     write_enable = vector_wr_en;
             default:    write_enable = !killed;
         endcase
     end
