@@ -378,6 +378,7 @@ end
 
     always_comb begin
         unique case (instruction_operation_i)
+            NOP,
             SB,SH,SW,
             BEQ,BNE,
             BLT,BLTU,
