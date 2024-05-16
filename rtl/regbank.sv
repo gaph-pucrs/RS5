@@ -23,6 +23,10 @@
 
 module regbank
     import RS5_pkg::*;
+#(
+    parameter bit    DEBUG    = 1'b0,
+    parameter string DBG_FILE = "./debug/regBank.txt"
+)
 (
     input   logic         clk, 
     input   logic         reset_n,
@@ -39,12 +43,6 @@ module regbank
     logic [31:0] regfile [31:0];
 
 //////////////////////////////////////////////////////////////////////////////
-// Register zero (0)
-//////////////////////////////////////////////////////////////////////////////
-
-    assign  regfile[0] = '0;
-
-//////////////////////////////////////////////////////////////////////////////
 // Output assignment
 //////////////////////////////////////////////////////////////////////////////
 
@@ -55,30 +53,34 @@ module regbank
 // Reset and Write control
 //////////////////////////////////////////////////////////////////////////////
 
-    for (genvar i = 1; i < 32 ; i++) begin : gen_regfile
-        always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n) begin
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            for (int i = 0; i < 32; i++)
                 regfile[i] <= '0;
-            end
-            else if (rd == i && enable == 1'b1) begin
-                regfile[i] <= data_i;
-            end
+        end
+        else if (enable == 1'b1 && rd != '0) begin
+            regfile[rd] <= data_i;
         end
     end
 
 //////////////////////////////////////////////////////////////////////////////
 // DEBUG 
 //////////////////////////////////////////////////////////////////////////////
-    int fd;
+    if (DEBUG) begin : gen_reg_dbg
+        int fd;
 
-    initial begin
-        fd = $fopen ("./debug/regBank.txt", "w");
-    end
+        initial begin
+            fd = $fopen (DBG_FILE, "w");
+            if (fd == 0) begin
+                $display("Error opening file %s", DBG_FILE);
+            end
+        end
 
-    always_ff @(posedge clk) begin
-        $fwrite(fd,"[%0d] %02d - %8h \t %02d - %8h\n", $time, rs1, data1_o, rs2, data2_o);
-        if (rd != '0 && enable == 1'b1) begin
-            $fwrite(fd,"[%0d] --------------------------------- %02d - %8h\n", $time, rd, data_i);
+        always_ff @(posedge clk) begin
+            $fwrite(fd,"[%0d] %02d - %8h \t %02d - %8h\n", $time(), rs1, data1_o, rs2, data2_o);
+            if (rd != '0 && enable == 1'b1) begin
+                $fwrite(fd,"[%0d] --------------------------------- %02d - %8h\n", $time, rd, data_i);
+            end
         end
     end
 

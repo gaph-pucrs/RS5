@@ -23,10 +23,14 @@
 module RS5
     import RS5_pkg::*;
 #(
-    parameter environment_e Environment = ASIC,
-    parameter rv32_e        RV32        = RV32I,
-    parameter bit           XOSVMEnable = 1'b0,
-    parameter bit           ZIHPMEnable = 1'b0
+    parameter environment_e Environment  = ASIC,
+    parameter rv32_e        RV32         = RV32I,
+    parameter bit           XOSVMEnable  = 1'b0,
+    parameter bit           ZIHPMEnable  = 1'b0,
+    parameter bit           ZKNEEnable   = 1'b0,
+    parameter bit           DEBUG        = 1'b0,
+    parameter string        DBG_REG_FILE = "./debug/regBank.txt",
+    parameter string        DBG_CSR_FILE = "./debug/Report.txt"
 )
 (
     input  logic                    clk,
@@ -138,7 +142,7 @@ module RS5
 //////////////////////////////////////////////////////////////////////////////
 // Assigns
 //////////////////////////////////////////////////////////////////////////////
-    
+
     if (XOSVMEnable == 1'b1) begin : gen_xosvm_mmu_on
         assign mmu_en = privilege != privilegeLevel_e'(2'b11) && mvmctl == 1'b1;
     end
@@ -146,16 +150,16 @@ module RS5
         assign mmu_en = 1'b0;
     end
 
-    assign regbank_write_enable =   (rd == '0) 
-                                    ? 1'b0 
+    assign regbank_write_enable =   (rd == '0)
+                                    ? 1'b0
                                     : regbank_write_enable_int;
 
-    assign rs1_data_read =  (rs1 == rd && regbank_write_enable) 
-                            ? regbank_data_writeback 
+    assign rs1_data_read =  (rs1 == rd && regbank_write_enable)
+                            ? regbank_data_writeback
                             : regbank_data1;
 
-    assign rs2_data_read =  (rs2 == rd && regbank_write_enable) 
-                            ? regbank_data_writeback 
+    assign rs2_data_read =  (rs2 == rd && regbank_write_enable)
+                            ? regbank_data_writeback
                             : regbank_data2;
 
     assign enable_fetch = ~(stall | hazard | hold | instruction_prefetched);
@@ -168,15 +172,15 @@ module RS5
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     fetch fetch1 (
-        .clk                    (clk), 
-        .reset_n                (reset_n), 
+        .clk                    (clk),
+        .reset_n                (reset_n),
         .enable                 (enable_fetch),
-        .jump_i                 (jump), 
+        .jump_i                 (jump),
         .jump_target_i          (jump_target),
         .mtvec_i                (mtvec),
-        .mepc_i                 (mepc), 
-        .exception_raised_i     (RAISE_EXCEPTION), 
-        .machine_return_i       (MACHINE_RETURN), 
+        .mepc_i                 (mepc),
+        .exception_raised_i     (RAISE_EXCEPTION),
+        .machine_return_i       (MACHINE_RETURN),
         .interrupt_ack_i        (interrupt_ack_o),
         .jump_misaligned_o      (jump_misaligned),
         .instruction_address_o  (instruction_address), 
@@ -194,7 +198,7 @@ module RS5
             .exception_o    (mmu_inst_fault       ),
             .address_o      (instruction_address_o)
         );
-    end 
+    end
     else begin : gen_xosvm_i_mmu_off
         assign mmu_inst_fault        = 1'b0;
         assign instruction_address_o = instruction_address;
@@ -205,8 +209,10 @@ module RS5
 /////////////////////////////////////////////////////////// DECODER /////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    decode decoder1 (
-        .clk                        (clk), 
+    decode # (
+        .ZKNEEnable(ZKNEEnable)
+    ) decoder1 (
+        .clk                        (clk),
         .reset_n                    (reset_n),
         .enable                     (enable_decode),
         .instruction_i              (instruction_i),
@@ -258,15 +264,18 @@ module RS5
         );
     end
     else begin : RegFileFF_blk
-        regbank regbankff (
+        regbank #(
+            .DEBUG      (DEBUG       ),
+            .DBG_FILE   (DBG_REG_FILE)
+        ) regbankff (
             .clk        (clk),
             .reset_n    (reset_n),
-            .rs1        (rs1), 
+            .rs1        (rs1),
             .rs2        (rs2),
-            .rd         (rd), 
+            .rd         (rd),
             .enable     (regbank_write_enable),
-            .data_i     (regbank_data_writeback), 
-            .data1_o    (regbank_data1), 
+            .data_i     (regbank_data_writeback),
+            .data1_o    (regbank_data1),
             .data2_o    (regbank_data2)
         );
     end
@@ -276,7 +285,8 @@ module RS5
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     execute #(
-        .RV32        (RV32)
+        .RV32        (RV32),
+        .ZKNEEnable  (ZKNEEnable)
     ) execute1 (
         .clk                     (clk), 
         .reset_n                 (reset_n), 
@@ -324,7 +334,7 @@ module RS5
     retire retire1 (
         .instruction_operation_i(instruction_operation_retire),
         .result_i               (result_retire),
-        .mem_data_i             (mem_data_i), 
+        .mem_data_i             (mem_data_i),
         .regbank_data_o         (regbank_data_writeback)
     );
 
@@ -332,26 +342,28 @@ module RS5
 /////////////////////////////////////////////////////////// CSRs BANK ///////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     CSRBank #(
-      .XOSVMEnable  (XOSVMEnable),
-      .ZIHPMEnable  (ZIHPMEnable),
-      .RV32         (RV32       )
+      .XOSVMEnable(XOSVMEnable ),
+      .ZIHPMEnable(ZIHPMEnable ),
+      .RV32       (RV32        ),
+      .DEBUG      (DEBUG       ),
+      .DBG_FILE   (DBG_CSR_FILE)
     ) CSRBank1 (
-        .clk                        (clk), 
-        .reset_n                    (reset_n), 
-        .read_enable_i              (csr_read_enable), 
-        .write_enable_i             (csr_write_enable), 
-        .operation_i                (csr_operation), 
-        .address_i                  (csr_addr), 
-        .data_i                     (csr_data_to_write), 
+        .clk                        (clk),
+        .reset_n                    (reset_n),
+        .read_enable_i              (csr_read_enable),
+        .write_enable_i             (csr_write_enable),
+        .operation_i                (csr_operation),
+        .address_i                  (csr_addr),
+        .data_i                     (csr_data_to_write),
         .killed                     (killed),
         .out                        (csr_data_read),
         .instruction_operation_i    (instruction_operation_execute),
         .hazard                     (hazard),
         .stall                      (stall),
-        .raise_exception_i          (RAISE_EXCEPTION), 
+        .raise_exception_i          (RAISE_EXCEPTION),
         .machine_return_i           (MACHINE_RETURN),
-        .exception_code_i           (Exception_Code), 
-        .pc_i                       (pc_execute), 
+        .exception_code_i           (Exception_Code),
+        .pc_i                       (pc_execute),
         .instruction_i              (instruction_execute),
         .jump_i                     (jump),
         .jump_target_i              (jump_target),
@@ -359,8 +371,8 @@ module RS5
         .irq_i                      (irq_i),
         .interrupt_ack_i            (interrupt_ack_o),
         .interrupt_pending_o        (interrupt_pending),
-        .privilege_o                (privilege), 
-        .mepc                       (mepc), 
+        .privilege_o                (privilege),
+        .mepc                       (mepc),
         .mtvec                      (mtvec),
     // XOSVM Signals
         .mvmctl_o                   (mvmctl),
