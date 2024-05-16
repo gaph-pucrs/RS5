@@ -47,6 +47,7 @@ module execute
     input   logic [31:0]        second_operand_i,
     input   logic [31:0]        third_operand_i,
     input   iType_e             instruction_operation_i,
+    input   logic               instruction_compressed_i,
     input   logic  [2:0]        tag_i,
     input   privilegeLevel_e    privilege_i,
 
@@ -126,7 +127,7 @@ module execute
 
     always_comb begin
         unique case (instruction_operation_i)
-            JAL, JALR:  sum2_opB = 4;
+            JAL, JALR:  sum2_opB = instruction_compressed_i ? 2 : 4;
             SUB:        sum2_opB = -second_operand_i;
             default:    sum2_opB = third_operand_i;
         endcase
@@ -395,10 +396,10 @@ end
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
-            curr_tag <= 0;
+            curr_tag <= '0;
         end
         else if ((jump_o | raise_exception_o | machine_return_o | interrupt_ack_o) == 1'b1) begin
-            curr_tag <= curr_tag + 1;
+            curr_tag <= curr_tag + 1'b1;
         end
     end
 

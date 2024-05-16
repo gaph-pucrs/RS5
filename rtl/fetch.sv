@@ -35,6 +35,7 @@ module fetch  #(parameter start_address = 32'b0)(
     input   logic           machine_return_i,
     input   logic           interrupt_ack_i,
     
+    output  logic           jump_misaligned_o,
     output  logic [31:0]    instruction_address_o,
     output  logic [31:0]    pc_o,
     output  logic  [2:0]    tag_o
@@ -42,6 +43,7 @@ module fetch  #(parameter start_address = 32'b0)(
 
     logic [31:0] pc;
     logic  [2:0] next_tag, current_tag;
+    logic jump_misaligned;
 
 //////////////////////////////////////////////////////////////////////////////
 // PC Control
@@ -50,6 +52,7 @@ module fetch  #(parameter start_address = 32'b0)(
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             pc <= start_address;
+            jump_misaligned <= 1'b0;
         end
         else if (machine_return_i == 1'b1) begin                              
             pc <= mepc_i;
@@ -58,10 +61,13 @@ module fetch  #(parameter start_address = 32'b0)(
             pc <= mtvec_i;
         end
         else if (jump_i == 1'b1) begin
-            pc <= jump_target_i;
+            pc <= {jump_target_i[31:2], 2'b00};
+            if (jump_target_i[1:0] != '0)
+                jump_misaligned <= 1'b1;
         end
         else if (enable == 1'b1) begin
             pc <= pc + 4;
+            jump_misaligned <= 1'b0;
         end
     end
 
@@ -78,6 +84,15 @@ module fetch  #(parameter start_address = 32'b0)(
         end
     end
 
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            jump_misaligned_o <= '0;
+        end
+        else begin
+            jump_misaligned_o <= jump_misaligned;
+        end
+    end
+
 //////////////////////////////////////////////////////////////////////////////
 // Non-Sensitive Outputs 
 //////////////////////////////////////////////////////////////////////////////
@@ -91,7 +106,7 @@ module fetch  #(parameter start_address = 32'b0)(
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
-            current_tag <= '0;
+            current_tag <= '1;  /* Start with invalid tag */
             next_tag    <= '0;
         end
         else if ((jump_i | exception_raised_i | machine_return_i | interrupt_ack_i) == 1'b1) begin

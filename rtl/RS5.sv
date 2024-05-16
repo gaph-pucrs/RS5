@@ -69,6 +69,7 @@ module RS5
 //////////////////////////////////////////////////////////////////////////////
 
     logic           enable_fetch;
+    logic           instruction_prefetched;
 
 //////////////////////////////////////////////////////////////////////////////
 // Decoder signals
@@ -77,6 +78,7 @@ module RS5
     logic   [31:0]  pc_decode;
     logic    [2:0]  tag_decode;
     logic           enable_decode;
+    logic           jump_misaligned;
 
 //////////////////////////////////////////////////////////////////////////////
 // RegBank signals
@@ -101,6 +103,7 @@ module RS5
     logic           exc_ilegal_inst_execute;
     logic           exc_misaligned_fetch_execute;
     logic           exc_inst_access_fault_execute;
+    logic           instruction_compressed;
 
 //////////////////////////////////////////////////////////////////////////////
 // Retire signals
@@ -155,7 +158,7 @@ module RS5
                             ? regbank_data_writeback 
                             : regbank_data2;
 
-    assign enable_fetch = ~(stall | hazard | hold);
+    assign enable_fetch = ~(stall | hazard | hold | instruction_prefetched);
 
     assign enable_decode = ~(stall | hold);
 
@@ -175,6 +178,7 @@ module RS5
         .exception_raised_i     (RAISE_EXCEPTION), 
         .machine_return_i       (MACHINE_RETURN), 
         .interrupt_ack_i        (interrupt_ack_o),
+        .jump_misaligned_o      (jump_misaligned),
         .instruction_address_o  (instruction_address), 
         .pc_o                   (pc_decode), 
         .tag_o                  (tag_decode)
@@ -205,7 +209,8 @@ module RS5
         .clk                        (clk), 
         .reset_n                    (reset_n),
         .enable                     (enable_decode),
-        .instruction_i              (instruction_i), 
+        .instruction_i              (instruction_i),
+        .jump_misaligned_i          (jump_misaligned),
         .pc_i                       (pc_decode), 
         .tag_i                      (tag_decode), 
         .rs1_data_read_i            (rs1_data_read), 
@@ -218,9 +223,11 @@ module RS5
         .third_operand_o            (third_operand_execute), 
         .pc_o                       (pc_execute), 
         .instruction_o              (instruction_execute), 
+        .compressed_o               (instruction_compressed),
         .tag_o                      (tag_execute), 
         .instruction_operation_o    (instruction_operation_execute), 
         .hazard_o                   (hazard),
+        .instruction_prefetched_o   (instruction_prefetched),
         .exc_inst_access_fault_i    (mmu_inst_fault),
         .exc_inst_access_fault_o    (exc_inst_access_fault_execute),
         .exc_ilegal_inst_o          (exc_ilegal_inst_execute),
@@ -271,43 +278,44 @@ module RS5
     execute #(
         .RV32        (RV32)
     ) execute1 (
-        .clk                    (clk), 
-        .reset_n                (reset_n), 
-        .stall                  (stall),
-        .instruction_i          (instruction_execute), 
-        .pc_i                   (pc_execute), 
-        .first_operand_i        (first_operand_execute), 
-        .second_operand_i       (second_operand_execute), 
-        .third_operand_i        (third_operand_execute),
-        .instruction_operation_i(instruction_operation_execute), 
-        .tag_i                  (tag_execute), 
-        .privilege_i            (privilege),
-        .exc_ilegal_inst_i      (exc_ilegal_inst_execute),
-        .exc_misaligned_fetch_i (exc_misaligned_fetch_execute),
-        .exc_inst_access_fault_i(exc_inst_access_fault_execute),
-        .exc_load_access_fault_i(mmu_data_fault),
-        .hold_o                 (hold),
-        .killed_o               (killed),
-        .write_enable_o         (regbank_write_enable_int),
-        .instruction_operation_o(instruction_operation_retire), 
-        .result_o               (result_retire),
-        .mem_address_o          (mem_address), 
-        .mem_read_enable_o      (mem_read_enable), 
-        .mem_write_enable_o     (mem_write_enable),
-        .mem_write_data_o       (mem_data_o),
-        .csr_address_o          (csr_addr), 
-        .csr_read_enable_o      (csr_read_enable), 
-        .csr_data_read_i        (csr_data_read),
-        .csr_write_enable_o     (csr_write_enable), 
-        .csr_operation_o        (csr_operation), 
-        .csr_data_o             (csr_data_to_write), 
-        .jump_o                 (jump),
-        .jump_target_o          (jump_target),
-        .interrupt_pending_i    (interrupt_pending),
-        .interrupt_ack_o        (interrupt_ack_o),
-        .machine_return_o       (MACHINE_RETURN),
-        .raise_exception_o      (RAISE_EXCEPTION), 
-        .exception_code_o       (Exception_Code)
+        .clk                     (clk), 
+        .reset_n                 (reset_n), 
+        .stall                   (stall),
+        .instruction_i           (instruction_execute), 
+        .pc_i                    (pc_execute), 
+        .first_operand_i         (first_operand_execute), 
+        .second_operand_i        (second_operand_execute), 
+        .third_operand_i         (third_operand_execute),
+        .instruction_operation_i (instruction_operation_execute), 
+        .instruction_compressed_i(instruction_compressed),
+        .tag_i                   (tag_execute), 
+        .privilege_i             (privilege),
+        .exc_ilegal_inst_i       (exc_ilegal_inst_execute),
+        .exc_misaligned_fetch_i  (exc_misaligned_fetch_execute),
+        .exc_inst_access_fault_i (exc_inst_access_fault_execute),
+        .exc_load_access_fault_i (mmu_data_fault),
+        .hold_o                  (hold),
+        .killed_o                (killed),
+        .write_enable_o          (regbank_write_enable_int),
+        .instruction_operation_o (instruction_operation_retire), 
+        .result_o                (result_retire),
+        .mem_address_o           (mem_address), 
+        .mem_read_enable_o       (mem_read_enable), 
+        .mem_write_enable_o      (mem_write_enable),
+        .mem_write_data_o        (mem_data_o),
+        .csr_address_o           (csr_addr), 
+        .csr_read_enable_o       (csr_read_enable), 
+        .csr_data_read_i         (csr_data_read),
+        .csr_write_enable_o      (csr_write_enable), 
+        .csr_operation_o         (csr_operation), 
+        .csr_data_o              (csr_data_to_write), 
+        .jump_o                  (jump),
+        .jump_target_o           (jump_target),
+        .interrupt_pending_i     (interrupt_pending),
+        .interrupt_ack_o         (interrupt_ack_o),
+        .machine_return_o        (MACHINE_RETURN),
+        .raise_exception_o       (RAISE_EXCEPTION), 
+        .exception_code_o        (Exception_Code)
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
