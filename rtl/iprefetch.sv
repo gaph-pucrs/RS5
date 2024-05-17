@@ -136,7 +136,6 @@ module iprefetch
     logic [31:0] instruction_aligned;
     logic [31:0] instruction_misaligned;
     logic [31:0] instruction_prefetched;
-    logic [31:0] instruction_hazard;
 
     assign instruction_aligned    = instruction_i;
     assign instruction_misaligned = {instruction_i[15:0], instruction_r[31:16]};
