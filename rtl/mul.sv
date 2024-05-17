@@ -3,8 +3,6 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
-`include "RS5_pkg.sv"
-
 module mul
     import RS5_pkg::*;
 (

@@ -24,6 +24,7 @@
 `include "../rtl/muldiv.sv"
 `include "../rtl/mulNbits.sv"
 `include "../rtl/mul.sv"
+`include "../rtl/div.sv"
 `include "../rtl/vectorCSRs.sv"
 `include "../rtl/vectorRegbank.sv"
 `include "../rtl/vectorALU.sv"
@@ -54,7 +55,7 @@ module testbench
 //////////////////////////////////////////////////////////////////////////////
 
     localparam int           MEM_WIDTH = 65536;
-    localparam string        BIN_FILE = "../app/assembly/vectorlsu.bin";
+    localparam string        BIN_FILE = "../app/berkeley_suite/test.bin";
     
     localparam int           i_cnt = 1;
 

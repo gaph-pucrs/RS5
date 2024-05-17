@@ -75,6 +75,9 @@ module execute
     output  csrOperation_e      csr_operation_o,
     output  logic [31:0]        csr_data_o,
 
+    output  logic [31:0]        vtype_o,
+    output  logic [31:0]        vlen_o,
+
     output  logic               jump_o,
     output  logic [31:0]        jump_target_o,
 
@@ -330,6 +333,8 @@ end
         .op2_scalar_i           (second_operand_i),
         .op3_scalar_i           (third_operand_i),
         .hold_o                 (hold_vector),
+        .vtype_o                (vtype_o),
+        .vlen_o                 (vlen_o),
         .mem_address_o          (mem_address_vector),
         .mem_read_enable_o      (mem_read_enable_vector),
         .mem_write_enable_o     (mem_write_enable_vector),

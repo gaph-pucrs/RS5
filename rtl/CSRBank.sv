@@ -19,13 +19,13 @@
  * 1) Write - Writes the given data in the given CRS.
  * 2) Set - Uses the given data as a mask to set bits in the CSR,
  * 3) Clear - Uses the given data as a mask to clear bits in CSR.
- * Each operation applies the CSR mask alongside with the CSR 
+ * Each operation applies the CSR mask alongside with the CSR
  * current content in a determined way to generate the new CSR content.
  */
 
-module CSRBank 
+module CSRBank
     import RS5_pkg::*;
-#( 
+#(
     parameter bit       XOSVMEnable = 1'b0,
     parameter bit       ZIHPMEnable = 1'b0,
     parameter rv32_e    RV32        = RV32I,
@@ -48,6 +48,9 @@ module CSRBank
     input   iType_e             instruction_operation_i,
     input   logic               hazard,
     input   logic               stall,
+
+    input   logic [31:0]        vtype_i,
+    input   logic [31:0]        vlen_i,
 /* verilator lint_on UNUSEDSIGNAL */
 
     input   logic               raise_exception_i,
@@ -407,7 +410,7 @@ module CSRBank
                 CYCLEH:         out = mcycle[63:32];
                 TIMEH:          out = mtime_i[63:32];
                 INSTRETH:       out = minstret[63:32];
-                
+
                 MVMCTL:         out = {31'b0,mvmctl};
                 MVMDO:          out = mvmdo[31:0];
                 MVMDS:          out = mvmds[31:0];
@@ -417,7 +420,10 @@ module CSRBank
                 MVMIM:          out = mvmim[31:0];
 
                 // Vector Extension CSRs
-                VLENB_CSR:      out = VLEN/8;
+                VSTART:         out = '0;
+                VLENBYTES:      out = VLEN/8;
+                VTYPE:          out = vtype_i;
+                VL:             out = vlen_i;
 
                 default:        out = '0;
             endcase

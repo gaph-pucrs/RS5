@@ -22,6 +22,7 @@ module RS5
     import RS5_pkg::*;
 #(
     parameter environment_e Environment = ASIC,
+    parameter int           VLEN        = 64,
     parameter rv32_e        RV32        = RV32I,
     parameter bit           XOSVMEnable = 1'b0,
     parameter bit           ZIHPMEnable = 1'b0
@@ -101,6 +102,8 @@ module RS5
     logic           exc_ilegal_inst_execute;
     logic           exc_misaligned_fetch_execute;
     logic           exc_inst_access_fault_execute;
+    logic   [31:0]  vtype, vlen;
+
 
 //////////////////////////////////////////////////////////////////////////////
 // Retire signals
@@ -274,6 +277,7 @@ module RS5
 
     execute #(
         .Environment (Environment),
+        .VLEN        (VLEN),
         .RV32        (RV32)
     ) execute1 (
         .clk                    (clk), 
@@ -311,6 +315,8 @@ module RS5
         .csr_write_enable_o     (csr_write_enable), 
         .csr_operation_o        (csr_operation), 
         .csr_data_o             (csr_data_to_write), 
+        .vtype_o                (vtype),
+        .vlen_o                 (vlen),
         .jump_o                 (jump),
         .jump_target_o          (jump_target),
         .interrupt_pending_i    (interrupt_pending),
@@ -341,6 +347,7 @@ module RS5
     CSRBank #(
       .XOSVMEnable  (XOSVMEnable),
       .ZIHPMEnable  (ZIHPMEnable),
+      .VLEN         (VLEN       ),
       .RV32         (RV32       )
     ) CSRBank1 (
         .clk                        (clk), 
@@ -355,6 +362,8 @@ module RS5
         .instruction_operation_i    (instruction_operation_execute),
         .hazard                     (hazard),
         .stall                      (stall),
+        .vtype_i                    (vtype),
+        .vlen_i                     (vlen),
         .raise_exception_i          (RAISE_EXCEPTION), 
         .machine_return_i           (MACHINE_RETURN),
         .exception_code_i           (Exception_Code), 

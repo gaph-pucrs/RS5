@@ -18,6 +18,7 @@ module vectorUnit
     output  logic           hold_o,
 
     output  logic [31:0]    vtype_o,
+    output  logic [31:0]    vlen_o,
 
     output logic [31:0]     mem_address_o,
     output logic            mem_read_enable_o,
@@ -94,7 +95,8 @@ module vectorUnit
         .zimm               (zimm),
         .rs1                (rs1),
         .rd                 (rd),
-        .vtype              (vtype_o),
+        .vtype_o            (vtype_o),
+        .vlen_o             (vlen_o),
         .vsew               (vsew),
         .vlmul              (vlmul),
         .vl                 (vl),

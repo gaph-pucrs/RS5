@@ -14,7 +14,9 @@ module vectorCSRs
     input   logic [4:0]             rs1,
     input   logic [4:0]             rd,
 
-    output  logic [31:0]            vtype,
+    output  logic [31:0]            vtype_o,
+    output  logic [31:0]            vlen_o,
+
     output  vew_e                   vsew,
     output  vlmul_e                 vlmul,
     output  logic[$bits(VLEN)-1:0]  vl,
@@ -23,7 +25,6 @@ module vectorCSRs
 
     logic [$bits(VLENB)-1:0] elementsPerRegister;
     logic [$bits(VLEN)-1:0]  vl_max;
-    logic [$bits(VLEN)-1:0]  vstart;
     logic        vill, vill_next, vma, vma_next, vta, vta_next;
     vew_e        vsew_next;
     vlmul_e      vlmul_next;
@@ -96,7 +97,7 @@ module vectorCSRs
 // CSRs
 //////////////////////////////////////////////////////////////////////////////
 
-    assign vtype  = {vill, 23'b0, vma, vta, vsew, vlmul};
-    assign vstart = '0;
+    assign vtype_o  = {vill, 23'b0, vma, vta, vsew, vlmul};
+    assign vlen_o   = {'0, vl};
 
 endmodule
