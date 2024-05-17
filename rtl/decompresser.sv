@@ -145,7 +145,7 @@ module decompresser
     always_comb begin
         unique case (funct4) inside
             4'b010?: expansion_C2 = {4'b0000, CI_imm[1:0], CI_imm[5:2], 2'b00, 5'h02, 3'b010, CI_rd, 7'b0000011}; /* C.LWSP */
-            4'b000?: expansion_C2 = {7'b0000000, CI_imm, CI_rd, 3'b001, CI_rd, 7'b0010011}; /* C.SLLI */
+            4'b000?: expansion_C2 = {6'b000000, CI_imm, CI_rd, 3'b001, CI_rd, 7'b0010011}; /* C.SLLI */
             4'b110?: expansion_C2 = {4'b0000, CSS_imm[5:3], CSS_rs2, 5'h02, 3'b010, CSS_imm[2:0], 2'b00, 7'b0100011}; /* C.SWSP */
             4'b1000: expansion_C2 = (CR_rs2 == '0) 
                         ? {12'b0, CR_rs1, 3'b000, 5'b00000, 7'b1100111} /* C.JR */
