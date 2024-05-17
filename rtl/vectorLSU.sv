@@ -10,6 +10,7 @@ module vectorLSU
     input  logic [31:0]     instruction_i,
     input  logic [31:0]     base_address_i,
     input  logic [31:0]     stride_i,
+    input  logic [VLEN-1:0] indexed_offsets_i,
     input  logic [VLEN-1:0] write_data_i,
 
     input  vector_states_e  current_state,
@@ -73,6 +74,8 @@ module vectorLSU
 //////////////////////////////////////////////////////////////////////////////
 
     logic next_cycle_is_last;
+    logic indexed_wait_update_index_reg;
+    assign indexed_wait_update_index_reg = (state == VLSU_FIRST_CYCLE && addrMode inside {INDEXED_ORDERED, INDEXED_UNORDERED} && hold_o != 1'b1);
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
@@ -92,7 +95,10 @@ module vectorLSU
                     next_state = VLSU_IDLE;
 
             VLSU_FIRST_CYCLE:
-                    next_state = VLSU_EXEC;
+                    if (indexed_wait_update_index_reg)
+                        next_state = VLSU_FIRST_CYCLE;
+                    else
+                        next_state = VLSU_EXEC;
 
             VLSU_EXEC:
                 if (next_cycle_is_last)
@@ -135,30 +141,44 @@ module vectorLSU
 
     logic [31:0] address;
     logic [31:0] offset;
+    logic [31:0] offset_strided;
+    logic [31:0] offset_indexed;
+
+    assign offset = (addrMode inside {UNIT_STRIDED, STRIDED})
+                    ? offset_strided
+                    : offset_indexed;
 
     assign address = base_address_i + offset;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
-            offset <= '0;
+            offset_strided <= '0;
         end
         else if (state == VLSU_IDLE) begin
-            offset <= '0;
+            offset_strided <= '0;
         end
         else if (addrMode == UNIT_STRIDED) begin
             if (state == VLSU_LAST_CYCLE)
-                offset <= offset;
+                offset_strided <= offset_strided;
             else
-                offset <= offset + 32'h4;
+                offset_strided <= offset_strided + 32'h4;
         end else if (addrMode == STRIDED) begin
             if (state == VLSU_LAST_CYCLE)
-                offset <= offset;
+                offset_strided <= offset_strided;
             else
-                offset <= offset + stride_i;
+                offset_strided <= offset_strided + stride_i;
         end
         else begin
-            offset <= offset;
+            offset_strided <= offset_strided;
         end
+    end
+
+    always_comb begin
+        unique case(width)
+                EW8:     offset_indexed = {24'h0, indexed_offsets_i[( 8*(totalElementsProcessed+1))-1-:8 ]};
+                EW16:    offset_indexed = {16'h0, indexed_offsets_i[(16*(totalElementsProcessed+1))-1-:16]};
+                default: offset_indexed = indexed_offsets_i[(32*(totalElementsProcessed+1))-1-:32];
+        endcase
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -176,7 +196,8 @@ module vectorLSU
             totalElementsProcessed  <= '0;
         end
         else begin
-            totalElementsProcessed  <= nextTotalElementsProcessed;
+            if (!indexed_wait_update_index_reg)
+                totalElementsProcessed  <= nextTotalElementsProcessed;
         end
     end
 
@@ -299,7 +320,7 @@ module vectorLSU
                 end
             end
         end
-        else if (addrMode == STRIDED) begin
+        else begin
             shift_amount = 0;
             if (width == EW8) begin
                 unique case(address[1:0])
@@ -319,10 +340,6 @@ module vectorLSU
                 shift_amount = 0;
                 mem_write_enable = 4'b1111;
             end
-        end
-        else begin
-            shift_amount     = 0;
-            mem_write_enable = 4'b0000;
         end
     end
 
@@ -403,7 +420,7 @@ module vectorLSU
     logic [VLEN-1:0] read_data;
 
     always_comb begin
-        if (addrMode == STRIDED || (addrMode == UNIT_STRIDED && state_r == VLSU_FIRST_CYCLE)) begin
+        if (addrMode != UNIT_STRIDED || (addrMode == UNIT_STRIDED && state_r == VLSU_FIRST_CYCLE)) begin
             case (address_r[1:0])
                 2'b11: begin
                     read_data_8b[0] = mem_read_data_i[31:24];
@@ -436,7 +453,7 @@ module vectorLSU
     assign read_data_16b[1] = mem_read_data_i[31:16];
 
     always_comb begin
-        if (addrMode == STRIDED || (addrMode == UNIT_STRIDED && state_r == VLSU_FIRST_CYCLE)) begin
+        if (addrMode != UNIT_STRIDED || (addrMode == UNIT_STRIDED && state_r == VLSU_FIRST_CYCLE)) begin
             case (address_r[1])
                 1'b1:
                     read_data_16b[0] = mem_read_data_i[31:16];

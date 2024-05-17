@@ -238,7 +238,7 @@ package RS5_pkg;
         UNIT_STRIDED,
         INDEXED_UNORDERED,
         STRIDED,
-        INDEXED_RDERED
+        INDEXED_ORDERED
     } addrModes_e;
 
 endpackage

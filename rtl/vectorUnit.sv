@@ -327,6 +327,7 @@ module vectorUnit
         .instruction_i          (instruction_i),
         .base_address_i         (op1_scalar_i),
         .stride_i               (op2_scalar_i),
+        .indexed_offsets_i      (first_operand),
         .write_data_i           (third_operand),
         .current_state          (state),
         .cycle_count            (cycle_count),

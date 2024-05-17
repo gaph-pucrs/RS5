@@ -19,7 +19,7 @@
 // RAM MEMORY
 //////////////////////////////////////////////////////////////////////////////
 
-module RAM_mem 
+module RAM_mem
     import RS5_pkg::*;
 #(
     parameter int    MEM_WIDTH  = 65536,
