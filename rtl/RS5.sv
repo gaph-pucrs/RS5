@@ -365,6 +365,7 @@ module RS5
         .exception_code_i           (Exception_Code),
         .pc_i                       (pc_execute),
         .instruction_i              (instruction_execute),
+        .instruction_compressed_i   (instruction_compressed),
         .jump_i                     (jump),
         .jump_target_i              (jump_target),
         .mtime_i                    (mtime_i),

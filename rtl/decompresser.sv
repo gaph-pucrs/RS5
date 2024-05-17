@@ -162,9 +162,6 @@ module decompresser
                 else begin
                     expansion_C2 = {7'b0000000, CR_rs2, CR_rs1, 3'b000, CR_rs1, 7'b0110011}; /* C.ADD */ 
                 end
-                // expansion_C2 = (CR_rs2 == '0) 
-                //        ? /* C.JALR */
-                //        : ; /* C.ADD */ 
             end
             default: expansion_C2 = '0;
         endcase

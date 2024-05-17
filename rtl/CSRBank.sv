@@ -58,6 +58,7 @@ module CSRBank
     input   exceptionCode_e     exception_code_i,
     input   logic [31:0]        pc_i,
     input   logic [31:0]        instruction_i,
+    input   logic               instruction_compressed_i,
 
     input   logic               jump_i,
     input   logic [31:0]        jump_target_i,
@@ -203,11 +204,11 @@ module CSRBank
             // MEDELEG:    begin current_val = medeleg;         wmask = '1; end
             // MIDELEG:    begin current_val = mideleg;         wmask = '1; end
             MIE:        begin current_val = mie;             wmask = 32'h00000888; end
-            MTVEC:      begin current_val = mtvec_r;         wmask = 32'hFFFFFFFC; end
+            MTVEC:      begin current_val = mtvec_r;         wmask = 32'hFFFFFFFE; end
             // MCOUNTEREN: begin current_val = mcounteren;      wmask = '1; end
             // MSTATUSH:   begin current_val = mstatush;        wmask = '1; end
             MSCRATCH:   begin current_val = mscratch;        wmask = 32'hFFFFFFFF; end
-            MEPC:       begin current_val = mepc_r;          wmask = 32'hFFFFFFFC; end
+            MEPC:       begin current_val = mepc_r;          wmask = 32'hFFFFFFFE; end
             MCAUSE:     begin current_val = mcause;          wmask = 32'hFFFFFFFF; end
             MTVAL:      begin current_val = mtval;           wmask = 32'hFFFFFFFF; end
             MCYCLE:     begin current_val = mcycle[31:0];    wmask = 32'hFFFFFFFF; end
@@ -314,7 +315,7 @@ module CSRBank
                 if(jump_i)
                     mepc_r      <= jump_target_i;
                 else
-                    mepc_r      <= pc_i + 32'd4;
+                    mepc_r      <= instruction_compressed_i ? pc_i + 32'd2 : pc_i + 32'd4;
             end
         //////////////////////////////////////////////////////////////////////////////
         // CSR Write

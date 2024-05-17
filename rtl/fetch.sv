@@ -55,10 +55,14 @@ module fetch  #(parameter start_address = 32'b0)(
             jump_misaligned <= 1'b0;
         end
         else if (machine_return_i == 1'b1) begin                              
-            pc <= mepc_i;
+            pc <= {mepc_i[31:2], 2'b00};
+            if (mepc_i[1:0] != '0)
+                jump_misaligned <= 1'b1;
         end
         else if ((exception_raised_i | interrupt_ack_i) == 1'b1) begin
-            pc <= mtvec_i;
+            pc <= {mtvec_i[31:2], 2'b00};
+            if (mtvec_i[1:0] != '0)
+                jump_misaligned <= 1'b1;
         end
         else if (jump_i == 1'b1) begin
             pc <= {jump_target_i[31:2], 2'b00};
