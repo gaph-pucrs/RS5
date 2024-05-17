@@ -118,7 +118,7 @@ module decode
             last_instruction <= instruction;
     end
 
-    always_ff @(posedge clk) begin
+    always_ff @(posedge clk or negedge reset_n) begin
         if (reset_n == 1'b0)
             last_hazard <= 1'b1;
         else
