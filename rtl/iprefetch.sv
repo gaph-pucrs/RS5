@@ -157,7 +157,7 @@ module iprefetch
     always_comb begin
         if (misaligned)
             instruction = instruction_misaligned;
-        else if (misaligned_r)
+        else if (misaligned_r && valid_tag)
             instruction = instruction_prefetched;
         else
             instruction = instruction_aligned;
