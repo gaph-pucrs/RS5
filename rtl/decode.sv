@@ -471,7 +471,7 @@ module decode
 
     always_comb begin
         unique case (instruction_format)
-            R_TYPE:             second_operand   = rs2_data_read_i;
+            R_TYPE, B_TYPE:     second_operand   = rs2_data_read_i;
             default:            second_operand   = immediate;
         endcase
     end
