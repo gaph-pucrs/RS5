@@ -23,6 +23,8 @@
  * current content in a determined way to generate the new CSR content.
  */
 
+`include "RS5_pkg.sv"
+
 module CSRBank
     import RS5_pkg::*;
 #(
@@ -30,11 +32,13 @@ module CSRBank
     parameter bit       ZIHPMEnable = 1'b0,
     parameter rv32_e    RV32        = RV32I,
     parameter bit       VEnable     = 1'b0,
-    parameter int       VLEN        = 128
+    parameter int       VLEN        = 128,
+    parameter bit       DEBUG       = 1'b0,
+    parameter string    DBG_FILE    = "./debug/Report.txt"
 )
 (
     input   logic               clk,
-    input   logic               reset,
+    input   logic               reset_n,
 
     input   logic               read_enable_i,
     input   logic               write_enable_i,
@@ -44,7 +48,8 @@ module CSRBank
     input   logic               killed,
     output  logic [31:0]        out,
 
-/* verilator lint_off UNUSEDSIGNAL */
+    /* Signals enabled with ZIHPM */
+    /* verilator lint_off UNUSEDSIGNAL */
     input   iType_e             instruction_operation_i,
     input   logic               hazard,
     input   logic               stall,
@@ -63,7 +68,7 @@ module CSRBank
     input   logic [31:0]        jump_target_i,
 
     input   logic [63:0]        mtime_i,
-    
+
     input   logic [31:0]        irq_i,
     input   logic               interrupt_ack_i,
     output  logic               interrupt_pending_o,
@@ -74,9 +79,9 @@ module CSRBank
     output  logic [31:0]        mtvec,
 
     output  logic               mvmctl_o,
-    output  logic [31:0]        mvmdo_o, 
-    output  logic [31:0]        mvmio_o, 
-    output  logic [31:0]        mvmds_o, 
+    output  logic [31:0]        mvmdo_o,
+    output  logic [31:0]        mvmio_o,
+    output  logic [31:0]        mvmds_o,
     output  logic [31:0]        mvmis_o,
     output  logic [31:0]        mvmim_o,
     output  logic [31:0]        mvmdm_o
@@ -89,27 +94,37 @@ module CSRBank
 // CSRs definition
 //////////////////////////////////////////////////////////////////////////////
 
-    localparam logic [31:0] MISA_VALUE =  (0 << 0)              // A - Atomic Extension
-                                        | (0 << 1)              // B - Bit-Manipulation extension
-                                        | (0 << 2)              // C - Compressed extension
-                                        | (0 << 3)              // D - Double precision floating-point extension
-                                        | (0 << 4)              // E - RV32E base ISA
-                                        | (0 << 5)              // F - Single precision floating-point extension
-                                        | (0 << 6)              // F - Reserved
-                                        | (0 << 7)              // F - Hypervisor extension
-                                        | (1 << 8)              // I - RV32I/64I/128I base ISA
-                                        | ((RV32==RV32M) << 12) // M - Integer Multiply/Divide extension
-                                        | (0 << 13)             // N - User level interrupts supported
-                                        | (0 << 15)             // P - Packed-SIMD extension
-                                        | (0 << 18)             // S - Supervisor mode implemented
-                                        | (1 << 20)             // U - User mode implemented
-                                        | (VEnable << 21)       // V - Vector extension
-                                        | (XOSVMEnable << 23)   // X - Non-standard extensions present
-                                        | (32'(1) << 30);       // M-XLEN
+    localparam logic [31:0] MISA_VALUE = {
+        1'b0,
+        1'b1,           // M-XLEN
+        6'b0,
+        XOSVMEnable,    // X - Non-standard extensions present
+        1'b0,
+        VEnable,           // V - Vector extension
+        1'b1,           // U - User mode implemented
+        1'b0,
+        1'b0,           // S - Supervisor mode implemented
+        2'b0,
+        1'b0,           // P - Packed-SIMD extension
+        1'b0,
+        1'b0,           // N - User level interrupts supported
+        (RV32==RV32M),  // M - Integer Multiply/Divide extension
+        3'b0,
+        1'b1,           // I - RV32I/64I/128I base ISA
+        1'b0,           // F - Hypervisor extension
+        1'b0,           // F - Reserved
+        1'b0,           // F - Single precision floating-point extension
+        1'b0,           // E - RV32E base ISA
+        1'b0,           // D - Double precision floating-point extension
+        1'b0,           // C - Compressed extension
+        1'b0,           // B - Bit-Manipulation extension
+        1'b0            // A - Atomic Extension
+    };
 
     logic [31:0] misa, mstatus, mtvec_r, mip, mie, mscratch, mepc_r, mcause, mtval;
     logic [63:0] mcycle, minstret;
 
+    /* Signals enabled with XOSVM */
     /* verilator lint_off UNUSEDSIGNAL */
     logic [31:0] mvmdo, mvmio, mvmds, mvmis, mvmdm, mvmim;
     logic        mvmctl;
@@ -123,11 +138,12 @@ module CSRBank
     logic [31:0] interrupt_ack_counter, raise_exception_counter, context_switch_counter;
     logic [31:0] logic_counter, arithmetic_counter, shift_counter, branch_counter, jump_counter;
     logic [31:0] load_counter, store_counter, sys_counter, csr_counter;
+    interruptionCode_e Interruption_Code;
+
+    /* Signals enabled with ZIHPM */
     /* verilator lint_off UNUSEDSIGNAL */
     logic [31:0] mul_counter, div_counter;
     /* verilator lint_on UNUSEDSIGNAL */
-    //logic [31:0] medeleg, mideleg; // NOT IMPLEMENTED YET (REQUIRED ONLY WHEN SYSTEM HAVE S-MODE)
-    interruptionCode_e Interruption_Code;
 
 //////////////////////////////////////////////////////////////////////////////
 // MCAUSE and MSTATUS CSRs
@@ -138,31 +154,31 @@ module CSRBank
 
     assign mcause = {mcause_interrupt, mcause_exc_code};
 
-    logic       mstatus_sie, mstatus_mie, mstatus_spie, mstatus_ube, mstatus_mpie, mstatus_spp;
+    logic       mstatus_mie, mstatus_ube, mstatus_mpie;
     logic [1:0] mstatus_vs, mstatus_mpp, mstatus_fs, mstatus_xs;
     logic       mstatus_mprv, mstatus_sum, mstatus_mxr, mstatus_tvm, mstatus_tw, mstatus_tsr, mstatus_sd;
 
     assign mstatus = {
-                        mstatus_sd, 
-                        8'b0, 
-                        mstatus_tsr, 
-                        mstatus_tw, 
-                        mstatus_tvm, 
-                        mstatus_mxr, 
-                        mstatus_sum, 
-                        mstatus_mprv, 
-                        mstatus_xs, 
-                        mstatus_fs, 
-                        mstatus_mpp, 
-                        mstatus_vs, 
-                        mstatus_spp, 
-                        mstatus_mpie, 
-                        mstatus_ube, 
-                        mstatus_spie, 
-                        1'b0, 
-                        mstatus_mie, 
-                        1'b0, 
-                        mstatus_sie, 
+                        mstatus_sd,
+                        8'b0,
+                        mstatus_tsr,
+                        mstatus_tw,
+                        mstatus_tvm,
+                        1'b0, // mstatus_mxr
+                        mstatus_sum,
+                        1'b0, // mstatus_mprv
+                        mstatus_xs,
+                        mstatus_fs,
+                        mstatus_mpp,
+                        mstatus_vs,
+                        1'b0, // mstatus_spp
+                        mstatus_mpie,
+                        mstatus_ube,
+                        1'b0,
+                        1'b0,
+                        mstatus_mie,
+                        1'b0,
+                        1'b0,
                         1'b0
                     };
 
@@ -188,7 +204,7 @@ module CSRBank
         wmask = '1;
         case (CSR)
             MSTATUS:    begin current_val = mstatus;         wmask = 32'h007E19AA; end
-            MISA:       begin current_val = misa;            wmask = 32'h3C000000; end
+            MISA:       begin current_val = misa;            wmask = 32'h00301000; end
             // MEDELEG:    begin current_val = medeleg;         wmask = '1; end
             // MIDELEG:    begin current_val = mideleg;         wmask = '1; end
             MIE:        begin current_val = mie;             wmask = 32'h00000888; end
@@ -222,9 +238,9 @@ module CSRBank
 
     always_comb begin
         case (operation_i)
-            SET:     wr_data = (current_val | data_i) & wmask;
-            CLEAR:   wr_data = (current_val & (~data_i)) & wmask;
-            default: wr_data = data_i & wmask; // WRITE
+            SET:     wr_data = (current_val | (data_i & wmask));
+            CLEAR:   wr_data = (current_val & ~(data_i & wmask));
+            default: wr_data = (current_val & ~wmask) | (data_i & wmask); // WRITE
         endcase
     end
 
@@ -232,13 +248,12 @@ module CSRBank
 // CSR Writing
 //////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk) begin
+    always_ff @(posedge clk or negedge reset_n) begin
         //////////////////////////////////////////////////////////////////////////////
         // Reset
         //////////////////////////////////////////////////////////////////////////////
-        if (reset == 1'b1) begin
+        if (!reset_n) begin
             mstatus_mie      <= 1'b0;
-            mstatus_mprv     <= 1'b0;
             misa             <= MISA_VALUE;
             //medeleg        <= '0;
             //mideleg        <= '0;
@@ -260,8 +275,8 @@ module CSRBank
         //////////////////////////////////////////////////////////////////////////////
         else begin
             mcycle      <= mcycle + 1;
-            minstret    <= (killed) 
-                            ? minstret 
+            minstret    <= (killed)
+                            ? minstret
                             : minstret + 1;
         //////////////////////////////////////////////////////////////////////////////
         // Machine Return
@@ -280,13 +295,11 @@ module CSRBank
                 privilege       <= privilegeLevel_e'(2'b11);
                 mstatus_mpie    <= mstatus_mie;
                 mstatus_mie     <= 0;
-                mepc_r          <= (exception_code_i == ECALL_FROM_MMODE || exception_code_i == BREAKPOINT) 
-                                    ? pc_i 
-                                    : pc_i+4;             // Return address
-                mtval           <= (exception_code_i == ILLEGAL_INSTRUCTION) 
-                                    ? instruction_i 
+                mepc_r          <= pc_i;
+                mtval           <= (exception_code_i == ILLEGAL_INSTRUCTION)
+                                    ? instruction_i
                                     : pc_i;
-            end 
+            end
         //////////////////////////////////////////////////////////////////////////////
         // Interrupt
         //////////////////////////////////////////////////////////////////////////////
@@ -298,11 +311,15 @@ module CSRBank
                 mstatus_mpie    <= mstatus_mie;
                 mstatus_mie     <= 0;
 
+                /* Interrupted instruction is in fact the next instruction,
+                 * because this one will be retired completely before taking
+                 * the trap
+                 */
                 if(jump_i)
                     mepc_r      <= jump_target_i;
                 else
-                    mepc_r      <= pc_i;                // Return address
-            end 
+                    mepc_r      <= pc_i + 32'd4;
+            end
         //////////////////////////////////////////////////////////////////////////////
         // CSR Write
         //////////////////////////////////////////////////////////////////////////////
@@ -325,25 +342,25 @@ module CSRBank
                     MCAUSE: begin
                                     mcause_interrupt    <= wr_data[31];
                                     mcause_exc_code     <= wr_data[30:0];
-                            end    
+                            end
                     MSTATUS:begin
                                     mstatus_sd          <= wr_data[31];
                                     mstatus_tsr         <= wr_data[22];
                                     mstatus_tw          <= wr_data[21];
                                     mstatus_tvm         <= wr_data[20];
-                                    mstatus_mxr         <= wr_data[19];
+                                    //mstatus_mxr         <= wr_data[19];
                                     mstatus_sum         <= wr_data[18];
-                                    mstatus_mprv        <= wr_data[17];
+                                    //mstatus_mprv        <= wr_data[17];
                                     mstatus_xs          <= wr_data[16:15];
                                     mstatus_fs          <= wr_data[14:13];
                                     mstatus_mpp         <= wr_data[12:11];
                                     mstatus_vs          <= wr_data[10:9];
-                                    mstatus_spp         <= wr_data[8];
+                                    //mstatus_spp         <= wr_data[8];
                                     mstatus_mpie        <= wr_data[7];
                                     mstatus_ube         <= wr_data[6];
-                                    mstatus_spie        <= wr_data[5];
+                                    // mstatus_spie        <= wr_data[5];
                                     mstatus_mie         <= wr_data[3];
-                                    mstatus_sie         <= wr_data[1];
+                                    // mstatus_sie         <= wr_data[1];
                             end
 
                     default:    ; // no op
@@ -436,10 +453,10 @@ module CSRBank
 //////////////////////////////////////////////////////////////////////////////
 // XOSVM Extension
 //////////////////////////////////////////////////////////////////////////////
-    
-    if (XOSVMEnable == 1'b1) begin
-        always_ff @(posedge clk) begin
-            if (reset == 1'b1) begin
+
+    if (XOSVMEnable == 1'b1) begin : gen_xosvm_csr_on
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n) begin
                 mvmctl      <= '0;
                 mvmdo       <= '0;
                 mvmds       <= '0;
@@ -447,23 +464,22 @@ module CSRBank
                 mvmio       <= '0;
                 mvmis       <= '0;
                 mvmim       <= '0;
-            end 
+            end
             else if (write_allowed == 1'b1) begin
-                /* verilator lint_off CASEINCOMPLETE */
                 case (CSR)
-                    MVMCTL: mvmctl  <= wr_data[0];
-                    MVMDO:  mvmdo   <= wr_data;
-                    MVMDS:  mvmds   <= wr_data;
-                    MVMDM:  mvmdm   <= wr_data;
-                    MVMIO:  mvmio   <= wr_data;
-                    MVMIS:  mvmis   <= wr_data;
-                    MVMIM:  mvmim   <= wr_data;
+                    MVMCTL:     mvmctl  <= wr_data[0];
+                    MVMDO:      mvmdo   <= wr_data;
+                    MVMDS:      mvmds   <= wr_data;
+                    MVMDM:      mvmdm   <= wr_data;
+                    MVMIO:      mvmio   <= wr_data;
+                    MVMIS:      mvmis   <= wr_data;
+                    MVMIM:      mvmim   <= wr_data;
+                    default: ;
                 endcase
-                /* verilator lint_on CASEINCOMPLETE */
             end
         end
     end
-    else begin
+    else begin : gen_xosvm_csr_off
         assign mvmctl   = '0;
         assign mvmdo    = '0;
         assign mvmds    = '0;
@@ -495,8 +511,8 @@ module CSRBank
             MTIE = mie[ 7],
             MSIE = mie[ 3];
 
-    always_ff @(posedge clk) begin
-        if (reset == 1'b1) begin
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
             mip <= '0;
         end
         else begin
@@ -513,8 +529,7 @@ module CSRBank
                 Interruption_Code <= M_SW_INT;
             else if ((MTIP & MTIE) == 1'b1)     // Machine Timer
                 Interruption_Code <= M_TIM_INT;
-
-        end 
+        end
         else begin
             interrupt_pending_o <= 0;
         end
@@ -524,11 +539,10 @@ module CSRBank
 // ZIHPM
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    if (ZIHPMEnable == 1'b1) begin
-        int fd;
+    if (ZIHPMEnable == 1'b1) begin : gen_zihpm_csr_on
 
-        always_ff @(posedge clk) begin
-            if (reset == 1'b1) begin
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n) begin
                 instructions_killed_counter <= '0;
                 nop_counter                 <= '0;
                 logic_counter               <= '0;
@@ -576,38 +590,45 @@ module CSRBank
             end
         end
 
-        initial begin
-            fd = $fopen ("./debug/Report.txt", "w");
-        end
+        if (DEBUG) begin : gen_csr_dbg
+            int fd;
 
-        final begin
-            $fwrite(fd,"Clock Cycles:           %0d\n", mcycle);
-            $fwrite(fd,"Instructions Retired:   %0d\n", minstret);
-            $fwrite(fd,"Instructions Killed:    %0d\n", instructions_killed_counter);
-            $fwrite(fd,"Context Switches:       %0d\n", context_switch_counter);
-            $fwrite(fd,"Exceptions Raised:      %0d\n", raise_exception_counter);
-            $fwrite(fd,"Interrupts Acked:       %0d\n", interrupt_ack_counter);
+            initial begin
+                fd = $fopen (DBG_FILE, "w");
+                if (fd == 0) begin
+                    $display("Error opening file %s", DBG_FILE);
+                end
+            end
 
-            $fwrite(fd,"\nCYCLES WITH::\n");
-            $fwrite(fd,"HAZARDS:                %0d\n", hazard_counter);
-            $fwrite(fd,"STALL:                  %0d\n", stall_counter);
+            final begin
+                $fwrite(fd,"Clock Cycles:           %0d\n", mcycle);
+                $fwrite(fd,"Instructions Retired:   %0d\n", minstret);
+                $fwrite(fd,"Instructions Killed:    %0d\n", instructions_killed_counter);
+                $fwrite(fd,"Context Switches:       %0d\n", context_switch_counter);
+                $fwrite(fd,"Exceptions Raised:      %0d\n", raise_exception_counter);
+                $fwrite(fd,"Interrupts Acked:       %0d\n", interrupt_ack_counter);
 
-            $fwrite(fd,"\nINSTRUCTION COUNTERS:\n");
-            $fwrite(fd,"NOP:                    %0d\n", nop_counter);
-            $fwrite(fd,"LOGIC:                  %0d\n", logic_counter);
-            $fwrite(fd,"ARITH:                  %0d\n", arithmetic_counter);
-            $fwrite(fd,"SHIFT:                  %0d\n", shift_counter);
-            $fwrite(fd,"BRANCH:                 %0d\n", branch_counter);
-            $fwrite(fd,"JUMP:                   %0d\n", jump_counter);
-            $fwrite(fd,"LOAD:                   %0d\n", load_counter);
-            $fwrite(fd,"STORE:                  %0d\n", store_counter);
-            $fwrite(fd,"SYS:                    %0d\n", sys_counter);
-            $fwrite(fd,"CSR:                    %0d\n", csr_counter);
-            $fwrite(fd,"MUL:                    %0d\n", mul_counter);
-            $fwrite(fd,"DIV:                    %0d\n", div_counter);
+                $fwrite(fd,"\nCYCLES WITH::\n");
+                $fwrite(fd,"HAZARDS:                %0d\n", hazard_counter);
+                $fwrite(fd,"STALL:                  %0d\n", stall_counter);
+
+                $fwrite(fd,"\nINSTRUCTION COUNTERS:\n");
+                $fwrite(fd,"NOP:                    %0d\n", nop_counter);
+                $fwrite(fd,"LOGIC:                  %0d\n", logic_counter);
+                $fwrite(fd,"ARITH:                  %0d\n", arithmetic_counter);
+                $fwrite(fd,"SHIFT:                  %0d\n", shift_counter);
+                $fwrite(fd,"BRANCH:                 %0d\n", branch_counter);
+                $fwrite(fd,"JUMP:                   %0d\n", jump_counter);
+                $fwrite(fd,"LOAD:                   %0d\n", load_counter);
+                $fwrite(fd,"STORE:                  %0d\n", store_counter);
+                $fwrite(fd,"SYS:                    %0d\n", sys_counter);
+                $fwrite(fd,"CSR:                    %0d\n", csr_counter);
+                $fwrite(fd,"MUL:                    %0d\n", mul_counter);
+                $fwrite(fd,"DIV:                    %0d\n", div_counter);
+            end
         end
     end
-    else begin
+    else begin : gen_zihpm_csr_off
         assign instructions_killed_counter = '0;
         assign nop_counter                 = '0;
         assign logic_counter               = '0;

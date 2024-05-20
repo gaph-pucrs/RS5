@@ -14,30 +14,36 @@
  *
  * \detailed
  * Execute Unit is the third stage of the RS5 processor core. It implements
- * an Arithmetic Logic Unit (ALU) responsible for calculations, it also have 
- * a Branch Unit that makes the decision of branching based on instruction 
+ * an Arithmetic Logic Unit (ALU) responsible for calculations, it also have
+ * a Branch Unit that makes the decision of branching based on instruction
  * operation and operands. Also implements the Memory Load and Store mechanism.
  * Lastly it implements the CSR access logic.
  * The operations are performed based on Tag comparisons between this unit's tag
- * and the instruction tag, if they mismatch the instruction is killed and its 
+ * and the instruction tag, if they mismatch the instruction is killed and its
  * operation is not performed. A performed branch causes the internal tag to be
- * increased, causing the tag mismatch on the following instructions until an 
+ * increased, causing the tag mismatch on the following instructions until an
  * instruction fetched from the new flow arrives with the updated tag.
  */
+
+`include "RS5_pkg.sv"
 
 module execute
     import RS5_pkg::*;
 #(
-    parameter environment_e Environment = ASIC,
     parameter rv32_e        RV32        = RV32I,
+    parameter bit           ZKNEEnable  = 1'b1,
     parameter int           VLEN        = 64
 )
 (
     input   logic               clk,
-    input   logic               reset,
+    input   logic               reset_n,
     input   logic               stall,
 
+    /* Bits 14:12 and 6:0 are not used in this module */
+    /* verilator lint_off UNUSEDSIGNAL */
     input   logic [31:0]        instruction_i,
+    /* verilator lint_on UNUSEDSIGNAL */
+
     input   logic [31:0]        pc_i,
     input   logic [31:0]        first_operand_i,
     input   logic [31:0]        second_operand_i,
@@ -57,10 +63,6 @@ module execute
     output  logic               write_enable_o,
     output  iType_e             instruction_operation_o,
     output  logic [31:0]        result_o,
-
-    output  logic [63:0]        mul_result_o,
-    output  logic [63:0]        mulh_result_o,
-    output  logic [63:0]        mulhsu_result_o,
 
     output  logic [31:0]        mem_address_o,
     output  logic               mem_read_enable_o,
@@ -202,7 +204,7 @@ module execute
                     2'b01:   mem_write_enable = 4'b0010;
                     default: mem_write_enable = 4'b0001;
                 endcase
-            SH:              mem_write_enable = (sum_result[1])
+            SH:              mem_write_enable_o = (sum_result[1])
                                                 ? 4'b1100
                                                 : 4'b0011;
             SW:              mem_write_enable = 4'b1111;
@@ -274,45 +276,138 @@ end
     end
 
 /////////////////////////////////////////////////////////////////////////////
-// Multiplication and Division Operations
+// Multiplication signals
+//////////////////////////////////////////////////////////////////////////////
+
+    logic [31:0] mul_result;
+    logic        hold_mul;
+    logic        hold_div;
+
+    assign hold_o = (hold_mul | hold_div);
+
+    if (RV32 == RV32M || RV32 == RV32ZMMUL) begin : gen_zmmul_on
+
+        logic [1:0] signed_mode_mul;
+        logic       enable_mul;
+        logic       mul_low;
+
+        always_comb begin
+            unique case (instruction_operation_i)
+                MULH:    signed_mode_mul = 2'b11;
+                MULHSU:  signed_mode_mul = 2'b01;
+                default: signed_mode_mul = 2'b00;
+            endcase
+        end
+
+        assign enable_mul = (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU});
+        assign mul_low    = (instruction_operation_i == MUL);
+
+        mul mul1 (
+            .clk              (clk),
+            .reset_n          (reset_n),
+            .first_operand_i  (first_operand_i),
+            .second_operand_i (second_operand_i),
+            .signed_mode_i    (signed_mode_mul),
+            .enable_i         (enable_mul),
+            .mul_low_i        (mul_low),
+            .hold_o           (hold_mul),
+            .result_o         (mul_result)
+        );
+    end
+    else begin : gen_zmmul_off
+        assign hold_mul   = 1'b0;
+        assign mul_result = '0;
+    end
+
+/////////////////////////////////////////////////////////////////////////////
+// Division
 //////////////////////////////////////////////////////////////////////////////
 
     logic [31:0] div_result;
-    logic [31:0] divu_result;
     logic [31:0] rem_result;
-    logic [31:0] remu_result;
-    logic        hold_muldiv;
 
-    if (RV32 == RV32M || RV32 == RV32ZMMUL) begin
-        muldiv #(
-            .Environment    (Environment),
-            .RV32           (RV32)
-        ) muldiv1 (
-            .clk                        (clk),
-            .reset                      (reset),
-            .first_operand_i            (first_operand_i),
-            .second_operand_i           (second_operand_i),
-            .instruction_operation_i    (instruction_operation_i),
-            .hold_o                     (hold_muldiv),
-            .div_result_o               (div_result),
-            .divu_result_o              (divu_result),
-            .rem_result_o               (rem_result),
-            .remu_result_o              (remu_result),
-            .mul_result_o               (mul_result_o),
-            .mulh_result_o              (mulh_result_o),
-            .mulhsu_result_o            (mulhsu_result_o)
+    if (RV32 == RV32M) begin : gen_div_on
+        logic enable_div;
+        logic signed_div;
+
+        assign enable_div = (instruction_operation_i inside {DIV, DIVU, REM, REMU});
+        assign signed_div = (instruction_operation_i inside {DIV, REM});
+
+        div div1 (
+            .clk              (clk),
+            .reset_n          (reset_n),
+            .first_operand_i  (first_operand_i),
+            .second_operand_i (second_operand_i),
+            .enable_i         (enable_div),
+            .signed_i         (signed_div),
+            .hold_o           (hold_div),
+            .div_result_o     (div_result),
+            .rem_result_o     (rem_result)
         );
     end
-    else begin
-        assign hold_muldiv      = 1'b0;
-        assign mul_result_o     = '0;
-        assign mulh_result_o    = '0;
-        assign mulhsu_result_o  = '0;
+    else begin : gen_div_off
+        assign hold_div         = 1'b0;
         assign div_result       = '0;
-        assign divu_result      = '0;
         assign rem_result       = '0;
-        assign remu_result      = '0;
     end
+
+//////////////////////////////////////////////////////////////////////////////
+// AES
+//////////////////////////////////////////////////////////////////////////////
+
+    logic [31:0] aes_result;
+
+    if (ZKNEEnable) begin: zkne_gen_on
+        logic aes_mix;
+        logic aes_valid;
+
+        assign aes_mix = (instruction_operation_i == AES32ESMI);
+        assign aes_valid = (instruction_operation_i inside {AES32ESMI, AES32ESI});
+
+        aes_unit #(
+            .LOGIC_GATING(1'b1)  // Gate sub-module inputs to save toggling
+        ) u_aes_unit (
+            .rs1_in   (first_operand_i),      // Source register 1
+            .rs2_in   (second_operand_i),     // Source register 2
+            .bs_in    (instruction_i[31:30]), // Byte select immediate
+            .mix_in   (aes_mix),              // SubBytes + MixColumn or just SubBytes
+            .valid_in (aes_valid),            // Are the inputs valid?
+            .rd_out   (aes_result)            // Output destination register value
+        );
+    end
+    else begin : zkne_gen_off
+        assign aes_result = '0;
+    end
+
+//////////////////////////////////////////////////////////////////////////////
+// Vector Extension
+//////////////////////////////////////////////////////////////////////////////
+    logic [31:0] vector_scalar_result;
+    logic        vector_wr_en;
+    logic        hold_vector;
+
+    vectorUnit #(
+        .VLEN       (64         )
+    ) vector (
+        .clk                    (clk),
+        .reset_n                (!reset),
+        .instruction_i          (instruction_i),
+        .instruction_operation_i(instruction_operation_i),
+        .vector_operation_i     (vector_operation_i),
+        .op1_scalar_i           (first_operand_i),
+        .op2_scalar_i           (second_operand_i),
+        .op3_scalar_i           (third_operand_i),
+        .hold_o                 (hold_vector),
+        .vtype_o                (vtype_o),
+        .vlen_o                 (vlen_o),
+        .mem_address_o          (mem_address_vector),
+        .mem_read_enable_o      (mem_read_enable_vector),
+        .mem_write_enable_o     (mem_write_enable_vector),
+        .mem_write_data_o       (mem_write_data_vector),
+        .mem_read_data_i        (mem_read_data_i),
+        .res_scalar_o           (vector_scalar_result),
+        .wr_en_scalar_o         (vector_wr_en)
+    );
 
 //////////////////////////////////////////////////////////////////////////////
 // Vector Extension
@@ -351,23 +446,23 @@ end
     always_comb begin
         unique case (instruction_operation_i)
             CSRRW, CSRRS, CSRRC,
-            CSRRWI,CSRRSI,CSRRCI:    result = csr_data_read_i;
-            JAL,JALR,SUB:            result = sum2_result;
-            SLT:                     result = {31'b0, less_than};
-            SLTU:                    result = {31'b0, less_than_unsigned};
-            XOR:                     result = xor_result;
-            OR:                      result = or_result;
-            AND:                     result = and_result;
-            SLL:                     result = sll_result;
-            SRL:                     result = srl_result;
-            SRA:                     result = sra_result;
-            LUI:                     result = second_operand_i;
-            DIV:                     result = div_result;
-            DIVU:                    result = divu_result;
-            REM:                     result = rem_result;
-            REMU:                    result = remu_result;
-            VECTOR, VLOAD, VSTORE:   result = vector_scalar_result;
-            default:                 result = sum_result;
+            CSRRWI,CSRRSI,CSRRCI:   result = csr_data_read_i;
+            JAL,JALR,SUB:           result = sum2_result;
+            SLT:                    result = {31'b0, less_than};
+            SLTU:                   result = {31'b0, less_than_unsigned};
+            XOR:                    result = xor_result;
+            OR:                     result = or_result;
+            AND:                    result = and_result;
+            SLL:                    result = sll_result;
+            SRL:                    result = srl_result;
+            SRA:                    result = sra_result;
+            LUI:                    result = second_operand_i;
+            DIV,DIVU:               result = div_result;
+            REM,REMU:               result = rem_result;
+            MUL,MULH,MULHU,MULHSU:  result = mul_result;
+            AES32ESI, AES32ESMI:    result = aes_result;
+            VECTOR, VLOAD, VSTORE:  result = vector_scalar_result;
+            default:                result = sum_result;
         endcase
     end
 
@@ -381,7 +476,7 @@ end
             VECTOR,
             VLOAD,
             VSTORE:     write_enable = vector_wr_en;
-            default:    write_enable = !killed;
+            default:    write_enable = ~(killed | raise_exception_o);
         endcase
     end
 
@@ -390,10 +485,13 @@ end
 //////////////////////////////////////////////////////////////////////////////
     assign hold_o = hold_muldiv | hold_vector;
 
-    always_ff @(posedge clk) begin
-        if (
-            stall == 1'b0 & hold_o == 1'b0
-        ) begin
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            write_enable_o          <= 1'b0;
+            instruction_operation_o <= NOP;
+            result_o                <= '0;
+        end
+        else if (stall == 1'b0 & hold_o == 1'b0) begin
             write_enable_o          <= write_enable;
             instruction_operation_o <= instruction_operation_i;
             result_o                <= result;
@@ -439,8 +537,8 @@ end
 // TAG control based on signals Jump and Killed
 //////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk) begin
-        if (reset == 1'b1) begin
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
             curr_tag <= 0;
         end
         else if ((jump_o | raise_exception_o | machine_return_o | interrupt_ack_o) == 1'b1) begin
@@ -453,7 +551,7 @@ end
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        if ((reset | killed) == 1'b0) begin
+        if ((!reset_n | killed) == 1'b0) begin
             if (exc_inst_access_fault_i == 1'b1) begin
                 raise_exception_o = 1'b1;
                 machine_return_o  = 1'b0;
@@ -469,21 +567,21 @@ end
                 interrupt_ack_o   = 1'b0;
                 exception_code_o  = ILLEGAL_INSTRUCTION;
                 // $write("[%0d] EXCEPTION - ILLEGAL INSTRUCTION: %8h %8h\n", $time, pc_i, instruction_i);
-            end 
+            end
             else if (exc_misaligned_fetch_i == 1'b1) begin
                 raise_exception_o = 1'b1;
                 machine_return_o  = 1'b0;
                 interrupt_ack_o   = 1'b0;
                 exception_code_o  = INSTRUCTION_ADDRESS_MISALIGNED;
                 // $write("[%0d] EXCEPTION - INSTRUCTION ADDRESS MISALIGNED: %8h %8h\n", $time, pc_i, instruction_i);
-            end 
+            end
             else if (instruction_operation_i == ECALL) begin
                 raise_exception_o = 1'b1;
                 machine_return_o  = 1'b0;
                 interrupt_ack_o   = 1'b0;
-                exception_code_o  = ECALL_FROM_MMODE;
+                exception_code_o  = (privilege_i == USER) ? ECALL_FROM_UMODE : ECALL_FROM_MMODE;
                 // $write("[%0d] EXCEPTION - ECALL_FROM_MMODE: %8h %8h\n", $time, pc_i, instruction_i);
-            end 
+            end
             else if (instruction_operation_i == EBREAK) begin
                 raise_exception_o = 1'b1;
                 machine_return_o  = 1'b0;
@@ -497,15 +595,15 @@ end
                 interrupt_ack_o   = 1'b0;
                 exception_code_o  = LOAD_ACCESS_FAULT;
                 // $write("[%0d] EXCEPTION - LOAD ACCESS FAULT: %8h %8h %8h\n", $time, pc_i, instruction_i, mem_address_o);
-            end 
+            end
             else if (instruction_operation_i == MRET) begin
                 raise_exception_o = 1'b0;
                 machine_return_o  = 1'b1;
                 interrupt_ack_o   = 1'b0;
                 exception_code_o  = NE;
                 // $write("[%0d] MRET: %8h %8h\n", $time, pc_i, instruction_i);
-            end 
-            else if (interrupt_pending_i == 1'b1 && instruction_operation_i != NOP) begin
+            end
+            else if (interrupt_pending_i == 1'b1 && instruction_operation_i != NOP && !hold_o) begin
                 raise_exception_o = 1'b0;
                 machine_return_o  = 1'b0;
                 interrupt_ack_o   = 1'b1;

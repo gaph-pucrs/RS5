@@ -1,18 +1,20 @@
 module RS5_FPGA_Platform
     import RS5_pkg::*;
 #(
-    parameter int           i_cnt       = 1,
+    parameter int           i_cnt       = 2,
     parameter environment_e Environment = FPGA,
-    parameter rv32_e        RV32        = RV32I,
+    parameter rv32_e        RV32        = RV32M,
     parameter bit           XOSVMEnable = 1'b0,
-    parameter bit           ZIHPMEnable = 1'b0
+    parameter bit           ZIHPMEnable = 1'b0,
+    parameter int           CLKS_PER_BIT_UART = 868
 )
 (
     input  logic       clk,
-    input  logic       reset,
+    input  logic       reset_n,
     input  logic       BTND,
+    input  logic       UART_RX,
     output logic       UART_TX
-);
+); 
     logic [31:0]            cpu_instruction_address, cpu_instruction;
     logic [31:0]            cpu_data_address, cpu_data_in, cpu_data_out;
     logic                   cpu_operation_enable, enable_ram, enable_peripherals, enable_rtc, enable_plic;
@@ -26,7 +28,7 @@ module RS5_FPGA_Platform
     logic                   interrupt_ack;
     logic [31:0]            irq;
     logic [i_cnt:1]         irq_peripherals, iack_peripherals;
-
+    
     assign irq = {20'h0, mei, 3'h0, mti, 7'h0};
 
 //////////////////////////////////////////////////////////////////////////////
@@ -100,7 +102,7 @@ module RS5_FPGA_Platform
         .ZIHPMEnable    (ZIHPMEnable)
     ) dut (
         .clk                    (clk), 
-        .reset                  (!reset),
+        .reset_n                (reset_n),
         .stall                  (stall),
         .instruction_i          (cpu_instruction), 
         .mem_data_i             (cpu_data_in), 
@@ -140,7 +142,7 @@ module RS5_FPGA_Platform
 
     rtc rtc(
         .clk        (clk),
-        .reset      (!reset),
+        .reset_n    (reset_n),
         .en_i       (enable_rtc),
         .addr_i     (cpu_data_address[3:0]),
         .we_i       ({4'h0, cpu_write_enable}),
@@ -157,26 +159,29 @@ module RS5_FPGA_Platform
     plic #(
         .i_cnt(i_cnt)
     ) plic1 (
-        .clk    (clk),
-        .reset  (!reset),
-        .en_i   (enable_plic),
-        .we_i   (cpu_write_enable),
-        .addr_i (cpu_data_address[23:0]),
-        .data_i (cpu_data_out),
-        .data_o (data_plic),     
-        .irq_i  (irq_peripherals),
-        .iack_i (interrupt_ack),
-        .irq_o  (mei),
-        .iack_o (iack_peripherals)
+        .clk     (clk),
+        .reset_n (reset_n),
+        .en_i    (enable_plic),
+        .we_i    (cpu_write_enable),
+        .addr_i  (cpu_data_address[23:0]),
+        .data_i  (cpu_data_out),
+        .data_o  (data_plic),     
+        .irq_i   (irq_peripherals),
+        .iack_i  (interrupt_ack),
+        .irq_o   (mei),
+        .iack_o  (iack_peripherals)
     );
 
 //////////////////////////////////////////////////////////////////////////////
 // PERIPHERALS
 //////////////////////////////////////////////////////////////////////////////
 
-    Peripherals Peripherals1 (
+    Peripherals #(
+        .i_cnt(i_cnt),
+        .CLKS_PER_BIT_UART(CLKS_PER_BIT_UART)
+    ) Peripherals1 (
         .clk            (clk), 
-        .reset          (!reset), 
+        .reset_n        (reset_n), 
         .stall_o        (stall),
         .enable_i       (enable_peripherals), 
         .write_enable_i (cpu_write_enable),
@@ -185,6 +190,7 @@ module RS5_FPGA_Platform
         .data_o         (data_peripherals),
         .BTND           (BTND),
         .UART_TX        (UART_TX),
+        .UART_RX        (UART_RX),
         .interrupt_req_o(irq_peripherals),
         .interrupt_ack_i(iack_peripherals)
     );

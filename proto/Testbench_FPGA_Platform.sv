@@ -28,12 +28,13 @@ module Testbench_FPGA_Platform ();
 
     logic           clk=1, rstCPU;
     logic           BTND;
+    logic           UART_RX;
 
 //////////////////////////////////////////////////////////////////////////////
 // PARAMETERS FOR CORE INSTANTIATION
 //////////////////////////////////////////////////////////////////////////////
     
-    localparam int              i_cnt = 1;
+    localparam int              i_cnt = 2;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // RESET CPU 
@@ -60,21 +61,69 @@ module Testbench_FPGA_Platform ();
     
     RS5_FPGA_Platform #(
         .i_cnt      (i_cnt),
+        .CLKS_PER_BIT_UART(5)
     ) dut (
         .clk        (clk), 
-        .reset      (rstCPU), 
-        .BTND       (BTND)
+        .reset_n    (rstCPU), 
+        .BTND       (BTND),
+        .UART_RX    (UART_RX)
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Interrupt Emulation
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-   /* 
+ 
     initial begin
-        BTND  = 0;
+        UART_RX  = 1;
+        BTND = 0;
         #3000
-        BTND  = 1; 
+        UART_RX  = 0; 
+        #50
+        UART_RX  = 1; 
+        #50
+        UART_RX  = 0; 
+        #50
+        UART_RX  = 1; 
+        #50
+        UART_RX  = 0; 
+        #50
+        UART_RX  = 1; 
+        #50
+        UART_RX  = 1; 
+        #50
+        UART_RX  = 1; 
+        #50
+        UART_RX  = 1; 
+        #50
+        UART_RX  = 0;
+        #50
+        UART_RX  = 1; 
+        #5
+        BTND = 1;
+        #60
+        BTND  =0;
+        #3000
+        UART_RX  = 0; 
+        #50
+        UART_RX  = 1; 
+        #50
+        UART_RX  = 1; 
+        #50
+        UART_RX  = 1; 
+        #50
+        UART_RX  = 1; 
+        #50
+        UART_RX  = 1; 
+        #50
+        UART_RX  = 1; 
+        #50
+        UART_RX  = 1; 
+        #50
+        UART_RX  = 1; 
+        #50
+        UART_RX  = 0;
+        #50
+        UART_RX  = 1; 
     end
-    */
 
 endmodule

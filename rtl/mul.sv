@@ -3,6 +3,8 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 
+`include "RS5_pkg.sv"
+
 module mul
     import RS5_pkg::*;
 (
@@ -16,14 +18,14 @@ module mul
     input   logic        mul_low_i,
 
     output  logic        hold_o,
-    
     output  logic [31:0] result_o
 );
 
     typedef enum logic [1:0]{
         ALBL, ALBH, AHBL, AHBH
-    } mul_fsm;
-    mul_fsm mul_state, next_state;
+    } mul_states_e;
+
+    mul_states_e mul_state, next_state;
 
     logic [34:0] mac_result, mac_result_partial;
     logic [34:0] mac_result_reg;
@@ -37,14 +39,14 @@ module mul
 
     assign signed_mult  = (signed_mode_i != 2'b00);
     assign result_o = mac_result_partial[31:0];
-    assign start        = (mul_state == ALBL && enable_i == 1'b1);        
-    
-    assign mac_result   = $signed({sign_a, op_a}) * $signed({sign_b, op_b}) + $signed(accum);     
+    assign start        = (mul_state == ALBL && enable_i == 1'b1);
+
+    assign mac_result   = $signed({sign_a, op_a}) * $signed({sign_b, op_b}) + $signed(accum);
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             mac_result_reg <= 0;
-        end 
+        end
         else begin
             mac_result_reg <= mac_result_partial;
         end
@@ -66,7 +68,7 @@ module mul
                 sign_b         = 1'b0;
                 accum          = '0;
                 mac_result_partial = mac_result;
-                if (start == 1'b1) begin 
+                if (start == 1'b1) begin
                     next_state = ALBH;
                     hold_o     = 1'b1;
                 end else begin
@@ -84,7 +86,7 @@ module mul
 
                 if (mul_low_i) begin
                     mac_result_partial = {3'b0, mac_result[15:0], mac_result_reg[15:0]};
-                end 
+                end
                 else begin
                     mac_result_partial = mac_result;
                 end

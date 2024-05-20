@@ -1,3 +1,5 @@
-vlog tb_top.sv
-vsim work.tb_top
+vlog ../rtl/aes/*.sv
+vlog ../rtl/*.sv
+vlog *.sv
+vsim work.testbench
 run -all

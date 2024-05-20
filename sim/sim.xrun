@@ -1,2 +1,2 @@
--smartorder -top tb_top 
-./tb_top.sv
+testbench.sv -smartorder ../rtl/*.sv *.sv -incdir ../rtl  -incdir ./rtl/aes/ ../rtl/aes/*.sv
+./testbench.sv

@@ -12,32 +12,10 @@
  * Testbench for RS5 simulation.
  *
  * \detailed
- * Testbench for RS5 simulation.
+ * Testbench for RS5 simulation.de
  */
 
-`timescale 1ns/1ps
-
 `include "../rtl/RS5_pkg.sv"
-`include "../rtl/mmu.sv"
-`include "../rtl/fetch.sv"
-`include "../rtl/decode.sv"
-`include "../rtl/muldiv.sv"
-`include "../rtl/mulNbits.sv"
-`include "../rtl/mul.sv"
-`include "../rtl/div.sv"
-`include "../rtl/vectorCSRs.sv"
-`include "../rtl/vectorRegbank.sv"
-`include "../rtl/vectorALU.sv"
-`include "../rtl/vectorLSU.sv"
-`include "../rtl/vectorUnit.sv"
-`include "../rtl/execute.sv"
-`include "../rtl/retire.sv"
-`include "../rtl/regbank.sv"
-`include "../rtl/CSRBank.sv"
-`include "../rtl/RS5.sv"
-`include "../rtl/plic.sv"
-`include "../rtl/rtc.sv"
-`include "./RAM_mem.sv"
 
 //////////////////////////////////////////////////////////////////////////////
 // CPU TESTBENCH
@@ -45,30 +23,59 @@
 
 module testbench
     import RS5_pkg::*;
-    (
-        input logic clk_i,
-        input logic rst_i
-    );
+(
+);
 
 //////////////////////////////////////////////////////////////////////////////
 // PARAMETERS FOR CORE INSTANTIATION
 //////////////////////////////////////////////////////////////////////////////
 
-    localparam int           MEM_WIDTH = 65536;
-    localparam string        BIN_FILE = "../app/berkeley_suite/test.bin";
-    
+    localparam rv32_e        INSTRUCTION_SET = RV32M;
+    localparam bit           USE_XOSVM       = 1'b1;
+    localparam bit           USE_ZIHPM       = 1'b1;
+    localparam bit           USE_ZKNE        = 1'b1;
+    localparam int           MEM_WIDTH       = 65536;
+    localparam string        BIN_FILE        = "../app/riscv-tests/test.bin";
+
     localparam int           i_cnt = 1;
+
+///////////////////////////////////////// Clock generator //////////////////////////////
+
+    logic        clk=1;
+
+    always begin
+        #5.0 clk <= 0;
+        #5.0 clk <= 1;
+    end
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////// RESET CPU ////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    logic reset_n;
+
+    initial begin
+        reset_n = 0;                                          // RESET for CPU initialization
+
+        #100 reset_n = 1;                                     // Hold state for 100 ns
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 // TB SIGNALS
 //////////////////////////////////////////////////////////////////////////////
 
+    /* Number of used bits is defined by the memory size */
     /* verilator lint_off UNUSEDSIGNAL */
     logic [31:0]            instruction_address;
-    logic                   interrupt_ack;
-    logic [63:0]            mtime;
+    /* verilator lint_on UNUSEDSIGNAL */
+
+    /* RTC is 64 bits but the bus is 32 bits */
+    /* verilator lint_off UNUSEDSIGNAL */
     logic [63:0]            data_rtc;
     /* verilator lint_on UNUSEDSIGNAL */
+
+    logic                   interrupt_ack;
+    logic [63:0]            mtime;
     logic [31:0]            instruction;
     logic                   enable_ram, enable_rtc, enable_plic, enable_tb;
     logic                   mem_operation_enable;
@@ -120,8 +127,8 @@ module testbench
             enable_tb   = 1'b0;
         end
     end
-    
-    always_ff @(posedge clk_i) begin
+
+    always_ff @(posedge clk) begin
         enable_tb_r     <= enable_tb;
         enable_rtc_r    <= enable_rtc;
         enable_plic_r   <= enable_plic;
@@ -146,16 +153,22 @@ module testbench
 // CPU
 //////////////////////////////////////////////////////////////////////////////
 
-    RS5 dut (
-        .clk                    (clk_i), 
-        .reset                  (rst_i), 
+    RS5 #(
+        .Environment(ASIC),
+        .RV32       (INSTRUCTION_SET),
+        .XOSVMEnable(USE_XOSVM),
+        .ZIHPMEnable(USE_ZIHPM),
+        .ZKNEEnable (USE_ZKNE)
+    ) dut (
+        .clk                    (clk),
+        .reset_n                (reset_n),
         .stall                  (1'b0),
-        .instruction_i          (instruction), 
-        .mem_data_i             (mem_data_read), 
+        .instruction_i          (instruction),
+        .mem_data_i             (mem_data_read),
         .mtime_i                (mtime),
         .irq_i                  (irq),
-        .instruction_address_o  (instruction_address), 
-        .mem_operation_enable_o (mem_operation_enable), 
+        .instruction_address_o  (instruction_address),
+        .mem_operation_enable_o (mem_operation_enable),
         .mem_write_enable_o     (mem_write_enable),
         .mem_address_o          (mem_address),
         .mem_data_o             (mem_data_write),
@@ -170,18 +183,18 @@ module testbench
         .MEM_WIDTH(MEM_WIDTH),
         .BIN_FILE(BIN_FILE)
     ) RAM_MEM (
-        .clk        (clk_i), 
+        .clk        (clk),
 
-        .enA_i      (1'b1), 
-        .weA_i      (4'h0), 
-        .addrA_i    (instruction_address[15:0]), 
-        .dataA_i    (32'h00000000), 
+        .enA_i      (1'b1),
+        .weA_i      (4'h0),
+        .addrA_i    (instruction_address[15:0]),
+        .dataA_i    (32'h00000000),
         .dataA_o    (instruction),
 
-        .enB_i      (enable_ram), 
-        .weB_i      (mem_write_enable), 
-        .addrB_i    (mem_address[15:0]), 
-        .dataB_i    (mem_data_write), 
+        .enB_i      (enable_ram),
+        .weB_i      (mem_write_enable),
+        .addrB_i    (mem_address[15:0]),
+        .dataB_i    (mem_data_write),
         .dataB_o    (data_ram)
     );
 
@@ -189,22 +202,25 @@ module testbench
 // PLIC
 //////////////////////////////////////////////////////////////////////////////
 
+    /* Bits depending on connected peripherals */
+    /* verilator lint_off UNUSED */
+    logic [i_cnt:1] iack_periph;
+    /* verilator lint_on UNUSED */
+
     plic #(
         .i_cnt(i_cnt)
     ) plic1 (
-        .clk    (clk_i),
-        .reset  (rst_i),
-        .en_i   (enable_plic),
-        .we_i   (mem_write_enable),
-        .addr_i (mem_address[23:0]),
-        .data_i (mem_data_write),
-        .data_o (data_plic),     
-        .irq_i  ('0),
-        .iack_i (interrupt_ack),
-        /* verilator lint_off PINCONNECTEMPTY */
-        .iack_o (),
-        /* verilator lint_on PINCONNECTEMPTY */
-        .irq_o  (mei)
+        .clk     (clk),
+        .reset_n (reset_n),
+        .en_i    (enable_plic),
+        .we_i    (mem_write_enable),
+        .addr_i  (mem_address[23:0]),
+        .data_i  (mem_data_write),
+        .data_o  (data_plic),
+        .irq_i   ('0),
+        .iack_i  (interrupt_ack),
+        .iack_o  (iack_periph),
+        .irq_o   (mei)
     );
 
 //////////////////////////////////////////////////////////////////////////////
@@ -212,13 +228,13 @@ module testbench
 //////////////////////////////////////////////////////////////////////////////
 
     rtc rtc(
-        .clk        (clk_i),
-        .reset      (rst_i), 
+        .clk        (clk),
+        .reset_n    (reset_n),
         .en_i       (enable_rtc),
         .addr_i     (mem_address[3:0]),
         .we_i       ({4'h0, mem_write_enable}),
         .data_i     ({32'h0, mem_data_write}),
-        .data_o     (data_rtc),     
+        .data_o     (data_rtc),
         .mti_o      (mti),
         .mtime_o    (mtime)
     );
@@ -227,7 +243,7 @@ module testbench
 // Memory Mapped regs
 //////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk_i) begin
+    always_ff @(posedge clk) begin
         if (enable_tb) begin
             // OUTPUT REG
             if ((mem_address == 32'h80004000 || mem_address == 32'h80001000) && mem_write_enable != '0) begin
@@ -240,7 +256,7 @@ module testbench
                 $display("# %t END OF SIMULATION",$time);
                 $finish;
             end
-        end 
+        end
         else begin
             data_tb <= '0;
         end

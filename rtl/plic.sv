@@ -1,3 +1,5 @@
+`include "RS5_pkg.sv"
+
 module plic
 	import RS5_pkg::*;
 #(
@@ -5,15 +7,17 @@ module plic
 )
 (
     input   logic                   clk,
-    input   logic                   reset,
+    input   logic                   reset_n,
 
     input   logic                   en_i,
     input   logic  [3:0]            we_i,
     input   logic [23:0]            addr_i,
-/* verilator lint_off UNUSEDSIGNAL */ 
-    input   logic [31:0]            data_i,
-/* verilator lint_on UNUSEDSIGNAL */
     output  logic [31:0]            data_o,
+
+    /* Only a reduced number of bits is used depending on the number of interrupts */
+    /* verilator lint_off UNUSEDSIGNAL */
+    input   logic [31:0]            data_i,
+    /* verilator lint_on UNUSEDSIGNAL */
 
     input   logic [i_cnt:1]         irq_i,
     input   logic                   iack_i,
@@ -21,14 +25,16 @@ module plic
     output  logic [i_cnt:1]         iack_o,
     output  logic                   irq_o
 );
+    typedef logic [$clog2(i_cnt):0] intr_t;
 
-    logic [$clog2(i_cnt):0] id_int, id;
-    logic [i_cnt:1]         ie;
-    logic [i_cnt:1]         ip;
-    logic [i_cnt:1]         interrupt;
+    intr_t          id_int;
+    intr_t          id_r;
+    logic [i_cnt:1] ie;
+    logic [i_cnt:1] ip;
+    logic [i_cnt:1] interrupt;
 
-    always_ff @(posedge clk) begin
-        if (reset == 1'b1) begin
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
             ip <= '0;
         end
         else begin
@@ -38,44 +44,42 @@ module plic
 
     assign interrupt = ip & ie;
 
-/* verilator lint_off WIDTHTRUNC */
 	always_comb begin
 		id_int = '0;   /* 0 = NO IRQ */
 		for (int i = 1; i <= i_cnt; i++) begin
 			if (interrupt[i] == 1'b1) begin
-				id_int = '0;
+				id_int = intr_t'(i);           
 				break;
 			end
 		end
 	end
-/* verilator lint_on WIDTHTRUNC */
 
-    always_ff @(posedge clk) begin
-        if (reset == 1'b1) begin
-            id <= '0;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            id_r <= '0;
+        else
+            id_r <= id_int;
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            iack_o <= '0;
         end
-        else if (iack_i == 1'b1)begin
-            id <= id_int;
+        else begin
+            iack_o <= '0;
+            if (iack_i == 1'b1)
+                iack_o[id_int] <= 1'b1;
         end
     end
 
     assign irq_o    = (|interrupt) & ~iack_i;
 
-    always_comb begin
-        if (iack_i == 1'b1) begin
-            iack_o = (1'b1 << id);
-        end
-        else begin
-            iack_o = '0;
-        end
-    end
-
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Memory Mapped Regs
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    always_ff @( posedge clk ) begin
-        if (reset == 1'b1) begin
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
             ie      <= '0;
             data_o  <= '0;
         end  
@@ -88,9 +92,9 @@ module plic
             end
             else begin
                 case (addr_i)
-                    24'h000000:     data_o <= {{31-$clog2(i_cnt){1'b0}}, id};
-                    24'h000004:     data_o <= {{31-i_cnt{1'b0}}, ip, 1'b0};
-                    24'h000008:     data_o <= {{31-i_cnt{1'b0}}, ie, 1'b0};
+                    24'h000000:     data_o <= {{31-$clog2(i_cnt){1'b0}}, id_r}; /* ID */
+                    24'h000004:     data_o <= {{31-i_cnt{1'b0}}, ip, 1'b0};     /* IP */
+                    24'h000008:     data_o <= {{31-i_cnt{1'b0}}, ie, 1'b0};     /* IE */
 
                     default:        data_o <= '0;
                 endcase
