@@ -1,3 +1,4 @@
+/*
     logic [VLEN-1:0] first_operand_logic, second_operand_logic;
     logic [VLEN-1:0] result_and, result_or, result_xor, result_logic;
 
@@ -232,7 +233,7 @@
         end
     end
 */
-
+/*
     logic [VLEN-1:0] result_and, result_or, result_xor;
     logic [VLEN-1:0] result_and_64, result_or_64, result_xor_64;
     logic [31:0] result_and_32, result_or_32, result_xor_32;
@@ -287,3 +288,4 @@
             end
         end
     end
+*/

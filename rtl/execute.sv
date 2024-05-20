@@ -32,6 +32,7 @@ module execute
 #(
     parameter rv32_e        RV32        = RV32I,
     parameter bit           ZKNEEnable  = 1'b1,
+    parameter bit           VEnable     = 1'b0,
     parameter int           VLEN        = 64
 )
 (
@@ -162,10 +163,13 @@ module execute
 
     logic [31:0] mem_address_vector;
     logic [31:0] mem_address;
+
     logic        mem_read_enable;
     logic        mem_read_enable_vector;
+
     logic  [3:0] mem_write_enable;
     logic  [3:0] mem_write_enable_vector;
+
     logic [31:0] mem_write_data;
     logic [31:0] mem_write_data_vector;
 
@@ -204,7 +208,7 @@ module execute
                     2'b01:   mem_write_enable = 4'b0010;
                     default: mem_write_enable = 4'b0001;
                 endcase
-            SH:              mem_write_enable_o = (sum_result[1])
+            SH:              mem_write_enable = (sum_result[1])
                                                 ? 4'b1100
                                                 : 4'b0011;
             SW:              mem_write_enable = 4'b1111;
@@ -282,8 +286,6 @@ end
     logic [31:0] mul_result;
     logic        hold_mul;
     logic        hold_div;
-
-    assign hold_o = (hold_mul | hold_div);
 
     if (RV32 == RV32M || RV32 == RV32ZMMUL) begin : gen_zmmul_on
 
@@ -386,58 +388,39 @@ end
     logic        vector_wr_en;
     logic        hold_vector;
 
-    vectorUnit #(
-        .VLEN       (64         )
-    ) vector (
-        .clk                    (clk),
-        .reset_n                (!reset),
-        .instruction_i          (instruction_i),
-        .instruction_operation_i(instruction_operation_i),
-        .vector_operation_i     (vector_operation_i),
-        .op1_scalar_i           (first_operand_i),
-        .op2_scalar_i           (second_operand_i),
-        .op3_scalar_i           (third_operand_i),
-        .hold_o                 (hold_vector),
-        .vtype_o                (vtype_o),
-        .vlen_o                 (vlen_o),
-        .mem_address_o          (mem_address_vector),
-        .mem_read_enable_o      (mem_read_enable_vector),
-        .mem_write_enable_o     (mem_write_enable_vector),
-        .mem_write_data_o       (mem_write_data_vector),
-        .mem_read_data_i        (mem_read_data_i),
-        .res_scalar_o           (vector_scalar_result),
-        .wr_en_scalar_o         (vector_wr_en)
-    );
-
-//////////////////////////////////////////////////////////////////////////////
-// Vector Extension
-//////////////////////////////////////////////////////////////////////////////
-    logic [31:0] vector_scalar_result;
-    logic        vector_wr_en;
-    logic        hold_vector;
-
-    vectorUnit #(
-        .VLEN       (64         )
-    ) vector (
-        .clk                    (clk),
-        .reset_n                (!reset),
-        .instruction_i          (instruction_i),
-        .instruction_operation_i(instruction_operation_i),
-        .vector_operation_i     (vector_operation_i),
-        .op1_scalar_i           (first_operand_i),
-        .op2_scalar_i           (second_operand_i),
-        .op3_scalar_i           (third_operand_i),
-        .hold_o                 (hold_vector),
-        .vtype_o                (vtype_o),
-        .vlen_o                 (vlen_o),
-        .mem_address_o          (mem_address_vector),
-        .mem_read_enable_o      (mem_read_enable_vector),
-        .mem_write_enable_o     (mem_write_enable_vector),
-        .mem_write_data_o       (mem_write_data_vector),
-        .mem_read_data_i        (mem_read_data_i),
-        .res_scalar_o           (vector_scalar_result),
-        .wr_en_scalar_o         (vector_wr_en)
-    );
+    if (VEnable) begin : v_gen_on
+        vectorUnit #(
+            .VLEN  (VLEN)
+        ) vector (
+            .clk                    (clk),
+            .reset_n                (!reset),
+            .instruction_i          (instruction_i),
+            .instruction_operation_i(instruction_operation_i),
+            .vector_operation_i     (vector_operation_i),
+            .op1_scalar_i           (first_operand_i),
+            .op2_scalar_i           (second_operand_i),
+            .op3_scalar_i           (third_operand_i),
+            .hold_o                 (hold_vector),
+            .vtype_o                (vtype_o),
+            .vlen_o                 (vlen_o),
+            .mem_address_o          (mem_address_vector),
+            .mem_read_enable_o      (mem_read_enable_vector),
+            .mem_write_enable_o     (mem_write_enable_vector),
+            .mem_write_data_o       (mem_write_data_vector),
+            .mem_read_data_i        (mem_read_data_i),
+            .res_scalar_o           (vector_scalar_result),
+            .wr_en_scalar_o         (vector_wr_en)
+        );
+    end
+    else begin : v_gen_off
+        assign hold_vector  = '0;
+        assign vector_wr_en = '0;
+        assign vector_scalar_result     = '0;
+        assign mem_address_vector       = '0;
+        assign mem_read_enable_vector   = '0;
+        assign mem_write_enable_vector  = '0;
+        assign mem_write_data_vector    = '0;
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 // Demux
@@ -483,7 +466,7 @@ end
 //////////////////////////////////////////////////////////////////////////////
 // Output Registers
 //////////////////////////////////////////////////////////////////////////////
-    assign hold_o = hold_muldiv | hold_vector;
+    assign hold_o = hold_div | hold_mul | hold_vector;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin

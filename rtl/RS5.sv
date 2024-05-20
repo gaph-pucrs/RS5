@@ -24,11 +24,12 @@ module RS5
     import RS5_pkg::*;
 #(
     parameter environment_e Environment  = ASIC,
-    parameter int           VLEN         = 64,
     parameter rv32_e        RV32         = RV32I,
+    parameter int           VLEN         = 64,
     parameter bit           XOSVMEnable  = 1'b0,
     parameter bit           ZIHPMEnable  = 1'b0,
     parameter bit           ZKNEEnable   = 1'b0,
+    parameter bit           VEnable      = 1'b0,
     parameter bit           DEBUG        = 1'b0,
     parameter string        DBG_REG_FILE = "./debug/regBank.txt",
     parameter string        DBG_CSR_FILE = "./debug/Report.txt"
@@ -211,7 +212,7 @@ module RS5
 
     decode # (
         .ZKNEEnable(ZKNEEnable),
-        .VEnabled  (VEnabled)
+        .VEnable   (VEnable)
     ) decoder1 (
         .clk                        (clk),
         .reset_n                    (reset_n),
@@ -286,7 +287,7 @@ module RS5
     execute #(
         .RV32        (RV32),
         .ZKNEEnable  (ZKNEEnable),
-        .VEnabled    (VEnabled),
+        .VEnable     (VEnable),
         .VLEN        (VLEN)
     ) execute1 (
         .clk                    (clk),
@@ -349,7 +350,7 @@ module RS5
       .XOSVMEnable(XOSVMEnable ),
       .ZIHPMEnable(ZIHPMEnable ),
       .RV32       (RV32        ),
-      .VEnabled   (VEnabled)
+      .VEnable    (VEnable     ),
       .VLEN       (VLEN        ),
       .DEBUG      (DEBUG       ),
       .DBG_FILE   (DBG_CSR_FILE)

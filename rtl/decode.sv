@@ -26,7 +26,8 @@
 module decode
     import RS5_pkg::*;
 #(
-    parameter bit           ZKNEEnable  = 1'b1
+    parameter bit           ZKNEEnable  = 1'b1,
+    parameter bit           VEnable     = 1'b0
 )
 (
     input   logic           clk,
@@ -215,19 +216,19 @@ module decode
     always_comb begin
         unique case (opcode)
             7'b0110111: instruction_operation = LUI;
-            7'b0010111: instruction_operation = ADD;                /* AUIPC */
+            7'b0010111: instruction_operation = ADD;                        /* AUIPC */
             7'b1101111: instruction_operation = JAL;
             7'b1100111: instruction_operation = JALR;
-            7'b1100011: instruction_operation = decode_branch;      /* BRANCH */
-            7'b0000011: instruction_operation = decode_load;        /* LOAD */
-            7'b0100011: instruction_operation = decode_store;       /* STORE */
-            7'b0010011: instruction_operation = decode_op_imm;      /* OP-IMM */
-            7'b0110011: instruction_operation = decode_op;          /* OP */
-            7'b0001111: instruction_operation = decode_misc_mem;    /* MISC-MEM */
-            7'b1110011: instruction_operation = decode_system;      /* SYSTEM */
-            7'b1010111: instruction_operation = VECTOR;             /* OP-V */
-            7'b0000111: instruction_operation = VLOAD;              /* LOAD-FP */
-            7'b0100111: instruction_operation = VSTORE;             /* STORE-FP */
+            7'b1100011: instruction_operation = decode_branch;              /* BRANCH */
+            7'b0000011: instruction_operation = decode_load;                /* LOAD */
+            7'b0100011: instruction_operation = decode_store;               /* STORE */
+            7'b0010011: instruction_operation = decode_op_imm;              /* OP-IMM */
+            7'b0110011: instruction_operation = decode_op;                  /* OP */
+            7'b0001111: instruction_operation = decode_misc_mem;            /* MISC-MEM */
+            7'b1110011: instruction_operation = decode_system;              /* SYSTEM */
+            7'b1010111: instruction_operation = VEnable ? VECTOR : INVALID; /* OP-V */
+            7'b0000111: instruction_operation = VEnable ? VLOAD  : INVALID; /* LOAD-FP */
+            7'b0100111: instruction_operation = VEnable ? VSTORE : INVALID; /* STORE-FP */
             default:    instruction_operation = INVALID;
         endcase
     end
