@@ -25,6 +25,7 @@ module RS5
 #(
     parameter environment_e Environment  = ASIC,
     parameter rv32_e        RV32         = RV32I,
+    parameter bit           COMPRESSED   = 1'b0,
     parameter bit           XOSVMEnable  = 1'b0,
     parameter bit           ZIHPMEnable  = 1'b0,
     parameter bit           ZKNEEnable   = 1'b0,
@@ -210,7 +211,8 @@ module RS5
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     decode # (
-        .ZKNEEnable(ZKNEEnable)
+        .ZKNEEnable(ZKNEEnable),
+        .COMPRESSED(COMPRESSED)
     ) decoder1 (
         .clk                        (clk),
         .reset_n                    (reset_n),
@@ -344,6 +346,7 @@ module RS5
     CSRBank #(
       .XOSVMEnable(XOSVMEnable ),
       .ZIHPMEnable(ZIHPMEnable ),
+      .COMPRESSED (COMPRESSED  ),
       .RV32       (RV32        ),
       .DEBUG      (DEBUG       ),
       .DBG_FILE   (DBG_CSR_FILE)

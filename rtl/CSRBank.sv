@@ -30,6 +30,7 @@ module CSRBank
 #(
     parameter bit       XOSVMEnable = 1'b0,
     parameter bit       ZIHPMEnable = 1'b0,
+    parameter bit       COMPRESSED  = 1'b0,
     parameter rv32_e    RV32        = RV32I,
     parameter bit       DEBUG       = 1'b0,
     parameter string    DBG_FILE    = "./debug/Report.txt"
@@ -204,11 +205,11 @@ module CSRBank
             // MEDELEG:    begin current_val = medeleg;         wmask = '1; end
             // MIDELEG:    begin current_val = mideleg;         wmask = '1; end
             MIE:        begin current_val = mie;             wmask = 32'h00000888; end
-            MTVEC:      begin current_val = mtvec_r;         wmask = 32'hFFFFFFFE; end
+            MTVEC:      begin current_val = mtvec_r;         wmask = COMPRESSED ? 32'hFFFFFFFE : 32'hFFFFFFFC; end
             // MCOUNTEREN: begin current_val = mcounteren;      wmask = '1; end
             // MSTATUSH:   begin current_val = mstatush;        wmask = '1; end
             MSCRATCH:   begin current_val = mscratch;        wmask = 32'hFFFFFFFF; end
-            MEPC:       begin current_val = mepc_r;          wmask = 32'hFFFFFFFE; end
+            MEPC:       begin current_val = mepc_r;          wmask = COMPRESSED ? 32'hFFFFFFFE : 32'hFFFFFFFC; end
             MCAUSE:     begin current_val = mcause;          wmask = 32'hFFFFFFFF; end
             MTVAL:      begin current_val = mtval;           wmask = 32'hFFFFFFFF; end
             MCYCLE:     begin current_val = mcycle[31:0];    wmask = 32'hFFFFFFFF; end

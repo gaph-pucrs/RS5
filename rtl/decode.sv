@@ -26,7 +26,8 @@
 module decode
     import RS5_pkg::*;
 #(
-    parameter bit           ZKNEEnable  = 1'b1
+    parameter bit           ZKNEEnable  = 1'b1,
+    parameter bit           COMPRESSED  = 1'b0
 )
 (
     input   logic           clk,
@@ -80,31 +81,40 @@ module decode
     logic instruction_compressed;
     logic enable_decode;
 
-    assign enable_decode = enable && !jump_misaligned_i;
+    if (COMPRESSED) begin : gen_compressed_on
 
-    logic [31:0] instruction_fetched;
-    logic [31:0] instruction_decompressed;
+        logic [31:0] instruction_fetched;
+        logic [31:0] instruction_decompressed;
 
-    assign instruction_decode = instruction_compressed ? instruction_decompressed : instruction_fetched;
+        assign enable_decode = enable && !jump_misaligned_i;
+        assign instruction_decode = instruction_compressed ? instruction_decompressed : instruction_fetched;
 
-    iprefetch prefetch (
-        .clk                (clk),
-        .reset_n            (reset_n),
-        .enable_i           (enable),
-        .hazard_i           (hazard_o),
-        .tag_i              (tag_i),
-        .pc_i               (pc_i),
-        .instruction_i      (instruction),
-        .prefetched_o       (instruction_prefetched_o),
-        .compressed_o       (instruction_compressed),
-        .pc_o               (pc_decode),
-        .instruction_o      (instruction_fetched)
-    );
+        iprefetch prefetch (
+            .clk                (clk),
+            .reset_n            (reset_n),
+            .enable_i           (enable),
+            .hazard_i           (hazard_o),
+            .tag_i              (tag_i),
+            .pc_i               (pc_i),
+            .instruction_i      (instruction),
+            .prefetched_o       (instruction_prefetched_o),
+            .compressed_o       (instruction_compressed),
+            .pc_o               (pc_decode),
+            .instruction_o      (instruction_fetched)
+        );
 
-    decompresser decompresser (
-        .instruction_i (instruction_fetched[15:0]),
-        .instruction_o (instruction_decompressed)
-    );
+        decompresser decompresser (
+            .instruction_i (instruction_fetched[15:0]),
+            .instruction_o (instruction_decompressed)
+        );
+    end
+    else begin : gen_compressed_off
+        assign enable_decode = enable;
+        assign instruction_decode = instruction;
+        assign instruction_compressed = 1'b0;
+        assign pc_decode = pc_i;
+        assign instruction_prefetched_o = 1'b0;
+    end
 
 
 //////////////////////////////////////////////////////////////////////////////
