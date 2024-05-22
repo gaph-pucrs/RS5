@@ -393,7 +393,7 @@ end
             .VLEN  (VLEN)
         ) vector (
             .clk                    (clk),
-            .reset_n                (!reset),
+            .reset_n                (reset_n),
             .instruction_i          (instruction_i),
             .instruction_operation_i(instruction_operation_i),
             .vector_operation_i     (vector_operation_i),

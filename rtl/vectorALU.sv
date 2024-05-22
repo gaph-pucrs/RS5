@@ -25,12 +25,6 @@ module vectorALU
     logic hold_mult;
     logic hold;
 
-    logic signed [VLEN-1:0] first_operand_signed, second_operand_signed, third_operand_signed;
-
-    assign first_operand_signed  = first_operand;
-    assign second_operand_signed = second_operand;
-    assign third_operand_signed  = third_operand;
-
     logic [VLEN-1:0] result_mult_r, third_operand_r;
 
 //////////////////////////////////////////////////////////////////////////////
@@ -154,33 +148,30 @@ module vectorALU
         unique case (vsew)
             EW8:
                 for (int i = 0; i < VLENB; i++) begin
-                    automatic logic [7:0] operand_sliced, operand_sliced_signed;
-                    operand_sliced        = second_operand[(8*(i+1))-1-:8];
-                    operand_sliced_signed = second_operand_signed[(8*(i+1))-1-:8];
+                    automatic logic [7:0] operand_sliced;
+                    operand_sliced = second_operand[(8*(i+1))-1-:8];
 
-                    result_sll[(8*(i+1))-1-:8]   = first_operand[(8*(i+1))-1-:8]           <<  operand_sliced[2:0];
-                    result_srl[(8*(i+1))-1-:8]   = first_operand[(8*(i+1))-1-:8]           >>  operand_sliced[2:0];
-                    result_sra[(8*(i+1))-1-:8]   = first_operand_signed[(8*(i+1))-1-:8]    >>> operand_sliced_signed[2:0];
+                    result_sll[(8*(i+1))-1-:8]   =         first_operand[(8*(i+1))-1-:8]    <<  operand_sliced[2:0];
+                    result_srl[(8*(i+1))-1-:8]   =         first_operand[(8*(i+1))-1-:8]    >>  operand_sliced[2:0];
+                    result_sra[(8*(i+1))-1-:8]   = $signed(first_operand[(8*(i+1))-1-:8])   >>> operand_sliced[2:0];
                 end
             EW16:
                 for (int i = 0; i < VLENB/2; i++) begin
-                    automatic logic [15:0] operand_sliced, operand_sliced_signed;
-                    operand_sliced        = second_operand[(16*(i+1))-1-:16];
-                    operand_sliced_signed = second_operand_signed[(16*(i+1))-1-:16];
+                    automatic logic [15:0] operand_sliced;
+                    operand_sliced = second_operand[(16*(i+1))-1-:16];
 
-                    result_sll[(16*(i+1))-1-:16] = first_operand[(16*(i+1))-1-:16]         <<  operand_sliced[3:0];
-                    result_srl[(16*(i+1))-1-:16] = first_operand[(16*(i+1))-1-:16]         >>  operand_sliced[3:0];
-                    result_sra[(16*(i+1))-1-:16] = first_operand_signed[(16*(i+1))-1-:16]  >>> operand_sliced_signed[3:0];
+                    result_sll[(16*(i+1))-1-:16] =         first_operand[(16*(i+1))-1-:16]  <<  operand_sliced[3:0];
+                    result_srl[(16*(i+1))-1-:16] =         first_operand[(16*(i+1))-1-:16]  >>  operand_sliced[3:0];
+                    result_sra[(16*(i+1))-1-:16] = $signed(first_operand[(16*(i+1))-1-:16]) >>> operand_sliced[3:0];
                 end
             default:
                 for (int i = 0; i < VLENB/4; i++) begin
-                    automatic logic [31:0] operand_sliced, operand_sliced_signed;
-                    operand_sliced        = second_operand[(32*(i+1))-1-:32];
-                    operand_sliced_signed = second_operand_signed[(32*(i+1))-1-:32];
+                    automatic logic [31:0] operand_sliced;
+                    operand_sliced = second_operand[(32*(i+1))-1-:32];
 
-                    result_sll[(32*(i+1))-1-:32] = first_operand[(32*(i+1))-1-:32]         <<  operand_sliced[4:0];
-                    result_srl[(32*(i+1))-1-:32] = first_operand[(32*(i+1))-1-:32]         >>  operand_sliced[4:0];
-                    result_sra[(32*(i+1))-1-:32] = first_operand_signed[(32*(i+1))-1-:32]  >>> operand_sliced_signed[4:0];
+                    result_sll[(32*(i+1))-1-:32] =         first_operand[(32*(i+1))-1-:32]  <<  operand_sliced[4:0];
+                    result_srl[(32*(i+1))-1-:32] =         first_operand[(32*(i+1))-1-:32]  >>  operand_sliced[4:0];
+                    result_sra[(32*(i+1))-1-:32] = $signed(first_operand[(32*(i+1))-1-:32]) >>> operand_sliced[4:0];
                 end
         endcase
     end
@@ -196,21 +187,21 @@ module vectorALU
 
     always_comb begin
         for (int i = 0; i < VLENB; i++) begin
-            equal_8b[i]                = first_operand[(8*(i+1))-1-:8] == second_operand[(8*(i+1))-1-:8];
-            greater_than_8b[i]         = first_operand[(8*(i+1))-1-:8] >  second_operand[(8*(i+1))-1-:8];
-            greater_than_signed_8b[i]  = first_operand_signed[(8*(i+1))-1-:8] > second_operand_signed[(8*(i+1))-1-:8];
+            equal_8b[i]                =         first_operand[(8*(i+1))-1-:8]  ==         second_operand[(8*(i+1))-1-:8];
+            greater_than_8b[i]         =         first_operand[(8*(i+1))-1-:8]  >          second_operand[(8*(i+1))-1-:8];
+            greater_than_signed_8b[i]  = $signed(first_operand[(8*(i+1))-1-:8]) >  $signed(second_operand[(8*(i+1))-1-:8]);
         end
 
         for (int i = 0; i < VLENB/2; i++) begin
-            equal_16b[i]               = first_operand[(16*(i+1))-1-:16] == second_operand[(16*(i+1))-1-:16];
-            greater_than_16b[i]        = first_operand[(16*(i+1))-1-:16] >  second_operand[(16*(i+1))-1-:16];
-            greater_than_signed_16b[i] = first_operand_signed[(16*(i+1))-1-:16] > second_operand_signed[(16*(i+1))-1-:16];
+            equal_16b[i]               =         first_operand[(16*(i+1))-1-:16]  ==         second_operand[(16*(i+1))-1-:16];
+            greater_than_16b[i]        =         first_operand[(16*(i+1))-1-:16]  >          second_operand[(16*(i+1))-1-:16];
+            greater_than_signed_16b[i] = $signed(first_operand[(16*(i+1))-1-:16]) >  $signed(second_operand[(16*(i+1))-1-:16]);
         end
 
         for (int i = 0; i < VLENB/4; i++) begin
-            equal_32b[i]               = first_operand[(32*(i+1))-1-:32] == second_operand[(32*(i+1))-1-:32];
-            greater_than_32b[i]        = first_operand[(32*(i+1))-1-:32] >  second_operand[(32*(i+1))-1-:32];
-            greater_than_signed_32b[i] = first_operand_signed[(32*(i+1))-1-:32] > second_operand_signed[(32*(i+1))-1-:32];
+            equal_32b[i]               =         first_operand[(32*(i+1))-1-:32]  ==         second_operand[(32*(i+1))-1-:32];
+            greater_than_32b[i]        =         first_operand[(32*(i+1))-1-:32]  >          second_operand[(32*(i+1))-1-:32];
+            greater_than_signed_32b[i] = $signed(first_operand[(32*(i+1))-1-:32]) >  $signed(second_operand[(32*(i+1))-1-:32]);
         end
     end
 
@@ -302,7 +293,6 @@ module vectorALU
                         end
                     end
         endcase
-        
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -314,9 +304,9 @@ module vectorALU
 
     always_comb begin
         unique case (vector_operation_i)
-            VMULH:    mult_signed_mode = 2'b11;
-            VMULHSU:  mult_signed_mode = 2'b01;
-            default:  mult_signed_mode = 2'b00;
+            VMULH,   VWMUL:   mult_signed_mode = 2'b11;
+            VMULHSU, VWMULSU: mult_signed_mode = 2'b01;
+            default:          mult_signed_mode = 2'b00;
         endcase
     end
 
@@ -330,8 +320,8 @@ module vectorALU
 
     always_comb begin
         for (int i = 0; i < VLENB; i++) begin
-            //mult_op_a_8b[i] = (vector_operation_i inside {VMADD, VNMSUB}) 
-            //                ? third_operand [(8*(i+1))-1-:8] 
+            //mult_op_a_8b[i] = (vector_operation_i inside {VMADD, VNMSUB})
+            //                ? third_operand [(8*(i+1))-1-:8]
             //                : first_operand [(8*(i+1))-1-:8];
             mult_op_a_8b[i] = first_operand [(8*(i+1))-1-:8];
             mult_op_b_8b[i] = second_operand[(8*(i+1))-1-:8];
@@ -407,7 +397,7 @@ module vectorALU
 
     assign mult_enable = (
                             (vector_operation_i inside {VMUL, VMULH, VMULHSU, VMULHU, VMACC, VNMSAC, VMADD, VNMSUB})
-                        &&  (current_state == V_EXEC) 
+                        &&  (current_state == V_EXEC)
                         &&  (vsew==EW32)
                         );
     assign mult_low    = (vector_operation_i inside {VMUL, VMACC, VNMSAC, VMADD, VNMSUB});
@@ -648,11 +638,10 @@ module vectorALU
             VSLL:            result_o <= result_sll;
             VSRL:            result_o <= result_srl;
             VSRA:            result_o <= result_sra;
-            /*
             VMSEQ,  VMSNE,
             VMSLTU, VMSLT,
             VMSLEU, VMSLE,
-            VMSGTU, VMSGT:   result_o <= result_comparison;*/
+            VMSGTU, VMSGT:   result_o <= result_comparison;
             VMIN:            result_o <= result_min;
             VMINU:           result_o <= result_minu;
             VMAX:            result_o <= result_max;
