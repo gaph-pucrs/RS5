@@ -28,10 +28,27 @@ module vectorCSRs
     logic        vill, vill_next, vma, vma_next, vta, vta_next;
     vew_e        vsew_next;
     vlmul_e      vlmul_next;
+    logic        cfg_error, cfg_error_r;
 
 //////////////////////////////////////////////////////////////////////////////
 // Combinational
 //////////////////////////////////////////////////////////////////////////////
+
+
+    always_comb begin
+        case (vlmul_next)
+            LMUL_1_8:   cfg_error = (vsew_next inside {EW16, EW32, EW64}) 
+                                    ? 1'b1
+                                    : 1'b0;
+            LMUL_1_4:   cfg_error = (vsew_next inside {EW32, EW64}) 
+                                    ? 1'b1
+                                    : 1'b0;
+            LMUL_1_2:   cfg_error = (vsew_next == EW64)
+                                    ? 1'b1
+                                    : 1'b0;
+            default:    cfg_error   = 1'b0;
+        endcase
+    end
 
     always_comb begin
         if (vector_operation_i == VSETVL) begin
@@ -74,22 +91,26 @@ module vectorCSRs
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
-            vill  <= 1'b0;
-            vma   <= 1'b0;
-            vta   <= 1'b0;
-            vsew  <= EW8;
-            vlmul <= LMUL_1;
-            vl    <= '0;
+            cfg_error_r <= 1'b0;
+            vill        <= 1'b0;
+            vma         <= 1'b0;
+            vta         <= 1'b0;
+            vsew        <= EW8;
+            vlmul       <= LMUL_1;
+            vl          <= '0;
         end
         else if (vector_operation_i inside {VSETVL, VSETVLI, VSETIVLI}) begin
-            vill  <= vill_next;
-            vma   <= vma_next;
-            vta   <= vta_next;
-            vsew  <= vsew_next;
-            vlmul <= vlmul_next;
-            vl    <= vl_next;
+            cfg_error_r <= cfg_error;
+            vill        <= vill_next | cfg_error;
+            vma         <= vma_next;
+            vta         <= vta_next;
+            vsew        <= vsew_next;
+            vlmul       <= vlmul_next;
+            vl          <=  (cfg_error)
+                            ? '0
+                            : vl_next;
 
-            $display("[%0t] Set VSEW = %s, VLMUL = %s, VL = %d\n", $time, vsew_next, vlmul_next, vl_next);
+            //$display("[%0t] Set VSEW = %s, VLMUL = %s, VL = %d\n", $time, vsew_next, vlmul_next, vl_next);
         end
     end
 
@@ -97,7 +118,9 @@ module vectorCSRs
 // CSRs
 //////////////////////////////////////////////////////////////////////////////
 
-    assign vtype_o  = {vill, 23'b0, vma, vta, vsew, vlmul};
     assign vlen_o   = {'0, vl};
+    assign vtype_o  = (cfg_error_r)
+                    ? {1'b1, 31'b0}
+                    : {vill, 23'b0, vma, vta, vsew, vlmul};
 
 endmodule
