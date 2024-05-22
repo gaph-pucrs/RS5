@@ -217,7 +217,7 @@ module vectorLSU
                         2'b11:      elementsProcessed = 3;
                         2'b10:      elementsProcessed = 2;
                         2'b01:      elementsProcessed = 1;
-                        default:    elementsProcessed = 0;
+                        default:    elementsProcessed = 4;
                     endcase
                 end
                 else begin
@@ -234,7 +234,7 @@ module vectorLSU
                 else if(state == VLSU_LAST_CYCLE) begin
                     unique case(base_address_i[1])
                         1'b1:       elementsProcessed = 1;
-                        default:    elementsProcessed = 0;
+                        default:    elementsProcessed = 2;
                     endcase
                 end
                 else begin
@@ -283,7 +283,7 @@ module vectorLSU
                         2'b11:   mem_write_enable = 4'b0111;
                         2'b10:   mem_write_enable = 4'b0011;
                         2'b01:   mem_write_enable = 4'b0001;
-                        default: mem_write_enable = 4'b0000;
+                        default: mem_write_enable = 4'b1111;
                     endcase
                 end
                 else begin
@@ -302,7 +302,7 @@ module vectorLSU
                     shift_amount = 0;
                     unique case(base_address_i[1])
                         1'b1:       mem_write_enable = 4'b0011;
-                        default:    mem_write_enable = 4'b0000;
+                        default:    mem_write_enable = 4'b1111;
                     endcase
                 end
                 else begin
@@ -312,7 +312,7 @@ module vectorLSU
             end
             else begin
                 shift_amount = 0;
-                if(state inside {VLSU_IDLE, VLSU_LAST_CYCLE}) begin
+                if(state inside {VLSU_IDLE}) begin
                     mem_write_enable = 4'b0000;
                 end
                 else begin
