@@ -44,7 +44,8 @@ module vectorUnit
 
     vew_e   vsew, vsew_effective;
     vlmul_e vlmul, vlmul_effective;
-    logic[$bits(VLEN)-1:0] vl, vl_next;
+    logic[$bits(VLEN)-1:0]  vl, vl_curr_reg, vl_next;
+    logic[$bits(VLENB)-1:0] elementsPerRegister;
 
     vector_states_e  state, next_state;
 
@@ -78,6 +79,8 @@ module vectorUnit
     assign accumulate_instruction = (vector_operation_i inside {VMACC, VNMSAC, VMADD, VNMSUB});
     assign reduction_instruction  = (vector_operation_i inside {VREDSUM, VREDMAXU, VREDMAX, VREDMINU, VREDMIN, VREDAND, VREDOR, VREDXOR});
     assign widening = (vector_operation_i inside {VWMUL, VWMULU, VWMULSU});
+
+    assign elementsPerRegister = VLENB >> vsew;
 
 //////////////////////////////////////////////////////////////////////////////
 // CSRs
@@ -198,6 +201,19 @@ module vectorUnit
             cycle_count_vd <= cycle_count_vd + 1;
     end
 
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            vl_curr_reg <= '0;
+        else if (next_state == V_IDLE)
+            vl_curr_reg <= 0;
+        else if (state == V_IDLE && next_state == V_EXEC)
+            vl_curr_reg <= vl;
+        else if (next_state == V_EXEC && (hold == 1'b0))
+            vl_curr_reg <= $signed(vl_curr_reg - elementsPerRegister) >= 0
+                            ? vl_curr_reg - elementsPerRegister
+                            : 0;
+    end
+
 //////////////////////////////////////////////////////////////////////////////
 // Register Bank
 //////////////////////////////////////////////////////////////////////////////
@@ -217,25 +233,44 @@ module vectorUnit
 
     // WRITE ENABLE GENERATION
     always_ff @(posedge clk) begin
-        if ((state == V_EXEC) && (vl > 0) && (!hold || hold_widening) && instruction_operation_i != VSTORE) begin
+        if ((state == V_EXEC) && (vl_curr_reg > 0) && (!hold || hold_widening) && instruction_operation_i != VSTORE) begin
             unique case (vsew_effective)
                 EW8: begin
                     for (int i = 0; i < VLENB; i++) begin
-                        write_enable[i] <= (i < vl) ? 1'b1 : 1'b0;
+                        if (reduction_instruction) begin
+                            write_enable[i] <= (i == 0) ? 1'b1 : 1'b0;
+                        end
+                        else begin
+                            write_enable[i] <= (i < vl_curr_reg) ? 1'b1 : 1'b0;
+                        end
                     end
                 end
                 EW16: begin
                     for (int i = 0; i < VLENB/2; i++) begin
-                        write_enable[(i*2)]   <= (i < vl) ? 1'b1 : 1'b0;
-                        write_enable[(i*2)+1] <= (i < vl) ? 1'b1 : 1'b0;
+                        if (reduction_instruction) begin
+                            write_enable[(i*2)]   <= (i == 0) ? 1'b1 : 1'b0;
+                            write_enable[(i*2)+1] <= (i == 0) ? 1'b1 : 1'b0;
+                        end
+                        else begin
+                            write_enable[(i*2)]   <= (i < vl_curr_reg) ? 1'b1 : 1'b0;
+                            write_enable[(i*2)+1] <= (i < vl_curr_reg) ? 1'b1 : 1'b0;
+                        end
                     end
                 end
                 default: begin
                     for (int i = 0; i < VLENB/4; i++) begin
-                        write_enable[(i*4)]   <= (i < vl) ? 1'b1 : 1'b0;
-                        write_enable[(i*4)+1] <= (i < vl) ? 1'b1 : 1'b0;
-                        write_enable[(i*4)+2] <= (i < vl) ? 1'b1 : 1'b0;
-                        write_enable[(i*4)+3] <= (i < vl) ? 1'b1 : 1'b0;
+                        if (reduction_instruction) begin
+                            write_enable[(i*4)]   <= (i == 0) ? 1'b1 : 1'b0;
+                            write_enable[(i*4)+1] <= (i == 0) ? 1'b1 : 1'b0;
+                            write_enable[(i*4)+2] <= (i == 0) ? 1'b1 : 1'b0;
+                            write_enable[(i*4)+3] <= (i == 0) ? 1'b1 : 1'b0;
+                        end
+                        else begin
+                            write_enable[(i*4)]   <= (i < vl_curr_reg) ? 1'b1 : 1'b0;
+                            write_enable[(i*4)+1] <= (i < vl_curr_reg) ? 1'b1 : 1'b0;
+                            write_enable[(i*4)+2] <= (i < vl_curr_reg) ? 1'b1 : 1'b0;
+                            write_enable[(i*4)+3] <= (i < vl_curr_reg) ? 1'b1 : 1'b0;
+                        end
                     end
                 end
             endcase
@@ -361,6 +396,8 @@ module vectorUnit
         .third_operand      (third_operand),
         .vector_operation_i (vector_operation_i),
         .cycle_count        (cycle_count),
+        .vlmul              (vlmul),
+        .vl                 (vl),
         .current_state      (state),
         .vsew               (vsew),
         .widening_i         (widening),
