@@ -48,7 +48,7 @@ module vectorRegbank
         end
     end
 */
-    for (genvar j = 1; j < 32 ; j++) begin : gen_vectorRegfile
+    for (genvar j = 0; j < 32 ; j++) begin : gen_vectorRegfile
         always_ff @(posedge clk  or negedge reset_n) begin
             if (!reset_n) begin
                 regfile[j] <= '0;
@@ -62,7 +62,5 @@ module vectorRegbank
             end
         end
     end
-
-    assign regfile[0] = '0;
 
 endmodule

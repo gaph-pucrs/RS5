@@ -34,13 +34,12 @@ module vectorCSRs
 // Combinational
 //////////////////////////////////////////////////////////////////////////////
 
-
     always_comb begin
         case (vlmul_next)
-            LMUL_1_8:   cfg_error = (vsew_next inside {EW16, EW32, EW64}) 
+            LMUL_1_8:   cfg_error = (vsew_next inside {EW16, EW32, EW64})
                                     ? 1'b1
                                     : 1'b0;
-            LMUL_1_4:   cfg_error = (vsew_next inside {EW32, EW64}) 
+            LMUL_1_4:   cfg_error = (vsew_next inside {EW32, EW64})
                                     ? 1'b1
                                     : 1'b0;
             LMUL_1_2:   cfg_error = (vsew_next == EW64)
