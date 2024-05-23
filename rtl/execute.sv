@@ -389,13 +389,16 @@ end
     logic        hold_vector;
 
     if (VEnable) begin : v_gen_on
+        iType_e vector_inst;
+
+        assign vector_inst = (killed) ? NOP : instruction_operation_i;
         vectorUnit #(
             .VLEN  (VLEN)
         ) vector (
             .clk                    (clk),
             .reset_n                (reset_n),
             .instruction_i          (instruction_i),
-            .instruction_operation_i(instruction_operation_i),
+            .instruction_operation_i(vector_inst),
             .vector_operation_i     (vector_operation_i),
             .op1_scalar_i           (first_operand_i),
             .op2_scalar_i           (second_operand_i),
