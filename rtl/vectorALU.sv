@@ -12,9 +12,14 @@ module vectorALU
     input  logic [VLEN-1:0]       third_operand,
     input  vector_states_e        current_state,
     input  logic [4:0]            cycle_count,
+    input  logic [4:0]            cycle_count_r,
     input  vlmul_e                vlmul,
     input  logic                  widening_i,
     input  logic[$bits(VLEN)-1:0] vl,
+    input  logic                  vm,
+    input  logic [ VLENB   -1:0]  mask_sew8 [8],
+    input  logic [(VLENB/2)-1:0]  mask_sew16[8],
+    input  logic [(VLENB/4)-1:0]  mask_sew32[8],
 
     input  iTypeVector_e          vector_operation_i,
     input  vew_e                  vsew,
@@ -76,48 +81,68 @@ module vectorALU
     always_comb begin
         for (int i = 0; i < VLENB; i++) begin
             if (i == 0) begin
-                result_redand_8b[(8*(i+1))-1-:8] = first_operand[7:0] & second_operand[7:0];
-                result_redor_8b [(8*(i+1))-1-:8] = first_operand[7:0] | second_operand[7:0];
-                result_redxor_8b[(8*(i+1))-1-:8] = first_operand[7:0] ^ second_operand[7:0];
-                result_redsum_8b[(8*(i+1))-1-:8] = first_operand[7:0] + second_operand[7:0];
+                if (vm || mask_sew8[cycle_count_r][0]) begin
+                    result_redand_8b[(8*(i+1))-1-:8] = first_operand[7:0] & second_operand[7:0];
+                    result_redor_8b [(8*(i+1))-1-:8] = first_operand[7:0] | second_operand[7:0];
+                    result_redxor_8b[(8*(i+1))-1-:8] = first_operand[7:0] ^ second_operand[7:0];
+                    result_redsum_8b[(8*(i+1))-1-:8] = first_operand[7:0] + second_operand[7:0];
 
-                result_redmin_8b[(8*(i+1))-1-:8]  = ($signed(first_operand[7:0]) > $signed(second_operand[7:0])) 
-                                                    ? second_operand[7:0]
-                                                    : first_operand [7:0];
+                    result_redmin_8b [(8*(i+1))-1-:8] = ($signed(first_operand[7:0]) > $signed(second_operand[7:0]))
+                                                        ? second_operand[7:0]
+                                                        : first_operand [7:0];
+                    result_redminu_8b[(8*(i+1))-1-:8] = (first_operand[7:0] > second_operand[7:0])
+                                                        ? second_operand[7:0]
+                                                        : first_operand [7:0];
+                    result_redmax_8b [(8*(i+1))-1-:8] = ($signed(first_operand[7:0]) > $signed(second_operand[7:0]))
+                                                        ? first_operand [7:0]
+                                                        : second_operand[7:0];
+                    result_redmaxu_8b[(8*(i+1))-1-:8] = (first_operand[7:0] > second_operand[7:0])
+                                                        ? first_operand [7:0]
+                                                        : second_operand[7:0];
+                end
+                else begin
+                    result_redand_8b[(8*(i+1))-1-:8] = second_operand[7:0];
+                    result_redor_8b [(8*(i+1))-1-:8] = second_operand[7:0];
+                    result_redxor_8b[(8*(i+1))-1-:8] = second_operand[7:0];
+                    result_redsum_8b[(8*(i+1))-1-:8] = second_operand[7:0];
 
-                result_redminu_8b[(8*(i+1))-1-:8] = (first_operand[7:0] > second_operand[7:0]) 
-                                                    ? second_operand[7:0]
-                                                    : first_operand [7:0];
-
-                result_redmax_8b[(8*(i+1))-1-:8]  = ($signed(first_operand[7:0]) > $signed(second_operand[7:0]))
-                                                    ? first_operand [7:0]
-                                                    : second_operand[7:0];
-
-                result_redmaxu_8b[(8*(i+1))-1-:8] = (first_operand[7:0] > second_operand[7:0]) 
-                                                    ? first_operand [7:0]
-                                                    : second_operand[7:0];
+                    result_redmin_8b [(8*(i+1))-1-:8] = second_operand[7:0];
+                    result_redminu_8b[(8*(i+1))-1-:8] = second_operand[7:0];
+                    result_redmax_8b [(8*(i+1))-1-:8] = second_operand[7:0];
+                    result_redmaxu_8b[(8*(i+1))-1-:8] = second_operand[7:0];
+                end
             end
             else begin
-                result_redand_8b[(8*(i+1))-1-:8] = first_operand[(8*(i+1))-1-:8] & result_redand_8b[(8*i)-1-:8];
-                result_redor_8b [(8*(i+1))-1-:8] = first_operand[(8*(i+1))-1-:8] | result_redor_8b [(8*i)-1-:8];
-                result_redxor_8b[(8*(i+1))-1-:8] = first_operand[(8*(i+1))-1-:8] ^ result_redxor_8b[(8*i)-1-:8];
-                result_redsum_8b[(8*(i+1))-1-:8] = first_operand[(8*(i+1))-1-:8] + result_redsum_8b[(8*i)-1-:8];
+                if (vm || mask_sew8[cycle_count_r][i]) begin
+                    result_redand_8b[(8*(i+1))-1-:8] = first_operand[(8*(i+1))-1-:8] & result_redand_8b[(8*i)-1-:8];
+                    result_redor_8b [(8*(i+1))-1-:8] = first_operand[(8*(i+1))-1-:8] | result_redor_8b [(8*i)-1-:8];
+                    result_redxor_8b[(8*(i+1))-1-:8] = first_operand[(8*(i+1))-1-:8] ^ result_redxor_8b[(8*i)-1-:8];
+                    result_redsum_8b[(8*(i+1))-1-:8] = first_operand[(8*(i+1))-1-:8] + result_redsum_8b[(8*i)-1-:8];
 
-                result_redmin_8b[(8*(i+1))-1-:8]  = ($signed(first_operand[(8*(i+1))-1-:8]) > $signed(result_redmin_8b[(8*i)-1-:8]))
-                                                    ? result_redmin_8b[(8*i)-1-:8]
-                                                    : first_operand[(8*(i+1))-1-:8];
+                    result_redmin_8b [(8*(i+1))-1-:8] = ($signed(first_operand[(8*(i+1))-1-:8]) > $signed(result_redmin_8b[(8*i)-1-:8]))
+                                                        ? result_redmin_8b[(8*i)-1-:8]
+                                                        : first_operand[(8*(i+1))-1-:8];
+                    result_redminu_8b[(8*(i+1))-1-:8] = (first_operand[(8*(i+1))-1-:8] > result_redminu_8b[(8*i)-1-:8])
+                                                        ? result_redminu_8b[(8*i)-1-:8]
+                                                        : first_operand[(8*(i+1))-1-:8];
+                    result_redmax_8b [(8*(i+1))-1-:8] = ($signed(first_operand[(8*(i+1))-1-:8]) > $signed(result_redmax_8b[(8*i)-1-:8]))
+                                                        ? first_operand[(8*(i+1))-1-:8]
+                                                        : result_redmax_8b[(8*i)-1-:8];
+                    result_redmaxu_8b[(8*(i+1))-1-:8] = (first_operand[(8*(i+1))-1-:8] > result_redmaxu_8b[(8*i)-1-:8])
+                                                        ? first_operand[(8*(i+1))-1-:8]
+                                                        : result_redmaxu_8b[(8*i)-1-:8];
+                end
+                else begin
+                    result_redand_8b[(8*(i+1))-1-:8] = result_redand_8b[(8*i)-1-:8];
+                    result_redor_8b [(8*(i+1))-1-:8] = result_redor_8b [(8*i)-1-:8];
+                    result_redxor_8b[(8*(i+1))-1-:8] = result_redxor_8b[(8*i)-1-:8];
+                    result_redsum_8b[(8*(i+1))-1-:8] = result_redsum_8b[(8*i)-1-:8];
 
-                result_redminu_8b[(8*(i+1))-1-:8] = (first_operand[(8*(i+1))-1-:8] > result_redminu_8b[(8*i)-1-:8]) 
-                                                    ? result_redminu_8b[(8*i)-1-:8]
-                                                    : first_operand[(8*(i+1))-1-:8];
-
-                result_redmax_8b[(8*(i+1))-1-:8]  = ($signed(first_operand[(8*(i+1))-1-:8]) > $signed(result_redmax_8b[(8*i)-1-:8]))
-                                                    ? first_operand[(8*(i+1))-1-:8]
-                                                    : result_redmax_8b[(8*i)-1-:8];
-
-                result_redmaxu_8b[(8*(i+1))-1-:8] = (first_operand[(8*(i+1))-1-:8] > result_redmaxu_8b[(8*i)-1-:8]) 
-                                                    ? first_operand[(8*(i+1))-1-:8]
-                                                    : result_redmaxu_8b[(8*i)-1-:8];
+                    result_redmin_8b [(8*(i+1))-1-:8] = result_redmin_8b [(8*i)-1-:8];
+                    result_redminu_8b[(8*(i+1))-1-:8] = result_redminu_8b[(8*i)-1-:8];
+                    result_redmax_8b [(8*(i+1))-1-:8] = result_redmax_8b [(8*i)-1-:8];
+                    result_redmaxu_8b[(8*(i+1))-1-:8] = result_redmaxu_8b[(8*i)-1-:8];
+                end
             end
         end
     end
@@ -125,48 +150,68 @@ module vectorALU
     always_comb begin
         for (int i = 0; i < VLENB/2; i++) begin
             if (i == 0) begin
-                result_redand_16b[(16*(i+1))-1-:16] = first_operand[15:0] & second_operand[15:0];
-                result_redor_16b [(16*(i+1))-1-:16] = first_operand[15:0] | second_operand[15:0];
-                result_redxor_16b[(16*(i+1))-1-:16] = first_operand[15:0] ^ second_operand[15:0];
-                result_redsum_16b[(16*(i+1))-1-:16] = first_operand[15:0] + second_operand[15:0];
+                if (vm || mask_sew16[cycle_count_r][0]) begin
+                    result_redand_16b[(16*(i+1))-1-:16] = first_operand[15:0] & second_operand[15:0];
+                    result_redor_16b [(16*(i+1))-1-:16] = first_operand[15:0] | second_operand[15:0];
+                    result_redxor_16b[(16*(i+1))-1-:16] = first_operand[15:0] ^ second_operand[15:0];
+                    result_redsum_16b[(16*(i+1))-1-:16] = first_operand[15:0] + second_operand[15:0];
 
-                result_redmin_16b[(16*(i+1))-1-:16]  = ($signed(first_operand[15:0]) > $signed(second_operand[15:0])) 
-                                                    ? second_operand[15:0]
-                                                    : first_operand [15:0];
+                    result_redmin_16b [(16*(i+1))-1-:16] = ($signed(first_operand[15:0]) > $signed(second_operand[15:0]))
+                                                        ? second_operand[15:0]
+                                                        : first_operand [15:0];
+                    result_redminu_16b[(16*(i+1))-1-:16] = (first_operand[15:0] > second_operand[15:0])
+                                                        ? second_operand[15:0]
+                                                        : first_operand [15:0];
+                    result_redmax_16b [(16*(i+1))-1-:16] = ($signed(first_operand[15:0]) > $signed(second_operand[15:0]))
+                                                        ? first_operand [15:0]
+                                                        : second_operand[15:0];
+                    result_redmaxu_16b[(16*(i+1))-1-:16] = (first_operand[15:0] > second_operand[15:0])
+                                                        ? first_operand [15:0]
+                                                        : second_operand[15:0];
+                end
+                else begin
+                    result_redand_16b[(16*(i+1))-1-:16] = second_operand[15:0];
+                    result_redor_16b [(16*(i+1))-1-:16] = second_operand[15:0];
+                    result_redxor_16b[(16*(i+1))-1-:16] = second_operand[15:0];
+                    result_redsum_16b[(16*(i+1))-1-:16] = second_operand[15:0];
 
-                result_redminu_16b[(16*(i+1))-1-:16] = (first_operand[15:0] > second_operand[15:0]) 
-                                                    ? second_operand[15:0]
-                                                    : first_operand [15:0];
-
-                result_redmax_16b[(16*(i+1))-1-:16]  = ($signed(first_operand[15:0]) > $signed(second_operand[15:0]))
-                                                    ? first_operand [15:0]
-                                                    : second_operand[15:0];
-
-                result_redmaxu_16b[(16*(i+1))-1-:16] = (first_operand[15:0] > second_operand[15:0]) 
-                                                    ? first_operand [15:0]
-                                                    : second_operand[15:0];
+                    result_redmin_16b [(16*(i+1))-1-:16] = second_operand[15:0];
+                    result_redminu_16b[(16*(i+1))-1-:16] = second_operand[15:0];
+                    result_redmax_16b [(16*(i+1))-1-:16] = second_operand[15:0];
+                    result_redmaxu_16b[(16*(i+1))-1-:16] = second_operand[15:0];
+                end
             end
             else begin
-                result_redand_16b[(16*(i+1))-1-:16] = first_operand[(16*(i+1))-1-:16] & result_redand_16b[(16*i)-1-:16];
-                result_redor_16b [(16*(i+1))-1-:16] = first_operand[(16*(i+1))-1-:16] | result_redor_16b [(16*i)-1-:16];
-                result_redxor_16b[(16*(i+1))-1-:16] = first_operand[(16*(i+1))-1-:16] ^ result_redxor_16b[(16*i)-1-:16];
-                result_redsum_16b[(16*(i+1))-1-:16] = first_operand[(16*(i+1))-1-:16] + result_redsum_16b[(16*i)-1-:16];
+                if (vm || mask_sew16[cycle_count_r][i]) begin
+                    result_redand_16b[(16*(i+1))-1-:16] = first_operand[(16*(i+1))-1-:16] & result_redand_16b[(16*i)-1-:16];
+                    result_redor_16b [(16*(i+1))-1-:16] = first_operand[(16*(i+1))-1-:16] | result_redor_16b [(16*i)-1-:16];
+                    result_redxor_16b[(16*(i+1))-1-:16] = first_operand[(16*(i+1))-1-:16] ^ result_redxor_16b[(16*i)-1-:16];
+                    result_redsum_16b[(16*(i+1))-1-:16] = first_operand[(16*(i+1))-1-:16] + result_redsum_16b[(16*i)-1-:16];
 
-                result_redmin_16b[(16*(i+1))-1-:16]  = ($signed(first_operand[(16*(i+1))-1-:16]) > $signed(result_redmin_16b[(16*i)-1-:16]))
-                                                    ? result_redmin_16b[(16*i)-1-:16]
-                                                    : first_operand[(16*(i+1))-1-:16];
+                    result_redmin_16b [(16*(i+1))-1-:16] = ($signed(first_operand[(16*(i+1))-1-:16]) > $signed(result_redmin_16b[(16*i)-1-:16]))
+                                                        ? result_redmin_16b[(16*i)-1-:16]
+                                                        : first_operand[(16*(i+1))-1-:16];
+                    result_redminu_16b[(16*(i+1))-1-:16] = (first_operand[(16*(i+1))-1-:16] > result_redminu_16b[(16*i)-1-:16])
+                                                        ? result_redminu_16b[(16*i)-1-:16]
+                                                        : first_operand[(16*(i+1))-1-:16];
+                    result_redmax_16b [(16*(i+1))-1-:16] = ($signed(first_operand[(16*(i+1))-1-:16]) > $signed(result_redmax_16b[(16*i)-1-:16]))
+                                                        ? first_operand[(16*(i+1))-1-:16]
+                                                        : result_redmax_16b[(16*i)-1-:16];
+                    result_redmaxu_16b[(16*(i+1))-1-:16] = (first_operand[(16*(i+1))-1-:16] > result_redmaxu_16b[(16*i)-1-:16])
+                                                        ? first_operand[(16*(i+1))-1-:16]
+                                                        : result_redmaxu_16b[(16*i)-1-:16];
+                end
+                else begin
+                    result_redand_16b[(16*(i+1))-1-:16] = result_redand_16b[(16*i)-1-:16];
+                    result_redor_16b [(16*(i+1))-1-:16] = result_redor_16b [(16*i)-1-:16];
+                    result_redxor_16b[(16*(i+1))-1-:16] = result_redxor_16b[(16*i)-1-:16];
+                    result_redsum_16b[(16*(i+1))-1-:16] = result_redsum_16b[(16*i)-1-:16];
 
-                result_redminu_16b[(16*(i+1))-1-:16] = (first_operand[(16*(i+1))-1-:16] > result_redminu_16b[(16*i)-1-:16]) 
-                                                    ? result_redminu_16b[(16*i)-1-:16]
-                                                    : first_operand[(16*(i+1))-1-:16];
-
-                result_redmax_16b[(16*(i+1))-1-:16]  = ($signed(first_operand[(16*(i+1))-1-:16]) > $signed(result_redmax_16b[(16*i)-1-:16]))
-                                                    ? first_operand[(16*(i+1))-1-:16]
-                                                    : result_redmax_16b[(16*i)-1-:16];
-
-                result_redmaxu_16b[(16*(i+1))-1-:16] = (first_operand[(16*(i+1))-1-:16] > result_redmaxu_16b[(16*i)-1-:16]) 
-                                                    ? first_operand[(16*(i+1))-1-:16]
-                                                    : result_redmaxu_16b[(16*i)-1-:16];
+                    result_redmin_16b [(16*(i+1))-1-:16] = result_redmin_16b [(16*i)-1-:16];
+                    result_redminu_16b[(16*(i+1))-1-:16] = result_redminu_16b[(16*i)-1-:16];
+                    result_redmax_16b [(16*(i+1))-1-:16] = result_redmax_16b [(16*i)-1-:16];
+                    result_redmaxu_16b[(16*(i+1))-1-:16] = result_redmaxu_16b[(16*i)-1-:16];
+                end
             end
         end
     end
@@ -174,48 +219,68 @@ module vectorALU
     always_comb begin
         for (int i = 0; i < VLENB/4; i++) begin
             if (i == 0) begin
-                result_redand_32b[(32*(i+1))-1-:32] = first_operand[31:0] & second_operand[31:0];
-                result_redor_32b [(32*(i+1))-1-:32] = first_operand[31:0] | second_operand[31:0];
-                result_redxor_32b[(32*(i+1))-1-:32] = first_operand[31:0] ^ second_operand[31:0];
-                result_redsum_32b[(32*(i+1))-1-:32] = first_operand[31:0] + second_operand[31:0];
+                if (vm || mask_sew32[cycle_count_r][i]) begin
+                    result_redand_32b[(32*(i+1))-1-:32] = first_operand[31:0] & second_operand[31:0];
+                    result_redor_32b [(32*(i+1))-1-:32] = first_operand[31:0] | second_operand[31:0];
+                    result_redxor_32b[(32*(i+1))-1-:32] = first_operand[31:0] ^ second_operand[31:0];
+                    result_redsum_32b[(32*(i+1))-1-:32] = first_operand[31:0] + second_operand[31:0];
 
-                result_redmin_32b[(32*(i+1))-1-:32]  = ($signed(first_operand[31:0]) > $signed(second_operand[31:0])) 
-                                                    ? second_operand[31:0]
-                                                    : first_operand [31:0];
+                    result_redmin_32b [(32*(i+1))-1-:32] = ($signed(first_operand[31:0]) > $signed(second_operand[31:0]))
+                                                        ? second_operand[31:0]
+                                                        : first_operand [31:0];
+                    result_redminu_32b[(32*(i+1))-1-:32] = (first_operand[31:0] > second_operand[31:0])
+                                                        ? second_operand[31:0]
+                                                        : first_operand [31:0];
+                    result_redmax_32b [(32*(i+1))-1-:32] = ($signed(first_operand[31:0]) > $signed(second_operand[31:0]))
+                                                        ? first_operand [31:0]
+                                                        : second_operand[31:0];
+                    result_redmaxu_32b[(32*(i+1))-1-:32] = (first_operand[31:0] > second_operand[31:0])
+                                                        ? first_operand [31:0]
+                                                        : second_operand[31:0];
+                end
+                else begin
+                    result_redand_32b[(32*(i+1))-1-:32] = second_operand[31:0];
+                    result_redor_32b [(32*(i+1))-1-:32] = second_operand[31:0];
+                    result_redxor_32b[(32*(i+1))-1-:32] = second_operand[31:0];
+                    result_redsum_32b[(32*(i+1))-1-:32] = second_operand[31:0];
 
-                result_redminu_32b[(32*(i+1))-1-:32] = (first_operand[31:0] > second_operand[31:0]) 
-                                                    ? second_operand[31:0]
-                                                    : first_operand [31:0];
-
-                result_redmax_32b[(32*(i+1))-1-:32]  = ($signed(first_operand[31:0]) > $signed(second_operand[31:0]))
-                                                    ? first_operand [31:0]
-                                                    : second_operand[31:0];
-
-                result_redmaxu_32b[(32*(i+1))-1-:32] = (first_operand[31:0] > second_operand[31:0]) 
-                                                    ? first_operand [31:0]
-                                                    : second_operand[31:0];
+                    result_redmin_32b [(32*(i+1))-1-:32] = second_operand[31:0];
+                    result_redminu_32b[(32*(i+1))-1-:32] = second_operand[31:0];
+                    result_redmax_32b [(32*(i+1))-1-:32] = second_operand[31:0];
+                    result_redmaxu_32b[(32*(i+1))-1-:32] = second_operand[31:0];
+                end
             end
             else begin
-                result_redand_32b[(32*(i+1))-1-:32] = first_operand[(32*(i+1))-1-:32] & result_redand_32b[(32*i)-1-:32];
-                result_redor_32b [(32*(i+1))-1-:32] = first_operand[(32*(i+1))-1-:32] | result_redor_32b [(32*i)-1-:32];
-                result_redxor_32b[(32*(i+1))-1-:32] = first_operand[(32*(i+1))-1-:32] ^ result_redxor_32b[(32*i)-1-:32];
-                result_redsum_32b[(32*(i+1))-1-:32] = first_operand[(32*(i+1))-1-:32] + result_redsum_32b[(32*i)-1-:32];
+                if (vm || mask_sew32[cycle_count_r][i]) begin
+                    result_redand_32b[(32*(i+1))-1-:32] = first_operand[(32*(i+1))-1-:32] & result_redand_32b[(32*i)-1-:32];
+                    result_redor_32b [(32*(i+1))-1-:32] = first_operand[(32*(i+1))-1-:32] | result_redor_32b [(32*i)-1-:32];
+                    result_redxor_32b[(32*(i+1))-1-:32] = first_operand[(32*(i+1))-1-:32] ^ result_redxor_32b[(32*i)-1-:32];
+                    result_redsum_32b[(32*(i+1))-1-:32] = first_operand[(32*(i+1))-1-:32] + result_redsum_32b[(32*i)-1-:32];
 
-                result_redmin_32b[(32*(i+1))-1-:32]  = ($signed(first_operand[(32*(i+1))-1-:32]) > $signed(result_redmin_32b[(32*i)-1-:32]))
-                                                    ? result_redmin_32b[(32*i)-1-:32]
-                                                    : first_operand[(32*(i+1))-1-:32];
+                    result_redmin_32b [(32*(i+1))-1-:32] = ($signed(first_operand[(32*(i+1))-1-:32]) > $signed(result_redmin_32b[(32*i)-1-:32]))
+                                                        ? result_redmin_32b[(32*i)-1-:32]
+                                                        : first_operand[(32*(i+1))-1-:32];
+                    result_redminu_32b[(32*(i+1))-1-:32] = (first_operand[(32*(i+1))-1-:32] > result_redminu_32b[(32*i)-1-:32])
+                                                        ? result_redminu_32b[(32*i)-1-:32]
+                                                        : first_operand[(32*(i+1))-1-:32];
+                    result_redmax_32b [(32*(i+1))-1-:32] = ($signed(first_operand[(32*(i+1))-1-:32]) > $signed(result_redmax_32b[(32*i)-1-:32]))
+                                                        ? first_operand[(32*(i+1))-1-:32]
+                                                        : result_redmax_32b[(32*i)-1-:32];
+                    result_redmaxu_32b[(32*(i+1))-1-:32] = (first_operand[(32*(i+1))-1-:32] > result_redmaxu_32b[(32*i)-1-:32])
+                                                        ? first_operand[(32*(i+1))-1-:32]
+                                                        : result_redmaxu_32b[(32*i)-1-:32];
+                end
+                else begin
+                    result_redand_32b[(32*(i+1))-1-:32] = result_redand_32b[(32*i)-1-:32];
+                    result_redor_32b [(32*(i+1))-1-:32] = result_redor_32b [(32*i)-1-:32];
+                    result_redxor_32b[(32*(i+1))-1-:32] = result_redxor_32b[(32*i)-1-:32];
+                    result_redsum_32b[(32*(i+1))-1-:32] = result_redsum_32b[(32*i)-1-:32];
 
-                result_redminu_32b[(32*(i+1))-1-:32] = (first_operand[(32*(i+1))-1-:32] > result_redminu_32b[(32*i)-1-:32]) 
-                                                    ? result_redminu_32b[(32*i)-1-:32]
-                                                    : first_operand[(32*(i+1))-1-:32];
-
-                result_redmax_32b[(32*(i+1))-1-:32]  = ($signed(first_operand[(32*(i+1))-1-:32]) > $signed(result_redmax_32b[(32*i)-1-:32]))
-                                                    ? first_operand[(32*(i+1))-1-:32]
-                                                    : result_redmax_32b[(32*i)-1-:32];
-
-                result_redmaxu_32b[(32*(i+1))-1-:32] = (first_operand[(32*(i+1))-1-:32] > result_redmaxu_32b[(32*i)-1-:32]) 
-                                                    ? first_operand[(32*(i+1))-1-:32]
-                                                    : result_redmaxu_32b[(32*i)-1-:32];
+                    result_redmin_32b [(32*(i+1))-1-:32] = result_redmin_32b [(32*i)-1-:32];
+                    result_redminu_32b[(32*(i+1))-1-:32] = result_redminu_32b[(32*i)-1-:32];
+                    result_redmax_32b [(32*(i+1))-1-:32] = result_redmax_32b [(32*i)-1-:32];
+                    result_redmaxu_32b[(32*(i+1))-1-:32] = result_redmaxu_32b[(32*i)-1-:32];
+                end
             end
         end
     end
@@ -385,7 +450,7 @@ module vectorALU
             greater_than_signed_32b[i] = $signed(first_operand[(32*(i+1))-1-:32]) >  $signed(second_operand[(32*(i+1))-1-:32]);
         end
     end
-
+/*
     always_comb begin
         unique case(vector_operation_i)
             VMSNE:  begin
@@ -438,7 +503,7 @@ module vectorALU
             default:result_comparison = {'0, result_comparison_32b};
         endcase
     end
-
+*/
 //////////////////////////////////////////////////////////////////////////////
 // Min/Max
 //////////////////////////////////////////////////////////////////////////////
@@ -829,10 +894,12 @@ module vectorALU
             VSLL:            result_o <= result_sll;
             VSRL:            result_o <= result_srl;
             VSRA:            result_o <= result_sra;
+            /*
             VMSEQ,  VMSNE,
             VMSLTU, VMSLT,
             VMSLEU, VMSLE,
             VMSGTU, VMSGT:   result_o <= result_comparison;
+            */
             VMIN:            result_o <= result_min;
             VMINU:           result_o <= result_minu;
             VMAX:            result_o <= result_max;
@@ -840,7 +907,7 @@ module vectorALU
             VMUL, VMULH,
             VMULHU, VMULHSU: result_o <= result_mult;
             VWMUL, VWMULU,
-            VWMULSU:         result_o <= (widening_counter == 1'b1) ? result_mult[VLEN-1:0] : result_mult[VLEN-1:0];
+            VWMULSU:         result_o <= (widening_counter == 1'b1) ? result_mult[(2*VLEN)-1:VLEN] : result_mult[VLEN-1:0];
             VDIV, VDIVU:     result_o <= result_div;
             VREM, VREMU:     result_o <= result_rem;
             VREDAND:         result_o <= result_redand;

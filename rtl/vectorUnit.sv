@@ -36,23 +36,27 @@ module vectorUnit
     logic [ 4:0] rd, rs1, rs2;
     logic [ 2:0] funct3;
     logic [10:0] zimm;
+    logic        vm;
     opCat_e      opCat;
     addrModes_e  addrMode;
     logic        reduction_instruction;
     logic        accumulate_instruction;
+    logic        compare_instruction;
     logic        widening;
 
     vew_e   vsew, vsew_effective;
     vlmul_e vlmul, vlmul_effective;
-    logic[$bits(VLEN)-1:0]  vl, vl_curr_reg, vl_next;
+    logic[$bits(VLEN )-1:0] vl, vl_curr_reg, vl_next;
     logic[$bits(VLENB)-1:0] elementsPerRegister;
 
     vector_states_e  state, next_state;
 
     logic [VLEN-1:0]  scalar_replicated, imm_replicated;
+    logic [VLEN-1:0]  v0_mask;
+
     logic [4:0]       vs1_addr, vs2_addr, vs3_addr;
     logic [VLEN-1:0]  vs1_data, vs2_data, vs3_data;
-    logic [4:0]       cycle_count, cycle_count_vd;
+    logic [4:0]       cycle_count, cycle_count_r, cycle_count_vd;
     logic             hold, hold_widening, hold_alu, hold_lsu;
 
     logic [VLEN-1:0]  first_operand, second_operand, third_operand;
@@ -70,6 +74,7 @@ module vectorUnit
     assign rd  = instruction_i[11:7];
     assign rs1 = instruction_i[19:15];
     assign rs2 = instruction_i[24:20];
+    assign vm  = instruction_i[25];
 
     assign funct3   = instruction_i[14:12];
     assign zimm     = {instruction_i[30:20]};
@@ -78,6 +83,7 @@ module vectorUnit
 
     assign accumulate_instruction = (vector_operation_i inside {VMACC, VNMSAC, VMADD, VNMSUB});
     assign reduction_instruction  = (vector_operation_i inside {VREDSUM, VREDMAXU, VREDMAX, VREDMINU, VREDMIN, VREDAND, VREDOR, VREDXOR});
+    assign compare_instruction    = (vector_operation_i inside {VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT});
     assign widening = (vector_operation_i inside {VWMUL, VWMULU, VWMULSU});
 
     assign elementsPerRegister = VLENB >> vsew;
@@ -105,6 +111,22 @@ module vectorUnit
         .vl                 (vl),
         .vl_next            (vl_next)
     );
+
+//////////////////////////////////////////////////////////////////////////////
+// MASKs
+//////////////////////////////////////////////////////////////////////////////
+
+    logic [ VLENB   -1:0] mask_sew8 [8];
+    logic [(VLENB/2)-1:0] mask_sew16[8];
+    logic [(VLENB/4)-1:0] mask_sew32[8];
+
+    always_comb begin
+        for (int i = 0; i < 8; i++) begin
+            mask_sew8 [i] = v0_mask[( VLENB   *(i+1))-1-:VLENB];
+            mask_sew16[i] = v0_mask[((VLENB/2)*(i+1))-1-:VLENB/2];
+            mask_sew32[i] = v0_mask[((VLENB/4)*(i+1))-1-:VLENB/4];
+        end
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 // FSM
@@ -192,6 +214,15 @@ module vectorUnit
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
+            cycle_count_r <= 0;
+        else if (widening || accumulate_instruction)
+            cycle_count_r <= cycle_count_vd;
+        else if (!hold)
+            cycle_count_r <= cycle_count;
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
             cycle_count_vd <= 0;
         else if (next_state == V_IDLE)
             cycle_count_vd <= 0;
@@ -207,6 +238,8 @@ module vectorUnit
         else if (next_state == V_IDLE)
             vl_curr_reg <= 0;
         else if (state == V_IDLE && next_state == V_EXEC)
+            vl_curr_reg <= vl;
+        else if (accumulate_instruction && cycle_count_vd == 0)
             vl_curr_reg <= vl;
         else if (next_state == V_EXEC && (hold == 1'b0))
             vl_curr_reg <= $signed(vl_curr_reg - elementsPerRegister) >= 0
@@ -241,7 +274,12 @@ module vectorUnit
                             write_enable[i] <= (i == 0) ? 1'b1 : 1'b0;
                         end
                         else begin
-                            write_enable[i] <= (i < vl_curr_reg) ? 1'b1 : 1'b0;
+                            if (vm || mask_sew8[cycle_count_r][i]) begin
+                                write_enable[i] <= (i < vl_curr_reg) ? 1'b1 : 1'b0;
+                            end
+                            else begin
+                                write_enable[i] <= 1'b0;
+                            end
                         end
                     end
                 end
@@ -252,8 +290,14 @@ module vectorUnit
                             write_enable[(i*2)+1] <= (i == 0) ? 1'b1 : 1'b0;
                         end
                         else begin
-                            write_enable[(i*2)]   <= (i < vl_curr_reg) ? 1'b1 : 1'b0;
-                            write_enable[(i*2)+1] <= (i < vl_curr_reg) ? 1'b1 : 1'b0;
+                            if (vm || mask_sew16[cycle_count_r][i]) begin
+                                write_enable[(i*2)]   <= (i < vl_curr_reg) ? 1'b1 : 1'b0;
+                                write_enable[(i*2)+1] <= (i < vl_curr_reg) ? 1'b1 : 1'b0;
+                            end
+                            else begin
+                                write_enable[(i*2)]   <= 1'b0;
+                                write_enable[(i*2)+1] <= 1'b0;
+                            end
                         end
                     end
                 end
@@ -266,10 +310,18 @@ module vectorUnit
                             write_enable[(i*4)+3] <= (i == 0) ? 1'b1 : 1'b0;
                         end
                         else begin
-                            write_enable[(i*4)]   <= (i < vl_curr_reg) ? 1'b1 : 1'b0;
-                            write_enable[(i*4)+1] <= (i < vl_curr_reg) ? 1'b1 : 1'b0;
-                            write_enable[(i*4)+2] <= (i < vl_curr_reg) ? 1'b1 : 1'b0;
-                            write_enable[(i*4)+3] <= (i < vl_curr_reg) ? 1'b1 : 1'b0;
+                            if (vm || mask_sew32[cycle_count_r][i]) begin
+                                write_enable[(i*4)]   <= (i < vl_curr_reg) ? 1'b1 : 1'b0;
+                                write_enable[(i*4)+1] <= (i < vl_curr_reg) ? 1'b1 : 1'b0;
+                                write_enable[(i*4)+2] <= (i < vl_curr_reg) ? 1'b1 : 1'b0;
+                                write_enable[(i*4)+3] <= (i < vl_curr_reg) ? 1'b1 : 1'b0;
+                            end
+                            else begin
+                                write_enable[(i*4)]   <= 1'b0;
+                                write_enable[(i*4)+1] <= 1'b0;
+                                write_enable[(i*4)+2] <= 1'b0;
+                                write_enable[(i*4)+3] <= 1'b0;
+                            end
                         end
                     end
                 end
@@ -292,6 +344,7 @@ module vectorUnit
         .enable   (write_enable),
         .vd_addr  (vd_addr_r),
         .result   (result),
+        .v0_mask  (v0_mask),
         .vs1_data (vs1_data),
         .vs2_data (vs2_data),
         .vs3_data (vs3_data)
@@ -396,8 +449,13 @@ module vectorUnit
         .third_operand      (third_operand),
         .vector_operation_i (vector_operation_i),
         .cycle_count        (cycle_count),
+        .cycle_count_r      (cycle_count_r),
         .vlmul              (vlmul),
         .vl                 (vl),
+        .vm                 (vm),
+        .mask_sew8          (mask_sew8),
+        .mask_sew16         (mask_sew16),
+        .mask_sew32         (mask_sew32),
         .current_state      (state),
         .vsew               (vsew),
         .widening_i         (widening),

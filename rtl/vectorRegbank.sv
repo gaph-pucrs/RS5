@@ -15,6 +15,7 @@ module vectorRegbank
     input   logic [4:0]       vd_addr,
     input   logic [VLEN-1:0]  result,
 
+    output  logic [VLEN-1:0]  v0_mask,
     output  logic [VLEN-1:0]  vs1_data,
     output  logic [VLEN-1:0]  vs2_data,
     output  logic [VLEN-1:0]  vs3_data
@@ -26,6 +27,7 @@ module vectorRegbank
 // Reads
 //////////////////////////////////////////////////////////////////////////////
 
+    assign v0_mask  = regfile[0];
     assign vs1_data = regfile[vs1_addr];
     assign vs2_data = regfile[vs2_addr];
     assign vs3_data = regfile[vs3_addr];
