@@ -4,31 +4,38 @@ module vectorLSU
     parameter int VLEN  = 64,
     parameter int VLENB = 8
 ) (
-    input  logic            clk,
-    input  logic            reset_n,
+    input  logic                  clk,
+    input  logic                  reset_n,
 
-    input  logic [31:0]     instruction_i,
-    input  logic [31:0]     base_address_i,
-    input  logic [31:0]     stride_i,
-    input  logic [VLEN-1:0] indexed_offsets_i,
-    input  logic [VLEN-1:0] write_data_i,
+    input  logic [31:0]           instruction_i,
+    input  logic [31:0]           base_address_i,
+    input  logic [31:0]           stride_i,
+    input  logic [VLEN-1:0]       indexed_offsets_i,
+    input  logic [VLEN-1:0]       write_data_i,
 
-    input  vector_states_e  current_state,
-    input  logic [ 4:0]     cycle_count,
+    input  vector_states_e        current_state,
+    input  logic [ 4:0]           cycle_count,
 
-    input  iType_e          instruction_operation_i,
-    input  vew_e            vsew,
-    input  vlmul_e          vlmul,
+    input  iType_e                instruction_operation_i,
+    input  vew_e                  vsew,
+    input  vlmul_e                vlmul,
 
-    output logic            hold_o,
+    input  logic [4:0]            cycle_count_r,
+    input  logic[$bits(VLEN)-1:0] vl_curr_reg,
+    input  logic                  vm,
+    input  logic [ VLENB   -1:0]  mask_sew8 [8],
+    input  logic [(VLENB/2)-1:0]  mask_sew16[8],
+    input  logic [(VLENB/4)-1:0]  mask_sew32[8],
 
-    output logic [31:0]     mem_address_o,
-    output logic            mem_read_enable_o,
-    output logic [ 3:0]     mem_write_enable_o,
-    output logic [31:0]     mem_write_data_o,
-    input  logic [31:0]     mem_read_data_i,
+    output logic                  hold_o,
 
-    output logic [VLEN-1:0] read_data_o
+    output logic [31:0]           mem_address_o,
+    output logic                  mem_read_enable_o,
+    output logic [ 3:0]           mem_write_enable_o,
+    output logic [31:0]           mem_write_data_o,
+    input  logic [31:0]           mem_read_data_i,
+
+    output logic [VLEN-1:0]       read_data_o
 );
 
     vector_lsu_states_e next_state, state, state_r;
@@ -158,10 +165,7 @@ module vectorLSU
             offset_strided <= '0;
         end
         else if (addrMode == UNIT_STRIDED) begin
-            if (state == VLSU_LAST_CYCLE)
-                offset_strided <= offset_strided;
-            else
-                offset_strided <= offset_strided + 32'h4;
+            offset_strided <= offset_strided + 32'h4;
         end else if (addrMode == STRIDED) begin
             if (state == VLSU_LAST_CYCLE)
                 offset_strided <= offset_strided;
@@ -212,26 +216,12 @@ module vectorLSU
                         default:    elementsProcessed = 4;
                     endcase
                 end
-                else if (state == VLSU_LAST_CYCLE) begin
-                    unique case(base_address_i[1:0])
-                        2'b11:      elementsProcessed = 3;
-                        2'b10:      elementsProcessed = 2;
-                        2'b01:      elementsProcessed = 1;
-                        default:    elementsProcessed = 4;
-                    endcase
-                end
                 else begin
                     elementsProcessed = 4;
                 end
             end
             else if (width == EW16) begin
                 if(state == VLSU_FIRST_CYCLE) begin
-                    unique case(base_address_i[1])
-                        1'b1:       elementsProcessed = 1;
-                        default:    elementsProcessed = 2;
-                    endcase
-                end
-                else if(state == VLSU_LAST_CYCLE) begin
                     unique case(base_address_i[1])
                         1'b1:       elementsProcessed = 1;
                         default:    elementsProcessed = 2;
@@ -270,44 +260,70 @@ module vectorLSU
         if (addrMode == UNIT_STRIDED) begin
             if (width == EW8) begin
                 if(state == VLSU_FIRST_CYCLE) begin
+                    for (int i = 0, int j = 0; i < 4; i++)
+                        if (i >= base_address_i[1:0] && j < vl_curr_reg) begin
+                            mem_write_enable[i] = (vm | mask_sew8[cycle_count_r][j]);
+                            j++;
+                        end
+                        else begin
+                            mem_write_enable[i] = 1'b0;
+                        end
+
                     unique case(base_address_i[1:0])
-                        2'b11:   begin mem_write_enable = 4'b1000; shift_amount = 24; end
-                        2'b10:   begin mem_write_enable = 4'b1100; shift_amount = 16; end
-                        2'b01:   begin mem_write_enable = 4'b1110; shift_amount = 8; end
-                        default: begin mem_write_enable = 4'b1111; shift_amount = 0; end
+                        2'b11:   shift_amount = 24;
+                        2'b10:   shift_amount = 16;
+                        2'b01:   shift_amount = 8;
+                        default: shift_amount = 0;
                     endcase
                 end
                 else if (state == VLSU_LAST_CYCLE) begin
                     shift_amount = 0;
-                    unique case(base_address_i[1:0])
-                        2'b11:   mem_write_enable = 4'b0111;
-                        2'b10:   mem_write_enable = 4'b0011;
-                        2'b01:   mem_write_enable = 4'b0001;
-                        default: mem_write_enable = 4'b1111;
-                    endcase
+                    for (int i = 0; i < 4; i++)
+                        if ((i < base_address_i[1:0] || base_address_i[1:0] == 0) && (totalElementsProcessed + i) < vl_curr_reg)
+                            mem_write_enable[i] = (vm | mask_sew8[cycle_count_r][totalElementsProcessed + i]);
+                        else
+                            mem_write_enable[i] = 1'b0;
                 end
                 else begin
                     shift_amount = 0;
-                    mem_write_enable = 4'b1111;
+                    for (int i = 0; i < 4; i++)
+                        mem_write_enable[i] = (vm | mask_sew8[cycle_count_r][totalElementsProcessed+i]) && ((totalElementsProcessed + i) < vl_curr_reg);
                 end
             end
             else if (width == EW16) begin
                 if(state == VLSU_FIRST_CYCLE) begin
+                    for (int i = 0, int j = 0; i < 2; i++)
+                        if (i >= base_address_i[1] && j < vl_curr_reg) begin
+                            mem_write_enable[2*(i+1)-1-:2] = (vm | mask_sew16[cycle_count_r][j])
+                                                            ? 2'b11
+                                                            : 2'b00;
+                            j++;
+                        end
+                        else begin
+                            mem_write_enable[2*(i+1)-1-:2] = 2'b00;
+                        end
+
                     unique case(base_address_i[1])
-                        1'b1:    begin mem_write_enable = 4'b1100; shift_amount = 16; end
-                        default: begin mem_write_enable = 4'b1111; shift_amount = 0; end
+                        1'b1:    shift_amount = 16;
+                        default: shift_amount = 0;
                     endcase
                 end
                 else if(state == VLSU_LAST_CYCLE) begin
                     shift_amount = 0;
-                    unique case(base_address_i[1])
-                        1'b1:       mem_write_enable = 4'b0011;
-                        default:    mem_write_enable = 4'b1111;
-                    endcase
+                    for (int i = 0; i < 2; i++)
+                        if ((i < base_address_i[1] || base_address_i[1] == 0) && (totalElementsProcessed + i) < vl_curr_reg)
+                            mem_write_enable[2*(i+1)-1-:2] = (vm | mask_sew16[cycle_count_r][totalElementsProcessed + i])
+                                                            ? 2'b11
+                                                            : 2'b00;
+                        else
+                            mem_write_enable[2*(i+1)-1-:2] = 2'b00;
                 end
                 else begin
-                    shift_amount     = 0;
-                    mem_write_enable = 4'b1111;
+                    shift_amount = 0;
+                    for (int i = 0; i < 2; i++)
+                        mem_write_enable[2*(i+1)-1-:2] = (vm | mask_sew16[cycle_count_r][totalElementsProcessed+i]) && ((totalElementsProcessed + i) < vl_curr_reg)
+                                                        ? 2'b11
+                                                        : 2'b00;
                 end
             end
             else begin
@@ -316,13 +332,15 @@ module vectorLSU
                     mem_write_enable = 4'b0000;
                 end
                 else begin
-                    mem_write_enable = 4'b1111;
+                    mem_write_enable = (vm | mask_sew32[cycle_count_r][totalElementsProcessed]) && (totalElementsProcessed < vl_curr_reg)
+                                        ? 4'b1111
+                                        : 4'b0000;
                 end
             end
         end
         else begin
             shift_amount = 0;
-            if (width == EW8) begin
+            if ((width == EW8) && (vm | mask_sew8[cycle_count_r][totalElementsProcessed]) && (totalElementsProcessed < vl_curr_reg)) begin
                 unique case(address[1:0])
                     2'b11:   mem_write_enable = 4'b1000;
                     2'b10:   mem_write_enable = 4'b0100;
@@ -330,15 +348,17 @@ module vectorLSU
                     default: mem_write_enable = 4'b0001;
                 endcase
             end
-            else if (width == EW16) begin
+            else if ((width == EW16) && (vm | mask_sew16[cycle_count_r][totalElementsProcessed]) && (totalElementsProcessed < vl_curr_reg)) begin
                 unique case(address[1])
                     1'b1:       mem_write_enable = 4'b1100;
                     default:    mem_write_enable = 4'b0011;
                 endcase
             end
-            else begin
-                shift_amount = 0;
+            else if ((width == EW32) && (vm | mask_sew32[cycle_count_r][totalElementsProcessed]) && (totalElementsProcessed < vl_curr_reg)) begin
                 mem_write_enable = 4'b1111;
+            end
+            else begin
+                mem_write_enable = 4'b0000;
             end
         end
     end

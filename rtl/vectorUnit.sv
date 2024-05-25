@@ -424,6 +424,12 @@ module vectorUnit
         .instruction_operation_i(instruction_operation_i),
         .vsew                   (vsew),
         .vlmul                  (vlmul),
+        .cycle_count_r          (cycle_count_r),
+        .vl_curr_reg            (vl_curr_reg),
+        .vm                     (vm),
+        .mask_sew8              (mask_sew8),
+        .mask_sew16             (mask_sew16),
+        .mask_sew32             (mask_sew32),
         .hold_o                 (hold_lsu),
 
         .mem_address_o          (mem_address_o),
