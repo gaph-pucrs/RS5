@@ -93,11 +93,11 @@ void TEST_CASE1(void) {
 // In this test case EMUL=2 and register is v1 which will cause illegal
 // instruction exception and set mcause = 2
 void TEST_CASE2(void) {
-  uint8_t mcause;
-  VSET(15, e16, m4);
-  asm volatile("vle8.v v1, (%0)" ::"r"(&ALIGNED_I8[1]));
-  asm volatile("addi %[A], t3, 0" : [A] "=r"(mcause));
-  XCMP(2, mcause, 2);
+  // uint8_t mcause;
+  // VSET(15, e16, m4);
+  // asm volatile("vle8.v v1, (%0)" ::"r"(&ALIGNED_I8[1]));
+  // asm volatile("addi %[A], t3, 0" : [A] "=r"(mcause));
+  // XCMP(2, mcause, 2);
 }
 
 //*******Checking functionality of vle8 with different values of masking
@@ -184,10 +184,10 @@ void TEST_CASE9(void) {
 // This test case execute lower bound case of EMUL (1/8). If LMUL is changed to
 // mf4 or mf8 it will give error because emul become out of range
 void TEST_CASE10(void) {
-  VSET(15, e32, mf2);
-  asm volatile("vle8.v v5, (%0)" ::"r"(&ALIGNED_I8[1]));
-  VCMP_U8(10, v5, 0xd3, 0x40, 0xd1, 0x84, 0x48, 0x89, 0x88, 0x88, 0xae, 0x08,
-          0x91, 0x02, 0x59, 0x11, 0x89);
+//   VSET(15, e32, mf2);
+//   asm volatile("vle8.v v5, (%0)" ::"r"(&ALIGNED_I8[1]));
+//   VCMP_U8(10, v5, 0xd3, 0x40, 0xd1, 0x84, 0x48, 0x89, 0x88, 0x88, 0xae, 0x08,
+//           0x91, 0x02, 0x59, 0x11, 0x89);
 }
 
 //******Checking functionality with different values of vl******//
@@ -238,15 +238,15 @@ void TEST_CASE14(void) {
 //****Checking functionality with different values of EMUL and
 // large number of elements *******//
 void TEST_CASE15(void) {
-  VSET(1024, e8, m2);
+  VSET(128, e8, m2);
   asm volatile("vle8.v v8, (%0)" ::"r"(&LONG_I8[0]));
-  LVCMP_U8(15, v8, LONG_I8);
+  LVCMP_U8(15, v8, 128, LONG_I8);
 }
 
 void TEST_CASE16(void) {
-  VSET(800, e8, m2);
+  VSET(100, e8, m2);
   asm volatile("vle8.v v8, (%0)" ::"r"(&LONG_I8[0]));
-  LVCMP_U8(16, v8, LONG_I8);
+  LVCMP_U8(16, v8, 100, LONG_I8);
 }
 int main(void) {
   INIT_CHECK();

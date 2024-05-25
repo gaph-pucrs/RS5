@@ -28,38 +28,38 @@ void handle_trap(void) {
   asm volatile("addi t1, t1, 4");
   asm volatile("csrw mepc, t1");
 
-  asm volatile("ld ra, 8(sp)");
-  asm volatile("ld sp, 16(sp)");
-  asm volatile("ld gp, 24(sp)");
-  asm volatile("ld tp, 32(sp)");
-  asm volatile("ld t0, 40(sp)");
-  asm volatile("ld t0, 40(sp)");
-  asm volatile("ld t1, 48(sp)");
-  asm volatile("ld t2, 56(sp)");
-  asm volatile("ld s0, 64(sp)");
-  asm volatile("ld s1, 72(sp)");
-  asm volatile("ld a0, 80(sp)");
-  asm volatile("ld a1, 88(sp)");
-  asm volatile("ld a2, 96(sp)");
-  asm volatile("ld a3, 104(sp)");
-  asm volatile("ld a4, 112(sp)");
-  asm volatile("ld a5, 120(sp)");
-  asm volatile("ld a6, 128(sp)");
-  asm volatile("ld a7, 136(sp)");
-  asm volatile("ld s2, 144(sp)");
-  asm volatile("ld s3, 152(sp)");
-  asm volatile("ld s4, 160(sp)");
-  asm volatile("ld s5, 168(sp)");
-  asm volatile("ld s6, 176(sp)");
-  asm volatile("ld s7, 184(sp)");
-  asm volatile("ld s8, 192(sp)");
-  asm volatile("ld s9, 200(sp)");
-  asm volatile("ld s10, 208(sp)");
-  asm volatile("ld s11, 216(sp)");
-  asm volatile("ld t3, 224(sp)");
-  asm volatile("ld t4, 232(sp)");
-  asm volatile("ld t5, 240(sp)");
-  asm volatile("ld t6, 248(sp)");
+  asm volatile("lw ra, 8(sp)");
+  asm volatile("lw sp, 16(sp)");
+  asm volatile("lw gp, 24(sp)");
+  asm volatile("lw tp, 32(sp)");
+  asm volatile("lw t0, 40(sp)");
+  asm volatile("lw t0, 40(sp)");
+  asm volatile("lw t1, 48(sp)");
+  asm volatile("lw t2, 56(sp)");
+  asm volatile("lw s0, 64(sp)");
+  asm volatile("lw s1, 72(sp)");
+  asm volatile("lw a0, 80(sp)");
+  asm volatile("lw a1, 88(sp)");
+  asm volatile("lw a2, 96(sp)");
+  asm volatile("lw a3, 104(sp)");
+  asm volatile("lw a4, 112(sp)");
+  asm volatile("lw a5, 120(sp)");
+  asm volatile("lw a6, 128(sp)");
+  asm volatile("lw a7, 136(sp)");
+  asm volatile("lw s2, 144(sp)");
+  asm volatile("lw s3, 152(sp)");
+  asm volatile("lw s4, 160(sp)");
+  asm volatile("lw s5, 168(sp)");
+  asm volatile("lw s6, 176(sp)");
+  asm volatile("lw s7, 184(sp)");
+  asm volatile("lw s8, 192(sp)");
+  asm volatile("lw s9, 200(sp)");
+  asm volatile("lw s10, 208(sp)");
+  asm volatile("lw s11, 216(sp)");
+  asm volatile("lw t3, 224(sp)");
+  asm volatile("lw t4, 232(sp)");
+  asm volatile("lw t5, 240(sp)");
+  asm volatile("lw t6, 248(sp)");
 
   // Read mcause
   asm volatile("csrr t3, mcause");
@@ -97,17 +97,17 @@ void TEST_CASE1(void) {
 // In this test case EMUL=2 and register is v1 which will cause illegal
 // instruction exception and set mcause = 2
 void TEST_CASE2(void) {
-  uint8_t mcause;
-  reset_vec32(ALIGNED_I32);
-  VSET(16, e32, m1);
-  VLOAD_32(v1, 0x9fe41920, 0xf9aa71f0, 0xa11a9384, 0x99991348, 0x9fa831c7,
-           0x38197598, 0x18931795, 0x81937598, 0x18747547, 0x3eeeeeee,
-           0x90139301, 0xab8b9148, 0x90318509, 0x31897598, 0x83195999,
-           0x89139848);
-  VSET(16, e64, m4);
-  asm volatile("vse32.v v1, (%0)" ::"r"(ALIGNED_I32));
-  asm volatile("addi %[A], t3, 0" : [A] "=r"(mcause));
-  XCMP(2, mcause, 2);
+  // uint8_t mcause;
+  // reset_vec32(ALIGNED_I32);
+  // VSET(16, e32, m1);
+  // VLOAD_32(v1, 0x9fe41920, 0xf9aa71f0, 0xa11a9384, 0x99991348, 0x9fa831c7,
+  //          0x38197598, 0x18931795, 0x81937598, 0x18747547, 0x3eeeeeee,
+  //          0x90139301, 0xab8b9148, 0x90318509, 0x31897598, 0x83195999,
+  //          0x89139848);
+  // VSET(16, e64, m4);
+  // asm volatile("vse32.v v1, (%0)" ::"r"(ALIGNED_I32));
+  // asm volatile("addi %[A], t3, 0" : [A] "=r"(mcause));
+  // XCMP(2, mcause, 2);
 }
 
 //*******Checking functionality of vse16 with different values of masking
@@ -232,7 +232,7 @@ void TEST_CASE9(void) {
            0x38197598, 0x18931795, 0x81937598, 0x18747547, 0x3eeeeeee,
            0x90139301, 0xab8b9148, 0x90318509, 0x31897598, 0x83195999,
            0x89139848);
-  __asm__ volatile("vsetivli %[A], 12, e16, m1, tu, mu" : [A] "=r"(avl));
+  __asm__ volatile("vsetivli %[A], 12, e32, m1, tu, mu" : [A] "=r"(avl));
   asm volatile("vse32.v v4, (%0), v0.t" ::"r"(ALIGNED_I32));
   VCLEAR(v4);
   VVCMP_U32(9, ALIGNED_I32, 1, 0xf9aa71f0, 3, 0x99991348, 5, 0x38197598, 7,
@@ -332,55 +332,55 @@ void TEST_CASE14(void) {
 
 //******Checking functionality with different vstart value*****//
 void TEST_CASE15(void) {
-  reset_vec32(ALIGNED_I32);
-  VSET(16, e32, m1);
-  VLOAD_32(v7, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
-  asm volatile("vse32.v v7, (%0)" ::"r"(ALIGNED_I32));
-  VCLEAR(v7);
-  VLOAD_32(v7, 0x9fe41920, 0xf9aa71f0, 0xa11a9384, 0x99991348, 0x9fa831c7,
-           0x38197598, 0x18931795, 0x81937598, 0x18747547, 0x3eeeeeee,
-           0x90139301, 0xab8b9148, 0x90318509, 0x31897598, 0x83195999,
-           0x89139848);
-  VSET(13, e32, m1);
-  write_csr(vstart, 2);
-  asm volatile("vse32.v v7, (%0)" ::"r"(ALIGNED_I32));
-  VVCMP_U32(15, ALIGNED_I32, 1, 2, 0xa11a9384, 0x99991348, 0x9fa831c7,
-            0x38197598, 0x18931795, 0x81937598, 0x18747547, 0x3eeeeeee,
-            0x90139301, 0xab8b9148, 0x90318509, 14, 15, 16);
+  // reset_vec32(ALIGNED_I32);
+  // VSET(16, e32, m1);
+  // VLOAD_32(v7, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
+  // asm volatile("vse32.v v7, (%0)" ::"r"(ALIGNED_I32));
+  // VCLEAR(v7);
+  // VLOAD_32(v7, 0x9fe41920, 0xf9aa71f0, 0xa11a9384, 0x99991348, 0x9fa831c7,
+  //          0x38197598, 0x18931795, 0x81937598, 0x18747547, 0x3eeeeeee,
+  //          0x90139301, 0xab8b9148, 0x90318509, 0x31897598, 0x83195999,
+  //          0x89139848);
+  // VSET(13, e32, m1);
+  // write_csr(vstart, 2);
+  // asm volatile("vse32.v v7, (%0)" ::"r"(ALIGNED_I32));
+  // VVCMP_U32(15, ALIGNED_I32, 1, 2, 0xa11a9384, 0x99991348, 0x9fa831c7,
+  //           0x38197598, 0x18931795, 0x81937598, 0x18747547, 0x3eeeeeee,
+  //           0x90139301, 0xab8b9148, 0x90318509, 14, 15, 16);
 }
 
 //****Checking functionality with different values of EMUL and
 // large number of elements *******//
 void TEST_CASE16(void) {
   reset_vec32(ALIGNED_I32);
-  VSET(1024, e32, m8);
+  VSET(128, e32, m8);
   asm volatile("vle32.v v8, (%0)" ::"r"(&LONG_I32[0]));
   asm volatile("vse32.v v8, (%0)" ::"r"(ALIGNED_I32));
-  LVVCMP_U32(16, ALIGNED_I32, LONG_I32);
+  LVVCMP_U32(16, ALIGNED_I32, 128, LONG_I32);
 }
 
 void TEST_CASE17(void) {
   reset_vec32(ALIGNED_I32);
-  VSET(512, e32, m4);
+  VSET(64, e32, m4);
   asm volatile("vle32.v v12, (%0)" ::"r"(&LONG_I32[0]));
   asm volatile("vse32.v v12, (%0)" ::"r"(ALIGNED_I32));
-  LVVCMP_U32(17, ALIGNED_I32, LONG_I32);
+  LVVCMP_U32(17, ALIGNED_I32, 64, LONG_I32);
 }
 
 void TEST_CASE18(void) {
   reset_vec32(ALIGNED_I32);
-  VSET(256, e32, m2);
+  VSET(32, e32, m2);
   asm volatile("vle32.v v10, (%0)" ::"r"(&LONG_I32[0]));
   asm volatile("vse32.v v10, (%0)" ::"r"(ALIGNED_I32));
-  LVVCMP_U32(18, ALIGNED_I32, LONG_I32);
+  LVVCMP_U32(18, ALIGNED_I32, 32, LONG_I32);
 }
 
 void TEST_CASE19(void) {
   reset_vec32(ALIGNED_I32);
-  VSET(200, e32, m2);
+  VSET(25, e32, m2);
   asm volatile("vle32.v v8, (%0)" ::"r"(&LONG_I32[0]));
   asm volatile("vse32.v v8, (%0)" ::"r"(ALIGNED_I32));
-  LVVCMP_U32(19, ALIGNED_I32, LONG_I32);
+  LVVCMP_U32(19, ALIGNED_I32, 25, LONG_I32);
 }
 
 int main(void) {

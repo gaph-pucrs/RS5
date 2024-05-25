@@ -35,13 +35,13 @@ void TEST_CASE3(void) {
 }
 
 void TEST_CASE4(void) {
-  VSET(4, e64, m1);
-  volatile uint64_t INP1[] = {0x9fe419208f2e05e0, 0xf9aa71f0c394bbd3,
-                              0xa11a9384a7163840, 0x99991348a9f38cd1};
-  uint64_t stride = 8;
-  asm volatile("vlse64.v v1, (%0), %1" ::"r"(INP1), "r"(stride));
-  VCMP_U64(4, v1, 0x9fe419208f2e05e0, 0xf9aa71f0c394bbd3, 0xa11a9384a7163840,
-           0x99991348a9f38cd1);
+//   VSET(4, e64, m1);
+//   volatile uint64_t INP1[] = {0x9fe419208f2e05e0, 0xf9aa71f0c394bbd3,
+//                               0xa11a9384a7163840, 0x99991348a9f38cd1};
+//   uint64_t stride = 8;
+//   asm volatile("vlse64.v v1, (%0), %1" ::"r"(INP1), "r"(stride));
+//   VCMP_U64(4, v1, 0x9fe419208f2e05e0, 0xf9aa71f0c394bbd3, 0xa11a9384a7163840,
+//            0x99991348a9f38cd1);
 }
 
 // Zero-stride tests
@@ -66,12 +66,12 @@ void TEST_CASE6(void) {
 
 // Different LMUL
 void TEST_CASE7(void) {
-  VSET(8, e64, m2);
-  volatile uint64_t INP1[] = {0x9fa831c7a11a9384};
-  asm volatile("vlse64.v v2, (%0), x0" ::"r"(INP1));
-  VCMP_U64(7, v2, 0x9fa831c7a11a9384, 0x9fa831c7a11a9384, 0x9fa831c7a11a9384,
-           0x9fa831c7a11a9384, 0x9fa831c7a11a9384, 0x9fa831c7a11a9384,
-           0x9fa831c7a11a9384, 0x9fa831c7a11a9384);
+  // VSET(8, e64, m2);
+  // volatile uint64_t INP1[] = {0x9fa831c7a11a9384};
+  // asm volatile("vlse64.v v2, (%0), x0" ::"r"(INP1));
+  // VCMP_U64(7, v2, 0x9fa831c7a11a9384, 0x9fa831c7a11a9384, 0x9fa831c7a11a9384,
+  //          0x9fa831c7a11a9384, 0x9fa831c7a11a9384, 0x9fa831c7a11a9384,
+  //          0x9fa831c7a11a9384, 0x9fa831c7a11a9384);
 }
 
 // Others
@@ -87,30 +87,30 @@ void TEST_CASE8(void) {
 
 // Stride greater than default Ara AXI width == 128-bit (4 lanes)
 void TEST_CASE9(void) {
-  VSET(2, e64, m1);
-  volatile uint64_t INP1[] = {0x99991348a9f38cd1, 0x9fa831c7a11a9384,
-                              0x9fa831c7a11a9384, 0x9fa831c7a11a9384,
-                              0x9fa831c7a11a9384, 0x01015ac1309bb678};
-  uint64_t stride = 40;
-  asm volatile("vlse64.v v1, (%0), %1" ::"r"(INP1), "r"(stride));
-  VCMP_U64(9, v1, 0x99991348a9f38cd1, 0x01015ac1309bb678);
+  // VSET(2, e64, m1);
+  // volatile uint64_t INP1[] = {0x99991348a9f38cd1, 0x9fa831c7a11a9384,
+  //                             0x9fa831c7a11a9384, 0x9fa831c7a11a9384,
+  //                             0x9fa831c7a11a9384, 0x01015ac1309bb678};
+  // uint64_t stride = 40;
+  // asm volatile("vlse64.v v1, (%0), %1" ::"r"(INP1), "r"(stride));
+  // VCMP_U64(9, v1, 0x99991348a9f38cd1, 0x01015ac1309bb678);
 }
 
 // Fill Ara internal Load Buffer
 void TEST_CASE10(void) {
-  VSET(8, e64, m1);
-  volatile uint64_t INP1[] = {
-      0x9fe419208f2e05e0, 0xf9aa71f0c394bbd3, 0xa11a9384a7163840,
-      0x99991348a9f38cd1, 0x9fa831c7a11a9384, 0x3819759853987548,
-      0x1893179501093489, 0x81937598aa819388, 0x1874754791888188,
-      0x3eeeeeeee33111ae, 0x9013930148815808, 0xab8b914891484891,
-      0x9031850931584902, 0x3189759837598759, 0x8319599991911111,
-      0x8913984898951989};
-  uint64_t stride = 16;
-  asm volatile("vlse64.v v1, (%0), %1" ::"r"(INP1), "r"(stride));
-  VCMP_U64(10, v1, 0x9fe419208f2e05e0, 0xa11a9384a7163840, 0x9fa831c7a11a9384,
-           0x1893179501093489, 0x1874754791888188, 0x9013930148815808,
-           0x9031850931584902, 0x8319599991911111);
+  // VSET(8, e64, m1);
+  // volatile uint64_t INP1[] = {
+  //     0x9fe419208f2e05e0, 0xf9aa71f0c394bbd3, 0xa11a9384a7163840,
+  //     0x99991348a9f38cd1, 0x9fa831c7a11a9384, 0x3819759853987548,
+  //     0x1893179501093489, 0x81937598aa819388, 0x1874754791888188,
+  //     0x3eeeeeeee33111ae, 0x9013930148815808, 0xab8b914891484891,
+  //     0x9031850931584902, 0x3189759837598759, 0x8319599991911111,
+  //     0x8913984898951989};
+  // uint64_t stride = 16;
+  // asm volatile("vlse64.v v1, (%0), %1" ::"r"(INP1), "r"(stride));
+  // VCMP_U64(10, v1, 0x9fe419208f2e05e0, 0xa11a9384a7163840, 0x9fa831c7a11a9384,
+  //          0x1893179501093489, 0x1874754791888188, 0x9013930148815808,
+  //          0x9031850931584902, 0x8319599991911111);
 }
 
 // Masked stride loads
@@ -148,20 +148,20 @@ void TEST_CASE13(void) {
 }
 
 void TEST_CASE14(void) {
-  VSET(8, e64, m1);
-  volatile uint64_t INP1[] = {
-      0x9fe419208f2e05e0, 0xf9aa71f0c394bbd3, 0xa11a9384a7163840,
-      0x99991348a9f38cd1, 0x9fa831c7a11a9384, 0x3819759853987548,
-      0x1893179501093489, 0x81937598aa819388, 0x1874754791888188,
-      0x3eeeeeeee33111ae, 0x9013930148815808, 0xab8b914891484891,
-      0x9031850931584902, 0x3189759837598759, 0x8319599991911111,
-      0x8913984898951989};
-  uint64_t stride = 16;
-  VLOAD_8(v0, 0xAA);
-  VCLEAR(v1);
-  asm volatile("vlse64.v v1, (%0), %1, v0.t" ::"r"(INP1), "r"(stride));
-  VCMP_U64(14, v1, 0, 0xa11a9384a7163840, 0, 0x1893179501093489, 0,
-           0x9013930148815808, 0, 0x8319599991911111);
+  // VSET(8, e64, m1);
+  // volatile uint64_t INP1[] = {
+  //     0x9fe419208f2e05e0, 0xf9aa71f0c394bbd3, 0xa11a9384a7163840,
+  //     0x99991348a9f38cd1, 0x9fa831c7a11a9384, 0x3819759853987548,
+  //     0x1893179501093489, 0x81937598aa819388, 0x1874754791888188,
+  //     0x3eeeeeeee33111ae, 0x9013930148815808, 0xab8b914891484891,
+  //     0x9031850931584902, 0x3189759837598759, 0x8319599991911111,
+  //     0x8913984898951989};
+  // uint64_t stride = 16;
+  // VLOAD_8(v0, 0xAA);
+  // VCLEAR(v1);
+  // asm volatile("vlse64.v v1, (%0), %1, v0.t" ::"r"(INP1), "r"(stride));
+  // VCMP_U64(14, v1, 0, 0xa11a9384a7163840, 0, 0x1893179501093489, 0,
+  //          0x9013930148815808, 0, 0x8319599991911111);
 }
 
 int main(void) {

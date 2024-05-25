@@ -125,7 +125,7 @@ static int test_case;
 
 //Macro used to compare large number of elements
 #define LVCMP(T,str,casenum,elements, vexp ,vact)                                     \
-  printf("Checking the results of the test case %d:\n", casenum);                     \
+  printf("Checking the results of the test case %d:\n",casenum);                      \
   MEMORY_BARRIER;                                                                     \
   for (unsigned int i = 0; i < elements; i++) {                                       \
     if (vexp[i] != vact[i]) {                                                         \
@@ -243,24 +243,20 @@ static int test_case;
 #define VCMP_U16(casenum,vect,act...) {VSTORE_U16(vect); VCMP(uint16_t,%x,casenum,Ru16,act)}
 #define VCMP_U8(casenum,vect,act...)  {VSTORE_U8(vect) ; VCMP(uint8_t, %x,casenum, Ru8,act)}
 
-#define LVCMP_U8(casenum,vect,act)   {uint64_t vl; read_vl(vl); VSTORE_L8(vect);     \
-                                       LVCMP(uint8_t, %x,casenum,vl, Lu8, act)}
-#define LVCMP_U16(casenum,vect,act)  {uint64_t vl; read_vl(vl); VSTORE_L16(vect);    \
-                                       LVCMP(uint16_t, %x,casenum,vl,Lu16,act)}
-#define LVCMP_U32(casenum,vect,act)  {uint64_t vl; read_vl(vl); VSTORE_L32(vect);    \
-                                       LVCMP(uint32_t, %x,casenum,vl,Lu32,act)}
-#define LVCMP_U64(casenum,vect,act)  {uint64_t vl; read_vl(vl); VSTORE_L64(vect);    \
-                                       LVCMP(uint64_t, %x,casenum,vl,Lu64,act)}
+#define LVCMP_U8(casenum,vect,vl,act)   {VSTORE_L8(vect); LVCMP(uint8_t, %x,casenum,vl, Lu8, act)}
+#define LVCMP_U16(casenum,vect,vl,act)  {VSTORE_L16(vect); LVCMP(uint16_t, %x,casenum,vl,Lu16,act)}
+#define LVCMP_U32(casenum,vect,vl,act)  {VSTORE_L32(vect); LVCMP(uint32_t, %x,casenum,vl,Lu32,act)}
+#define LVCMP_U64(casenum,vect,vl,act)  {VSTORE_L64(vect); LVCMP(uint64_t, %x,casenum,vl,Lu64,act)}
 
 #define VVCMP_U64(casenum,ptr64,act...) {VCMP(uint64_t,%x,casenum,ptr64,act)}
 #define VVCMP_U32(casenum,ptr32,act...) {VCMP(uint32_t,%x,casenum,ptr32,act)}
 #define VVCMP_U16(casenum,ptr16,act...) {VCMP(uint16_t,%x,casenum,ptr16,act)}
 #define VVCMP_U8(casenum,ptr8,act...)   {VCMP(uint8_t, %x,casenum,ptr8, act)}
 
-#define LVVCMP_U64(casenum,ptr64,act) {uint64_t vl; read_vl(vl); LVCMP(uint64_t,%x,casenum,vl, ptr64,act)}
-#define LVVCMP_U32(casenum,ptr32,act) {uint64_t vl; read_vl(vl); LVCMP(uint32_t,%x,casenum,vl, ptr32,act)}
-#define LVVCMP_U16(casenum,ptr16,act) {uint64_t vl; read_vl(vl); LVCMP(uint16_t,%x,casenum,vl, ptr16,act)}
-#define LVVCMP_U8(casenum,ptr8,act)   {uint64_t vl; read_vl(vl); LVCMP(uint8_t, %x,casenum,vl, ptr8, act)}
+#define LVVCMP_U64(casenum,ptr64,vl,act) {LVCMP(uint64_t,%x,casenum,vl, ptr64,act)}
+#define LVVCMP_U32(casenum,ptr32,vl,act) {LVCMP(uint32_t,%x,casenum,vl, ptr32,act)}
+#define LVVCMP_U16(casenum,ptr16,vl,act) {LVCMP(uint16_t,%x,casenum,vl, ptr16,act)}
+#define LVVCMP_U8(casenum,ptr8,vl,act)   {LVCMP(uint8_t, %x,casenum,vl, ptr8, act)}
 
 #define VCMP_I64(casenum,vect,act...) {VSTORE_I64(vect); VCMP(int64_t,%ld, casenum,Ri64,act)}
 #define VCMP_I32(casenum,vect,act...) {VSTORE_I32(vect); VCMP(int32_t,%d,  casenum,Ri32,act)}
