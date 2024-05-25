@@ -48,16 +48,7 @@ _entry:
 	.global n ## _ret; \
 	n ## _ret:
 
-	# Logics
 	jal main
-	#jal test_or
-	#jal test_xor
-
-	# MACs
-	#jal test_vnmsac
-	#jal test_vmadd
-	#jal test_vnmsub
-	#jal test_vmacc
 
 	li a0,0x80001000
 	addi a1,zero,'D'
