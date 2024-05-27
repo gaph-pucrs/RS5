@@ -34,20 +34,18 @@ module vectorUnit
 
     // Decoding signals
     logic [ 4:0] rd, rs1, rs2;
-    logic [ 2:0] funct3;
     logic [10:0] zimm;
     logic        vm;
     opCat_e      opCat;
-    addrModes_e  addrMode;
     logic        reduction_instruction;
     logic        accumulate_instruction;
     logic        compare_instruction;
-    logic        widening;
+    logic        widening_instruction;
 
     vew_e   vsew, vsew_effective;
     vlmul_e vlmul, vlmul_effective;
     logic[$bits(VLEN )-1:0] vl, vl_curr_reg, vl_next;
-    logic[$bits(VLENB)-1:0] elementsPerRegister;
+    logic[$bits(VLENB)-1:0] elements_per_reg;
 
     vector_states_e  state, next_state;
 
@@ -76,17 +74,15 @@ module vectorUnit
     assign rs2 = instruction_i[24:20];
     assign vm  = instruction_i[25];
 
-    assign funct3   = instruction_i[14:12];
     assign zimm     = {instruction_i[30:20]};
-    assign opCat    = opCat_e'(funct3);
-    assign addrMode = addrModes_e'(instruction_i[27:26]);
+    assign opCat    = opCat_e'(instruction_i[14:12]);
 
     assign accumulate_instruction = (vector_operation_i inside {VMACC, VNMSAC, VMADD, VNMSUB});
     assign reduction_instruction  = (vector_operation_i inside {VREDSUM, VREDMAXU, VREDMAX, VREDMINU, VREDMIN, VREDAND, VREDOR, VREDXOR});
     assign compare_instruction    = (vector_operation_i inside {VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT});
-    assign widening = (vector_operation_i inside {VWMUL, VWMULU, VWMULSU});
+    assign widening_instruction   = (vector_operation_i inside {VWMUL, VWMULU, VWMULSU});
 
-    assign elementsPerRegister = VLENB >> vsew;
+    assign elements_per_reg = VLENB >> vsew;
 
 //////////////////////////////////////////////////////////////////////////////
 // CSRs
@@ -132,7 +128,7 @@ module vectorUnit
 // FSM
 //////////////////////////////////////////////////////////////////////////////
 
-    assign hold_o = (next_state == V_EXEC || next_state == V_END);
+    assign hold_o = (next_state inside {V_EXEC, V_END});
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
@@ -146,7 +142,10 @@ module vectorUnit
     always_comb begin
         unique case (state)
             V_IDLE:
-                if ((instruction_operation_i == VECTOR && !(vector_operation_i inside {VNOP, VSETVL, VSETVLI, VSETIVLI})) || instruction_operation_i inside {VLOAD, VSTORE})
+                if (
+                    (instruction_operation_i == VECTOR && !(vector_operation_i inside {VNOP, VSETVL, VSETVLI, VSETIVLI}))
+                ||  (instruction_operation_i inside {VLOAD, VSTORE})
+                )
                     next_state = V_EXEC;
                 else
                     next_state = V_IDLE;
@@ -170,11 +169,17 @@ module vectorUnit
         endcase
     end
 
+//////////////////////////////////////////////////////////////////////////////
+// SEW and VLMUL Control
+//////////////////////////////////////////////////////////////////////////////
+
     always_comb begin
-        if (widening) begin
+        if (widening_instruction) begin
             unique case (vsew)
-                EW8:  vsew_effective = EW16;
-                EW16: vsew_effective = EW32;
+                EW8:
+                    vsew_effective = EW16;
+                EW16:
+                    vsew_effective = EW32;
                 default: begin
                     vsew_effective = vsew;
                     $error("Widening operations with VSEW=32b are not supported");
@@ -187,15 +192,20 @@ module vectorUnit
     end
 
     always_comb begin
-        if (widening) begin
+        if (widening_instruction) begin
             unique case (vlmul)
-                LMUL_1: vlmul_effective = LMUL_2;
-                LMUL_2: vlmul_effective = LMUL_4;
-                LMUL_8: vlmul_effective = LMUL_8;
-                default: begin
-                    vlmul_effective = vlmul;
+                LMUL_1:
+                    vlmul_effective = LMUL_2;
+                LMUL_2:
+                    vlmul_effective = LMUL_4;
+                LMUL_4:
+                    vlmul_effective = LMUL_8;
+                LMUL_8: begin
+                    vlmul_effective = LMUL_8;
                     $error("Widening operations with LMUL=8 are not supported");
                 end
+                default:
+                    vlmul_effective = vlmul;
             endcase
         end
         else begin
@@ -203,49 +213,50 @@ module vectorUnit
         end
     end
 
-    always_ff @(posedge clk or negedge reset_n) begin
+//////////////////////////////////////////////////////////////////////////////
+// Cycle Count Control
+//////////////////////////////////////////////////////////////////////////////
+
+    always_ff @(posedge clk or negedge reset_n)
         if (!reset_n)
             cycle_count <= 0;
         else if (next_state == V_IDLE)
             cycle_count <= 0;
         else if (next_state == V_EXEC && hold == 1'b0)
             cycle_count <= cycle_count + 1;
-    end
 
-    always_ff @(posedge clk or negedge reset_n) begin
+    always_ff @(posedge clk or negedge reset_n)
+        if (!reset_n)
+            cycle_count_vd <= 0;
+        else if ((next_state == V_IDLE) || (accumulate_instruction && state == V_IDLE && next_state == V_EXEC))
+            cycle_count_vd <= 0;
+        else if (next_state == V_EXEC && (!hold || hold_widening))
+            cycle_count_vd <= cycle_count_vd + 1;
+
+    always_ff @(posedge clk or negedge reset_n)
         if (!reset_n)
             cycle_count_r <= 0;
-        else if (widening || accumulate_instruction)
+        else if (widening_instruction || accumulate_instruction)
             cycle_count_r <= cycle_count_vd;
         else if (!hold)
             cycle_count_r <= cycle_count;
-    end
 
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            cycle_count_vd <= 0;
-        else if (next_state == V_IDLE)
-            cycle_count_vd <= 0;
-        else if (accumulate_instruction == 1'b1 && state == V_IDLE && next_state == V_EXEC)
-            cycle_count_vd <= 0;
-        else if (next_state == V_EXEC && ((hold == 1'b0) || (hold == 1'b1 && hold_widening == 1'b1)))
-            cycle_count_vd <= cycle_count_vd + 1;
-    end
+//////////////////////////////////////////////////////////////////////////////
+// Vector Length Control
+//////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk or negedge reset_n) begin
+    always_ff @(posedge clk or negedge reset_n)
         if (!reset_n)
             vl_curr_reg <= '0;
         else if (next_state == V_IDLE)
             vl_curr_reg <= 0;
-        else if (state == V_IDLE && next_state == V_EXEC)
-            vl_curr_reg <= vl;
-        else if (accumulate_instruction && cycle_count_vd == 0)
+        else if ((state == V_IDLE && next_state == V_EXEC) || (accumulate_instruction && cycle_count_vd == 0))
             vl_curr_reg <= vl;
         else if (next_state == V_EXEC && (hold == 1'b0))
-            vl_curr_reg <= $signed(vl_curr_reg - elementsPerRegister) >= 0
-                            ? vl_curr_reg - elementsPerRegister
-                            : 0;
-    end
+            if ($signed(vl_curr_reg - elements_per_reg) >= 0)
+                vl_curr_reg = vl_curr_reg - elements_per_reg;
+            else
+                vl_curr_reg = 0;
 
 //////////////////////////////////////////////////////////////////////////////
 // Register Bank
@@ -259,73 +270,48 @@ module vectorUnit
     end
 
     always_ff @(posedge clk) begin
-        if ((hold == 1'b0) || (hold == 1'b1 && hold_widening == 1'b1))
-        vd_addr   <= rd + cycle_count_vd;
-        vd_addr_r <= vd_addr;
+        if (!hold || hold_widening) begin
+            vd_addr   <= (reduction_instruction)
+                        ? rd
+                        : rd + cycle_count_vd;
+            vd_addr_r <= vd_addr;
+        end
     end
 
     // WRITE ENABLE GENERATION
     always_ff @(posedge clk) begin
-        if ((state == V_EXEC) && (vl_curr_reg > 0) && (!hold || hold_widening) && instruction_operation_i != VSTORE) begin
-            unique case (vsew_effective)
-                EW8: begin
-                    for (int i = 0; i < VLENB; i++) begin
-                        if (reduction_instruction) begin
-                            write_enable[i] <= (i == 0) ? 1'b1 : 1'b0;
-                        end
-                        else begin
-                            if (vm || mask_sew8[cycle_count_r][i]) begin
-                                write_enable[i] <= (i < vl_curr_reg) ? 1'b1 : 1'b0;
-                            end
-                            else begin
+        if ((state == V_EXEC) && (!hold || hold_widening) && instruction_operation_i != VSTORE) begin
+            if (reduction_instruction) begin
+                unique case (vsew_effective)
+                    EW8:     write_enable <= {'0, 1'b1};
+                    EW16:    write_enable <= {'0, 2'b11};
+                    default: write_enable <= {'0, 4'b1111};
+                endcase
+            end
+            else begin
+                unique case (vsew_effective)
+                    EW8:
+                        for (int i = 0; i < VLENB; i++)
+                            if ((vm || mask_sew8[cycle_count_r][i]) && (i < vl_curr_reg))
+                                write_enable[i] <= 1'b1;
+                            else
                                 write_enable[i] <= 1'b0;
-                            end
-                        end
-                    end
-                end
-                EW16: begin
-                    for (int i = 0; i < VLENB/2; i++) begin
-                        if (reduction_instruction) begin
-                            write_enable[(i*2)]   <= (i == 0) ? 1'b1 : 1'b0;
-                            write_enable[(i*2)+1] <= (i == 0) ? 1'b1 : 1'b0;
-                        end
-                        else begin
-                            if (vm || mask_sew16[cycle_count_r][i]) begin
-                                write_enable[(i*2)]   <= (i < vl_curr_reg) ? 1'b1 : 1'b0;
-                                write_enable[(i*2)+1] <= (i < vl_curr_reg) ? 1'b1 : 1'b0;
-                            end
-                            else begin
-                                write_enable[(i*2)]   <= 1'b0;
-                                write_enable[(i*2)+1] <= 1'b0;
-                            end
-                        end
-                    end
-                end
-                default: begin
-                    for (int i = 0; i < VLENB/4; i++) begin
-                        if (reduction_instruction) begin
-                            write_enable[(i*4)]   <= (i == 0) ? 1'b1 : 1'b0;
-                            write_enable[(i*4)+1] <= (i == 0) ? 1'b1 : 1'b0;
-                            write_enable[(i*4)+2] <= (i == 0) ? 1'b1 : 1'b0;
-                            write_enable[(i*4)+3] <= (i == 0) ? 1'b1 : 1'b0;
-                        end
-                        else begin
-                            if (vm || mask_sew32[cycle_count_r][i]) begin
-                                write_enable[(i*4)]   <= (i < vl_curr_reg) ? 1'b1 : 1'b0;
-                                write_enable[(i*4)+1] <= (i < vl_curr_reg) ? 1'b1 : 1'b0;
-                                write_enable[(i*4)+2] <= (i < vl_curr_reg) ? 1'b1 : 1'b0;
-                                write_enable[(i*4)+3] <= (i < vl_curr_reg) ? 1'b1 : 1'b0;
-                            end
-                            else begin
-                                write_enable[(i*4)]   <= 1'b0;
-                                write_enable[(i*4)+1] <= 1'b0;
-                                write_enable[(i*4)+2] <= 1'b0;
-                                write_enable[(i*4)+3] <= 1'b0;
-                            end
-                        end
-                    end
-                end
-            endcase
+
+                    EW16:
+                        for (int i = 0; i < VLENB/2; i++)
+                            if ((vm || mask_sew16[cycle_count_r][i]) && (i < vl_curr_reg))
+                                write_enable[(i*2)+:2] <= 2'b11;
+                            else
+                                write_enable[(i*2)+:2] <= 2'b00;
+
+                    default:
+                        for (int i = 0; i < VLENB/4; i++)
+                            if ((vm || mask_sew32[cycle_count_r][i]) && (i < vl_curr_reg))
+                                write_enable[(i*4)+:4] <= 4'b1111;
+                            else
+                                write_enable[(i*4)+:4] <= 4'b0000;
+                endcase
+            end
         end
         else begin
             write_enable <= '0;
@@ -356,7 +342,7 @@ module vectorUnit
 
     always_comb begin
         unique case (vsew)
-            EW8:     scalar_replicated = {(VLENB){op1_scalar_i[7:0]}};
+            EW8:     scalar_replicated = {(VLENB)  {op1_scalar_i[ 7:0]}};
             EW16:    scalar_replicated = {(VLENB/2){op1_scalar_i[15:0]}};
             default: scalar_replicated = {(VLENB/4){op1_scalar_i[31:0]}};
         endcase
@@ -464,7 +450,6 @@ module vectorUnit
         .mask_sew32         (mask_sew32),
         .current_state      (state),
         .vsew               (vsew),
-        .widening_i         (widening),
         .hold_o             (hold_alu),
         .hold_widening_o    (hold_widening),
         .result_o           (result_alu)
@@ -490,4 +475,5 @@ module vectorUnit
             wr_en_scalar_o = 1'b0;
         end
     end
+
 endmodule

@@ -35,21 +35,7 @@ module vectorRegbank
 //////////////////////////////////////////////////////////////////////////////
 // Reset and Write control
 //////////////////////////////////////////////////////////////////////////////
-/*
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            regfile <= '{VLEN{'0}};
-        else begin
-            // Don't write to v0 (reserved for vector mask)
-            if ((enable != '0) && (vd_addr != '0)) begin
-                for (int i = 0; i < VLENB; i++) begin
-                    if (enable[i])
-                        regfile[vd_addr][(8*(i+1))-1-:8]  <= result[(8*(i+1))-1-:8];
-                end
-            end
-        end
-    end
-*/
+
     for (genvar j = 0; j < 32 ; j++) begin : gen_vectorRegfile
         always_ff @(posedge clk  or negedge reset_n) begin
             if (!reset_n) begin
@@ -58,7 +44,7 @@ module vectorRegbank
             else if (vd_addr == j && enable != '0) begin
                 for (int i = 0; i < VLENB; i++) begin
                     if (enable[i]) begin
-                        regfile[j][(8*(i+1))-1-:8]  <= result[(8*(i+1))-1-:8];
+                        regfile[j][(8*i)+:8]  <= result[(8*i)+:8];
                     end
                 end
             end
