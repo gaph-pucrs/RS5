@@ -37,6 +37,7 @@ module CSRBank
 (
     input   logic               clk,
     input   logic               reset_n,
+    input   logic               sys_reset,
 
     input   logic               read_enable_i,
     input   logic               write_enable_i,
@@ -243,11 +244,11 @@ module CSRBank
 // CSR Writing
 //////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk or negedge reset_n) begin
+    always_ff @(posedge clk or negedge reset_n or posedge sys_reset) begin
         //////////////////////////////////////////////////////////////////////////////
         // Reset
         //////////////////////////////////////////////////////////////////////////////
-        if (!reset_n) begin
+        if (!reset_n | sys_reset) begin
             mstatus_mie      <= 1'b0;
             misa             <= MISA_VALUE;
             //medeleg        <= '0;
