@@ -254,9 +254,9 @@ module vectorUnit
             vl_curr_reg <= vl;
         else if (next_state == V_EXEC && (hold == 1'b0))
             if ($signed(vl_curr_reg - elements_per_reg) >= 0)
-                vl_curr_reg = vl_curr_reg - elements_per_reg;
+                vl_curr_reg <= vl_curr_reg - elements_per_reg;
             else
-                vl_curr_reg = 0;
+                vl_curr_reg <= 0;
 
 //////////////////////////////////////////////////////////////////////////////
 // Register Bank
@@ -299,7 +299,7 @@ module vectorUnit
 
                     EW16:
                         for (int i = 0; i < VLENB/2; i++)
-                            if ((vm || mask_sew16[cycle_count_r][i]) && (i < vl_curr_reg))
+                            if ((vm || mask_sew16[cycle_count_r][i]) && (i < vl_curr_reg)) 
                                 write_enable[(i*2)+:2] <= 2'b11;
                             else
                                 write_enable[(i*2)+:2] <= 2'b00;
@@ -430,6 +430,11 @@ module vectorUnit
 // ALU
 //////////////////////////////////////////////////////////////////////////////
 
+    logic [$bits(VLEN )-1:0] vl_reductions;
+    assign vl_reductions = (vl_curr_reg > elements_per_reg)
+                            ? elements_per_reg
+                            : vl_curr_reg;
+
     vectorALU #(
         .VLEN   (VLEN),
         .VLENB  (VLENB)
@@ -443,7 +448,7 @@ module vectorUnit
         .cycle_count        (cycle_count),
         .cycle_count_r      (cycle_count_r),
         .vlmul              (vlmul),
-        .vl                 (vl),
+        .vl                 (vl_reductions),
         .vm                 (vm),
         .mask_sew8          (mask_sew8),
         .mask_sew16         (mask_sew16),
