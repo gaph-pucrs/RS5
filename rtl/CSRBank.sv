@@ -51,6 +51,7 @@ module CSRBank
     input   iType_e             instruction_operation_i,
     input   logic               hazard,
     input   logic               stall,
+    input   logic               hold,
     /* verilator lint_on UNUSEDSIGNAL */
 
     input   logic               raise_exception_i,
