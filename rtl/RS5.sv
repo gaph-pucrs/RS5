@@ -367,6 +367,7 @@ module RS5
         .instruction_operation_i    (instruction_operation_execute),
         .hazard                     (hazard),
         .stall                      (stall),
+        .hold                       (hold),
         .vtype_i                    (vtype),
         .vlen_i                     (vlen),
         .raise_exception_i          (RAISE_EXCEPTION),

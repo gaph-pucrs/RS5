@@ -53,6 +53,7 @@ module CSRBank
     input   iType_e             instruction_operation_i,
     input   logic               hazard,
     input   logic               stall,
+    input   logic               hold,
 
     input   logic [31:0]        vtype_i,
     input   logic [31:0]        vlen_i,
@@ -275,7 +276,7 @@ module CSRBank
         //////////////////////////////////////////////////////////////////////////////
         else begin
             mcycle      <= mcycle + 1;
-            minstret    <= (killed)
+            minstret    <= (killed | hold)
                             ? minstret
                             : minstret + 1;
         //////////////////////////////////////////////////////////////////////////////
@@ -584,8 +585,10 @@ module CSRBank
                     store_counter           <= (instruction_operation_i inside {SB, SH, SW})                                    ? store_counter             + 1 : store_counter;
                     sys_counter             <= (instruction_operation_i inside {SRET, MRET, WFI, ECALL, EBREAK})                ? sys_counter               + 1 : sys_counter;
                     csr_counter             <= (instruction_operation_i inside {CSRRW, CSRRWI, CSRRS, CSRRSI, CSRRC, CSRRCI})   ? csr_counter               + 1 : csr_counter;
-                    mul_counter             <= (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU})                      ? mul_counter               + 1 : mul_counter;
-                    div_counter             <= (instruction_operation_i inside {DIV, DIVU, REM, REMU})                          ? div_counter               + 1 : div_counter;
+                    if (!hold) begin
+                        mul_counter         <= (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU})                      ? mul_counter               + 1 : mul_counter;
+                        div_counter         <= (instruction_operation_i inside {DIV, DIVU, REM, REMU})                          ? div_counter               + 1 : div_counter;
+                    end
                 end
             end
         end
