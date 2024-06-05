@@ -48,7 +48,7 @@ module fetch  #(parameter start_address = 32'b0)(
 // PC Control
 //////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk or negedge reset_n or posedge sys_reset) begin
+    always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n | sys_reset) begin
             pc <= start_address;
         end
