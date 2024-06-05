@@ -36,6 +36,7 @@ module execute
 (
     input   logic               clk,
     input   logic               reset_n,
+    input   logic               sys_reset,
     input   logic               stall,
 
     /* Bits 14:12 and 6:0 are not used in this module */
@@ -408,7 +409,7 @@ end
 // Killed signal generation
 //////////////////////////////////////////////////////////////////////////////
 
-    assign killed   = (curr_tag != tag_i);
+    assign killed   = (curr_tag != tag_i) | sys_reset;
 
     assign killed_o = killed;
 

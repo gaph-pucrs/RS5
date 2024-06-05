@@ -24,6 +24,7 @@
 module fetch  #(parameter start_address = 32'b0)(
     input   logic           clk,
     input   logic           reset_n,
+    input   logic           sys_reset,
     input   logic           enable,
 
     input   logic           jump_i,
@@ -48,7 +49,7 @@ module fetch  #(parameter start_address = 32'b0)(
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
+        if (!reset_n | sys_reset) begin
             pc <= start_address;
         end
         else if (machine_return_i == 1'b1) begin                              

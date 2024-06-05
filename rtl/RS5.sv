@@ -35,6 +35,7 @@ module RS5
 (
     input  logic                    clk,
     input  logic                    reset_n,
+    input  logic                    sys_reset_i,
     input  logic                    stall,
 
     input  logic [31:0]             instruction_i,
@@ -53,6 +54,7 @@ module RS5
 //////////////////////////////////////////////////////////////////////////////
 // Global signals
 //////////////////////////////////////////////////////////////////////////////
+
     logic            jump;
     logic            hazard;
     logic            hold;
@@ -169,8 +171,9 @@ module RS5
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     fetch fetch1 (
-        .clk                    (clk),
-        .reset_n                (reset_n),
+        .clk                    (clk), 
+        .reset_n                (reset_n), 
+        .sys_reset              (sys_reset_i),
         .enable                 (enable_fetch),
         .jump_i                 (jump),
         .jump_target_i          (jump_target),
@@ -281,8 +284,9 @@ module RS5
         .RV32        (RV32),
         .ZKNEEnable  (ZKNEEnable)
     ) execute1 (
-        .clk                    (clk),
-        .reset_n                (reset_n),
+        .clk                    (clk), 
+        .reset_n                (reset_n), 
+        .sys_reset              (sys_reset_i),
         .stall                  (stall),
         .instruction_i          (instruction_execute),
         .pc_i                   (pc_execute),
@@ -340,13 +344,14 @@ module RS5
       .DEBUG      (DEBUG       ),
       .DBG_FILE   (DBG_CSR_FILE)
     ) CSRBank1 (
-        .clk                        (clk),
-        .reset_n                    (reset_n),
-        .read_enable_i              (csr_read_enable),
-        .write_enable_i             (csr_write_enable),
-        .operation_i                (csr_operation),
-        .address_i                  (csr_addr),
-        .data_i                     (csr_data_to_write),
+        .clk                        (clk), 
+        .reset_n                    (reset_n), 
+        .sys_reset                  (sys_reset_i),
+        .read_enable_i              (csr_read_enable), 
+        .write_enable_i             (csr_write_enable), 
+        .operation_i                (csr_operation), 
+        .address_i                  (csr_addr), 
+        .data_i                     (csr_data_to_write), 
         .killed                     (killed),
         .out                        (csr_data_read),
         .instruction_operation_i    (instruction_operation_execute),
