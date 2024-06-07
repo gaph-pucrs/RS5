@@ -26,8 +26,7 @@
 module decode
     import RS5_pkg::*;
 #(
-    parameter bit           ZKNEEnable  = 1'b1,
-    parameter bit           COMPRESSED  = 1'b0
+    parameter bit           ZKNEEnable  = 1'b1
 )
 (
     input   logic           clk,
@@ -39,7 +38,7 @@ module decode
     input   logic  [2:0]    tag_i,
     input   logic [31:0]    rs1_data_read_i,
     input   logic [31:0]    rs2_data_read_i,
-    input   logic           jump_misaligned_i,
+    input   logic           compressed_i,
 
     output  logic  [4:0]    rs1_o,
     output  logic  [4:0]    rs2_o,
@@ -53,7 +52,6 @@ module decode
     output  logic  [2:0]    tag_o,
     output  iType_e         instruction_operation_o,
     output  logic           hazard_o,
-    output  logic           instruction_prefetched_o,
 
     input   logic           exc_inst_access_fault_i,
     output  logic           exc_inst_access_fault_o,
@@ -68,53 +66,9 @@ module decode
     logic           last_stall;
     logic           locked_memory;
     logic  [4:0]    locked_register;
-    logic [31:0]    pc_decode;
-    logic [31:0]    instruction_decode;
 
     formatType_e    instruction_format;
     iType_e         instruction_operation;
-
-//////////////////////////////////////////////////////////////////////////////
-// Compressed extension
-//////////////////////////////////////////////////////////////////////////////
-
-    logic instruction_compressed;
-    logic enable_decode;
-
-    if (COMPRESSED) begin : gen_compressed_on
-
-        logic [31:0] instruction_fetched;
-        logic [31:0] instruction_decompressed;
-
-        assign enable_decode = enable && !jump_misaligned_i;
-        assign instruction_decode = instruction_compressed ? instruction_decompressed : instruction_fetched;
-
-        iprefetch prefetch (
-            .clk                (clk),
-            .reset_n            (reset_n),
-            .enable_i           (enable),
-            .hazard_i           (hazard_o),
-            .tag_i              (tag_i),
-            .pc_i               (pc_i),
-            .instruction_i      (instruction),
-            .prefetched_o       (instruction_prefetched_o),
-            .compressed_o       (instruction_compressed),
-            .pc_o               (pc_decode),
-            .instruction_o      (instruction_fetched)
-        );
-
-        decompresser decompresser (
-            .instruction_i (instruction_fetched[15:0]),
-            .instruction_o (instruction_decompressed)
-        );
-    end
-    else begin : gen_compressed_off
-        assign enable_decode = enable;
-        assign instruction_decode = instruction;
-        assign instruction_compressed = 1'b0;
-        assign pc_decode = pc_i;
-        assign instruction_prefetched_o = 1'b0;
-    end
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -167,9 +121,9 @@ module decode
     logic [6:0] funct7;
     logic [6:0] opcode;
 
-    assign opcode = instruction_decode[6:0];
-    assign funct3 = instruction_decode[14:12];
-    assign funct7 = instruction_decode[31:25];
+    assign opcode = instruction[6:0];
+    assign funct3 = instruction[14:12];
+    assign funct7 = instruction[31:25];
 
     always_comb begin
         unique case (funct3)
@@ -252,7 +206,7 @@ module decode
     end
 
     always_comb begin
-        unique case (instruction_decode[31:7]) inside
+        unique case (instruction[31:7]) inside
             25'b0000000000000000000000000:  decode_system = ECALL;
             25'b0000000000010000000000000:  decode_system = EBREAK;
             25'b0001000000100000000000000:  decode_system = SRET;
@@ -310,11 +264,11 @@ module decode
     logic [31:0] imm_j;
     logic [31:0] imm_r;
 
-    assign imm_i = {{21{instruction_decode[31]}}, instruction_decode[30:20]};
-    assign imm_s = {{21{instruction_decode[31]}}, instruction_decode[30:25], instruction_decode[11:7]};
-    assign imm_b = {{20{instruction_decode[31]}}, instruction_decode[7], instruction_decode[30:25], instruction_decode[11:8], 1'b0};
-    assign imm_u = {instruction_decode[31:12], 12'b0};
-    assign imm_j = {{12{instruction_decode[31]}}, instruction_decode[19:12], instruction_decode[20], instruction_decode[30:25], instruction_decode[24:21], 1'b0};
+    assign imm_i = {{21{instruction[31]}}, instruction[30:20]};
+    assign imm_s = {{21{instruction[31]}}, instruction[30:25], instruction[11:7]};
+    assign imm_b = {{20{instruction[31]}}, instruction[7], instruction[30:25], instruction[11:8], 1'b0};
+    assign imm_u = {instruction[31:12], 12'b0};
+    assign imm_j = {{12{instruction[31]}}, instruction[19:12], instruction[20], instruction[30:25], instruction[24:21], 1'b0};
     assign imm_r = '0;
 
     always_comb begin
@@ -341,8 +295,8 @@ module decode
             locked_register <= '0;
             locked_memory   <= '0;
         end
-        else if (enable_decode == 1'b1) begin
-            locked_register <= instruction_decode[11:7];
+        else if (enable == 1'b1) begin
+            locked_register <= instruction[11:7];
             locked_memory   <= (opcode[6:2] == 5'b01000);
         end
     end
@@ -351,8 +305,8 @@ module decode
 // Addresses to RegBank
 //////////////////////////////////////////////////////////////////////////////
 
-    assign rs1_o = instruction_decode[19:15];
-    assign rs2_o = instruction_decode[24:20];
+    assign rs1_o = instruction[19:15];
+    assign rs2_o = instruction[24:20];
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
@@ -408,7 +362,7 @@ module decode
     assign hazard_rs1 = locked_rs1      & use_rs1;
     assign hazard_rs2 = locked_rs2      & use_rs2;
 
-    assign hazard_o   = (hazard_mem | hazard_rs1 | hazard_rs2) & enable_decode;
+    assign hazard_o   = (hazard_mem | hazard_rs1 | hazard_rs2) & enable;
 
 //////////////////////////////////////////////////////////////////////////////
 // Exception Detection
@@ -418,7 +372,7 @@ module decode
     logic misaligned_fetch;
 
     assign invalid_inst     = instruction_operation == INVALID;
-    assign misaligned_fetch = pc_decode[0] != 1'b0;
+    assign misaligned_fetch = pc_i[0] != 1'b0;
 
 //////////////////////////////////////////////////////////////////////////////
 // Control of the exits based on format
@@ -427,7 +381,7 @@ module decode
     always_comb begin
         unique case (instruction_format)
             U_TYPE, J_TYPE: begin
-                                first_operand   = pc_decode;
+                                first_operand   = pc_i;
                                 second_operand  = immediate;
                                 third_operand   = immediate;
                             end
@@ -480,13 +434,13 @@ module decode
             exc_misaligned_fetch_o  <= 1'b0;
             exc_inst_access_fault_o <= 1'b0;
         end 
-        else if (enable_decode == 1'b1) begin
+        else if (enable == 1'b1) begin
             first_operand_o         <= first_operand;
             second_operand_o        <= second_operand;
             third_operand_o         <= third_operand;
-            pc_o                    <= pc_decode;
-            instruction_o           <= instruction_decode;
-            compressed_o            <= instruction_compressed;
+            pc_o                    <= pc_i;
+            instruction_o           <= instruction;
+            compressed_o            <= compressed_i;
             instruction_operation_o <= instruction_operation;
             tag_o                   <= tag_i;
             exc_ilegal_inst_o       <= invalid_inst;

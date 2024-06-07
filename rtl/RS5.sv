@@ -77,6 +77,14 @@ module RS5
     logic           instruction_prefetched;
 
 //////////////////////////////////////////////////////////////////////////////
+// Prefetch signals
+//////////////////////////////////////////////////////////////////////////////
+
+    logic   [31:0]  pc_prefetch;
+    logic    [2:0]  tag_prefetch;
+    logic           jumped;
+
+//////////////////////////////////////////////////////////////////////////////
 // Decoder signals
 //////////////////////////////////////////////////////////////////////////////
 
@@ -84,6 +92,7 @@ module RS5
     logic    [2:0]  tag_decode;
     logic           enable_decode;
     logic           jump_misaligned;
+    logic           instruction_compressed;
 
 //////////////////////////////////////////////////////////////////////////////
 // RegBank signals
@@ -108,7 +117,7 @@ module RS5
     logic           exc_ilegal_inst_execute;
     logic           exc_misaligned_fetch_execute;
     logic           exc_inst_access_fault_execute;
-    logic           instruction_compressed;
+    logic           instruction_compressed_execute;
 
 //////////////////////////////////////////////////////////////////////////////
 // Retire signals
@@ -163,7 +172,7 @@ module RS5
                             ? regbank_data_writeback
                             : regbank_data2;
 
-    assign enable_fetch = ~(stall | hazard | hold | instruction_prefetched);
+    assign enable_fetch = ~(stall | hold | instruction_prefetched);
 
     assign enable_decode = ~(stall | hold);
 
@@ -172,10 +181,11 @@ module RS5
 //////////////////////////////////////////////////////////// FETCH //////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+
     fetch fetch1 (
         .clk                    (clk),
         .reset_n                (reset_n),
-        .enable                 (enable_fetch),
+        .enable_i               (enable_fetch),
         .jump_i                 (jump),
         .jump_target_i          (jump_target),
         .mtvec_i                (mtvec),
@@ -183,10 +193,12 @@ module RS5
         .exception_raised_i     (RAISE_EXCEPTION),
         .machine_return_i       (MACHINE_RETURN),
         .interrupt_ack_i        (interrupt_ack_o),
+        .hazard_i               (hazard),
         .jump_misaligned_o      (jump_misaligned),
+        .jumped_o               (jumped),
         .instruction_address_o  (instruction_address), 
-        .pc_o                   (pc_decode), 
-        .tag_o                  (tag_decode)
+        .pc_o                   (pc_prefetch), 
+        .tag_o                  (tag_prefetch)
     );
 
     if (XOSVMEnable == 1'b1) begin : gen_xosvm_i_mmu_on
@@ -205,20 +217,65 @@ module RS5
         assign instruction_address_o = instruction_address;
     end
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////// C EXTENSION PREFETCH //////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    
+
+    logic [31:0] instruction_decode;
+
+    if (COMPRESSED == 1'b1) begin : gen_compressed_on
+
+        logic enable_prefetch;
+
+        logic [31:0] instruction_fetched;
+        logic [31:0] instruction_decompressed;
+
+        assign enable_prefetch = ~(stall | hold);
+        assign instruction_decode = instruction_compressed ? instruction_decompressed : instruction_fetched;
+
+        iprefetch prefetch (
+            .clk                (clk),
+            .reset_n            (reset_n),
+            .enable_i           (enable_prefetch),
+            .hazard_i           (hazard),
+            .jumped_i           (jumped),
+            .tag_i              (tag_prefetch),
+            .pc_i               (pc_prefetch),
+            .instruction_i      (instruction_i),
+            .jump_misaligned_i  (jump_misaligned),
+            .prefetched_o       (instruction_prefetched),
+            .compressed_o       (instruction_compressed),
+            .tag_o              (tag_decode),
+            .pc_o               (pc_decode),
+            .instruction_o      (instruction_fetched)
+        );
+
+        decompresser decompresser (
+            .instruction_i (instruction_fetched[15:0]),
+            .instruction_o (instruction_decompressed)
+        );
+    end
+    else begin : gen_compressed_off
+        assign instruction_decode = instruction_i;
+        assign instruction_compressed = 1'b0;
+        assign pc_decode = pc_prefetch;
+        assign tag_decode = tag_prefetch;
+        assign instruction_prefetched = 1'b0;
+    end
+
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// DECODER /////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     decode # (
-        .ZKNEEnable(ZKNEEnable),
-        .COMPRESSED(COMPRESSED)
+        .ZKNEEnable(ZKNEEnable)
     ) decoder1 (
         .clk                        (clk),
         .reset_n                    (reset_n),
         .enable                     (enable_decode),
-        .instruction_i              (instruction_i),
-        .jump_misaligned_i          (jump_misaligned),
+        .instruction_i              (instruction_decode),
         .pc_i                       (pc_decode), 
         .tag_i                      (tag_decode), 
         .rs1_data_read_i            (rs1_data_read), 
@@ -231,11 +288,11 @@ module RS5
         .third_operand_o            (third_operand_execute), 
         .pc_o                       (pc_execute), 
         .instruction_o              (instruction_execute), 
-        .compressed_o               (instruction_compressed),
-        .tag_o                      (tag_execute), 
+        .compressed_i               (instruction_compressed),
+        .compressed_o               (instruction_compressed_execute),
+        .tag_o                      (tag_execute),
         .instruction_operation_o    (instruction_operation_execute), 
         .hazard_o                   (hazard),
-        .instruction_prefetched_o   (instruction_prefetched),
         .exc_inst_access_fault_i    (mmu_inst_fault),
         .exc_inst_access_fault_o    (exc_inst_access_fault_execute),
         .exc_ilegal_inst_o          (exc_ilegal_inst_execute),
@@ -299,7 +356,7 @@ module RS5
         .second_operand_i        (second_operand_execute), 
         .third_operand_i         (third_operand_execute),
         .instruction_operation_i (instruction_operation_execute), 
-        .instruction_compressed_i(instruction_compressed),
+        .instruction_compressed_i(instruction_compressed_execute),
         .tag_i                   (tag_execute), 
         .privilege_i             (privilege),
         .exc_ilegal_inst_i       (exc_ilegal_inst_execute),

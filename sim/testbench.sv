@@ -31,7 +31,7 @@ module testbench
 //////////////////////////////////////////////////////////////////////////////
 
     localparam rv32_e        INSTRUCTION_SET = RV32M;
-    localparam bit           COMPRESSED      = 1'b0;
+    localparam bit           COMPRESSED      = 1'b1;
     localparam bit           USE_XOSVM       = 1'b1;
     localparam bit           USE_ZIHPM       = 1'b1;
     localparam bit           USE_ZKNE        = 1'b1;
