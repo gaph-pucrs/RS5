@@ -1,9 +1,0 @@
-[submodule "os/MAestro"]
-	path = os/MAestro
-	url = https://github.com/gaph-pucrs/MAestro
-[submodule "os/libmutils"]
-	path = os/libmutils
-	url = https://github.com/gaph-pucrs/libmutils
-[submodule "os/libmemphis"]
-	path = os/libmemphis
-	url = https://github.com/gaph-pucrs/libmemphis

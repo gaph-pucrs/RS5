@@ -97,14 +97,14 @@ module CSRBank
         6'b0,
         XOSVMEnable,    // X - Non-standard extensions present
         1'b0,
-        1'b0,           // V - Vector extension
+        1'b0,           // V - Vector extension 
         1'b1,           // U - User mode implemented
         1'b0,
         1'b0,           // S - Supervisor mode implemented
         2'b0,
         1'b0,           // P - Packed-SIMD extension
         1'b0,
-        1'b0,           // N - User level interrupts supported
+        1'b0,           // N - User level interrupts supported 
         (RV32==RV32M),  // M - Integer Multiply/Divide extension
         3'b0,
         1'b1,           // I - RV32I/64I/128I base ISA
@@ -151,31 +151,31 @@ module CSRBank
 
     assign mcause = {mcause_interrupt, mcause_exc_code};
 
-    logic mstatus_sie, mstatus_mie, mstatus_spie, mstatus_ube, mstatus_mpie, mstatus_spp;
+    logic mstatus_mie, mstatus_ube, mstatus_mpie;
     logic [1:0] mstatus_vs, mstatus_mpp, mstatus_fs, mstatus_xs;
-    logic mstatus_mprv, mstatus_sum, mstatus_mxr, mstatus_tvm, mstatus_tw, mstatus_tsr, mstatus_sd;
+    logic mstatus_sum, mstatus_tvm, mstatus_tw, mstatus_tsr, mstatus_sd;
 
     assign mstatus = {
-                        mstatus_sd,
-                        8'b0,
-                        mstatus_tsr,
-                        mstatus_tw,
-                        mstatus_tvm,
-                        mstatus_mxr,
-                        mstatus_sum,
-                        mstatus_mprv,
-                        mstatus_xs,
-                        mstatus_fs,
-                        mstatus_mpp,
-                        mstatus_vs,
-                        mstatus_spp,
-                        mstatus_mpie,
-                        mstatus_ube,
-                        mstatus_spie,
-                        1'b0,
-                        mstatus_mie,
-                        1'b0,
-                        mstatus_sie,
+                        mstatus_sd, 
+                        8'b0, 
+                        mstatus_tsr, 
+                        mstatus_tw, 
+                        mstatus_tvm, 
+                        1'b0, // mstatus_mxr 
+                        mstatus_sum, 
+                        1'b0, // mstatus_mprv
+                        mstatus_xs, 
+                        mstatus_fs, 
+                        mstatus_mpp, 
+                        mstatus_vs, 
+                        1'b0, // mstatus_spp
+                        mstatus_mpie, 
+                        mstatus_ube, 
+                        1'b0, 
+                        1'b0, 
+                        mstatus_mie, 
+                        1'b0, 
+                        1'b0, 
                         1'b0
                     };
 
@@ -201,7 +201,7 @@ module CSRBank
         wmask = '1;
         case (CSR)
             MSTATUS:    begin current_val = mstatus;         wmask = 32'h007E19AA; end
-            MISA:       begin current_val = misa;            wmask = 32'h3C000000; end
+            MISA:       begin current_val = misa;            wmask = 32'h00301000; end
             // MEDELEG:    begin current_val = medeleg;         wmask = '1; end
             // MIDELEG:    begin current_val = mideleg;         wmask = '1; end
             MIE:        begin current_val = mie;             wmask = 32'h00000888; end
@@ -235,9 +235,9 @@ module CSRBank
 
     always_comb begin
         case (operation_i)
-            SET:     wr_data = (current_val | data_i) & wmask;
-            CLEAR:   wr_data = (current_val & (~data_i)) & wmask;
-            default: wr_data = data_i & wmask; // WRITE
+            SET:     wr_data = (current_val | (data_i & wmask));
+            CLEAR:   wr_data = (current_val & ~(data_i & wmask));
+            default: wr_data = (current_val & ~wmask) | (data_i & wmask); // WRITE
         endcase
     end
 
@@ -251,7 +251,6 @@ module CSRBank
         //////////////////////////////////////////////////////////////////////////////
         if (!reset_n) begin
             mstatus_mie      <= 1'b0;
-            mstatus_mprv     <= 1'b0;
             misa             <= MISA_VALUE;
             //medeleg        <= '0;
             //mideleg        <= '0;
@@ -310,7 +309,7 @@ module CSRBank
                 mstatus_mie     <= 0;
 
                 /* Interrupted instruction is in fact the next instruction,
-                 * because this one will be retired completely beforing taking
+                 * because this one will be retired completely before taking
                  * the trap
                  */
                 if(jump_i)
@@ -346,19 +345,19 @@ module CSRBank
                                     mstatus_tsr         <= wr_data[22];
                                     mstatus_tw          <= wr_data[21];
                                     mstatus_tvm         <= wr_data[20];
-                                    mstatus_mxr         <= wr_data[19];
+                                    //mstatus_mxr         <= wr_data[19];
                                     mstatus_sum         <= wr_data[18];
-                                    mstatus_mprv        <= wr_data[17];
+                                    //mstatus_mprv        <= wr_data[17];
                                     mstatus_xs          <= wr_data[16:15];
                                     mstatus_fs          <= wr_data[14:13];
                                     mstatus_mpp         <= wr_data[12:11];
                                     mstatus_vs          <= wr_data[10:9];
-                                    mstatus_spp         <= wr_data[8];
+                                    //mstatus_spp         <= wr_data[8];
                                     mstatus_mpie        <= wr_data[7];
                                     mstatus_ube         <= wr_data[6];
-                                    mstatus_spie        <= wr_data[5];
+                                    // mstatus_spie        <= wr_data[5];
                                     mstatus_mie         <= wr_data[3];
-                                    mstatus_sie         <= wr_data[1];
+                                    // mstatus_sie         <= wr_data[1];
                             end
 
                     default:    ; // no op

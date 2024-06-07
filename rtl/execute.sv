@@ -379,6 +379,7 @@ end
 
     always_comb begin
         unique case (instruction_operation_i)
+            NOP,
             SB,SH,SW,
             BEQ,BNE,
             BLT,BLTU,
@@ -509,7 +510,7 @@ end
                 exception_code_o  = NE;
                 // $write("[%0d] MRET: %8h %8h\n", $time, pc_i, instruction_i);
             end
-            else if (interrupt_pending_i == 1'b1 && instruction_operation_i != NOP) begin
+            else if (interrupt_pending_i == 1'b1 && instruction_operation_i != NOP && !hold_o) begin
                 raise_exception_o = 1'b0;
                 machine_return_o  = 1'b0;
                 interrupt_ack_o   = 1'b1;
