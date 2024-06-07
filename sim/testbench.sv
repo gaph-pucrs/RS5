@@ -164,6 +164,7 @@ module testbench
     ) dut (
         .clk                    (clk),
         .reset_n                (reset_n),
+        .sys_reset_i            (1'b0),
         .stall                  (1'b0),
         .instruction_i          (instruction),
         .mem_data_i             (mem_data_read),

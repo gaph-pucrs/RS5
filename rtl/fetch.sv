@@ -24,7 +24,9 @@
 module fetch  #(parameter start_address = 32'b0)(
     input   logic           clk,
     input   logic           reset_n,
+    input   logic           sys_reset,
     input   logic           enable_i,
+
 
     input   logic           jump_i,
     input   logic [31:0]    jump_target_i,
@@ -63,7 +65,7 @@ module fetch  #(parameter start_address = 32'b0)(
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
+        if (!reset_n | sys_reset) begin
             pc <= start_address;
             jump_misaligned <= 1'b0;
         end

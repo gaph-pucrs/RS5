@@ -38,6 +38,7 @@ module CSRBank
 (
     input   logic               clk,
     input   logic               reset_n,
+    input   logic               sys_reset,
 
     input   logic               read_enable_i,
     input   logic               write_enable_i,
@@ -52,6 +53,7 @@ module CSRBank
     input   iType_e             instruction_operation_i,
     input   logic               hazard,
     input   logic               stall,
+    input   logic               hold,
     /* verilator lint_on UNUSEDSIGNAL */
 
     input   logic               raise_exception_i,
@@ -249,7 +251,7 @@ module CSRBank
         //////////////////////////////////////////////////////////////////////////////
         // Reset
         //////////////////////////////////////////////////////////////////////////////
-        if (!reset_n) begin
+        if (!reset_n | sys_reset) begin
             mstatus_mie      <= 1'b0;
             misa             <= MISA_VALUE;
             //medeleg        <= '0;
@@ -447,7 +449,7 @@ module CSRBank
 
     if (XOSVMEnable == 1'b1) begin : gen_xosvm_csr_on
         always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n) begin
+            if (!reset_n | sys_reset) begin
                 mvmctl      <= '0;
                 mvmdo       <= '0;
                 mvmds       <= '0;
@@ -533,7 +535,7 @@ module CSRBank
     if (ZIHPMEnable == 1'b1) begin : gen_zihpm_csr_on
 
         always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n) begin
+            if (!reset_n | sys_reset) begin
                 instructions_killed_counter <= '0;
                 nop_counter                 <= '0;
                 logic_counter               <= '0;
