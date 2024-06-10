@@ -137,8 +137,10 @@ module CSRBank
 
     logic [31:0] instructions_killed_counter, hazard_counter, stall_counter, nop_counter;
     logic [31:0] interrupt_ack_counter, raise_exception_counter, context_switch_counter;
-    logic [31:0] logic_counter, arithmetic_counter, shift_counter, branch_counter, jump_counter;
-    logic [31:0] load_counter, store_counter, sys_counter, csr_counter;
+    logic [31:0] logic_counter, addsub_counter, lui_slt_counter, shift_counter;
+    logic [31:0] branch_counter, jump_counter;
+    logic [31:0] load_counter, store_counter;
+    logic [31:0] sys_counter, csr_counter;
     interruptionCode_e Interruption_Code;
 
     /* Signals enabled with ZIHPM */
@@ -284,7 +286,7 @@ module CSRBank
         //////////////////////////////////////////////////////////////////////////////
             if (machine_return_i == 1'b1) begin
                 mstatus_mie     <= mstatus_mpie;
-                privilege       <= privilegeLevel_e'(mstatus_mpp);      // priv = MPP
+                privilege       <= privilegeLevel_e'(mstatus_mpp);
             end
         //////////////////////////////////////////////////////////////////////////////
         // Exception
@@ -416,7 +418,7 @@ module CSRBank
                 MHPMCOUNTER8:   out = stall_counter;
                 MHPMCOUNTER9:   out = nop_counter;
                 MHPMCOUNTER10:  out = logic_counter;
-                MHPMCOUNTER11:  out = arithmetic_counter;
+                MHPMCOUNTER11:  out = addsub_counter;
                 MHPMCOUNTER12:  out = shift_counter;
                 MHPMCOUNTER13:  out = branch_counter;
                 MHPMCOUNTER14:  out = jump_counter;
@@ -424,6 +426,7 @@ module CSRBank
                 MHPMCOUNTER16:  out = store_counter;
                 MHPMCOUNTER17:  out = sys_counter;
                 MHPMCOUNTER18:  out = csr_counter;
+                MHPMCOUNTER19:  out = lui_slt_counter;
 
                 CYCLEH:         out = mcycle[63:32];
                 TIMEH:          out = mtime_i[63:32];
@@ -547,13 +550,14 @@ module CSRBank
                 instructions_killed_counter <= '0;
                 nop_counter                 <= '0;
                 logic_counter               <= '0;
-                arithmetic_counter          <= '0;
+                addsub_counter              <= '0;
                 shift_counter               <= '0;
                 branch_counter              <= '0;
                 jump_counter                <= '0;
                 load_counter                <= '0;
                 store_counter               <= '0;
                 sys_counter                 <= '0;
+                lui_slt_counter             <= '0;
                 csr_counter                 <= '0;
                 mul_counter                 <= '0;
                 div_counter                 <= '0;
@@ -565,30 +569,30 @@ module CSRBank
                 context_switch_counter      <= '0;
             end
             else begin
-                instructions_killed_counter <= (killed)                                                             ? instructions_killed_counter  + 1 : instructions_killed_counter;
+                instructions_killed_counter <= (killed) ? instructions_killed_counter  + 1 : instructions_killed_counter;
 
-                hazard_counter              <= (hazard)                                                             ? hazard_counter               + 1 : hazard_counter;
-                stall_counter               <= (stall)                                                              ? stall_counter                + 1 : stall_counter;
+                hazard_counter              <= (hazard && !hold) ? hazard_counter + 1 : hazard_counter;
+                stall_counter               <= (stall)           ? stall_counter  + 1 : stall_counter;
 
                 interrupt_ack_counter       <= (interrupt_ack_i)                                                    ? interrupt_ack_counter   + 1 : interrupt_ack_counter;
                 raise_exception_counter     <= (raise_exception_i)                                                  ? raise_exception_counter + 1 : raise_exception_counter;
-                context_switch_counter      <= (jump_i || raise_exception_i || machine_return_i || interrupt_ack_i) ? context_switch_counter + 1 : context_switch_counter;
-                nop_counter                 <= (instruction_operation_i == NOP)                                     ?   nop_counter + 1 : nop_counter;
-
-                if (killed == 1'b0) begin
-                    logic_counter           <= (instruction_operation_i inside {XOR, OR, AND})                                  ? logic_counter             + 1 : logic_counter;
-                    arithmetic_counter      <= (instruction_operation_i inside {ADD, SUB, SLTU, SLT, LUI})                      ? arithmetic_counter        + 1 : arithmetic_counter;
-                    shift_counter           <= (instruction_operation_i inside {SLL, SRL, SRA})                                 ? shift_counter             + 1 : shift_counter;
-                    branch_counter          <= (instruction_operation_i inside {BEQ, BNE, BLT, BLTU, BGE, BGEU})                ? branch_counter            + 1 : branch_counter;
-                    jump_counter            <= (instruction_operation_i inside {JAL, JALR})                                     ? jump_counter              + 1 : jump_counter;
-                    load_counter            <= (instruction_operation_i inside {LB, LBU, LH, LHU, LW})                          ? load_counter              + 1 : load_counter;
-                    store_counter           <= (instruction_operation_i inside {SB, SH, SW})                                    ? store_counter             + 1 : store_counter;
-                    sys_counter             <= (instruction_operation_i inside {SRET, MRET, WFI, ECALL, EBREAK})                ? sys_counter               + 1 : sys_counter;
-                    csr_counter             <= (instruction_operation_i inside {CSRRW, CSRRWI, CSRRS, CSRRSI, CSRRC, CSRRCI})   ? csr_counter               + 1 : csr_counter;
-                    if (!hold) begin
-                        mul_counter         <= (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU})                      ? mul_counter               + 1 : mul_counter;
-                        div_counter         <= (instruction_operation_i inside {DIV, DIVU, REM, REMU})                          ? div_counter               + 1 : div_counter;
-                    end
+                context_switch_counter      <= (jump_i || raise_exception_i || machine_return_i || interrupt_ack_i) ? context_switch_counter  + 1 : context_switch_counter;
+                nop_counter                 <= (instruction_operation_i == NOP && !hold && !killed)                 ? nop_counter             + 1 : nop_counter;
+=======
+                if (!killed && !hold) begin
+                    logic_counter           <= (instruction_operation_i inside {XOR, OR, AND})                                  ? logic_counter   + 1 : logic_counter;
+                    addsub_counter          <= (instruction_operation_i inside {ADD, SUB})                                      ? addsub_counter  + 1 : addsub_counter;
+                    lui_slt_counter         <= (instruction_operation_i inside {SLTU, SLT, LUI})                                ? lui_slt_counter + 1 : lui_slt_counter;
+                    shift_counter           <= (instruction_operation_i inside {SLL, SRL, SRA})                                 ? shift_counter   + 1 : shift_counter;
+                    branch_counter          <= (instruction_operation_i inside {BEQ, BNE, BLT, BLTU, BGE, BGEU})                ? branch_counter  + 1 : branch_counter;
+                    jump_counter            <= (instruction_operation_i inside {JAL, JALR})                                     ? jump_counter    + 1 : jump_counter;
+                    load_counter            <= (instruction_operation_i inside {LB, LBU, LH, LHU, LW})                          ? load_counter    + 1 : load_counter;
+                    store_counter           <= (instruction_operation_i inside {SB, SH, SW})                                    ? store_counter   + 1 : store_counter;
+                    sys_counter             <= (instruction_operation_i inside {SRET, MRET, WFI, ECALL, EBREAK})                ? sys_counter     + 1 : sys_counter;
+                    csr_counter             <= (instruction_operation_i inside {CSRRW, CSRRWI, CSRRS, CSRRSI, CSRRC, CSRRCI})   ? csr_counter     + 1 : csr_counter;
+                    mul_counter             <= (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU})                      ? mul_counter     + 1 : mul_counter;
+                    div_counter             <= (instruction_operation_i inside {DIV, DIVU, REM, REMU})                          ? div_counter     + 1 : div_counter;
+>>>>>>> 21ca1fe (Updated instruction profiling)
                 end
             end
         end
@@ -617,8 +621,9 @@ module CSRBank
 
                 $fwrite(fd,"\nINSTRUCTION COUNTERS:\n");
                 $fwrite(fd,"NOP:                    %0d\n", nop_counter);
+                $fwrite(fd,"LUI_SLT:                %0d\n", lui_slt_counter);
                 $fwrite(fd,"LOGIC:                  %0d\n", logic_counter);
-                $fwrite(fd,"ARITH:                  %0d\n", arithmetic_counter);
+                $fwrite(fd,"ADDSUB:                 %0d\n", addsub_counter);
                 $fwrite(fd,"SHIFT:                  %0d\n", shift_counter);
                 $fwrite(fd,"BRANCH:                 %0d\n", branch_counter);
                 $fwrite(fd,"JUMP:                   %0d\n", jump_counter);
