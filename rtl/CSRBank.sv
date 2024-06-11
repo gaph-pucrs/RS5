@@ -629,7 +629,6 @@ module CSRBank
         assign instructions_killed_counter = '0;
         assign nop_counter                 = '0;
         assign logic_counter               = '0;
-        assign arithmetic_counter          = '0;
         assign shift_counter               = '0;
         assign branch_counter              = '0;
         assign jump_counter                = '0;
