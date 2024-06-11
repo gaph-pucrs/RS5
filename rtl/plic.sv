@@ -108,7 +108,7 @@ module plic
         else begin 
             if (en_i == 1'b1 && we_i != '0) begin
                 if (addr_i == 24'h00000C) begin
-                    iack_o[id_r] <= 1'b1;
+                    iack_o[data_i] <= 1'b1;
                 end
             end else begin
                 iack_o <= '0;
