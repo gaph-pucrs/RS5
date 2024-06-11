@@ -1,3 +1,5 @@
+`include "../rtl/RS5_pkg.sv"
+
 module RS5_FPGA_Platform
     import RS5_pkg::*;
 #(
@@ -6,18 +8,20 @@ module RS5_FPGA_Platform
     parameter rv32_e        RV32        = RV32M,
     parameter bit           XOSVMEnable = 1'b0,
     parameter bit           ZIHPMEnable = 1'b0,
+    parameter bit           ZKNEEnable  = 1'b0,
     parameter int           CLKS_PER_BIT_UART = 20833
 )
 (
     input  logic       clk_p,
     input  logic       clk_n,
-    input  logic       reset,
+    input  logic       reset_n,
     input  logic       BTND,
     input  logic       UART_RX,
     output logic       UART_TX
     
 );
 
+    logic clk;
     IBUFDS CLK_IBUFDS (.I(clk_p), .IB(clk_n), .O(clk));
 
     logic [31:0]            cpu_instruction_address, cpu_instruction;
@@ -104,10 +108,12 @@ module RS5_FPGA_Platform
         .Environment    (Environment),
         .RV32           (RV32),
         .XOSVMEnable    (XOSVMEnable),
-        .ZIHPMEnable    (ZIHPMEnable)
+        .ZIHPMEnable    (ZIHPMEnable),
+        .ZKNEEnable     (ZKNEEnable)
     ) dut (
         .clk                    (clk), 
-        .reset                  (reset),
+        .reset_n                (reset_n),
+        .sys_reset_i            (1'b0),
         .stall                  (stall),
         .instruction_i          (cpu_instruction), 
         .mem_data_i             (cpu_data_in), 
@@ -147,7 +153,7 @@ module RS5_FPGA_Platform
 
     rtc rtc(
         .clk        (clk),
-        .reset      (reset),
+        .reset_n    (reset_n),
         .en_i       (enable_rtc),
         .addr_i     (cpu_data_address[3:0]),
         .we_i       ({4'h0, cpu_write_enable}),
@@ -165,7 +171,7 @@ module RS5_FPGA_Platform
         .i_cnt(i_cnt)
     ) plic1 (
         .clk    (clk),
-        .reset  (reset),
+        .reset_n(reset_n),
         .en_i   (enable_plic),
         .we_i   (cpu_write_enable),
         .addr_i (cpu_data_address[23:0]),
@@ -186,7 +192,7 @@ module RS5_FPGA_Platform
         .CLKS_PER_BIT_UART(CLKS_PER_BIT_UART)
     ) Peripherals1 (
         .clk            (clk), 
-        .reset          (reset), 
+        .reset_n        (reset_n), 
         .stall_o        (stall),
         .enable_i       (enable_peripherals), 
         .write_enable_i (cpu_write_enable),
