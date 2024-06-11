@@ -2,7 +2,7 @@ module Peripherals
     import RS5_pkg::*;
 #(
     parameter i_cnt = 1,
-    parameter CLKS_PER_BIT_UART
+    parameter CLKS_PER_BIT_UART = 868
 )
 (
     input  logic            clk,
@@ -21,7 +21,6 @@ module Peripherals
     input  logic [i_cnt:1]  interrupt_ack_i    
 );
      
-    logic           stall_r;
     logic           BUFFER_write, BUFFER_read, BUFFER_empty, BUFFER_full;
     logic [7:0]     BUFFER_data;
     logic           UART_TX_send;
@@ -31,7 +30,6 @@ module Peripherals
     logic [7:0]     UART_RX_data;
     logic [7:0]     UART_RX_data_reg;
     logic           UART_RX_irq;
-    logic [i_cnt:1] irq;
     logic           BTND_debounced, BTND_debounced_r, button_detected, button_irq, button_ack;
 
     
@@ -66,6 +64,8 @@ module Peripherals
 //////////////////////////////////////////////////////////////////////////////
 // INTERRUPT CONTROL
 //////////////////////////////////////////////////////////////////////////////
+
+    logic UART_RX_ACK;
 
     assign interrupt_req_o[1]   = button_irq;
     assign interrupt_req_o[2]   = UART_RX_irq;
@@ -133,10 +133,6 @@ module Peripherals
         else begin
             stall_o = 0;
         end
-    end
-
-    always_ff @(posedge clk) begin
-        stall_r <= stall_o;
     end
 
     always_ff @(posedge clk or negedge reset_n) begin

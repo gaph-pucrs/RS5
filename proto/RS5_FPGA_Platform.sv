@@ -1,3 +1,5 @@
+`include "../rtl/RS5_pkg.sv"
+
 module RS5_FPGA_Platform
     import RS5_pkg::*;
 #(
@@ -6,6 +8,7 @@ module RS5_FPGA_Platform
     parameter rv32_e        RV32        = RV32M,
     parameter bit           XOSVMEnable = 1'b0,
     parameter bit           ZIHPMEnable = 1'b0,
+    parameter bit           ZKNEEnable  = 1'b0,
     parameter int           CLKS_PER_BIT_UART = 868
 )
 (
@@ -99,10 +102,12 @@ module RS5_FPGA_Platform
         .Environment    (Environment),
         .RV32           (RV32),
         .XOSVMEnable    (XOSVMEnable),
-        .ZIHPMEnable    (ZIHPMEnable)
+        .ZIHPMEnable    (ZIHPMEnable),
+        .ZKNEEnable     (ZKNEEnable)
     ) dut (
         .clk                    (clk), 
         .reset_n                (reset_n),
+        .sys_reset_i            (1'b0),
         .stall                  (stall),
         .instruction_i          (cpu_instruction), 
         .mem_data_i             (cpu_data_in), 
