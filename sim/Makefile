@@ -36,7 +36,7 @@ run:
 	@echo "-- DONE --------------------"
 
 lint:
-	@$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_INPUT) --lint-only -I../rtl -I../rtl/aes
+	@$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_INPUT) --lint-only -I../rtl -I../rtl/aes --timing
 
 clean:
 	@echo
