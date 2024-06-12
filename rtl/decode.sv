@@ -39,6 +39,7 @@ module decode
     input   logic [31:0]    rs1_data_read_i,
     input   logic [31:0]    rs2_data_read_i,
     input   logic           compressed_i,
+    input   logic           jumped_i,
 
     output  logic  [4:0]    rs1_o,
     output  logic  [4:0]    rs2_o,
@@ -362,7 +363,7 @@ module decode
     assign hazard_rs1 = locked_rs1      & use_rs1;
     assign hazard_rs2 = locked_rs2      & use_rs2;
 
-    assign hazard_o   = (hazard_mem | hazard_rs1 | hazard_rs2) & enable;
+    assign hazard_o   = (hazard_mem | hazard_rs1 | hazard_rs2) & enable & !jumped_i;
 
 //////////////////////////////////////////////////////////////////////////////
 // Exception Detection

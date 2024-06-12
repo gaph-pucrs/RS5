@@ -40,6 +40,7 @@ module fetch  #(parameter start_address = 32'b0)(
     
     output  logic           jump_misaligned_o,
     output  logic           jumped_o,
+    output  logic           jumped_r_o,
     output  logic [31:0]    instruction_address_o,
     output  logic [31:0]    pc_o,
     output  logic  [2:0]    tag_o
@@ -121,6 +122,8 @@ module fetch  #(parameter start_address = 32'b0)(
         else if (enable)
             jumped_o <= jumped_r;
     end
+
+    assign jumped_r_o = jumped_r;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)

@@ -84,7 +84,7 @@ module RS5
 
     logic   [31:0]  pc_prefetch;
     logic    [2:0]  tag_prefetch;
-    logic           jumped;
+    logic           jumped, jumped_r;
 
 //////////////////////////////////////////////////////////////////////////////
 // Decoder signals
@@ -199,6 +199,7 @@ module RS5
         .hazard_i               (hazard),
         .jump_misaligned_o      (jump_misaligned),
         .jumped_o               (jumped),
+        .jumped_r_o             (jumped_r),
         .instruction_address_o  (instruction_address), 
         .pc_o                   (pc_prefetch), 
         .tag_o                  (tag_prefetch)
@@ -280,7 +281,8 @@ module RS5
         .enable                     (enable_decode),
         .instruction_i              (instruction_decode),
         .pc_i                       (pc_decode), 
-        .tag_i                      (tag_decode), 
+        .tag_i                      (tag_decode),
+        .jumped_i                   (jumped | jumped_r | jump),
         .rs1_data_read_i            (rs1_data_read), 
         .rs2_data_read_i            (rs2_data_read), 
         .rs1_o                      (rs1), 
