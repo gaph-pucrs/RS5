@@ -95,7 +95,7 @@ module fetch  #(parameter start_address = 32'b0)(
             last_pc <= '0;
             last_pc_o <= '0;
         end
-        else begin
+        else if (enable == 1'b1) begin
             last_pc <= pc;
             last_pc_o <= pc_o;
         end
@@ -138,7 +138,6 @@ module fetch  #(parameter start_address = 32'b0)(
             jump_misaligned_o <= '0;
         end
         else begin
-          
             jump_misaligned_o <= jump_misaligned;
         end
     end
@@ -167,7 +166,7 @@ module fetch  #(parameter start_address = 32'b0)(
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
-            current_tag <= '1;  /* Start with invalid tag */
+            current_tag <= '0;
             next_tag    <= '0;
         end
         else if (jumped) begin

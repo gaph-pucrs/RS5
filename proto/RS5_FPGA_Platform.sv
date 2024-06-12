@@ -105,6 +105,7 @@ module RS5_FPGA_Platform
     ) dut (
         .clk                    (clk), 
         .reset_n                (reset_n),
+        .sys_reset_i            (1'b0),
         .stall                  (stall),
         .instruction_i          (cpu_instruction), 
         .mem_data_i             (cpu_data_in), 
