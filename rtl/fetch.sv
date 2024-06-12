@@ -21,7 +21,11 @@
  * its associated tag.
  */
 
-module fetch  #(parameter start_address = 32'b0)(
+module fetch  #(
+    parameter     start_address = 32'b0,
+    parameter bit COMPRESSED = 1'b0
+)
+(
     input   logic           clk,
     input   logic           reset_n,
     input   logic           sys_reset,
@@ -47,8 +51,11 @@ module fetch  #(parameter start_address = 32'b0)(
 );
 
     logic [31:0] pc;
-    logic [31:0] pc_r;
     logic  [2:0] next_tag, current_tag;
+
+    logic enable;
+
+    logic [31:0] pc_r;
     logic jump_misaligned;
     logic [31:0] last_pc;
     logic [31:0] last_pc_o;
@@ -56,56 +63,73 @@ module fetch  #(parameter start_address = 32'b0)(
     logic jumped;
     logic jumped_r;
 
-    logic enable;
-
-    assign enable = enable_i || jumped;
-
+    assign enable = COMPRESSED ? enable_i || jumped : enable_i;
 
 //////////////////////////////////////////////////////////////////////////////
 // PC Control
 //////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n | sys_reset) begin
-            pc <= start_address;
-            jump_misaligned <= 1'b0;
+    if (COMPRESSED == 1'b1) begin
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n | sys_reset) begin
+                pc <= start_address;
+                jump_misaligned <= 1'b0;
+            end
+            else if (machine_return_i == 1'b1) begin                              
+                pc <= {mepc_i[31:2], 2'b00};
+                if (mepc_i[1:0] != '0)
+                    jump_misaligned <= 1'b1;
+            end
+            else if ((exception_raised_i | interrupt_ack_i) == 1'b1) begin
+                pc <= {mtvec_i[31:2], 2'b00};
+                if (mtvec_i[1:0] != '0)
+                    jump_misaligned <= 1'b1;
+            end
+            else if (jump_i == 1'b1) begin
+                pc <= {jump_target_i[31:2], 2'b00};
+                if (jump_target_i[1:0] != '0)
+                    jump_misaligned <= 1'b1;
+            end
+            else if (enable == 1'b1 && (!hazard_i || jumped_r)) begin
+                pc <= pc + 4;
+                jump_misaligned <= 1'b0;
+            end
         end
-        else if (machine_return_i == 1'b1) begin                              
-            pc <= {mepc_i[31:2], 2'b00};
-            if (mepc_i[1:0] != '0)
-                jump_misaligned <= 1'b1;
-        end
-        else if ((exception_raised_i | interrupt_ack_i) == 1'b1) begin
-            pc <= {mtvec_i[31:2], 2'b00};
-            if (mtvec_i[1:0] != '0)
-                jump_misaligned <= 1'b1;
-        end
-        else if (jump_i == 1'b1) begin
-            pc <= {jump_target_i[31:2], 2'b00};
-            if (jump_target_i[1:0] != '0)
-                jump_misaligned <= 1'b1;
-        end
-        else if (enable == 1'b1 && (!hazard_i || jumped_r)) begin
-            pc <= pc + 4;
-            jump_misaligned <= 1'b0;
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n) begin
+                last_pc <= '0;
+                last_pc_o <= '0;
+            end
+            else if (enable == 1'b1) begin
+                last_pc <= pc;
+                last_pc_o <= pc_o;
+            end
         end
     end
-
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            last_pc <= '0;
-            last_pc_o <= '0;
-        end
-        else if (enable == 1'b1) begin
-            last_pc <= pc;
-            last_pc_o <= pc_o;
+    else begin
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n | sys_reset) begin
+                pc <= start_address;
+            end
+            else if (machine_return_i == 1'b1) begin                              
+                pc <= mepc_i;
+            end
+            else if ((exception_raised_i | interrupt_ack_i) == 1'b1) begin
+                pc <= mtvec_i;
+            end
+            else if (jump_i == 1'b1) begin
+                pc <= jump_target_i;
+            end
+            else if (enable == 1'b1) begin
+                pc <= pc + 4;
+            end
         end
     end
 
 //////////////////////////////////////////////////////////////////////////////
 // Sensitive Outputs 
 //////////////////////////////////////////////////////////////////////////////
-
 
     assign jumped = machine_return_i || exception_raised_i || interrupt_ack_i || jump_i;
 
@@ -125,23 +149,36 @@ module fetch  #(parameter start_address = 32'b0)(
 
     assign jumped_r_o = jumped_r;
 
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            pc_r <= '0;
-        else if (hazard_i && !jumped_r)
-            pc_r <= last_pc;
-        else if (enable == 1'b1)
-            pc_r <= pc;
-    end
+    if (COMPRESSED == 1'b1) begin
 
-    assign pc_o = (hazard_i && !jumped_o) ? last_pc_o : pc_r;
-
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            jump_misaligned_o <= '0;
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                pc_r <= '0;
+            else if (hazard_i && !jumped_r)
+                pc_r <= last_pc;
+            else if (enable == 1'b1)
+                pc_r <= pc;
         end
-        else begin
-            jump_misaligned_o <= jump_misaligned;
+
+        assign pc_o = (hazard_i && !jumped_o) ? last_pc_o : pc_r;
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n) begin
+                jump_misaligned_o <= '0;
+            end
+            else begin
+                jump_misaligned_o <= jump_misaligned;
+            end
+        end
+    end
+    else begin
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n) begin
+                pc_o <= '0;
+            end
+            else if (enable == 1'b1) begin
+                pc_o <= pc;
+            end
         end
     end
 
@@ -151,21 +188,27 @@ module fetch  #(parameter start_address = 32'b0)(
 
     logic [2:0] last_tag;
 
-    always_comb begin
-        if (hazard_i && !jumped_r || !enable) begin
-            instruction_address_o = last_pc;
-            tag_o = last_tag;
+    if (COMPRESSED == 1'b1) begin
+
+        always_comb begin
+            if (hazard_i && !jumped_r || !enable) begin
+                instruction_address_o = last_pc;
+                tag_o = last_tag;
+            end
+            else begin
+                instruction_address_o = pc;
+                tag_o = current_tag;
+            end
         end
-        else begin
-            instruction_address_o = pc;
-            tag_o = current_tag;
-        end
+    end
+    else begin
+        assign instruction_address_o = pc;
+        assign tag_o = current_tag;
     end
 
 //////////////////////////////////////////////////////////////////////////////
 // TAG Calculator 
 //////////////////////////////////////////////////////////////////////////////
-
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
@@ -180,12 +223,14 @@ module fetch  #(parameter start_address = 32'b0)(
         end
     end
 
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            last_tag <= '0;
-        end
-        else begin
-            last_tag <= current_tag;
+    if (COMPRESSED == 1'b1) begin
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n) begin
+                last_tag <= '0;
+            end
+            else begin
+                last_tag <= current_tag;
+            end
         end
     end
     

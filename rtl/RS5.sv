@@ -174,7 +174,12 @@ module RS5
                             ? regbank_data_writeback
                             : regbank_data2;
 
-    assign enable_fetch = ~(stall | hold | instruction_prefetched);
+    if (COMPRESSED == 1'b1) begin
+        assign enable_fetch = ~(stall | hold | instruction_prefetched);
+    end
+    else begin
+        assign enable_fetch = ~(stall | hold | hazard);
+    end
 
     assign enable_decode = ~(stall | hold);
 
@@ -184,7 +189,9 @@ module RS5
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-    fetch fetch1 (
+    fetch #(
+        .COMPRESSED(COMPRESSED)
+    ) fetch1 (
         .clk                    (clk),
         .reset_n                (reset_n),
         .sys_reset              (sys_reset_i),
