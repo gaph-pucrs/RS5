@@ -169,7 +169,7 @@ module fetch  #(parameter start_address = 32'b0)(
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
-            current_tag <= '0;
+            current_tag <= '1;
             next_tag    <= '0;
         end
         else if (jumped) begin

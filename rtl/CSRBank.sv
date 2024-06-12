@@ -65,6 +65,7 @@ module CSRBank
 
     input   logic               jump_i,
     input   logic [31:0]        jump_target_i,
+    input   logic               jump_misaligned_i,
 
     input   logic [63:0]        mtime_i,
 
@@ -139,6 +140,7 @@ module CSRBank
     logic [31:0] branch_counter, jump_counter;
     logic [31:0] load_counter, store_counter;
     logic [31:0] sys_counter, csr_counter;
+    logic [31:0] compressed_counter, jump_misaligned_counter;
     interruptionCode_e Interruption_Code;
 
     /* Signals enabled with ZIHPM */
@@ -554,6 +556,11 @@ module CSRBank
                 mul_counter                 <= '0;
                 div_counter                 <= '0;
 
+                if (COMPRESSED == 1'b1) begin
+                    jump_misaligned_counter     <= '0;
+                    compressed_counter          <= '0;
+                end
+
                 hazard_counter              <= '0;
                 stall_counter               <= '0;
                 interrupt_ack_counter       <= '0;
@@ -570,6 +577,10 @@ module CSRBank
                 raise_exception_counter     <= (raise_exception_i)                                                  ? raise_exception_counter + 1 : raise_exception_counter;
                 context_switch_counter      <= (jump_i || raise_exception_i || machine_return_i || interrupt_ack_i) ? context_switch_counter  + 1 : context_switch_counter;
                 nop_counter                 <= (instruction_operation_i == NOP && !hold && !killed)                 ? nop_counter             + 1 : nop_counter;
+                
+                if (COMPRESSED == 1'b1) begin
+                    jump_misaligned_counter <= jump_misaligned_i && !hold ? jump_misaligned_counter + 1 : jump_misaligned_counter;
+                end
 
                 if (!killed && !hold) begin
                     logic_counter           <= (instruction_operation_i inside {XOR, OR, AND})                                  ? logic_counter   + 1 : logic_counter;
@@ -584,6 +595,10 @@ module CSRBank
                     csr_counter             <= (instruction_operation_i inside {CSRRW, CSRRWI, CSRRS, CSRRSI, CSRRC, CSRRCI})   ? csr_counter     + 1 : csr_counter;
                     mul_counter             <= (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU})                      ? mul_counter     + 1 : mul_counter;
                     div_counter             <= (instruction_operation_i inside {DIV, DIVU, REM, REMU})                          ? div_counter     + 1 : div_counter;
+
+                    if (COMPRESSED == 1'b1) begin
+                        compressed_counter  <= instruction_compressed_i ? compressed_counter + 1 : compressed_counter;
+                    end
                 end
             end
         end
@@ -599,31 +614,37 @@ module CSRBank
             end
 
             final begin
-                $fwrite(fd,"Clock Cycles:           %0d\n", mcycle);
-                $fwrite(fd,"Instructions Retired:   %0d\n", minstret);
-                $fwrite(fd,"Instructions Killed:    %0d\n", instructions_killed_counter);
-                $fwrite(fd,"Context Switches:       %0d\n", context_switch_counter);
-                $fwrite(fd,"Exceptions Raised:      %0d\n", raise_exception_counter);
-                $fwrite(fd,"Interrupts Acked:       %0d\n", interrupt_ack_counter);
+                $fwrite(fd,"Clock Cycles:            %0d\n", mcycle);
+                $fwrite(fd,"Instructions Retired:    %0d\n", minstret);
+                if (COMPRESSED == 1'b1) begin
+                    $fwrite(fd,"Instructions Compressed: %0d\n", compressed_counter);
+                end
+                $fwrite(fd,"Instructions Killed:     %0d\n", instructions_killed_counter);
+                $fwrite(fd,"Context Switches:        %0d\n", context_switch_counter);
+                $fwrite(fd,"Exceptions Raised:       %0d\n", raise_exception_counter);
+                $fwrite(fd,"Interrupts Acked:        %0d\n", interrupt_ack_counter);
+                if (COMPRESSED == 1'b1) begin
+                    $fwrite(fd,"Misaligned Jumps:        %0d\n", jump_misaligned_counter);
+                end
 
                 $fwrite(fd,"\nCYCLES WITH::\n");
-                $fwrite(fd,"HAZARDS:                %0d\n", hazard_counter);
-                $fwrite(fd,"STALL:                  %0d\n", stall_counter);
+                $fwrite(fd,"HAZARDS:                 %0d\n", hazard_counter);
+                $fwrite(fd,"STALL:                   %0d\n", stall_counter);
 
                 $fwrite(fd,"\nINSTRUCTION COUNTERS:\n");
-                $fwrite(fd,"NOP:                    %0d\n", nop_counter);
-                $fwrite(fd,"LUI_SLT:                %0d\n", lui_slt_counter);
-                $fwrite(fd,"LOGIC:                  %0d\n", logic_counter);
-                $fwrite(fd,"ADDSUB:                 %0d\n", addsub_counter);
-                $fwrite(fd,"SHIFT:                  %0d\n", shift_counter);
-                $fwrite(fd,"BRANCH:                 %0d\n", branch_counter);
-                $fwrite(fd,"JUMP:                   %0d\n", jump_counter);
-                $fwrite(fd,"LOAD:                   %0d\n", load_counter);
-                $fwrite(fd,"STORE:                  %0d\n", store_counter);
-                $fwrite(fd,"SYS:                    %0d\n", sys_counter);
-                $fwrite(fd,"CSR:                    %0d\n", csr_counter);
-                $fwrite(fd,"MUL:                    %0d\n", mul_counter);
-                $fwrite(fd,"DIV:                    %0d\n", div_counter);
+                $fwrite(fd,"NOP:                     %0d\n", nop_counter);
+                $fwrite(fd,"LUI_SLT:                 %0d\n", lui_slt_counter);
+                $fwrite(fd,"LOGIC:                   %0d\n", logic_counter);
+                $fwrite(fd,"ADDSUB:                  %0d\n", addsub_counter);
+                $fwrite(fd,"SHIFT:                   %0d\n", shift_counter);
+                $fwrite(fd,"BRANCH:                  %0d\n", branch_counter);
+                $fwrite(fd,"JUMP:                    %0d\n", jump_counter);
+                $fwrite(fd,"LOAD:                    %0d\n", load_counter);
+                $fwrite(fd,"STORE:                   %0d\n", store_counter);
+                $fwrite(fd,"SYS:                     %0d\n", sys_counter);
+                $fwrite(fd,"CSR:                     %0d\n", csr_counter);
+                $fwrite(fd,"MUL:                     %0d\n", mul_counter);
+                $fwrite(fd,"DIV:                     %0d\n", div_counter);
             end
         end
     end
@@ -631,7 +652,8 @@ module CSRBank
         assign instructions_killed_counter = '0;
         assign nop_counter                 = '0;
         assign logic_counter               = '0;
-        assign arithmetic_counter          = '0;
+        assign lui_slt_counter             = '0;
+        assign addsub_counter              = '0;
         assign shift_counter               = '0;
         assign branch_counter              = '0;
         assign jump_counter                = '0;
