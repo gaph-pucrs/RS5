@@ -70,7 +70,7 @@ module iprefetch
     logic [31:0] pc_r;
 
     assign pc = jumped_i || (jumped_r && hazard_r) ? pc_i : pc_r;
-    assign pc_add = compressed ? 32'd2 : 32'd4;
+    assign pc_add = compressed || jump_misaligned_i ? 32'd2 : 32'd4;
     assign next_pc = pc + pc_add;
 
     always_ff @(posedge clk or negedge reset_n) begin
