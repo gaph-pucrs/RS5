@@ -35,9 +35,7 @@ module testbench
     localparam bit           USE_ZIHPM       = 1'b1;
     localparam bit           USE_ZKNE        = 1'b1;
 
-    localparam bit           PROFILING       = 1'b0;
-    localparam bit           PROFILING_FILE  = "./debug/Report.txt";
-
+    localparam bit           PROFILING       = 1'b1;
     localparam bit           DEBUG           = 1'b0;
 
     localparam int           MEM_WIDTH       = 65_536;
@@ -166,8 +164,7 @@ module testbench
         .ZIHPMEnable    (USE_ZIHPM),
         .ZKNEEnable     (USE_ZKNE),
 	.DEBUG          (DEBUG),
-	.PROFILING      (PROFILING),
-	.PROFILING_FILE (PROFILING_FILE)
+	.PROFILING      (PROFILING)
     ) dut (
         .clk                    (clk),
         .reset_n                (reset_n),
