@@ -65,7 +65,11 @@ module CSRBank
 
     input   logic               jump_i,
     input   logic [31:0]        jump_target_i,
+
+    /* Not used without compressed */
+    /* verilator lint_off UNUSEDSIGNAL */
     input   logic               jump_misaligned_i,
+    /* verilator lint_on UNUSEDSIGNAL */
 
     input   logic [63:0]        mtime_i,
 
@@ -415,6 +419,8 @@ module CSRBank
                 MHPMCOUNTER17:  out = sys_counter;
                 MHPMCOUNTER18:  out = csr_counter;
                 MHPMCOUNTER19:  out = lui_slt_counter;
+                MHPMCOUNTER20:  out = compressed_counter;
+                MHPMCOUNTER21:  out = jump_misaligned_counter;
 
                 CYCLEH:         out = mcycle[63:32];
                 TIMEH:          out = mtime_i[63:32];
@@ -656,6 +662,8 @@ module CSRBank
         assign interrupt_ack_counter       = '0;
         assign raise_exception_counter     = '0;
         assign context_switch_counter      = '0;
+        assign compressed_counter          = '0;
+        assign jump_misaligned_counter     = '0;
     end
 
 endmodule
