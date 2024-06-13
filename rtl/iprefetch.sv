@@ -77,7 +77,7 @@ module iprefetch
         if (reset_n == 1'b0) begin
             pc_r <= '0;
         end
-        else if (enable_i == 1'b1 && (hazard_i == 1'b0 || jumped_i)) begin
+        else if (enable_i == 1'b1 && hazard_i == 1'b0) begin
             pc_r <= next_pc;
         end
     end
@@ -95,7 +95,7 @@ module iprefetch
         if (reset_n == 1'b0) begin
             misaligned_r <= '0;
         end
-        else if (enable_i == 1'b1 && (hazard_i == 1'b0 || jumped_i)) begin
+        else if (enable_i == 1'b1 && hazard_i == 1'b0) begin
             misaligned_r <= misaligned;
         end
     end
@@ -151,7 +151,7 @@ module iprefetch
             compressed_o  <= 1'b0;
             instruction_o <= '0;
         end
-        else if (enable_i == 1'b1 && (!hazard_i || jumped_i)) begin
+        else if (enable_i == 1'b1 && !hazard_i) begin
             pc_o          <= pc;
             compressed_o  <= compressed;
             instruction_o <= instruction;
@@ -162,7 +162,7 @@ module iprefetch
         if (reset_n == 1'b0) begin
             tag_o <= '0;
         end
-        else if (enable_i == 1'b1 && (!hazard_i || jumped_i) && !jump_misaligned_i) begin
+        else if (enable_i == 1'b1 && !hazard_i && !jump_misaligned_i) begin
             tag_o <= tag_i;
         end
     end

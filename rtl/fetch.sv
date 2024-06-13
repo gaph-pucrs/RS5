@@ -90,7 +90,7 @@ module fetch  #(
                 if (jump_target_i[1:0] != '0)
                     jump_misaligned <= 1'b1;
             end
-            else if (enable == 1'b1 && (!hazard_i || jumped_r)) begin
+            else if (enable == 1'b1 && !hazard_i) begin
                 pc <= pc + 4;
                 jump_misaligned <= 1'b0;
             end
@@ -154,13 +154,13 @@ module fetch  #(
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
                 pc_r <= '0;
-            else if (hazard_i && !jumped_r)
+            else if (hazard_i)
                 pc_r <= last_pc;
             else if (enable == 1'b1)
                 pc_r <= pc;
         end
 
-        assign pc_o = (hazard_i && !jumped_o) ? last_pc_o : pc_r;
+        assign pc_o = (hazard_i) ? last_pc_o : pc_r;
 
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n) begin
@@ -191,7 +191,7 @@ module fetch  #(
     if (COMPRESSED == 1'b1) begin
 
         always_comb begin
-            if (hazard_i && !jumped_r || !enable) begin
+            if (hazard_i || !enable) begin
                 instruction_address_o = last_pc;
                 tag_o = last_tag;
             end
