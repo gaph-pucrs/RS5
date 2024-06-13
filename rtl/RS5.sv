@@ -23,14 +23,15 @@
 module RS5
     import RS5_pkg::*;
 #(
-    parameter environment_e Environment  = ASIC,
-    parameter rv32_e        RV32         = RV32I,
-    parameter bit           XOSVMEnable  = 1'b0,
-    parameter bit           ZIHPMEnable  = 1'b0,
-    parameter bit           ZKNEEnable   = 1'b0,
-    parameter bit           DEBUG        = 1'b0,
-    parameter string        DBG_REG_FILE = "./debug/regBank.txt",
-    parameter string        DBG_CSR_FILE = "./debug/Report.txt"
+    parameter environment_e Environment    = ASIC,
+    parameter rv32_e        RV32           = RV32I,
+    parameter bit           XOSVMEnable    = 1'b0,
+    parameter bit           ZIHPMEnable    = 1'b0,
+    parameter bit           ZKNEEnable     = 1'b0,
+    parameter bit           DEBUG          = 1'b0,
+    parameter string        DBG_REG_FILE   = "./debug/regBank.txt",
+    parameter bit           PROFILING      = 1'b0,
+    parameter string        PROFILING_FILE = "./debug/Report.txt"
 )
 (
     input  logic                    clk,
@@ -338,11 +339,11 @@ module RS5
 /////////////////////////////////////////////////////////// CSRs BANK ///////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     CSRBank #(
-      .XOSVMEnable(XOSVMEnable ),
-      .ZIHPMEnable(ZIHPMEnable ),
-      .RV32       (RV32        ),
-      .DEBUG      (DEBUG       ),
-      .DBG_FILE   (DBG_CSR_FILE)
+      .XOSVMEnable    (XOSVMEnable   ),
+      .ZIHPMEnable    (ZIHPMEnable   ),
+      .RV32           (RV32          ),
+      .PROFILING      (PROFILING     ),
+      .PROFILING_FILE (PROFILING_FILE)
     ) CSRBank1 (
         .clk                        (clk), 
         .reset_n                    (reset_n), 
