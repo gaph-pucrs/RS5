@@ -76,17 +76,17 @@ module fetch  #(
                 jump_misaligned <= 1'b0;
             end
             else if (machine_return_i == 1'b1) begin                              
-                pc <= {mepc_i[31:2], 2'b00};
+                pc <= {mepc_i[31:2], 1'b0, mepc_i[0]};
                 if (mepc_i[1:0] != '0)
                     jump_misaligned <= 1'b1;
             end
             else if ((exception_raised_i | interrupt_ack_i) == 1'b1) begin
-                pc <= {mtvec_i[31:2], 2'b00};
+                pc <= {mtvec_i[31:2], 1'b0, mtvec_i[0]};
                 if (mtvec_i[1:0] != '0)
                     jump_misaligned <= 1'b1;
             end
             else if (jump_i == 1'b1) begin
-                pc <= {jump_target_i[31:2], 2'b00};
+                pc <= {jump_target_i[31:2], 1'b0, jump_target_i[0]};
                 if (jump_target_i[1:0] != '0)
                     jump_misaligned <= 1'b1;
             end
