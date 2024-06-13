@@ -57,22 +57,22 @@ module plic
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             id_r <= '0;
-        else
+        else if (iack_i)
             id_r <= id_int;
     end
 
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            iack_o <= '0;
-        end
-        else begin
-            iack_o <= '0;
-            if (iack_i == 1'b1)
-                iack_o[id_int] <= 1'b1;
-        end
-    end
+    // always_ff @(posedge clk or negedge reset_n) begin
+    //     if (!reset_n) begin
+    //         iack_o <= '0;
+    //     end
+    //     else begin
+    //         iack_o <= '0;
+    //         if (iack_i == 1'b1)
+    //             iack_o[id_int] <= 1'b1;
+    //     end
+    // end
 
-    assign irq_o    = (|interrupt) & ~iack_i;
+    assign irq_o    = (|interrupt); //& ~iack_i;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Memory Mapped Regs
@@ -86,7 +86,7 @@ module plic
         else if (en_i == 1'b1) begin
             if (we_i != '0) begin
                 case (addr_i)
-                    24'h000008:     ie      <= data_i[i_cnt:1];
+                    24'h000008:     ie            <= data_i[i_cnt:1];
                     default:        ;
                 endcase
             end
@@ -95,9 +95,23 @@ module plic
                     24'h000000:     data_o <= {{31-$clog2(i_cnt){1'b0}}, id_r}; /* ID */
                     24'h000004:     data_o <= {{31-i_cnt{1'b0}}, ip, 1'b0};     /* IP */
                     24'h000008:     data_o <= {{31-i_cnt{1'b0}}, ie, 1'b0};     /* IE */
-
                     default:        data_o <= '0;
                 endcase
+            end
+        end 
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            iack_o <= '0;
+        end
+        else begin 
+            if (en_i == 1'b1 && we_i != '0) begin
+                if (addr_i == 24'h00000C) begin
+                    iack_o[data_i] <= 1'b1;
+                end
+            end else begin
+                iack_o <= '0;
             end
         end
     end

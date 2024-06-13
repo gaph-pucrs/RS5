@@ -157,26 +157,26 @@ module CSRBank
 
     assign mcause = {mcause_interrupt, mcause_exc_code};
 
-    logic mstatus_mie, mstatus_ube, mstatus_mpie;
-    logic [1:0] mstatus_vs, mstatus_mpp, mstatus_fs, mstatus_xs;
-    logic mstatus_sum, mstatus_tvm, mstatus_tw, mstatus_tsr, mstatus_sd;
+    logic mstatus_mpie;
+    logic mstatus_mie;
+    logic [1:0] mstatus_mpp;
 
     assign mstatus = {
-                        mstatus_sd, 
+                        1'b0, 
                         8'b0, 
-                        mstatus_tsr, 
-                        mstatus_tw, 
-                        mstatus_tvm, 
+                        1'b0, 
+                        1'b0, 
+                        1'b0, 
                         1'b0, // mstatus_mxr 
-                        mstatus_sum, 
+                        1'b0, 
                         1'b0, // mstatus_mprv
-                        mstatus_xs, 
-                        mstatus_fs, 
+                        2'b0, 
+                        2'b0, 
                         mstatus_mpp, 
-                        mstatus_vs, 
+                        2'b0, 
                         1'b0, // mstatus_spp
                         mstatus_mpie, 
-                        mstatus_ube, 
+                        1'b0, 
                         1'b0, 
                         1'b0, 
                         mstatus_mie, 
@@ -256,7 +256,7 @@ module CSRBank
         // Reset
         //////////////////////////////////////////////////////////////////////////////
         if (!reset_n | sys_reset) begin
-            mstatus_mie      <= 1'b0;
+            mstatus_mie      <= '0;
             misa             <= MISA_VALUE;
             //medeleg        <= '0;
             //mideleg        <= '0;
@@ -272,6 +272,8 @@ module CSRBank
             mcycle           <= '0;
             minstret         <= '0;
             privilege        <= privilegeLevel_e'(2'b11);
+            mstatus_mpp      <= '1;
+            mstatus_mpie     <= '0;
         end
         //////////////////////////////////////////////////////////////////////////////
         // Cycle Updates
@@ -347,23 +349,9 @@ module CSRBank
                                     mcause_exc_code     <= wr_data[30:0];
                             end
                     MSTATUS:begin
-                                    mstatus_sd          <= wr_data[31];
-                                    mstatus_tsr         <= wr_data[22];
-                                    mstatus_tw          <= wr_data[21];
-                                    mstatus_tvm         <= wr_data[20];
-                                    //mstatus_mxr         <= wr_data[19];
-                                    mstatus_sum         <= wr_data[18];
-                                    //mstatus_mprv        <= wr_data[17];
-                                    mstatus_xs          <= wr_data[16:15];
-                                    mstatus_fs          <= wr_data[14:13];
                                     mstatus_mpp         <= wr_data[12:11];
-                                    mstatus_vs          <= wr_data[10:9];
-                                    //mstatus_spp         <= wr_data[8];
                                     mstatus_mpie        <= wr_data[7];
-                                    mstatus_ube         <= wr_data[6];
-                                    // mstatus_spie        <= wr_data[5];
                                     mstatus_mie         <= wr_data[3];
-                                    // mstatus_sie         <= wr_data[1];
                             end
 
                     default:    ; // no op
@@ -652,7 +640,6 @@ module CSRBank
         assign instructions_killed_counter = '0;
         assign nop_counter                 = '0;
         assign logic_counter               = '0;
-        assign lui_slt_counter             = '0;
         assign addsub_counter              = '0;
         assign shift_counter               = '0;
         assign branch_counter              = '0;
@@ -660,6 +647,7 @@ module CSRBank
         assign load_counter                = '0;
         assign store_counter               = '0;
         assign sys_counter                 = '0;
+        assign lui_slt_counter             = '0;
         assign csr_counter                 = '0;
         assign mul_counter                 = '0;
         assign div_counter                 = '0;
