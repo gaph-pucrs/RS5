@@ -272,8 +272,8 @@ end
             endcase
         end
 
-        assign enable_mul = (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU});
-        assign mul_low    = (instruction_operation_i == MUL);
+        assign enable_mul = (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU}) && !killed;
+        assign mul_low    = (instruction_operation_i == MUL) && !killed;
 
         mul mul1 (
             .clk              (clk),
@@ -303,8 +303,8 @@ end
         logic enable_div;
         logic signed_div;
 
-        assign enable_div = (instruction_operation_i inside {DIV, DIVU, REM, REMU});
-        assign signed_div = (instruction_operation_i inside {DIV, REM});
+        assign enable_div = (instruction_operation_i inside {DIV, DIVU, REM, REMU}) && !killed;
+        assign signed_div = (instruction_operation_i inside {DIV, REM}) && !killed;
 
         div div1 (
             .clk              (clk),
