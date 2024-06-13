@@ -34,8 +34,9 @@ module testbench
     localparam bit           USE_XOSVM       = 1'b1;
     localparam bit           USE_ZIHPM       = 1'b1;
     localparam bit           USE_ZKNE        = 1'b1;
-    localparam int           MEM_WIDTH       = 65536;
-    localparam string        BIN_FILE        = "../app/riscv-tests/test.bin";
+    localparam int           MEM_WIDTH       = 16_777_216;
+    // localparam string        BIN_FILE        = "../app/riscv-tests/test.bin";
+    localparam string BIN_FILE = "../app/conv/test.bin";
 
     localparam int           i_cnt = 1;
 

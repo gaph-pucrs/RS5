@@ -2,7 +2,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "printf.h"
+#include "lib/printf.h"
 
 #include "params/0_bias_lut.h"
 #include "params/3_bias_lut.h"
