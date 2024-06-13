@@ -76,7 +76,11 @@ module RS5
 //////////////////////////////////////////////////////////////////////////////
 
     logic           enable_fetch;
+
+    /* Unused without compressed */
+    /* verilator lint_off UNUSEDSIGNAL */
     logic           instruction_prefetched;
+    /* verilator lint_on UNUSEDSIGNAL */
 
 //////////////////////////////////////////////////////////////////////////////
 // Prefetch signals
@@ -174,10 +178,10 @@ module RS5
                             ? regbank_data_writeback
                             : regbank_data2;
 
-    if (COMPRESSED == 1'b1) begin
+    if (COMPRESSED == 1'b1) begin : gen_en_fetch_c
         assign enable_fetch = ~(stall | hold | instruction_prefetched);
     end
-    else begin
+    else begin : gen_en_fetch_nc
         assign enable_fetch = ~(stall | hold | hazard);
     end
 

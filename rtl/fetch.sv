@@ -40,7 +40,10 @@ module fetch  #(
     input   logic           exception_raised_i,
     input   logic           machine_return_i,
     input   logic           interrupt_ack_i,
+    /* Used only with compressed */
+    /* verilator lint_off UNUSEDSIGNAL */
     input   logic           hazard_i,
+    /* verilator lint_on UNUSEDSIGNAL */
     
     output  logic           jump_misaligned_o,
     output  logic           jumped_o,
@@ -55,10 +58,13 @@ module fetch  #(
 
     logic enable;
 
+    /* Not used without compressed */
+    /* verilator lint_off UNUSEDSIGNAL */
+    logic        jump_misaligned;
     logic [31:0] pc_r;
-    logic jump_misaligned;
     logic [31:0] last_pc;
     logic [31:0] last_pc_o;
+    /* verilator lint_on UNUSEDSIGNAL */
 
     logic jumped;
     logic jumped_r;
@@ -69,7 +75,7 @@ module fetch  #(
 // PC Control
 //////////////////////////////////////////////////////////////////////////////
 
-    if (COMPRESSED == 1'b1) begin
+    if (COMPRESSED == 1'b1) begin : gen_pc_c
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n | sys_reset) begin
                 pc <= start_address;
@@ -107,7 +113,7 @@ module fetch  #(
             end
         end
     end
-    else begin
+    else begin : gen_pc_nc
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n | sys_reset) begin
                 pc <= start_address;
@@ -125,6 +131,10 @@ module fetch  #(
                 pc <= pc + 4;
             end
         end
+
+        assign last_pc   = '0;
+        assign last_pc_o = '0;
+        assign jump_misaligned = 1'b0;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -149,7 +159,7 @@ module fetch  #(
 
     assign jumped_r_o = jumped_r;
 
-    if (COMPRESSED == 1'b1) begin
+    if (COMPRESSED == 1'b1) begin : gen_jmp_c
 
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
@@ -171,7 +181,7 @@ module fetch  #(
             end
         end
     end
-    else begin
+    else begin : gen_jmp_nc
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n) begin
                 pc_o <= '0;
@@ -180,16 +190,21 @@ module fetch  #(
                 pc_o <= pc;
             end
         end
+
+        assign pc_r = '0;
+        assign jump_misaligned_o = 1'b0;
     end
 
 //////////////////////////////////////////////////////////////////////////////
 // Non-Sensitive Outputs 
 //////////////////////////////////////////////////////////////////////////////
 
+    /* Not used when compressed is disabled */
+    /* verilator lint_off UNUSEDSIGNAL */
     logic [2:0] last_tag;
+    /* verilator lint_on UNUSEDSIGNAL */
 
-    if (COMPRESSED == 1'b1) begin
-
+    if (COMPRESSED == 1'b1) begin : gen_addr_c
         always_comb begin
             if (hazard_i || !enable) begin
                 instruction_address_o = last_pc;
@@ -201,7 +216,8 @@ module fetch  #(
             end
         end
     end
-    else begin
+    else begin : gen_addr_nc
+        assign last_tag = '0;
         assign instruction_address_o = pc;
         assign tag_o = current_tag;
     end
@@ -223,7 +239,7 @@ module fetch  #(
         end
     end
 
-    if (COMPRESSED == 1'b1) begin
+    if (COMPRESSED == 1'b1) begin : gen_tag_c
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n) begin
                 last_tag <= '0;
