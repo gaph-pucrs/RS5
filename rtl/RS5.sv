@@ -250,7 +250,7 @@ module RS5
         assign enable_prefetch = !(stall || hold);
         assign instruction_decode = instruction_compressed ? instruction_decompressed : instruction_fetched;
 
-        iprefetch prefetch (
+        align align (
             .clk                (clk),
             .reset_n            (reset_n),
             .enable_i           (enable_prefetch),

@@ -1,6 +1,6 @@
 /*!
  * RS5
- * \file iprefetch.sv
+ * \file laign.sv
  *
  * \author Angelo Elias Dal Zotto <angelo.dalzotto@edu.pucrs.br>
  * GAPH - Hardware Design Support Group (https://corfu.pucrs.br/)
@@ -10,7 +10,7 @@
  * \brief Instruction prefetcher for compressed extension unaligned fetch
  */
 
-module iprefetch
+module align
 (
     input  logic        clk,
     input  logic        reset_n,
