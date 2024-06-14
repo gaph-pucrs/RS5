@@ -23,7 +23,7 @@
 
 module fetch  #(
     parameter     start_address = 32'b0,
-    parameter bit COMPRESSED = 1'b0
+    parameter bit COMPRESSED    = 1'b0
 )
 (
     input   logic           clk,
@@ -69,34 +69,34 @@ module fetch  #(
     logic jumped;
     logic jumped_r;
 
-    assign enable = COMPRESSED ? enable_i || jumped : enable_i;
+    assign enable = COMPRESSED ? (enable_i || jumped) : enable_i;
 
 //////////////////////////////////////////////////////////////////////////////
 // PC Control
 //////////////////////////////////////////////////////////////////////////////
 
-    if (COMPRESSED == 1'b1) begin : gen_pc_c
+    if (COMPRESSED) begin : gen_pc_c
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n | sys_reset) begin
                 pc <= start_address;
                 jump_misaligned <= 1'b0;
             end
-            else if (machine_return_i == 1'b1) begin                              
+            else if (machine_return_i) begin                              
                 pc <= {mepc_i[31:2], 1'b0, mepc_i[0]};
                 if (mepc_i[1:0] != '0)
                     jump_misaligned <= 1'b1;
             end
-            else if ((exception_raised_i | interrupt_ack_i) == 1'b1) begin
+            else if ((exception_raised_i || interrupt_ack_i)) begin
                 pc <= {mtvec_i[31:2], 1'b0, mtvec_i[0]};
                 if (mtvec_i[1:0] != '0)
                     jump_misaligned <= 1'b1;
             end
-            else if (jump_i == 1'b1) begin
+            else if (jump_i) begin
                 pc <= {jump_target_i[31:2], 1'b0, jump_target_i[0]};
                 if (jump_target_i[1:0] != '0)
                     jump_misaligned <= 1'b1;
             end
-            else if (enable == 1'b1 && !hazard_i) begin
+            else if (enable && !hazard_i) begin
                 pc <= pc + 4;
                 jump_misaligned <= 1'b0;
             end
@@ -107,7 +107,7 @@ module fetch  #(
                 last_pc <= '0;
                 last_pc_o <= '0;
             end
-            else if (enable == 1'b1) begin
+            else if (enable) begin
                 last_pc <= pc;
                 last_pc_o <= pc_o;
             end
@@ -118,16 +118,16 @@ module fetch  #(
             if (!reset_n | sys_reset) begin
                 pc <= start_address;
             end
-            else if (machine_return_i == 1'b1) begin                              
+            else if (machine_return_i) begin                              
                 pc <= mepc_i;
             end
-            else if ((exception_raised_i | interrupt_ack_i) == 1'b1) begin
+            else if ((exception_raised_i || interrupt_ack_i)) begin
                 pc <= mtvec_i;
             end
-            else if (jump_i == 1'b1) begin
+            else if (jump_i) begin
                 pc <= jump_target_i;
             end
-            else if (enable == 1'b1) begin
+            else if (enable) begin
                 pc <= pc + 4;
             end
         end
@@ -159,14 +159,14 @@ module fetch  #(
 
     assign jumped_r_o = jumped_r;
 
-    if (COMPRESSED == 1'b1) begin : gen_jmp_c
+    if (COMPRESSED) begin : gen_jmp_c
 
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
                 pc_r <= '0;
             else if (hazard_i)
                 pc_r <= last_pc;
-            else if (enable == 1'b1)
+            else if (enable)
                 pc_r <= pc;
         end
 
@@ -186,7 +186,7 @@ module fetch  #(
             if (!reset_n) begin
                 pc_o <= '0;
             end
-            else if (enable == 1'b1) begin
+            else if (enable) begin
                 pc_o <= pc;
             end
         end
@@ -204,7 +204,7 @@ module fetch  #(
     logic [2:0] last_tag;
     /* verilator lint_on UNUSEDSIGNAL */
 
-    if (COMPRESSED == 1'b1) begin : gen_addr_c
+    if (COMPRESSED) begin : gen_addr_c
         always_comb begin
             if (hazard_i || !enable) begin
                 instruction_address_o = last_pc;
@@ -234,12 +234,12 @@ module fetch  #(
         else if (jumped) begin
             next_tag    <= current_tag + 1'b1;
         end
-        else if (enable == 1'b1) begin
+        else if (enable) begin
             current_tag <= next_tag;
         end
     end
 
-    if (COMPRESSED == 1'b1) begin : gen_tag_c
+    if (COMPRESSED) begin : gen_tag_c
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n) begin
                 last_tag <= '0;

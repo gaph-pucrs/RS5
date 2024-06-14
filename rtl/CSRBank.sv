@@ -327,7 +327,7 @@ module CSRBank
                 if(jump_i)
                     mepc_r      <= jump_target_i;
                 else
-                    mepc_r      <= instruction_compressed_i ? pc_i + 32'd2 : pc_i + 32'd4;
+                    mepc_r      <= pc_i + (instruction_compressed_i ? 32'd2 : 32'd4);
             end
         //////////////////////////////////////////////////////////////////////////////
         // CSR Write
@@ -573,7 +573,7 @@ module CSRBank
                 nop_counter                 <= (instruction_operation_i == NOP && !hold && !killed)                 ? nop_counter             + 1 : nop_counter;
                 
                 if (COMPRESSED == 1'b1) begin
-                    jump_misaligned_counter <= jump_misaligned_i && !hold ? jump_misaligned_counter + 1 : jump_misaligned_counter;
+                    jump_misaligned_counter <= jump_misaligned_counter + ((jump_misaligned_i && !hold) ? 1 : 0);
                 end
 
                 if (!killed && !hold) begin
@@ -591,7 +591,7 @@ module CSRBank
                     div_counter             <= (instruction_operation_i inside {DIV, DIVU, REM, REMU})                          ? div_counter     + 1 : div_counter;
 
                     if (COMPRESSED == 1'b1) begin
-                        compressed_counter  <= instruction_compressed_i ? compressed_counter + 1 : compressed_counter;
+                        compressed_counter  <= compressed_counter + (instruction_compressed_i ? 1 : 0);
                     end
                 end
             end

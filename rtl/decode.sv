@@ -26,7 +26,8 @@
 module decode
     import RS5_pkg::*;
 #(
-    parameter bit           ZKNEEnable  = 1'b1
+    parameter bit           ZKNEEnable  = 1'b1,
+    parameter bit           COMPRESSED  = 1'b0
 )
 (
     input   logic           clk,
@@ -84,21 +85,21 @@ module decode
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
-        if (reset_n == 1'b0)
+        if (!reset_n)
             last_hazard <= 1'b1;
         else
             last_hazard <= hazard_o;
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
-        if (reset_n == 1'b0)
+        if (!reset_n)
             last_stall <= 1'b1;
         else
-            last_stall <= ~enable;
+            last_stall <= !enable;
     end
 
     always_comb begin
-        if ((last_hazard | last_stall) == 1'b1) begin
+        if ((last_hazard || last_stall)) begin
             instruction = last_instruction;
         end
         else begin
@@ -292,11 +293,11 @@ module decode
             locked_register <= '0;
             locked_memory   <= '0;
         end
-        else if (hazard_o == 1'b1) begin
+        else if (hazard_o) begin
             locked_register <= '0;
             locked_memory   <= '0;
         end
-        else if (enable == 1'b1) begin
+        else if (enable) begin
             locked_register <= instruction[11:7];
             locked_memory   <= (opcode[6:2] == 5'b01000);
         end
@@ -363,7 +364,7 @@ module decode
     assign hazard_rs1 = locked_rs1      & use_rs1;
     assign hazard_rs2 = locked_rs2      & use_rs2;
 
-    assign hazard_o   = (hazard_mem | hazard_rs1 | hazard_rs2) & enable & !jumped_i;
+    assign hazard_o   = (hazard_mem || hazard_rs1 || hazard_rs2) && enable && !jumped_i;
 
 //////////////////////////////////////////////////////////////////////////////
 // Exception Detection
@@ -373,7 +374,13 @@ module decode
     logic misaligned_fetch;
 
     assign invalid_inst     = instruction_operation == INVALID;
-    assign misaligned_fetch = pc_i[0] != 1'b0;
+
+    if (COMPRESSED) begin : gen_misaligned_check_c
+        assign misaligned_fetch = pc_i[0] != 1'b0;
+    end
+    else begin : gen_misaligned_check_nc
+        assign misaligned_fetch = pc_i[1:0] != 2'b00;
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 // Control of the exits based on format
@@ -422,7 +429,7 @@ module decode
             exc_misaligned_fetch_o  <= 1'b0;
             exc_inst_access_fault_o <= 1'b0;
         end
-        else if (hazard_o == 1'b1) begin
+        else if (hazard_o) begin
             first_operand_o         <= '0;
             second_operand_o        <= '0;
             third_operand_o         <= '0;
@@ -435,7 +442,7 @@ module decode
             exc_misaligned_fetch_o  <= 1'b0;
             exc_inst_access_fault_o <= 1'b0;
         end 
-        else if (enable == 1'b1) begin
+        else if (enable) begin
             first_operand_o         <= first_operand;
             second_operand_o        <= second_operand;
             third_operand_o         <= third_operand;

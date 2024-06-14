@@ -449,7 +449,7 @@ end
         if (!reset_n) begin
             curr_tag <= '0;
         end
-        else if ((jump_o | raise_exception_o | machine_return_o | interrupt_ack_o) == 1'b1) begin
+        else if ((jump_o || raise_exception_o || machine_return_o || interrupt_ack_o)) begin
             curr_tag <= curr_tag + 1'b1;
         end
     end
@@ -460,7 +460,7 @@ end
 
     always_comb begin
         if ((!reset_n | killed) == 1'b0) begin
-            if (exc_inst_access_fault_i == 1'b1) begin
+            if (exc_inst_access_fault_i) begin
                 raise_exception_o = 1'b1;
                 machine_return_o  = 1'b0;
                 interrupt_ack_o   = 1'b0;
@@ -469,14 +469,14 @@ end
                 // $write("[%0d] EXCEPTION - INSTRUCTION ACCESS FAULT: %8h %8h\n", $time, pc_i, instruction_i);
             end
             else
-            if ((exc_ilegal_inst_i | exc_ilegal_csr_inst) == 1'b1) begin
+            if ((exc_ilegal_inst_i || exc_ilegal_csr_inst)) begin
                 raise_exception_o = 1'b1;
                 machine_return_o  = 1'b0;
                 interrupt_ack_o   = 1'b0;
                 exception_code_o  = ILLEGAL_INSTRUCTION;
                 // $write("[%0d] EXCEPTION - ILLEGAL INSTRUCTION: %8h %8h\n", $time, pc_i, instruction_i);
             end
-            else if (exc_misaligned_fetch_i == 1'b1) begin
+            else if (exc_misaligned_fetch_i) begin
                 raise_exception_o = 1'b1;
                 machine_return_o  = 1'b0;
                 interrupt_ack_o   = 1'b0;

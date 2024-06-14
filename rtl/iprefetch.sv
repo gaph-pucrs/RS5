@@ -33,21 +33,15 @@ module iprefetch
     logic [31:0] instruction;
 
     logic hazard_r;
+    logic jumped_r;
+
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             hazard_r <= 1'b0;
-        end
-        else if (enable_i) begin
-            hazard_r <= hazard_i;
-        end
-    end
-
-    logic jumped_r;
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
             jumped_r <= 1'b0;
         end
         else if (enable_i) begin
+            hazard_r <= hazard_i;
             jumped_r <= jumped_i;
         end
     end
@@ -69,15 +63,15 @@ module iprefetch
     logic [31:0] pc;
     logic [31:0] pc_r;
 
-    assign pc = jumped_i || (jumped_r && hazard_r) ? pc_i : pc_r;
+    assign pc = (jumped_i || (jumped_r && hazard_r)) ? pc_i : pc_r;
     assign pc_add = compressed || jump_misaligned_i ? 32'd2 : 32'd4;
     assign next_pc = pc + pc_add;
 
     always_ff @(posedge clk or negedge reset_n) begin
-        if (reset_n == 1'b0) begin
+        if (!reset_n) begin
             pc_r <= '0;
         end
-        else if (enable_i == 1'b1 && hazard_i == 1'b0) begin
+        else if (enable_i && !hazard_i) begin
             pc_r <= next_pc;
         end
     end
@@ -92,10 +86,10 @@ module iprefetch
     assign misaligned = pc[1];
 
     always_ff @(posedge clk or negedge reset_n) begin
-        if (reset_n == 1'b0) begin
+        if (!reset_n) begin
             misaligned_r <= '0;
         end
-        else if (enable_i == 1'b1 && hazard_i == 1'b0) begin
+        else if (enable_i && !hazard_i) begin
             misaligned_r <= misaligned;
         end
     end
@@ -109,19 +103,19 @@ module iprefetch
     logic [31:0] instruction_misaligned;
     logic [31:0] instruction_prefetched;
     logic        prefetched;
+    logic        prefetched_r;
 
     assign instruction_aligned    = instruction_i;
     assign instruction_misaligned = {instruction_i[15:0], instruction_r[31:16]};
     assign instruction_prefetched = instruction_r;
 
     assign prefetched  = misaligned & compressed;
-
-    logic prefetched_r;
+    assign prefetched_o = prefetched;
 
     always_ff @(posedge clk or negedge reset_n) begin
-        if (reset_n == 1'b0)
+        if (!reset_n)
             prefetched_r <= 1'b0;
-        else if (enable_i == 1'b1 && hazard_i == 1'b0)
+        else if (enable_i && !hazard_i)
             prefetched_r <= prefetched;
     end
 
@@ -135,23 +129,21 @@ module iprefetch
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
-        if (reset_n == 1'b0) begin
+        if (!reset_n) begin
             instruction_r <= '0;
         end
-        else if (enable_i == 1'b1 && !hazard_i && !(prefetched_r && compressed)) begin
+        else if (enable_i && !hazard_i && !(prefetched_r && compressed)) begin
             instruction_r <= instruction_i;
         end
     end
 
-    assign prefetched_o = prefetched;
-
     always_ff @(posedge clk or negedge reset_n) begin
-        if (reset_n == 1'b0) begin
+        if (!reset_n) begin
             pc_o          <= '0;
             compressed_o  <= 1'b0;
             instruction_o <= '0;
         end
-        else if (enable_i == 1'b1 && !hazard_i) begin
+        else if (enable_i && !hazard_i) begin
             pc_o          <= pc;
             compressed_o  <= compressed;
             instruction_o <= instruction;
@@ -159,10 +151,10 @@ module iprefetch
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
-        if (reset_n == 1'b0) begin
+        if (!reset_n) begin
             tag_o <= '0;
         end
-        else if (enable_i == 1'b1 && !hazard_i && !jump_misaligned_i) begin
+        else if (enable_i && !hazard_i && !jump_misaligned_i) begin
             tag_o <= tag_i;
         end
     end

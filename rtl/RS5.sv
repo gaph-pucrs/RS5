@@ -99,6 +99,7 @@ module RS5
     logic           enable_decode;
     logic           jump_misaligned;
     logic           instruction_compressed;
+    logic           is_jumping;
 
 //////////////////////////////////////////////////////////////////////////////
 // RegBank signals
@@ -179,10 +180,10 @@ module RS5
                             : regbank_data2;
 
     if (COMPRESSED == 1'b1) begin : gen_en_fetch_c
-        assign enable_fetch = ~(stall | hold | instruction_prefetched);
+        assign enable_fetch = ~(stall || hold || instruction_prefetched);
     end
     else begin : gen_en_fetch_nc
-        assign enable_fetch = ~(stall | hold | hazard);
+        assign enable_fetch = ~(stall || hold || hazard);
     end
 
     assign enable_decode = ~(stall | hold);
@@ -246,7 +247,7 @@ module RS5
         logic [31:0] instruction_fetched;
         logic [31:0] instruction_decompressed;
 
-        assign enable_prefetch = ~(stall | hold);
+        assign enable_prefetch = !(stall || hold);
         assign instruction_decode = instruction_compressed ? instruction_decompressed : instruction_fetched;
 
         iprefetch prefetch (
@@ -284,8 +285,11 @@ module RS5
 /////////////////////////////////////////////////////////// DECODER /////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+    assign is_jumping = jumped || jumped_r || jump;
+
     decode # (
-        .ZKNEEnable(ZKNEEnable)
+        .ZKNEEnable(ZKNEEnable),
+        .COMPRESSED(COMPRESSED)
     ) decoder1 (
         .clk                        (clk),
         .reset_n                    (reset_n),
@@ -293,7 +297,7 @@ module RS5
         .instruction_i              (instruction_decode),
         .pc_i                       (pc_decode), 
         .tag_i                      (tag_decode),
-        .jumped_i                   (jumped | jumped_r | jump),
+        .jumped_i                   (is_jumping),
         .rs1_data_read_i            (rs1_data_read), 
         .rs2_data_read_i            (rs2_data_read), 
         .rs1_o                      (rs1), 
