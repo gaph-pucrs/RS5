@@ -100,6 +100,9 @@ _entry:
 	TEST(rem)
 	TEST(remu)
 
+	/* RV32UC */
+	TEST(rvc)
+
 	/* I don't know where this one came from */
 	TEST(j)
 

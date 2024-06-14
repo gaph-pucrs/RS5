@@ -31,6 +31,7 @@ module testbench
 //////////////////////////////////////////////////////////////////////////////
 
     localparam rv32_e        INSTRUCTION_SET = RV32M;
+    localparam bit           COMPRESSED      = 1'b1;
     localparam bit           USE_XOSVM       = 1'b1;
     localparam bit           USE_ZIHPM       = 1'b1;
     localparam bit           USE_ZKNE        = 1'b1;
@@ -160,11 +161,12 @@ module testbench
     RS5 #(
         .Environment    (ASIC),
         .RV32           (INSTRUCTION_SET),
+        .COMPRESSED     (COMPRESSED),
         .XOSVMEnable    (USE_XOSVM),
         .ZIHPMEnable    (USE_ZIHPM),
         .ZKNEEnable     (USE_ZKNE),
-	.DEBUG          (DEBUG),
-	.PROFILING      (PROFILING)
+	    .DEBUG          (DEBUG),
+	    .PROFILING      (PROFILING)
     ) dut (
         .clk                    (clk),
         .reset_n                (reset_n),
