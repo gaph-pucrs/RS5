@@ -28,12 +28,13 @@
 module CSRBank
     import RS5_pkg::*;
 #(
-    parameter bit       XOSVMEnable = 1'b0,
-    parameter bit       ZIHPMEnable = 1'b0,
-    parameter bit       COMPRESSED  = 1'b0,
-    parameter rv32_e    RV32        = RV32I,
-    parameter bit       DEBUG       = 1'b0,
-    parameter string    DBG_FILE    = "./debug/Report.txt"
+    parameter bit       XOSVMEnable    = 1'b0,
+    parameter bit       ZIHPMEnable    = 1'b0,
+    parameter bit       COMPRESSED     = 1'b0,
+    parameter rv32_e    RV32           = RV32I,
+    parameter bit       PROFILING      = 1'b0,
+    parameter string    PROFILING_FILE = "./debug/Report.txt"
+
 )
 (
     input   logic               clk,
@@ -597,13 +598,13 @@ module CSRBank
             end
         end
 
-        if (DEBUG) begin : gen_csr_dbg
+        if (PROFILING) begin : gen_csr_dbg
             int fd;
 
             initial begin
-                fd = $fopen (DBG_FILE, "w");
+                fd = $fopen (PROFILING_FILE, "w");
                 if (fd == 0) begin
-                    $display("Error opening file %s", DBG_FILE);
+                    $display("Error opening file %s", PROFILING_FILE);
                 end
             end
 
