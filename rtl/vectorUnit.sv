@@ -192,7 +192,18 @@ module vectorUnit
     end
 
     always_comb begin
-        if (widening_instruction) begin
+        if (vector_operation_i inside {VMVXS, VMVSX}) begin
+            vlmul_effective = LMUL_1;
+        end
+        else if (vector_operation_i == VMVR) begin
+            unique case (instruction_i[17:15])
+                3'h1:    vlmul_effective = LMUL_2;
+                3'h3:    vlmul_effective = LMUL_4;
+                3'h7:    vlmul_effective = LMUL_8;
+                default: vlmul_effective = LMUL_1;
+            endcase
+        end
+        else if (widening_instruction) begin
             unique case (vlmul)
                 LMUL_1:
                     vlmul_effective = LMUL_2;
@@ -280,8 +291,8 @@ module vectorUnit
 
     // WRITE ENABLE GENERATION
     always_ff @(posedge clk) begin
-        if ((state == V_EXEC) && (!hold || hold_widening) && instruction_operation_i != VSTORE) begin
-            if (reduction_instruction) begin
+        if ((state == V_EXEC) && (!hold || hold_widening) && instruction_operation_i != VSTORE && vector_operation_i != VMVXS) begin
+            if (reduction_instruction || vector_operation_i == VMVSX) begin
                 unique case (vsew_effective)
                     EW8:     write_enable <= {'0, 1'b1};
                     EW16:    write_enable <= {'0, 2'b11};
@@ -471,9 +482,13 @@ module vectorUnit
             res_scalar_o   = vl_next;
             wr_en_scalar_o = 1'b1;
         end
-        else if (instruction_operation_i == VECTOR) begin
-            res_scalar_o   = result[31:0];
-            wr_en_scalar_o = 1'b0;
+        else if (vector_operation_i == VMVXS) begin
+            unique case (vsew_effective)
+                EW8:     res_scalar_o = {'0, result[7:0]};
+                EW16:    res_scalar_o = {'0, result[15:0]};
+                default: res_scalar_o = {'0, result[31:0]};
+            endcase
+            wr_en_scalar_o = 1'b1;
         end
         else begin
             res_scalar_o   = '0;

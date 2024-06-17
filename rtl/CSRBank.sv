@@ -578,7 +578,6 @@ module CSRBank
                 raise_exception_counter     <= (raise_exception_i)                                                  ? raise_exception_counter + 1 : raise_exception_counter;
                 context_switch_counter      <= (jump_i || raise_exception_i || machine_return_i || interrupt_ack_i) ? context_switch_counter  + 1 : context_switch_counter;
                 nop_counter                 <= (instruction_operation_i == NOP && !hold && !killed)                 ? nop_counter             + 1 : nop_counter;
-=======
                 if (!killed && !hold) begin
                     logic_counter           <= (instruction_operation_i inside {XOR, OR, AND})                                  ? logic_counter   + 1 : logic_counter;
                     addsub_counter          <= (instruction_operation_i inside {ADD, SUB})                                      ? addsub_counter  + 1 : addsub_counter;
@@ -592,7 +591,6 @@ module CSRBank
                     csr_counter             <= (instruction_operation_i inside {CSRRW, CSRRWI, CSRRS, CSRRSI, CSRRC, CSRRCI})   ? csr_counter     + 1 : csr_counter;
                     mul_counter             <= (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU})                      ? mul_counter     + 1 : mul_counter;
                     div_counter             <= (instruction_operation_i inside {DIV, DIVU, REM, REMU})                          ? div_counter     + 1 : div_counter;
->>>>>>> 21ca1fe (Updated instruction profiling)
                 end
             end
         end

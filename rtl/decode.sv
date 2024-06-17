@@ -267,6 +267,7 @@ module decode
             6'b001001:     decode_vector_opi = VAND;
             6'b001010:     decode_vector_opi = VOR;
             6'b001011:     decode_vector_opi = VXOR;
+            6'b010111:     decode_vector_opi = VMV;
             6'b011000:     decode_vector_opi = VMSEQ;
             6'b011001:     decode_vector_opi = VMSNE;
             6'b011010:     decode_vector_opi = VMSLTU;
@@ -276,6 +277,7 @@ module decode
             6'b011110:     decode_vector_opi = VMSGTU;
             6'b011111:     decode_vector_opi = VMSGT;
             6'b100101:     decode_vector_opi = VSLL;
+            6'b100111:     decode_vector_opi = VMVR;
             6'b101000:     decode_vector_opi = VSRL;
             6'b101001:     decode_vector_opi = VSRA;
             default:       decode_vector_opi = VNOP;
@@ -292,6 +294,9 @@ module decode
             6'b000101:     decode_vector_opm = VREDMIN;
             6'b000110:     decode_vector_opm = VREDMAXU;
             6'b000111:     decode_vector_opm = VREDMAX;
+            6'b010000:     decode_vector_opm = (rs2_o == '0)
+                                             ? VMVSX
+                                             : VMVXS;
             6'b100000:     decode_vector_opm = VDIVU;
             6'b100001:     decode_vector_opm = VDIV;
             6'b100010:     decode_vector_opm = VREMU;

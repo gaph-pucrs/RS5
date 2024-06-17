@@ -226,7 +226,11 @@ package RS5_pkg;
         VREDMIN,
         VREDAND,
         VREDOR,
-        VREDXOR
+        VREDXOR,
+        VMV,
+        VMVR,
+        VMVSX,
+        VMVXS
     } iTypeVector_e;
 
     typedef enum  logic[2:0] {

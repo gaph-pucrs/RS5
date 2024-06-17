@@ -939,6 +939,8 @@ module vectorALU
             VREDMINU:        result_o <= result_redminu;
             VREDMAX:         result_o <= result_redmax;
             VREDMAXU:        result_o <= result_redmaxu;
+            VMV, VMVSX:      result_o <= second_operand;
+            VMVXS, VMVR:     result_o <= first_operand;
             default:         result_o <= result_add;
         endcase
     end

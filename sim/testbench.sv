@@ -34,8 +34,10 @@ module testbench
     localparam bit           USE_XOSVM       = 1'b1;
     localparam bit           USE_ZIHPM       = 1'b1;
     localparam bit           USE_ZKNE        = 1'b1;
+    localparam bit           VEnable         = 1'b1;
+    localparam int           VLEN            = 512;
     localparam int           MEM_WIDTH       = 65536;
-    localparam string        BIN_FILE        = "../app/riscv-tests/test.bin";
+    localparam string        BIN_FILE        = "../app/vector-tests/test.bin";
 
     localparam int           i_cnt = 1;
 
@@ -156,6 +158,8 @@ module testbench
     RS5 #(
         .Environment(ASIC),
         .RV32       (INSTRUCTION_SET),
+        .VEnable    (VEnable),
+        .VLEN       (VLEN),
         .XOSVMEnable(USE_XOSVM),
         .ZIHPMEnable(USE_ZIHPM),
         .ZKNEEnable (USE_ZKNE)
