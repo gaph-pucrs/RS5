@@ -30,6 +30,7 @@
 module execute
     import RS5_pkg::*;
 #(
+    parameter environment_e Environment = ASIC,
     parameter rv32_e        RV32        = RV32I,
     parameter bit           ZKNEEnable  = 1'b1
 )
@@ -338,6 +339,7 @@ end
         assign aes_valid = (instruction_operation_i inside {AES32ESMI, AES32ESI});
 
         aes_unit #(
+            .Environment (Environment),
             .LOGIC_GATING(1'b1)  // Gate sub-module inputs to save toggling
         ) u_aes_unit (
             .rs1_in   (first_operand_i),      // Source register 1
