@@ -38,3 +38,4 @@ sim/obj_dir
 *.xcix
 **/.Xil
 *.fst
+*.dcp
