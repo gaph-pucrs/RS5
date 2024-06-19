@@ -66,13 +66,13 @@
     <Option Name="WTVcsLaunchSim" Val="0"/>
     <Option Name="WTRivieraLaunchSim" Val="0"/>
     <Option Name="WTActivehdlLaunchSim" Val="0"/>
-    <Option Name="WTXSimExportSim" Val="85"/>
-    <Option Name="WTModelSimExportSim" Val="85"/>
-    <Option Name="WTQuestaExportSim" Val="85"/>
+    <Option Name="WTXSimExportSim" Val="86"/>
+    <Option Name="WTModelSimExportSim" Val="86"/>
+    <Option Name="WTQuestaExportSim" Val="86"/>
     <Option Name="WTIesExportSim" Val="80"/>
-    <Option Name="WTVcsExportSim" Val="85"/>
-    <Option Name="WTRivieraExportSim" Val="85"/>
-    <Option Name="WTActivehdlExportSim" Val="85"/>
+    <Option Name="WTVcsExportSim" Val="86"/>
+    <Option Name="WTRivieraExportSim" Val="86"/>
+    <Option Name="WTActivehdlExportSim" Val="86"/>
     <Option Name="GenerateIPUpgradeLog" Val="TRUE"/>
     <Option Name="XSimRadix" Val="hex"/>
     <Option Name="XSimTimeUnit" Val="ns"/>
@@ -155,6 +155,13 @@
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
+      <File Path="$PPRDIR/../../rtl/align.sv">
+        <FileInfo>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
       <File Path="$PPRDIR/../../rtl/decode.sv">
         <FileInfo>
           <Attr Name="UsedIn" Val="synthesis"/>
@@ -184,13 +191,6 @@
         </FileInfo>
       </File>
       <File Path="$PPRDIR/../../rtl/fetch.sv">
-        <FileInfo>
-          <Attr Name="UsedIn" Val="synthesis"/>
-          <Attr Name="UsedIn" Val="implementation"/>
-          <Attr Name="UsedIn" Val="simulation"/>
-        </FileInfo>
-      </File>
-      <File Path="$PPRDIR/../../rtl/iprefetch.sv">
         <FileInfo>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
@@ -286,6 +286,14 @@
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
+      <File Path="$PPRDIR/../../rtl/iprefetch.sv">
+        <FileInfo>
+          <Attr Name="AutoDisabled" Val="1"/>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
       <File Path="$PPRDIR/../memimage.coe">
         <FileInfo>
           <Attr Name="UsedIn" Val="synthesis"/>
@@ -342,6 +350,14 @@
     </FileSet>
     <FileSet Name="utils_1" Type="Utils" RelSrcDir="$PSRCDIR/utils_1" RelGenDir="$PGENDIR/utils_1">
       <Filter Type="Utils"/>
+      <File Path="$PSRCDIR/utils_1/imports/synth_1/RS5_FPGA_Platform.dcp">
+        <FileInfo>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedInSteps" Val="synth_1"/>
+          <Attr Name="AutoDcp" Val="1"/>
+        </FileInfo>
+      </File>
       <Config>
         <Option Name="TopAutoSet" Val="TRUE"/>
       </Config>
@@ -369,17 +385,14 @@
     </Simulator>
   </Simulators>
   <Runs Version="1" Minor="21">
-    <Run Id="synth_1" Type="Ft3:Synth" SrcSet="sources_1" Part="xc7a100tcsg324-1" ConstrsSet="constrs_1" Description="Higher performance designs, resource sharing is turned off, the global fanout guide is set to a lower number, FSM extraction forced to one-hot, LUT combining is disabled, equivalent registers are preserved, SRL are inferred  with a larger threshold" AutoIncrementalCheckpoint="false" WriteIncrSynthDcp="false" State="current" Dir="$PRUNDIR/synth_1" IncludeInArchive="true" IsChild="false" AutoIncrementalDir="$PSRCDIR/utils_1/imports/synth_1" AutoRQSDir="$PSRCDIR/utils_1/imports/synth_1">
+    <Run Id="synth_1" Type="Ft3:Synth" SrcSet="sources_1" Part="xc7a100tcsg324-1" ConstrsSet="constrs_1" Description="Performs general area optimizations including changing the threshold for control set optimizations, forcing ternary adder implementation, applying lower thresholds for use of carry chain in comparators and also area optimized mux optimizations." AutoIncrementalCheckpoint="true" IncrementalCheckpoint="$PSRCDIR/utils_1/imports/synth_1/RS5_FPGA_Platform.dcp" WriteIncrSynthDcp="true" State="current" Dir="$PRUNDIR/synth_1" IncludeInArchive="true" IsChild="false" AutoIncrementalDir="$PSRCDIR/utils_1/imports/synth_1" AutoRQSDir="$PSRCDIR/utils_1/imports/synth_1">
       <Strategy Version="1" Minor="2">
-        <StratHandle Name="Flow_PerfOptimized_high" Flow="Vivado Synthesis 2023"/>
+        <StratHandle Name="Flow_AreaOptimized_high" Flow="Vivado Synthesis 2023">
+          <Desc>Performs general area optimizations including changing the threshold for control set optimizations, forcing ternary adder implementation, applying lower thresholds for use of carry chain in comparators and also area optimized mux optimizations.</Desc>
+        </StratHandle>
         <Step Id="synth_design">
-          <Option Id="Directive">7</Option>
-          <Option Id="KeepEquivalentRegisters">1</Option>
-          <Option Id="FsmExtraction">1</Option>
-          <Option Id="KeepEquivalentRegisters">1</Option>
-          <Option Id="NoCombineLuts">1</Option>
-          <Option Id="ResourceSharing">2</Option>
-          <Option Id="ShregMinSize">5</Option>
+          <Option Id="ControlSetOptThreshold">1</Option>
+          <Option Id="Directive">1</Option>
         </Step>
       </Strategy>
       <GeneratedRun Dir="$PRUNDIR" File="gen_run.xml"/>
@@ -387,9 +400,11 @@
       <Report Name="ROUTE_DESIGN.REPORT_METHODOLOGY" Enabled="1"/>
       <RQSFiles/>
     </Run>
-    <Run Id="impl_1" Type="Ft2:EntireDesign" Part="xc7a100tcsg324-1" ConstrsSet="constrs_1" Description="Similar to Performance_ExplorePostRoutePhysOpt, but enables logic optimization step (opt_design) with the ExploreWithRemap directive." AutoIncrementalCheckpoint="false" WriteIncrSynthDcp="false" State="current" Dir="$PRUNDIR/impl_1" SynthRun="synth_1" IncludeInArchive="true" IsChild="false" GenFullBitstream="true" AutoIncrementalDir="$PSRCDIR/utils_1/imports/impl_1" LaunchOptions="-jobs 12 " AutoRQSDir="$PSRCDIR/utils_1/imports/impl_1">
+    <Run Id="impl_1" Type="Ft2:EntireDesign" Part="xc7a100tcsg324-1" ConstrsSet="constrs_1" Description="Similar to Performance_ExplorePostRoutePhysOpt, but enables logic optimization step (opt_design) with the ExploreWithRemap directive." AutoIncrementalCheckpoint="false" WriteIncrSynthDcp="false" State="current" Dir="$PRUNDIR/impl_1" SynthRun="synth_1" IncludeInArchive="true" IsChild="false" GenFullBitstream="true" AutoIncrementalDir="$PSRCDIR/utils_1/imports/impl_1" LaunchOptions="-jobs 24 " AutoRQSDir="$PSRCDIR/utils_1/imports/impl_1">
       <Strategy Version="1" Minor="2">
-        <StratHandle Name="Performance_ExploreWithRemap" Flow="Vivado Implementation 2023"/>
+        <StratHandle Name="Performance_ExploreWithRemap" Flow="Vivado Implementation 2023">
+          <Desc>Similar to Performance_ExplorePostRoutePhysOpt, but enables logic optimization step (opt_design) with the ExploreWithRemap directive.</Desc>
+        </StratHandle>
         <Step Id="init_design"/>
         <Step Id="opt_design">
           <Option Id="Directive">6</Option>
