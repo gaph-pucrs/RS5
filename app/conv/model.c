@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include "printf.h"
+#include "lib/printf.h"
 
 #include "params/0_bias_int.h"
 #include "params/3_bias_int.h"

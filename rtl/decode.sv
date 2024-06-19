@@ -26,7 +26,8 @@
 module decode
     import RS5_pkg::*;
 #(
-    parameter bit           ZKNEEnable  = 1'b1
+    parameter bit           ZKNEEnable  = 1'b1,
+    parameter bit           COMPRESSED  = 1'b0
 )
 (
     input   logic           clk,
@@ -38,6 +39,8 @@ module decode
     input   logic  [2:0]    tag_i,
     input   logic [31:0]    rs1_data_read_i,
     input   logic [31:0]    rs2_data_read_i,
+    input   logic           compressed_i,
+    input   logic           jumped_i,
 
     output  logic  [4:0]    rs1_o,
     output  logic  [4:0]    rs2_o,
@@ -47,6 +50,7 @@ module decode
     output  logic [31:0]    third_operand_o,
     output  logic [31:0]    pc_o,
     output  logic [31:0]    instruction_o,
+    output  logic           compressed_o,
     output  logic  [2:0]    tag_o,
     output  iType_e         instruction_operation_o,
     output  logic           hazard_o,
@@ -68,25 +72,34 @@ module decode
     formatType_e    instruction_format;
     iType_e         instruction_operation;
 
+
 //////////////////////////////////////////////////////////////////////////////
 // Re-Decode isntruction on hazard or stall
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
+        if (!reset_n)
             last_instruction <= 32'h00000013;
-        end else begin
+        else
             last_instruction <= instruction;
-        end
     end
 
-    always_ff @(posedge clk) begin
-        last_hazard <= hazard_o;
-        last_stall  <= ~enable;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            last_hazard <= 1'b1;
+        else
+            last_hazard <= hazard_o;
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            last_stall <= 1'b1;
+        else
+            last_stall <= !enable;
     end
 
     always_comb begin
-        if ((last_hazard | last_stall) == 1'b1) begin
+        if ((last_hazard || last_stall)) begin
             instruction = last_instruction;
         end
         else begin
@@ -280,11 +293,11 @@ module decode
             locked_register <= '0;
             locked_memory   <= '0;
         end
-        else if (hazard_o == 1'b1) begin
+        else if (hazard_o) begin
             locked_register <= '0;
             locked_memory   <= '0;
         end
-        else if (enable == 1'b1) begin
+        else if (enable) begin
             locked_register <= instruction[11:7];
             locked_memory   <= (opcode[6:2] == 5'b01000);
         end
@@ -351,7 +364,7 @@ module decode
     assign hazard_rs1 = locked_rs1      & use_rs1;
     assign hazard_rs2 = locked_rs2      & use_rs2;
 
-    assign hazard_o   = (hazard_mem | hazard_rs1 | hazard_rs2) & enable;
+    assign hazard_o   = (hazard_mem || hazard_rs1 || hazard_rs2) && enable && !jumped_i;
 
 //////////////////////////////////////////////////////////////////////////////
 // Exception Detection
@@ -361,7 +374,13 @@ module decode
     logic misaligned_fetch;
 
     assign invalid_inst     = instruction_operation == INVALID;
-    assign misaligned_fetch = pc_i[1:0] != 2'b00;
+
+    if (COMPRESSED) begin : gen_misaligned_check_c
+        assign misaligned_fetch = pc_i[0] != 1'b0;
+    end
+    else begin : gen_misaligned_check_nc
+        assign misaligned_fetch = pc_i[1:0] != 2'b00;
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 // Control of the exits based on format
@@ -403,30 +422,33 @@ module decode
             third_operand_o         <= '0;
             pc_o                    <= '0;
             instruction_o           <= '0;
+            compressed_o            <= 1'b0;
             instruction_operation_o <= NOP;
             tag_o                   <= '0;
             exc_ilegal_inst_o       <= 1'b0;
             exc_misaligned_fetch_o  <= 1'b0;
             exc_inst_access_fault_o <= 1'b0;
         end
-        else if (hazard_o == 1'b1) begin
+        else if (hazard_o) begin
             first_operand_o         <= '0;
             second_operand_o        <= '0;
             third_operand_o         <= '0;
             pc_o                    <= '0;
             instruction_o           <= '0;
+            compressed_o            <= 1'b0;
             instruction_operation_o <= NOP;
             tag_o                   <= tag_i;
             exc_ilegal_inst_o       <= 1'b0;
             exc_misaligned_fetch_o  <= 1'b0;
             exc_inst_access_fault_o <= 1'b0;
-        end
-        else if (enable == 1'b1) begin
+        end 
+        else if (enable) begin
             first_operand_o         <= first_operand;
             second_operand_o        <= second_operand;
             third_operand_o         <= third_operand;
             pc_o                    <= pc_i;
             instruction_o           <= instruction;
+            compressed_o            <= compressed_i;
             instruction_operation_o <= instruction_operation;
             tag_o                   <= tag_i;
             exc_ilegal_inst_o       <= invalid_inst;

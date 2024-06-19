@@ -49,6 +49,7 @@ module execute
     input   logic [31:0]        second_operand_i,
     input   logic [31:0]        third_operand_i,
     input   iType_e             instruction_operation_i,
+    input   logic               instruction_compressed_i,
     input   logic  [2:0]        tag_i,
     input   privilegeLevel_e    privilege_i,
 
@@ -128,7 +129,7 @@ module execute
 
     always_comb begin
         unique case (instruction_operation_i)
-            JAL, JALR:  sum2_opB = 4;
+            JAL, JALR:  sum2_opB = instruction_compressed_i ? 2 : 4;
             SUB:        sum2_opB = -second_operand_i;
             default:    sum2_opB = third_operand_i;
         endcase
@@ -271,8 +272,8 @@ end
             endcase
         end
 
-        assign enable_mul = (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU});
-        assign mul_low    = (instruction_operation_i == MUL);
+        assign enable_mul = (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU}) && !killed;
+        assign mul_low    = (instruction_operation_i == MUL) && !killed;
 
         mul mul1 (
             .clk              (clk),
@@ -302,8 +303,8 @@ end
         logic enable_div;
         logic signed_div;
 
-        assign enable_div = (instruction_operation_i inside {DIV, DIVU, REM, REMU});
-        assign signed_div = (instruction_operation_i inside {DIV, REM});
+        assign enable_div = (instruction_operation_i inside {DIV, DIVU, REM, REMU}) && !killed;
+        assign signed_div = (instruction_operation_i inside {DIV, REM}) && !killed;
 
         div div1 (
             .clk              (clk),
@@ -446,10 +447,10 @@ end
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
-            curr_tag <= 0;
+            curr_tag <= '0;
         end
-        else if ((jump_o | raise_exception_o | machine_return_o | interrupt_ack_o) == 1'b1) begin
-            curr_tag <= curr_tag + 1;
+        else if ((jump_o || raise_exception_o || machine_return_o || interrupt_ack_o)) begin
+            curr_tag <= curr_tag + 1'b1;
         end
     end
 
@@ -459,7 +460,7 @@ end
 
     always_comb begin
         if ((!reset_n | killed) == 1'b0) begin
-            if (exc_inst_access_fault_i == 1'b1) begin
+            if (exc_inst_access_fault_i) begin
                 raise_exception_o = 1'b1;
                 machine_return_o  = 1'b0;
                 interrupt_ack_o   = 1'b0;
@@ -468,14 +469,14 @@ end
                 // $write("[%0d] EXCEPTION - INSTRUCTION ACCESS FAULT: %8h %8h\n", $time, pc_i, instruction_i);
             end
             else
-            if ((exc_ilegal_inst_i | exc_ilegal_csr_inst) == 1'b1) begin
+            if ((exc_ilegal_inst_i || exc_ilegal_csr_inst)) begin
                 raise_exception_o = 1'b1;
                 machine_return_o  = 1'b0;
                 interrupt_ack_o   = 1'b0;
                 exception_code_o  = ILLEGAL_INSTRUCTION;
                 // $write("[%0d] EXCEPTION - ILLEGAL INSTRUCTION: %8h %8h\n", $time, pc_i, instruction_i);
             end
-            else if (exc_misaligned_fetch_i == 1'b1) begin
+            else if (exc_misaligned_fetch_i) begin
                 raise_exception_o = 1'b1;
                 machine_return_o  = 1'b0;
                 interrupt_ack_o   = 1'b0;

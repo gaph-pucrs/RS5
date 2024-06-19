@@ -28,11 +28,13 @@
 module CSRBank
     import RS5_pkg::*;
 #(
-    parameter bit       XOSVMEnable = 1'b0,
-    parameter bit       ZIHPMEnable = 1'b0,
-    parameter rv32_e    RV32        = RV32I,
-    parameter bit       DEBUG       = 1'b0,
-    parameter string    DBG_FILE    = "./debug/Report.txt"
+    parameter bit       XOSVMEnable    = 1'b0,
+    parameter bit       ZIHPMEnable    = 1'b0,
+    parameter bit       COMPRESSED     = 1'b0,
+    parameter rv32_e    RV32           = RV32I,
+    parameter bit       PROFILING      = 1'b0,
+    parameter string    PROFILING_FILE = "./debug/Report.txt"
+
 )
 (
     input   logic               clk,
@@ -60,9 +62,15 @@ module CSRBank
     input   exceptionCode_e     exception_code_i,
     input   logic [31:0]        pc_i,
     input   logic [31:0]        instruction_i,
+    input   logic               instruction_compressed_i,
 
     input   logic               jump_i,
     input   logic [31:0]        jump_target_i,
+
+    /* Not used without compressed */
+    /* verilator lint_off UNUSEDSIGNAL */
+    input   logic               jump_misaligned_i,
+    /* verilator lint_on UNUSEDSIGNAL */
 
     input   logic [63:0]        mtime_i,
 
@@ -137,6 +145,7 @@ module CSRBank
     logic [31:0] branch_counter, jump_counter;
     logic [31:0] load_counter, store_counter;
     logic [31:0] sys_counter, csr_counter;
+    logic [31:0] compressed_counter, jump_misaligned_counter;
     interruptionCode_e Interruption_Code;
 
     /* Signals enabled with ZIHPM */
@@ -207,11 +216,11 @@ module CSRBank
             // MEDELEG:    begin current_val = medeleg;         wmask = '1; end
             // MIDELEG:    begin current_val = mideleg;         wmask = '1; end
             MIE:        begin current_val = mie;             wmask = 32'h00000888; end
-            MTVEC:      begin current_val = mtvec_r;         wmask = 32'hFFFFFFFC; end
+            MTVEC:      begin current_val = mtvec_r;         wmask = COMPRESSED ? 32'hFFFFFFFE : 32'hFFFFFFFC; end
             // MCOUNTEREN: begin current_val = mcounteren;      wmask = '1; end
             // MSTATUSH:   begin current_val = mstatush;        wmask = '1; end
             MSCRATCH:   begin current_val = mscratch;        wmask = 32'hFFFFFFFF; end
-            MEPC:       begin current_val = mepc_r;          wmask = 32'hFFFFFFFC; end
+            MEPC:       begin current_val = mepc_r;          wmask = COMPRESSED ? 32'hFFFFFFFE : 32'hFFFFFFFC; end
             MCAUSE:     begin current_val = mcause;          wmask = 32'hFFFFFFFF; end
             MTVAL:      begin current_val = mtval;           wmask = 32'hFFFFFFFF; end
             MCYCLE:     begin current_val = mcycle[31:0];    wmask = 32'hFFFFFFFF; end
@@ -319,7 +328,7 @@ module CSRBank
                 if(jump_i)
                     mepc_r      <= jump_target_i;
                 else
-                    mepc_r      <= pc_i + 32'd4;
+                    mepc_r      <= pc_i + (instruction_compressed_i ? 32'd2 : 32'd4);
             end
         //////////////////////////////////////////////////////////////////////////////
         // CSR Write
@@ -411,6 +420,8 @@ module CSRBank
                 MHPMCOUNTER17:  out = sys_counter;
                 MHPMCOUNTER18:  out = csr_counter;
                 MHPMCOUNTER19:  out = lui_slt_counter;
+                MHPMCOUNTER20:  out = compressed_counter;
+                MHPMCOUNTER21:  out = jump_misaligned_counter;
 
                 CYCLEH:         out = mcycle[63:32];
                 TIMEH:          out = mtime_i[63:32];
@@ -540,6 +551,11 @@ module CSRBank
                 mul_counter                 <= '0;
                 div_counter                 <= '0;
 
+                if (COMPRESSED == 1'b1) begin
+                    jump_misaligned_counter     <= '0;
+                    compressed_counter          <= '0;
+                end
+
                 hazard_counter              <= '0;
                 stall_counter               <= '0;
                 interrupt_ack_counter       <= '0;
@@ -556,6 +572,10 @@ module CSRBank
                 raise_exception_counter     <= (raise_exception_i)                                                  ? raise_exception_counter + 1 : raise_exception_counter;
                 context_switch_counter      <= (jump_i || raise_exception_i || machine_return_i || interrupt_ack_i) ? context_switch_counter  + 1 : context_switch_counter;
                 nop_counter                 <= (instruction_operation_i == NOP && !hold && !killed)                 ? nop_counter             + 1 : nop_counter;
+                
+                if (COMPRESSED == 1'b1) begin
+                    jump_misaligned_counter <= jump_misaligned_counter + ((jump_misaligned_i && !hold) ? 1 : 0);
+                end
 
                 if (!killed && !hold) begin
                     logic_counter           <= (instruction_operation_i inside {XOR, OR, AND})                                  ? logic_counter   + 1 : logic_counter;
@@ -570,46 +590,56 @@ module CSRBank
                     csr_counter             <= (instruction_operation_i inside {CSRRW, CSRRWI, CSRRS, CSRRSI, CSRRC, CSRRCI})   ? csr_counter     + 1 : csr_counter;
                     mul_counter             <= (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU})                      ? mul_counter     + 1 : mul_counter;
                     div_counter             <= (instruction_operation_i inside {DIV, DIVU, REM, REMU})                          ? div_counter     + 1 : div_counter;
+
+                    if (COMPRESSED == 1'b1) begin
+                        compressed_counter  <= compressed_counter + (instruction_compressed_i ? 1 : 0);
+                    end
                 end
             end
         end
 
-        if (DEBUG) begin : gen_csr_dbg
+        if (PROFILING) begin : gen_csr_dbg
             int fd;
 
             initial begin
-                fd = $fopen (DBG_FILE, "w");
+                fd = $fopen (PROFILING_FILE, "w");
                 if (fd == 0) begin
-                    $display("Error opening file %s", DBG_FILE);
+                    $display("Error opening file %s", PROFILING_FILE);
                 end
             end
 
             final begin
-                $fwrite(fd,"Clock Cycles:           %0d\n", mcycle);
-                $fwrite(fd,"Instructions Retired:   %0d\n", minstret);
-                $fwrite(fd,"Instructions Killed:    %0d\n", instructions_killed_counter);
-                $fwrite(fd,"Context Switches:       %0d\n", context_switch_counter);
-                $fwrite(fd,"Exceptions Raised:      %0d\n", raise_exception_counter);
-                $fwrite(fd,"Interrupts Acked:       %0d\n", interrupt_ack_counter);
+                $fwrite(fd,"Clock Cycles:            %0d\n", mcycle);
+                $fwrite(fd,"Instructions Retired:    %0d\n", minstret);
+                if (COMPRESSED == 1'b1) begin
+                    $fwrite(fd,"Instructions Compressed: %0d\n", compressed_counter);
+                end
+                $fwrite(fd,"Instructions Killed:     %0d\n", instructions_killed_counter);
+                $fwrite(fd,"Context Switches:        %0d\n", context_switch_counter);
+                $fwrite(fd,"Exceptions Raised:       %0d\n", raise_exception_counter);
+                $fwrite(fd,"Interrupts Acked:        %0d\n", interrupt_ack_counter);
+                if (COMPRESSED == 1'b1) begin
+                    $fwrite(fd,"Misaligned Jumps:        %0d\n", jump_misaligned_counter);
+                end
 
                 $fwrite(fd,"\nCYCLES WITH::\n");
-                $fwrite(fd,"HAZARDS:                %0d\n", hazard_counter);
-                $fwrite(fd,"STALL:                  %0d\n", stall_counter);
+                $fwrite(fd,"HAZARDS:                 %0d\n", hazard_counter);
+                $fwrite(fd,"STALL:                   %0d\n", stall_counter);
 
                 $fwrite(fd,"\nINSTRUCTION COUNTERS:\n");
-                $fwrite(fd,"NOP:                    %0d\n", nop_counter);
-                $fwrite(fd,"LUI_SLT:                %0d\n", lui_slt_counter);
-                $fwrite(fd,"LOGIC:                  %0d\n", logic_counter);
-                $fwrite(fd,"ADDSUB:                 %0d\n", addsub_counter);
-                $fwrite(fd,"SHIFT:                  %0d\n", shift_counter);
-                $fwrite(fd,"BRANCH:                 %0d\n", branch_counter);
-                $fwrite(fd,"JUMP:                   %0d\n", jump_counter);
-                $fwrite(fd,"LOAD:                   %0d\n", load_counter);
-                $fwrite(fd,"STORE:                  %0d\n", store_counter);
-                $fwrite(fd,"SYS:                    %0d\n", sys_counter);
-                $fwrite(fd,"CSR:                    %0d\n", csr_counter);
-                $fwrite(fd,"MUL:                    %0d\n", mul_counter);
-                $fwrite(fd,"DIV:                    %0d\n", div_counter);
+                $fwrite(fd,"NOP:                     %0d\n", nop_counter);
+                $fwrite(fd,"LUI_SLT:                 %0d\n", lui_slt_counter);
+                $fwrite(fd,"LOGIC:                   %0d\n", logic_counter);
+                $fwrite(fd,"ADDSUB:                  %0d\n", addsub_counter);
+                $fwrite(fd,"SHIFT:                   %0d\n", shift_counter);
+                $fwrite(fd,"BRANCH:                  %0d\n", branch_counter);
+                $fwrite(fd,"JUMP:                    %0d\n", jump_counter);
+                $fwrite(fd,"LOAD:                    %0d\n", load_counter);
+                $fwrite(fd,"STORE:                   %0d\n", store_counter);
+                $fwrite(fd,"SYS:                     %0d\n", sys_counter);
+                $fwrite(fd,"CSR:                     %0d\n", csr_counter);
+                $fwrite(fd,"MUL:                     %0d\n", mul_counter);
+                $fwrite(fd,"DIV:                     %0d\n", div_counter);
             end
         end
     end
@@ -633,6 +663,8 @@ module CSRBank
         assign interrupt_ack_counter       = '0;
         assign raise_exception_counter     = '0;
         assign context_switch_counter      = '0;
+        assign compressed_counter          = '0;
+        assign jump_misaligned_counter     = '0;
     end
 
 endmodule
