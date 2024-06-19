@@ -395,7 +395,7 @@ end
 // Output Registers
 //////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk or negedge reset_n) begin
+    always_ff @(posedge clk ) begin
         if (!reset_n) begin
             write_enable_o          <= 1'b0;
             instruction_operation_o <= NOP;
@@ -447,7 +447,7 @@ end
 // TAG control based on signals Jump and Killed
 //////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk or negedge reset_n) begin
+    always_ff @(posedge clk ) begin
         if (!reset_n) begin
             curr_tag <= '0;
         end

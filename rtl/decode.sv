@@ -77,21 +77,21 @@ module decode
 // Re-Decode isntruction on hazard or stall
 //////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk or negedge reset_n) begin
+    always_ff @(posedge clk) begin
         if (!reset_n)
             last_instruction <= 32'h00000013;
         else
             last_instruction <= instruction;
     end
 
-    always_ff @(posedge clk or negedge reset_n) begin
+    always_ff @(posedge clk ) begin
         if (!reset_n)
             last_hazard <= 1'b1;
         else
             last_hazard <= hazard_o;
     end
 
-    always_ff @(posedge clk or negedge reset_n) begin
+    always_ff @(posedge clk ) begin
         if (!reset_n)
             last_stall <= 1'b1;
         else
@@ -288,7 +288,7 @@ module decode
 // Registe Lock Queue (RLQ)
 //////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk or negedge reset_n) begin
+    always_ff @(posedge clk ) begin
         if (!reset_n) begin
             locked_register <= '0;
             locked_memory   <= '0;
@@ -310,7 +310,7 @@ module decode
     assign rs1_o = instruction[19:15];
     assign rs2_o = instruction[24:20];
 
-    always_ff @(posedge clk or negedge reset_n) begin
+    always_ff @(posedge clk ) begin
         if (!reset_n)
             rd_o <= '0;
         else if (enable)
@@ -415,7 +415,7 @@ module decode
 // Outputs
 //////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk or negedge reset_n) begin
+    always_ff @(posedge clk ) begin
         if (!reset_n) begin
             first_operand_o         <= '0;
             second_operand_o        <= '0;

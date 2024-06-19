@@ -34,7 +34,7 @@ module rtc (
     assign intr = (memory[7:0] >= memory[15:8]);
     assign mtime_o = memory[7:0];
 
-    always_ff @(posedge clk or negedge reset_n) begin
+    always_ff @(posedge clk ) begin
         if (!reset_n) begin
             mti_o <= 1'b0;
         end
@@ -43,7 +43,7 @@ module rtc (
         end
     end
 
-    always_ff @(posedge clk or negedge reset_n) begin
+    always_ff @(posedge clk ) begin
         memory[7:0] <= memory[7:0] + 1'b1;
         if (!reset_n) begin
             memory <= '0;

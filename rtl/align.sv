@@ -35,7 +35,7 @@ module align
     logic hazard_r;
     logic jumped_r;
 
-    always_ff @(posedge clk or negedge reset_n) begin
+    always_ff @(posedge clk ) begin
         if (!reset_n) begin
             hazard_r <= 1'b0;
             jumped_r <= 1'b0;
@@ -67,7 +67,7 @@ module align
     assign pc_add = compressed || jump_misaligned_i ? 32'd2 : 32'd4;
     assign next_pc = pc + pc_add;
 
-    always_ff @(posedge clk or negedge reset_n) begin
+    always_ff @(posedge clk ) begin
         if (!reset_n) begin
             pc_r <= '0;
         end
@@ -85,7 +85,7 @@ module align
 
     assign misaligned = pc[1];
 
-    always_ff @(posedge clk or negedge reset_n) begin
+    always_ff @(posedge clk ) begin
         if (!reset_n) begin
             misaligned_r <= '0;
         end
@@ -112,7 +112,7 @@ module align
     assign prefetched  = misaligned & compressed;
     assign prefetched_o = prefetched;
 
-    always_ff @(posedge clk or negedge reset_n) begin
+    always_ff @(posedge clk ) begin
         if (!reset_n)
             prefetched_r <= 1'b0;
         else if (enable_i && !hazard_i)
@@ -128,7 +128,7 @@ module align
             instruction = instruction_aligned;
     end
 
-    always_ff @(posedge clk or negedge reset_n) begin
+    always_ff @(posedge clk ) begin
         if (!reset_n) begin
             instruction_r <= '0;
         end
@@ -137,7 +137,7 @@ module align
         end
     end
 
-    always_ff @(posedge clk or negedge reset_n) begin
+    always_ff @(posedge clk ) begin
         if (!reset_n) begin
             pc_o          <= '0;
             compressed_o  <= 1'b0;
@@ -150,7 +150,7 @@ module align
         end
     end
 
-    always_ff @(posedge clk or negedge reset_n) begin
+    always_ff @(posedge clk ) begin
         if (!reset_n) begin
             tag_o <= '0;
         end

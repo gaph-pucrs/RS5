@@ -53,7 +53,7 @@ module regbank
 // Reset and Write control
 //////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk or negedge reset_n) begin
+    always_ff @(posedge clk ) begin
         if (!reset_n) begin
             for (int i = 0; i < 32; i++)
                 regfile[i] <= '0;

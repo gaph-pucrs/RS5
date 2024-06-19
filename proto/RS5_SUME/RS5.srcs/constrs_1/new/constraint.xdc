@@ -33,7 +33,7 @@ create_clock -add -name sys_clk_pin -period 5.00 -waveform {0 2.5} [get_ports {c
 #create_clock -add -name ddr_clk_pin -period 4.285715 -waveform {0 2.1428575} [get_ports {DDR3_SYSCLK_P}]; 
 
 ##BTN
-set_property -dict { PACKAGE_PIN AR13  IOSTANDARD LVCMOS15 } [get_ports { BTND }]; #IO_L12N_T1_MRCC_31 Sch=btn[0]
+#set_property -dict { PACKAGE_PIN AR13  IOSTANDARD LVCMOS15 } [get_ports { BTND }]; #IO_L12N_T1_MRCC_31 Sch=btn[0]
 set_property -dict { PACKAGE_PIN BB12  IOSTANDARD LVCMOS15 } [get_ports { reset }]; #IO_L24N_T3_31 Sch=btn[1]
 
 ##LED
@@ -48,8 +48,8 @@ set_property -dict { PACKAGE_PIN BB12  IOSTANDARD LVCMOS15 } [get_ports { reset 
 ##UART
 #set_property -dict { PACKAGE_PIN BA16  IOSTANDARD LVCMOS15 } [get_ports { UART_CTS }]; #IO_L23P_T3_32 Sch=uart_cts
 #set_property -dict { PACKAGE_PIN BB16  IOSTANDARD LVCMOS15 } [get_ports { UART_RTS }]; #IO_L23N_T3_32 Sch=uart_rts
-set_property -dict { PACKAGE_PIN BA19  IOSTANDARD LVCMOS15 } [get_ports { UART_TX }]; #IO_L24N_T3_32 Sch=uart_rxd_out
-set_property -dict { PACKAGE_PIN AY19  IOSTANDARD LVCMOS15 } [get_ports { UART_RX }]; #IO_L24P_T3_32 Sch=uart_txd_in
+set_property -dict { PACKAGE_PIN BA19  IOSTANDARD LVCMOS15 } [get_ports { UART_TX_serial }]; #IO_L24N_T3_32 Sch=uart_rxd_out
+set_property -dict { PACKAGE_PIN AY19  IOSTANDARD LVCMOS15 } [get_ports { UART_RX_serial }]; #IO_L24P_T3_32 Sch=uart_txd_in
 
 ##microSD
 #set_property -dict { PACKAGE_PIN AJ25  IOSTANDARD LVCMOS18 } [get_ports { SD_CCLK }]; #IO_L24P_T3_12 Sch=sd_cclk

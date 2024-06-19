@@ -76,7 +76,7 @@ module fetch  #(
 //////////////////////////////////////////////////////////////////////////////
 
     if (COMPRESSED) begin : gen_pc_c
-        always_ff @(posedge clk or negedge reset_n) begin
+        always_ff @(posedge clk ) begin
             if (!reset_n | sys_reset) begin
                 pc <= start_address;
                 jump_misaligned <= 1'b0;
@@ -102,7 +102,7 @@ module fetch  #(
             end
         end
 
-        always_ff @(posedge clk or negedge reset_n) begin
+        always_ff @(posedge clk) begin
             if (!reset_n) begin
                 last_pc <= '0;
                 last_pc_o <= '0;
@@ -114,7 +114,7 @@ module fetch  #(
         end
     end
     else begin : gen_pc_nc
-        always_ff @(posedge clk or negedge reset_n) begin
+        always_ff @(posedge clk ) begin
             if (!reset_n | sys_reset) begin
                 pc <= start_address;
             end
@@ -143,14 +143,14 @@ module fetch  #(
 
     assign jumped = machine_return_i || exception_raised_i || interrupt_ack_i || jump_i;
 
-    always_ff @(posedge clk or negedge reset_n) begin
+    always_ff @(posedge clk ) begin
         if (!reset_n)
             jumped_r <= 1'b1;
         else if (enable)
             jumped_r <= jumped;
     end
 
-    always_ff @(posedge clk or negedge reset_n) begin
+    always_ff @(posedge clk ) begin
         if (!reset_n)
             jumped_o <= 1'b1;
         else if (enable)
@@ -161,7 +161,7 @@ module fetch  #(
 
     if (COMPRESSED) begin : gen_jmp_c
 
-        always_ff @(posedge clk or negedge reset_n) begin
+        always_ff @(posedge clk ) begin
             if (!reset_n)
                 pc_r <= '0;
             else if (hazard_i)
@@ -172,7 +172,7 @@ module fetch  #(
 
         assign pc_o = (hazard_i) ? last_pc_o : pc_r;
 
-        always_ff @(posedge clk or negedge reset_n) begin
+        always_ff @(posedge clk ) begin
             if (!reset_n) begin
                 jump_misaligned_o <= '0;
             end
@@ -182,7 +182,7 @@ module fetch  #(
         end
     end
     else begin : gen_jmp_nc
-        always_ff @(posedge clk or negedge reset_n) begin
+        always_ff @(posedge clk ) begin
             if (!reset_n) begin
                 pc_o <= '0;
             end
@@ -226,7 +226,7 @@ module fetch  #(
 // TAG Calculator 
 //////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk or negedge reset_n) begin
+    always_ff @(posedge clk ) begin
         if (!reset_n) begin
             current_tag <= '1;
             next_tag    <= '0;
@@ -240,7 +240,7 @@ module fetch  #(
     end
 
     if (COMPRESSED) begin : gen_tag_c
-        always_ff @(posedge clk or negedge reset_n) begin
+        always_ff @(posedge clk ) begin
             if (!reset_n) begin
                 last_tag <= '0;
             end

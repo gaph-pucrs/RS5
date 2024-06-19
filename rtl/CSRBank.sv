@@ -256,7 +256,7 @@ module CSRBank
 // CSR Writing
 //////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk or negedge reset_n) begin
+    always_ff @(posedge clk) begin
         //////////////////////////////////////////////////////////////////////////////
         // Reset
         //////////////////////////////////////////////////////////////////////////////
@@ -448,7 +448,7 @@ module CSRBank
 //////////////////////////////////////////////////////////////////////////////
 
     if (XOSVMEnable == 1'b1) begin : gen_xosvm_csr_on
-        always_ff @(posedge clk or negedge reset_n) begin
+        always_ff @(posedge clk) begin
             if (!reset_n | sys_reset) begin
                 mvmctl      <= '0;
                 mvmdo       <= '0;
@@ -534,7 +534,7 @@ module CSRBank
 
     if (ZIHPMEnable == 1'b1) begin : gen_zihpm_csr_on
 
-        always_ff @(posedge clk or negedge reset_n) begin
+        always_ff @(posedge clk ) begin
             if (!reset_n | sys_reset) begin
                 instructions_killed_counter <= '0;
                 nop_counter                 <= '0;
