@@ -2,7 +2,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "printf.h"
+#include "lib/printf.h"
 
 #include "params/0_bias_lut.h"
 #include "params/3_bias_lut.h"
@@ -218,7 +218,7 @@ int main(){
         for (int i = 0; i < NUM_FILTERS; i++)
           for (int j = 0; j < CONV6_INPUT_SIZE-4; j++)
             {
-                INTconv6_featureMap[i][j] = (INTconv6_featureMap[i][j]/(INPUT_MULTIP)); 
+                INTconv6_featureMap[i][j] = (INTconv6_featureMap[i][j]/(INPUT_MULTIP));
                 if (INTconv6_featureMap[i][j] <= 0)
                     INTconv6_featureMap[i][j] = 0;
             }
@@ -302,15 +302,12 @@ int main(){
             INTfc2_out_vector[outputIndex] = INTfc2_totalValue + ( (int) fc2_bias_lut[ (biasCompressedData >> (biasDecompressedIndex * 4)) & 0x0F  ] );
         }
 
-
-
     //////////////////////////////// INT HANDLER
     // divide the feature map items by INPUT_MULTIP
         for (int i = 0; i < FC2_OUTPUT_SIZE; i++)
         {
             INTfc2_out_vector[i] = INTfc2_out_vector[i] / (INPUT_MULTIP*INPUT_MULTIP);
         }
-
 
     ////////////////////////// Result Classes
         // printf("\n############################################################## RESULT CLASSES\n");

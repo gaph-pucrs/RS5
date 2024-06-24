@@ -1,5 +1,5 @@
 #remove unreferenced functions
-CFLAGS_STRIP = -fdata-sections -ffunction-sections
+CFLAGS_STRIP = -fdata-sections -ffunction-sections -fdata-sections -ffunction-sections
 
 #-mrvv-vector-bits=zvl
 GCC_RISCV = riscv64-elf-gcc -march=rv32im_zicsr_zve32x_zvl128b -mabi=ilp32 -O3 $(CFLAGS_STRIP) -DDEBUG_PORT -static -mcmodel=medany -fvisibility=hidden -nostdlib -nostartfiles -mno-relax -DPRINTF_DISABLE_SUPPORT_FLOAT=1
@@ -8,8 +8,8 @@ READ_RISCV = riscv64-elf-readelf
 OBJ_RISCV = riscv64-elf-objcopy
 SIZE_RISCV = riscv64-elf-size
 
-TEST_OBJS   = $(addsuffix .o,$(basename $(wildcard test/*.S)))
-TEST_C_OBJS = $(addsuffix .o,$(basename $(wildcard test/*.c)))
+TEST_OBJS   = $(addsuffix .o,$(basename $(wildcard lib/*.S)))
+TEST_C_OBJS = $(addsuffix .o,$(basename $(wildcard lib/*.c ./*.c)))
 
 all: $(TEST_OBJS) $(TEST_C_OBJS)
 	$(GCC_RISCV) -c test.S -o test.o
@@ -32,4 +32,4 @@ all: $(TEST_OBJS) $(TEST_C_OBJS)
 
 clean:
 	-rm -rf *.o *.axf *.map *.lst *.sec *.cnt *.hex *.bin *~
-	-rm -rf test/*.o
+	-rm -rf lib/*.o
