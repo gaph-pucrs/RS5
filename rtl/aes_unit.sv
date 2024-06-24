@@ -16,8 +16,11 @@
 // IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 //
 
-module aes_unit #(
-    parameter LOGIC_GATING = 0  // Gate sub-module inputs to save toggling
+module aes_unit 
+    import RS5_pkg::*;
+#(
+    parameter environment_e Environment = ASIC,
+    parameter               LOGIC_GATING = 0  // Gate sub-module inputs to save toggling
 )(
     input wire[31:0] rs1_in,    // Source register 1
     input wire[31:0] rs2_in,    // Source register 2
@@ -85,9 +88,17 @@ module aes_unit #(
 
     assign rd_out = rotated ^ rs1_gated;
 
-    riscv_crypto_aes_fwd_sbox i_aes_sbox_fwd (
-        .in(sel_byte),
-        .fx(sbox_out)
-    );
+    if (Environment == FPGA) begin : gen_aes_sbox_fpga
+        riscv_crypto_aes_sbox i_aes_sbox_fwd (
+            .in(sel_byte),
+            .fx(sbox_out)
+        );
+    end
+    else begin : gen_aes_sbox_asic
+        riscv_crypto_aes_fwd_sbox i_aes_sbox_fwd (
+            .in(sel_byte),
+            .fx(sbox_out)
+        );
+    end
 
 endmodule
