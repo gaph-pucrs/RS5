@@ -54,31 +54,33 @@ int main(){
             input_vector[i] = dataset120[startingIndex + i];
         }
 
-
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// LAYER 1
     // CONVOLUTION 1
         static int INTconv0_featureMap[NUM_FILTERS][CONV0_INPUT_SIZE-4];
         static int INTconv0_currentKernel[KERNEL_SIZE];
         int INTconv0_current_bias = 0;
 
-        //printf(" Conv0 #################################################################\n");
+        printf(" Conv0 #################################################################\n");
         for (int k = 0; k < NUM_FILTERS; k++)
         {
             // Load Current Weights
             for (i = 0; i < KERNEL_SIZE; i++)
             {
                 INTconv0_currentKernel[i] = (int) (conv0_weights[i + (k * KERNEL_SIZE)]);
-                // printf("(%d, %d) %d\n", k, i, INTconv0_currentKernel[i]);
+                //printf("(%d, %d) %d\n", k, i, INTconv0_currentKernel[i]);
             }
 
             // Load Current Bias
             INTconv0_current_bias = (int) (conv0_bias[k]);
 
+            //printf("INTconv0_currentKernel[4] =  %d\n", INTconv0_currentKernel[4]);
+            //printf("Bias =  %d\n", INTconv0_current_bias);
 
             // Perform Kernel operation
+            int INTtotalSum = 0;
             for (i = 0; i <= sizeof(input_vector)/sizeof(input_vector[0])-KERNEL_SIZE; i++)
             {
-                int INTtotalSum = 0;
+                INTtotalSum = 0;
                 for (int j = 0; j < KERNEL_SIZE; j++)
                 {
                 // printf("%d + (%d * %d (%d)),     ", INTtotalSum, (input_vector[i+j]), INTconv0_currentKernel[j], j);
@@ -101,6 +103,7 @@ int main(){
             }
 
         }
+
         printf("############################# CONV1 - DIVISION DONE\n");
 
     ///// RELU
@@ -115,9 +118,17 @@ int main(){
 
         }
 
-        printf("############################# CONV1 - RELU DONE\n");
+        for (int i = 0; i < NUM_FILTERS; i++)
+        {
+            for (int j = 0; j < CONV0_INPUT_SIZE-4; j++)
+            {
+                printf("%d\n", INTconv0_featureMap[i][j]);
+            }
 
-    return 0;
+        }
+
+        printf("############################# CONV1 - RELU DONE\n");
+        return 0;
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// LAYER 3
     // CONVOLUTION 3
@@ -141,7 +152,8 @@ int main(){
             }
         }
 
-
+        printf("############################# CONV3 - DONE\n");
+        return 0;
     //////////////////////////////// INT HANDLER
     // divide the feature map items by MULTIP_conv3
         for (int i = 0; i < NUM_FILTERS; i++)
@@ -152,6 +164,7 @@ int main(){
             }
         }
 
+        printf("############################# CONV3 - DIVISION DONE\n");
 
     ///// RELU
         for (int i = 0; i < NUM_FILTERS; i++)
@@ -163,6 +176,7 @@ int main(){
             }
         }
 
+        printf("############################# CONV3 - RELU DONE\n");
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// LAYER 6
     // CONVOLUTION 6
@@ -186,6 +200,8 @@ int main(){
             }
         }
 
+        printf("############################# CONV6 - DONE\n");
+
     //////////////////////////////// INT HANDLER
     // divide the feature map items by MULTIP_conv6
         for (int i = 0; i < NUM_FILTERS; i++)
@@ -196,6 +212,8 @@ int main(){
             }
         }
 
+        printf("############################# CONV6 - DIVISION DONE\n");
+
     /////////////////////////// RELU
         for (int i = 0; i < NUM_FILTERS; i++)
         {
@@ -205,6 +223,8 @@ int main(){
                     INTconv6_featureMap[i][j] = 0;
             }
         }
+
+        printf("############################# CONV6 - RELU DONE\n");
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// LAYER 2
     ////////////////////////////////////////// FC Layer

@@ -41,6 +41,8 @@ module vectorUnit
     logic        accumulate_instruction;
     logic        compare_instruction;
     logic        widening_instruction;
+    logic        whole_reg_load_store;
+    logic        mask_instruction;
 
     vew_e   vsew, vsew_effective;
     vlmul_e vlmul, vlmul_effective;
@@ -81,6 +83,8 @@ module vectorUnit
     assign reduction_instruction  = (vector_operation_i inside {VREDSUM, VREDMAXU, VREDMAX, VREDMINU, VREDMIN, VREDAND, VREDOR, VREDXOR});
     assign compare_instruction    = (vector_operation_i inside {VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT});
     assign widening_instruction   = (vector_operation_i inside {VWMUL, VWMULU, VWMULSU});
+    assign whole_reg_load_store   = (instruction_i[24:20] == 5'b01000 && instruction_operation_i inside {VLOAD, VSTORE});
+    assign mask_instruction       = (vector_operation_i inside {VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT});
 
     assign elements_per_reg = VLENB >> vsew;
 
@@ -203,6 +207,14 @@ module vectorUnit
                 default: vlmul_effective = LMUL_1;
             endcase
         end
+        else if (whole_reg_load_store) begin
+            unique case (instruction_i[31:29])
+                3'h1:    vlmul_effective = LMUL_2;
+                3'h3:    vlmul_effective = LMUL_4;
+                3'h7:    vlmul_effective = LMUL_8;
+                default: vlmul_effective = LMUL_1;
+            endcase
+        end
         else if (widening_instruction) begin
             unique case (vlmul)
                 LMUL_1:
@@ -261,6 +273,8 @@ module vectorUnit
             vl_curr_reg <= '0;
         else if (next_state == V_IDLE)
             vl_curr_reg <= 0;
+        else if (whole_reg_load_store)
+            vl_curr_reg <= '1;
         else if ((state == V_IDLE && next_state == V_EXEC) || (accumulate_instruction && cycle_count_vd == 0))
             vl_curr_reg <= vl;
         else if (next_state == V_EXEC && (hold == 1'b0))
@@ -282,7 +296,7 @@ module vectorUnit
 
     always_ff @(posedge clk) begin
         if (!hold || hold_widening) begin
-            vd_addr   <= (reduction_instruction)
+            vd_addr   <= (reduction_instruction || mask_instruction)
                         ? rd
                         : rd + cycle_count_vd;
             vd_addr_r <= vd_addr;
@@ -299,6 +313,18 @@ module vectorUnit
                     default: write_enable <= {'0, 4'b1111};
                 endcase
             end
+            else if (whole_reg_load_store) begin
+                write_enable <= '1;
+            end
+            else if (mask_instruction) begin
+                for (int i = 0; i < 8; i++) begin
+                    unique case (vsew_effective)
+                        EW8:     write_enable[( VLENB   *(i+1))-1-:VLENB  ] <= (i == cycle_count_r) ? '1 : '0;
+                        EW16:    write_enable[((VLENB/2)*(i+1))-1-:VLENB/2] <= (i == cycle_count_r) ? '1 : '0;
+                        default: write_enable[((VLENB/4)*(i+1))-1-:VLENB/4] <= (i == cycle_count_r) ? '1 : '0;
+                    endcase
+                end
+            end
             else begin
                 unique case (vsew_effective)
                     EW8:
@@ -310,7 +336,7 @@ module vectorUnit
 
                     EW16:
                         for (int i = 0; i < VLENB/2; i++)
-                            if ((vm || mask_sew16[cycle_count_r][i]) && (i < vl_curr_reg)) 
+                            if ((vm || mask_sew16[cycle_count_r][i]) && (i < vl_curr_reg))
                                 write_enable[(i*2)+:2] <= 2'b11;
                             else
                                 write_enable[(i*2)+:2] <= 2'b00;
@@ -420,7 +446,7 @@ module vectorUnit
         .cycle_count            (cycle_count),
         .instruction_operation_i(instruction_operation_i),
         .vsew                   (vsew),
-        .vlmul                  (vlmul),
+        .vlmul                  (vlmul_effective),
         .cycle_count_r          (cycle_count_r),
         .vl_curr_reg            (vl_curr_reg),
         .vm                     (vm),
