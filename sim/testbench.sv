@@ -36,8 +36,10 @@ module testbench
     localparam bit           USE_ZIHPM       = 1'b1;
     localparam bit           USE_ZKNE        = 1'b1;
 
+    `ifdef DEBUG
     localparam bit           PROFILING       = 1'b1;
     localparam bit           DEBUG           = 1'b0;
+    `endif
 
     localparam int           MEM_WIDTH       = 65_536;
     localparam string        BIN_FILE        = "../app/riscv-tests/test.bin";
@@ -164,9 +166,11 @@ module testbench
         .COMPRESSED     (COMPRESSED),
         .XOSVMEnable    (USE_XOSVM),
         .ZIHPMEnable    (USE_ZIHPM),
-        .ZKNEEnable     (USE_ZKNE),
+        `ifdef DEBUG
 	    .DEBUG          (DEBUG),
-	    .PROFILING      (PROFILING)
+	    .PROFILING      (PROFILING),
+        `endif
+        .ZKNEEnable     (USE_ZKNE)
     ) dut (
         .clk                    (clk),
         .reset_n                (reset_n),
@@ -190,8 +194,11 @@ module testbench
 
     RAM_mem #(
         .MEM_WIDTH(MEM_WIDTH),
-        .BIN_FILE (BIN_FILE),
-	.DEBUG    (DEBUG)
+        `ifdef DEBUG
+        .DEBUG    (DEBUG),
+        `endif
+        .BIN_FILE (BIN_FILE)
+    
     ) RAM_MEM (
         .clk        (clk),
 

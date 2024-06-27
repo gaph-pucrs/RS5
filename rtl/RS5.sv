@@ -24,14 +24,16 @@ module RS5
     import RS5_pkg::*;
 #(
     parameter environment_e Environment    = ASIC,
-    parameter rv32_e        RV32           = RV32I,
+    parameter rv32_e        RV32           = RV32M,
     parameter bit           COMPRESSED   = 1'b0,
     parameter bit           XOSVMEnable    = 1'b0,
     parameter bit           ZIHPMEnable    = 1'b0,
-    parameter bit           ZKNEEnable     = 1'b0,
+    `ifdef DEBUG
     parameter bit           DEBUG          = 1'b0,
     parameter string        DBG_REG_FILE   = "./debug/regBank.txt",
-    parameter bit           PROFILING      = 1'b0
+    parameter bit           PROFILING      = 1'b0,
+    `endif
+    parameter bit           ZKNEEnable     = 1'b0
 )
 (
     input  logic                    clk,
@@ -344,8 +346,10 @@ module RS5
     end
     else begin : RegFileFF_blk
         regbank #(
+            `ifdef DEBUG
             .DEBUG      (DEBUG       ),
             .DBG_FILE   (DBG_REG_FILE)
+            `endif
         ) regbankff (
             .clk        (clk),
             .reset_n    (reset_n),
@@ -426,8 +430,10 @@ module RS5
       .XOSVMEnable(XOSVMEnable ),
       .ZIHPMEnable(ZIHPMEnable ),
       .COMPRESSED (COMPRESSED  ),
-      .RV32       (RV32        ),
-      .PROFILING  (PROFILING   )
+      `ifdef DEBUG
+      .PROFILING  (PROFILING   ),
+      `endif
+      .RV32       (RV32        )
     ) CSRBank1 (
         .clk                        (clk), 
         .reset_n                    (reset_n), 
