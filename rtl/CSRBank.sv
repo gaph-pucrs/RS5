@@ -28,14 +28,14 @@
 module CSRBank
     import RS5_pkg::*;
 #(
-    parameter bit       XOSVMEnable    = 1'b0,
+    parameter bit       XOSVMEnable    = 1'b1,
     parameter bit       ZIHPMEnable    = 1'b0,
-    parameter bit       COMPRESSED     = 1'b0,
+    parameter bit       COMPRESSED     = 1'b1,
     `ifdef DEBUG
     parameter bit       PROFILING      = 1'b0,
     parameter string    PROFILING_FILE = "./debug/Report.txt",
     `endif
-    parameter rv32_e    RV32           = RV32I
+    parameter rv32_e    RV32           = RV32M
 
 )
 (
@@ -544,18 +544,24 @@ module CSRBank
         end
     end
 
-    always_ff @(posedge clk) begin
-        if (mstatus_mie && (mie & mip) != '0 && !interrupt_ack_i) begin
-            interrupt_pending_o <= 1;
-            if ((MEIP & MEIE) == 1'b1)          // Machine External
-                Interruption_Code <= M_EXT_INT;
-            else if ((MSIP & MSIE) == 1'b1)     // Machine Software
-                Interruption_Code <= M_SW_INT;
-            else if ((MTIP & MTIE) == 1'b1)     // Machine Timer
-                Interruption_Code <= M_TIM_INT;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if(!reset_n) begin
+            Interruption_Code <= 0;
+            interrupt_pending_o <= 0;
         end
         else begin
-            interrupt_pending_o <= 0;
+            if (mstatus_mie && (mie & mip) != '0 && !interrupt_ack_i) begin
+                interrupt_pending_o <= 1;
+                if ((MEIP & MEIE) == 1'b1)          // Machine External
+                    Interruption_Code <= M_EXT_INT;
+                else if ((MSIP & MSIE) == 1'b1)     // Machine Software
+                    Interruption_Code <= M_SW_INT;
+                else if ((MTIP & MTIE) == 1'b1)     // Machine Timer
+                    Interruption_Code <= M_TIM_INT;
+            end
+            else begin
+                interrupt_pending_o <= 0;
+            end
         end
     end
 

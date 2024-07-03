@@ -31,7 +31,7 @@ module execute
     import RS5_pkg::*;
 #(
     parameter environment_e Environment = ASIC,
-    parameter rv32_e        RV32        = RV32I,
+    parameter rv32_e        RV32        = RV32M,
     parameter bit           ZKNEEnable  = 1'b1
 )
 (
@@ -461,7 +461,7 @@ end
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        if ((!reset_n | killed) == 1'b0) begin
+        if ((killed) == 1'b0) begin
             if (exc_inst_access_fault_i) begin
                 raise_exception_o = 1'b1;
                 machine_return_o  = 1'b0;

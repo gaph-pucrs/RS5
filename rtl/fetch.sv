@@ -23,7 +23,7 @@
 
 module fetch  #(
     parameter     start_address = 32'b0,
-    parameter bit COMPRESSED    = 1'b0
+    parameter bit COMPRESSED    = 1'b1
 )
 (
     input   logic           clk,

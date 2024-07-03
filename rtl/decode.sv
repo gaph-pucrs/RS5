@@ -27,7 +27,7 @@ module decode
     import RS5_pkg::*;
 #(
     parameter bit           ZKNEEnable  = 1'b1,
-    parameter bit           COMPRESSED  = 1'b0
+    parameter bit           COMPRESSED  = 1'b1
 )
 (
     input   logic           clk,
