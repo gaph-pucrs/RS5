@@ -25,6 +25,7 @@ module vectorALU
 
     output logic                  hold_o,
     output logic                  hold_widening_o,
+    output logic [VLEN-1:0]       result_mask_o,
     output logic [VLEN-1:0]       result_o
 );
 
@@ -489,10 +490,13 @@ module vectorALU
 // Compare
 //////////////////////////////////////////////////////////////////////////////
 
+    logic mask_instruction;
+
+    assign mask_instruction = (vector_operation_i inside {VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT});
+
     logic [ VLENB   -1:0] equal_8b,  greater_than_8b,  greater_than_signed_8b,  result_comparison_8b;
     logic [(VLENB/2)-1:0] equal_16b, greater_than_16b, greater_than_signed_16b, result_comparison_16b;
     logic [(VLENB/4)-1:0] equal_32b, greater_than_32b, greater_than_signed_32b, result_comparison_32b;
-    logic [ VLEN    -1:0] result_comparison;
 
     always_comb begin
         for (int i = 0; i < VLENB; i++) begin
@@ -559,12 +563,28 @@ module vectorALU
         endcase
     end
 
-    always_comb begin
-        unique case (vsew)
-            EW8:    result_comparison = {8 {result_comparison_8b  & ({VLENB  {vm}} | mask_sew8 [cycle_count_r])}};
-            EW16:   result_comparison = {16{result_comparison_16b & ({VLENB/2{vm}} | mask_sew16[cycle_count_r])}};
-            default:result_comparison = {32{result_comparison_32b & ({VLENB/4{vm}} | mask_sew32[cycle_count_r])}};
-        endcase
+    always @(posedge clk) begin
+        if (mask_instruction) begin
+            unique case (vsew)
+                EW8:
+                    for (int i = 0; i < 8; i++)
+                        if (i == cycle_count_r)
+                            result_mask_o[(VLENB*i)+:VLENB]       <= result_comparison_8b  & ({VLENB  {vm}} | mask_sew8 [cycle_count_r]);
+
+                EW16:
+                    for (int i = 0; i < 8; i++)
+                        if (i == cycle_count_r)
+                            result_mask_o[((VLENB/2)*i)+:VLENB/2] <= result_comparison_16b & ({VLENB/2{vm}} | mask_sew16[cycle_count_r]);
+
+                default:
+                    for (int i = 0; i < 8; i++)
+                        if (i == cycle_count_r)
+                            result_mask_o[((VLENB/4)*i)+:VLENB/4] <= result_comparison_32b & ({VLENB/4{vm}} | mask_sew32[cycle_count_r]);
+            endcase
+        end
+        else begin
+            result_mask_o <= '0;
+        end
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -915,10 +935,6 @@ module vectorALU
             VSLL:            result_o <= result_sll;
             VSRL:            result_o <= result_srl;
             VSRA:            result_o <= result_sra;
-            VMSEQ,  VMSNE,
-            VMSLTU, VMSLT,
-            VMSLEU, VMSLE,
-            VMSGTU, VMSGT:   result_o <= result_comparison;
             VMIN:            result_o <= result_min;
             VMINU:           result_o <= result_minu;
             VMAX:            result_o <= result_max;
