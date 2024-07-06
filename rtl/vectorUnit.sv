@@ -48,6 +48,8 @@ module vectorUnit
     vlmul_e vlmul, vlmul_effective;
     logic[$bits(VLEN )-1:0] vl, vl_curr_reg, vl_next;
     logic[$bits(VLENB)-1:0] elements_per_reg;
+    logic[$bits(VLEN )-1:0] total_elements_processed;
+    logic                   vector_process_done;
 
     vector_states_e  state, next_state;
 
@@ -62,7 +64,7 @@ module vectorUnit
     logic [VLEN-1:0]  first_operand, second_operand, third_operand;
 
     logic [4:0]       vd_addr, vd_addr_r;
-    logic [VLEN-1:0]  result_alu, result_lsu, result;
+    logic [VLEN-1:0]  result_alu, result_alu_mask, result_lsu, result;
     logic [VLENB-1:0] write_enable;
 
     assign hold = hold_alu | hold_lsu;
@@ -155,11 +157,13 @@ module vectorUnit
                     next_state = V_IDLE;
 
             V_EXEC:
-                if (
+                if ((
                     (vlmul_effective == LMUL_1  && cycle_count_vd < 1)
                 ||  (vlmul_effective == LMUL_2  && cycle_count_vd < 2)
                 ||  (vlmul_effective == LMUL_4  && cycle_count_vd < 4)
                 ||  (vlmul_effective == LMUL_8  && cycle_count_vd < 8)
+                )
+                && (!vector_process_done)
                 )
                     next_state = V_EXEC;
                 else
@@ -283,6 +287,16 @@ module vectorUnit
             else
                 vl_curr_reg <= 0;
 
+    always_ff @(posedge clk or negedge reset_n)
+        if (!reset_n)
+            total_elements_processed <= 0;
+        else if (next_state == V_IDLE)
+            total_elements_processed <= 0;
+        else if (!hold && !(accumulate_instruction && cycle_count_vd == 0))
+            total_elements_processed <= total_elements_processed + elements_per_reg;
+
+    assign vector_process_done = (total_elements_processed >= vl && !whole_reg_load_store && instruction_operation_i == VECTOR);
+
 //////////////////////////////////////////////////////////////////////////////
 // Register Bank
 //////////////////////////////////////////////////////////////////////////////
@@ -313,17 +327,8 @@ module vectorUnit
                     default: write_enable <= {'0, 4'b1111};
                 endcase
             end
-            else if (whole_reg_load_store) begin
+            else if (whole_reg_load_store || mask_instruction) begin
                 write_enable <= '1;
-            end
-            else if (mask_instruction) begin
-                for (int i = 0; i < 8; i++) begin
-                    unique case (vsew_effective)
-                        EW8:     write_enable[( VLENB   *(i+1))-1-:VLENB  ] <= (i == cycle_count_r) ? '1 : '0;
-                        EW16:    write_enable[((VLENB/2)*(i+1))-1-:VLENB/2] <= (i == cycle_count_r) ? '1 : '0;
-                        default: write_enable[((VLENB/4)*(i+1))-1-:VLENB/4] <= (i == cycle_count_r) ? '1 : '0;
-                    endcase
-                end
             end
             else begin
                 unique case (vsew_effective)
@@ -445,9 +450,11 @@ module vectorUnit
         .current_state          (state),
         .cycle_count            (cycle_count),
         .instruction_operation_i(instruction_operation_i),
+        .whole_reg_load_store   (whole_reg_load_store),
         .vsew                   (vsew),
         .vlmul                  (vlmul_effective),
         .cycle_count_r          (cycle_count_r),
+        .vl                     (vl),
         .vl_curr_reg            (vl_curr_reg),
         .vm                     (vm),
         .mask_sew8              (mask_sew8),
@@ -494,10 +501,18 @@ module vectorUnit
         .vsew               (vsew),
         .hold_o             (hold_alu),
         .hold_widening_o    (hold_widening),
+        .result_mask_o      (result_alu_mask),
         .result_o           (result_alu)
     );
 
-    assign result = (instruction_operation_i == VLOAD) ? result_lsu : result_alu;
+    always_comb begin
+        if (instruction_operation_i == VLOAD)
+            result = result_lsu;
+        else if (mask_instruction)
+            result = result_alu_mask;
+        else
+            result = result_alu;
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 // Scalar Result

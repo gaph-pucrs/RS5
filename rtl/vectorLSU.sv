@@ -17,10 +17,12 @@ module vectorLSU
     input  logic [ 4:0]           cycle_count,
 
     input  iType_e                instruction_operation_i,
+    input  logic                  whole_reg_load_store,
     input  vew_e                  vsew,
     input  vlmul_e                vlmul,
 
     input  logic [4:0]            cycle_count_r,
+    input  logic[$bits(VLEN)-1:0] vl,
     input  logic[$bits(VLEN)-1:0] vl_curr_reg,
     input  logic                  vm,
     input  logic [ VLENB   -1:0]  mask_sew8 [8],
@@ -40,9 +42,12 @@ module vectorLSU
 
     vector_lsu_states_e next_state, state;
 
+    logic                    vector_process_done;
+
     logic [$bits(VLENB)-1:0] elementsPerRegister;
-    logic [$bits(VLENB)-1:0] elementsProcessed, nextTotalElementsProcessed;
-    logic [$bits(VLENB)-1:0] totalElementsProcessed;
+    logic [$bits(VLENB)-1:0] elementsProcessedCycle, nextElementsProcessedRegister;
+    logic [$bits(VLENB)-1:0] elementsProcessedRegister;
+    logic [$bits(VLEN)-1:0]  elementsProcessedTotal;
     logic [3:0]              reg_count;
 
 //////////////////////////////////////////////////////////////////////////////
@@ -84,15 +89,17 @@ module vectorLSU
     always_comb begin
         if (addrMode == UNIT_STRIDED) begin
             unique case(width)
-                EW8:     next_cycle_is_last = ((elementsPerRegister - nextTotalElementsProcessed) <= 4);
-                EW16:    next_cycle_is_last = ((elementsPerRegister - nextTotalElementsProcessed) <= 2);
-                default: next_cycle_is_last = ((elementsPerRegister - nextTotalElementsProcessed) <= 1);
+                EW8:     next_cycle_is_last = ((elementsPerRegister - nextElementsProcessedRegister) <= 4);
+                EW16:    next_cycle_is_last = ((elementsPerRegister - nextElementsProcessedRegister) <= 2);
+                default: next_cycle_is_last = ((elementsPerRegister - nextElementsProcessedRegister) <= 1);
             endcase
         end
         else begin
-            next_cycle_is_last = (nextTotalElementsProcessed >= elementsPerRegister);
+            next_cycle_is_last = (nextElementsProcessedRegister >= elementsPerRegister);
         end
     end
+
+    assign vector_process_done = (elementsProcessedTotal >= vl && !whole_reg_load_store);
 
 //////////////////////////////////////////////////////////////////////////////
 // FSM
@@ -118,24 +125,24 @@ module vectorLSU
             VLSU_FIRST_CYCLE:
                     if (indexed_wait_update_index_reg)
                         next_state = VLSU_FIRST_CYCLE;
-                    else if (next_cycle_is_last)
+                    else if (next_cycle_is_last || vector_process_done)
                         next_state = VLSU_LAST_CYCLE;
                     else
                         next_state = VLSU_EXEC;
 
             VLSU_EXEC:
-                if (next_cycle_is_last)
+                if (next_cycle_is_last || vector_process_done)
                     next_state = VLSU_LAST_CYCLE;
                 else
                     next_state = VLSU_EXEC;
 
             VLSU_LAST_CYCLE:
-                if (
+                if ((
                     (vlmul == LMUL_1  && reg_count < 1)
                 ||  (vlmul == LMUL_2  && reg_count < 2)
                 ||  (vlmul == LMUL_4  && reg_count < 4)
                 ||  (vlmul == LMUL_8  && reg_count < 8)
-                )
+                ) && !vector_process_done)
                     next_state = VLSU_FIRST_CYCLE;
                 else
                     next_state = VLSU_IDLE;
@@ -178,9 +185,9 @@ module vectorLSU
 
     always_comb begin
         unique case(width)
-            EW8:     offset_indexed = {24'h0, indexed_offsets_i[( 8*totalElementsProcessed)+:8 ]};
-            EW16:    offset_indexed = {16'h0, indexed_offsets_i[(16*totalElementsProcessed)+:16]};
-            default: offset_indexed = indexed_offsets_i[(32*totalElementsProcessed)+:32];
+            EW8:     offset_indexed = {24'h0, indexed_offsets_i[( 8*elementsProcessedRegister)+:8 ]};
+            EW16:    offset_indexed = {16'h0, indexed_offsets_i[(16*elementsProcessedRegister)+:16]};
+            default: offset_indexed = indexed_offsets_i[(32*elementsProcessedRegister)+:32];
         endcase
     end
 
@@ -190,15 +197,24 @@ module vectorLSU
 
     always_comb
         if (state inside {VLSU_IDLE, VLSU_LAST_CYCLE})
-            nextTotalElementsProcessed = '0;
+            nextElementsProcessedRegister = '0;
         else
-            nextTotalElementsProcessed = totalElementsProcessed + elementsProcessed;
+            nextElementsProcessedRegister = elementsProcessedRegister + elementsProcessedCycle;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
-            totalElementsProcessed <= '0;
+            elementsProcessedRegister <= '0;
         else if (!indexed_wait_update_index_reg)
-            totalElementsProcessed <= nextTotalElementsProcessed;
+            elementsProcessedRegister <= nextElementsProcessedRegister;
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            elementsProcessedTotal <= 0;
+        else if (state == VLSU_IDLE)
+            elementsProcessedTotal <= 0;
+        else if (!indexed_wait_update_index_reg)
+            elementsProcessedTotal <= elementsProcessedTotal + elementsProcessedCycle;
     end
 
     always_comb begin
@@ -206,33 +222,33 @@ module vectorLSU
             if (width == EW8) begin
                 if(state == VLSU_FIRST_CYCLE) begin
                     unique case(base_address_i[1:0])
-                        2'b11:      elementsProcessed = 1;
-                        2'b10:      elementsProcessed = 2;
-                        2'b01:      elementsProcessed = 3;
-                        default:    elementsProcessed = 4;
+                        2'b11:      elementsProcessedCycle = 1;
+                        2'b10:      elementsProcessedCycle = 2;
+                        2'b01:      elementsProcessedCycle = 3;
+                        default:    elementsProcessedCycle = 4;
                     endcase
                 end
                 else begin
-                    elementsProcessed = 4;
+                    elementsProcessedCycle = 4;
                 end
             end
             else if (width == EW16) begin
                 if(state == VLSU_FIRST_CYCLE) begin
                     unique case(base_address_i[1])
-                        1'b1:       elementsProcessed = 1;
-                        default:    elementsProcessed = 2;
+                        1'b1:       elementsProcessedCycle = 1;
+                        default:    elementsProcessedCycle = 2;
                     endcase
                 end
                 else begin
-                    elementsProcessed = 2;
+                    elementsProcessedCycle = 2;
                 end
             end
             else begin
-                elementsProcessed = 1;
+                elementsProcessedCycle = 1;
             end
         end
         else begin
-            elementsProcessed = 1;
+            elementsProcessedCycle = 1;
         end
     end
 
@@ -275,15 +291,15 @@ module vectorLSU
                 else if (state == VLSU_LAST_CYCLE) begin
                     shift_amount = 0;
                     for (int i = 0; i < 4; i++)
-                        if ((i < base_address_i[1:0] || base_address_i[1:0] == 0) && (totalElementsProcessed + i) < vl_curr_reg)
-                            mem_write_enable[i] = (vm | mask_sew8[cycle_count_r][totalElementsProcessed + i]);
+                        if ((i < base_address_i[1:0] || base_address_i[1:0] == 0) && (elementsProcessedRegister + i) < vl_curr_reg)
+                            mem_write_enable[i] = (vm | mask_sew8[cycle_count_r][elementsProcessedRegister + i]);
                         else
                             mem_write_enable[i] = 1'b0;
                 end
                 else begin
                     shift_amount = 0;
                     for (int i = 0; i < 4; i++)
-                        mem_write_enable[i] = (vm | mask_sew8[cycle_count_r][totalElementsProcessed+i]) && ((totalElementsProcessed + i) < vl_curr_reg);
+                        mem_write_enable[i] = (vm | mask_sew8[cycle_count_r][elementsProcessedRegister+i]) && ((elementsProcessedRegister + i) < vl_curr_reg);
                 end
             end
             else if (width == EW16) begin
@@ -307,8 +323,8 @@ module vectorLSU
                 else if(state == VLSU_LAST_CYCLE) begin
                     shift_amount = 0;
                     for (int i = 0; i < 2; i++)
-                        if ((i < base_address_i[1] || base_address_i[1] == 0) && (totalElementsProcessed + i) < vl_curr_reg)
-                            mem_write_enable[(2*i)+:2] = (vm | mask_sew16[cycle_count_r][totalElementsProcessed + i])
+                        if ((i < base_address_i[1] || base_address_i[1] == 0) && (elementsProcessedRegister + i) < vl_curr_reg)
+                            mem_write_enable[(2*i)+:2] = (vm | mask_sew16[cycle_count_r][elementsProcessedRegister + i])
                                                         ? 2'b11
                                                         : 2'b00;
                         else
@@ -317,7 +333,7 @@ module vectorLSU
                 else begin
                     shift_amount = 0;
                     for (int i = 0; i < 2; i++)
-                        mem_write_enable[(2*i)+:2] = (vm | mask_sew16[cycle_count_r][totalElementsProcessed+i]) && ((totalElementsProcessed + i) < vl_curr_reg)
+                        mem_write_enable[(2*i)+:2] = (vm | mask_sew16[cycle_count_r][elementsProcessedRegister+i]) && ((elementsProcessedRegister + i) < vl_curr_reg)
                                                     ? 2'b11
                                                     : 2'b00;
                 end
@@ -328,7 +344,7 @@ module vectorLSU
                     mem_write_enable = 4'b0000;
                 end
                 else begin
-                    mem_write_enable = (vm | mask_sew32[cycle_count_r][totalElementsProcessed]) && (totalElementsProcessed < vl_curr_reg)
+                    mem_write_enable = (vm | mask_sew32[cycle_count_r][elementsProcessedRegister]) && (elementsProcessedRegister < vl_curr_reg)
                                         ? 4'b1111
                                         : 4'b0000;
                 end
@@ -336,7 +352,7 @@ module vectorLSU
         end
         else begin
             shift_amount = 0;
-            if ((width == EW8) && (vm | mask_sew8[cycle_count_r][totalElementsProcessed]) && (totalElementsProcessed < vl_curr_reg)) begin
+            if ((width == EW8) && (vm | mask_sew8[cycle_count_r][elementsProcessedRegister]) && (elementsProcessedRegister < vl_curr_reg)) begin
                 unique case(address[1:0])
                     2'b11:   mem_write_enable = 4'b1000;
                     2'b10:   mem_write_enable = 4'b0100;
@@ -344,13 +360,13 @@ module vectorLSU
                     default: mem_write_enable = 4'b0001;
                 endcase
             end
-            else if ((width == EW16) && (vm | mask_sew16[cycle_count_r][totalElementsProcessed]) && (totalElementsProcessed < vl_curr_reg)) begin
+            else if ((width == EW16) && (vm | mask_sew16[cycle_count_r][elementsProcessedRegister]) && (elementsProcessedRegister < vl_curr_reg)) begin
                 unique case(address[1])
                     1'b1:       mem_write_enable = 4'b1100;
                     default:    mem_write_enable = 4'b0011;
                 endcase
             end
-            else if ((width == EW32) && (vm | mask_sew32[cycle_count_r][totalElementsProcessed]) && (totalElementsProcessed < vl_curr_reg)) begin
+            else if ((width == EW32) && (vm | mask_sew32[cycle_count_r][elementsProcessedRegister]) && (elementsProcessedRegister < vl_curr_reg)) begin
                 mem_write_enable = 4'b1111;
             end
             else begin
@@ -369,25 +385,25 @@ module vectorLSU
         if (addrMode == UNIT_STRIDED) begin
             unique case (width)
                 EW8: begin
-                    write_data[ 7: 0] = write_data_i[(8*(totalElementsProcessed  ))+:8];
-                    write_data[15: 8] = write_data_i[(8*(totalElementsProcessed+1))+:8];
-                    write_data[23:16] = write_data_i[(8*(totalElementsProcessed+2))+:8];
-                    write_data[31:24] = write_data_i[(8*(totalElementsProcessed+3))+:8];
+                    write_data[ 7: 0] = write_data_i[(8*(elementsProcessedRegister  ))+:8];
+                    write_data[15: 8] = write_data_i[(8*(elementsProcessedRegister+1))+:8];
+                    write_data[23:16] = write_data_i[(8*(elementsProcessedRegister+2))+:8];
+                    write_data[31:24] = write_data_i[(8*(elementsProcessedRegister+3))+:8];
                 end
                 EW16: begin
-                    write_data[15: 0] = write_data_i[(16*(totalElementsProcessed  ))+:16];
-                    write_data[31:16] = write_data_i[(16*(totalElementsProcessed+1))+:16];
+                    write_data[15: 0] = write_data_i[(16*(elementsProcessedRegister  ))+:16];
+                    write_data[31:16] = write_data_i[(16*(elementsProcessedRegister+1))+:16];
                 end
                 default: begin
-                    write_data[31: 0] = write_data_i[(32*(totalElementsProcessed  ))+:32];
+                    write_data[31: 0] = write_data_i[(32*(elementsProcessedRegister  ))+:32];
                 end
             endcase
         end
         else begin
             unique case (width)
-                EW8:     write_data = {4{write_data_i[( 8*totalElementsProcessed)+:8 ]}};
-                EW16:    write_data = {2{write_data_i[(16*totalElementsProcessed)+:16]}};
-                default: write_data =    write_data_i[(32*totalElementsProcessed)+:32];
+                EW8:     write_data = {4{write_data_i[( 8*elementsProcessedRegister)+:8 ]}};
+                EW16:    write_data = {2{write_data_i[(16*elementsProcessedRegister)+:16]}};
+                default: write_data =    write_data_i[(32*elementsProcessedRegister)+:32];
             endcase
         end
     end
@@ -399,8 +415,8 @@ module vectorLSU
 
     logic [31:0] address_r;
     vector_lsu_states_e state_r;
-    logic [$bits(VLENB)-1:0] elementsProcessed_r;
-    logic [$bits(VLENB)-1:0] totalElementsProcessed_r;
+    logic [$bits(VLENB)-1:0] elementsProcessedCycle_r;
+    logic [$bits(VLENB)-1:0] elementsProcessedRegister_r;
 
     always @(posedge clk) begin
         address_r <= address;
@@ -417,16 +433,16 @@ module vectorLSU
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
-            elementsProcessed_r      <= '0;
-            totalElementsProcessed_r <= '0;
+            elementsProcessedCycle_r    <= '0;
+            elementsProcessedRegister_r <= '0;
         end
         else if (state == VLSU_IDLE) begin
-            elementsProcessed_r      <= '0;
-            totalElementsProcessed_r <= '0;
+            elementsProcessedCycle_r    <= '0;
+            elementsProcessedRegister_r <= '0;
         end
         else begin
-            elementsProcessed_r      <= elementsProcessed;
-            totalElementsProcessed_r <= totalElementsProcessed;
+            elementsProcessedCycle_r    <= elementsProcessedCycle;
+            elementsProcessedRegister_r <= elementsProcessedRegister;
         end
     end
 
@@ -488,21 +504,21 @@ module vectorLSU
     always_comb begin
         unique case (width)
             EW8: begin
-                read_data[(8*totalElementsProcessed_r)+:8] = read_data_8b[0];
-                if (elementsProcessed_r > 1)
-                    read_data[(8*(totalElementsProcessed_r+1))+:8] = read_data_8b[1];
-                if (elementsProcessed_r > 2)
-                    read_data[(8*(totalElementsProcessed_r+2))+:8] = read_data_8b[2];
-                if (elementsProcessed_r > 3)
-                    read_data[(8*(totalElementsProcessed_r+3))+:8] = read_data_8b[3];
+                read_data[(8*elementsProcessedRegister_r)+:8] = read_data_8b[0];
+                if (elementsProcessedCycle_r > 1)
+                    read_data[(8*(elementsProcessedRegister_r+1))+:8] = read_data_8b[1];
+                if (elementsProcessedCycle_r > 2)
+                    read_data[(8*(elementsProcessedRegister_r+2))+:8] = read_data_8b[2];
+                if (elementsProcessedCycle_r > 3)
+                    read_data[(8*(elementsProcessedRegister_r+3))+:8] = read_data_8b[3];
             end
             EW16: begin
-                read_data[(16*totalElementsProcessed_r)+:16] = read_data_16b[0];
-                if (elementsProcessed_r > 1)
-                    read_data[(16*(totalElementsProcessed_r+1))+:16] = read_data_16b[1];
+                read_data[(16*elementsProcessedRegister_r)+:16] = read_data_16b[0];
+                if (elementsProcessedCycle_r > 1)
+                    read_data[(16*(elementsProcessedRegister_r+1))+:16] = read_data_16b[1];
             end
             default: begin
-                read_data[(32*totalElementsProcessed_r)+:32] = mem_read_data_i;
+                read_data[(32*elementsProcessedRegister_r)+:32] = mem_read_data_i;
             end
         endcase
     end
