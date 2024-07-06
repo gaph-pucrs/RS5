@@ -330,6 +330,11 @@ module decode
         end
     end
 
+    always_ff @(posedge clk or negedge reset_n)
+        if (instruction_operation == VECTOR && vector_operation == VNOP)
+            $display("INVALID VECTOR INST!!!");
+
+
 //////////////////////////////////////////////////////////////////////////////
 //  Decodes the instruction format
 //////////////////////////////////////////////////////////////////////////////
