@@ -74,13 +74,13 @@ module vectorCSRs
 
     always_comb begin
         if (vector_operation_i == VSETIVLI)
-            vl_next = {'0, rs1};
+            vl_next = ({'0, rs1} > vl_max) ? vl_max : {'0, rs1};
         else if (rd != '0 && rs1 == '0)
             vl_next = vl_max;
         else if (rd == '0 && rs1 == '0)
             vl_next = vl;
         else
-            vl_next = op1_scalar_i;
+            vl_next = (op1_scalar_i > vl_max) ? vl_max : op1_scalar_i;
             //vl_next = (vector_operation_i == VSETVL) ? op1_scalar_i : {'0, op1_scalar_i[4:0]};
     end
 
