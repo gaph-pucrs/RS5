@@ -1,3 +1,5 @@
+/* verilator lint_off WIDTHEXPAND */
+/* verilator lint_off WIDTHTRUNC */
 module vectorUnit
     import RS5_pkg::*;
 #(
@@ -13,7 +15,6 @@ module vectorUnit
 
     input   logic [31:0]    op1_scalar_i,
     input   logic [31:0]    op2_scalar_i,
-    input   logic [31:0]    op3_scalar_i,
 
     output  logic           hold_o,
 
@@ -39,7 +40,6 @@ module vectorUnit
     opCat_e      opCat;
     logic        reduction_instruction;
     logic        accumulate_instruction;
-    logic        compare_instruction;
     logic        widening_instruction;
     logic        whole_reg_load_store;
     logic        mask_instruction;
@@ -58,7 +58,7 @@ module vectorUnit
 
     logic [4:0]       vs1_addr, vs2_addr, vs3_addr;
     logic [VLEN-1:0]  vs1_data, vs2_data, vs3_data;
-    logic [4:0]       cycle_count, cycle_count_r, cycle_count_vd;
+    logic [3:0]       cycle_count, cycle_count_r, cycle_count_vd;
     logic             hold, hold_widening, hold_alu, hold_lsu;
 
     logic [VLEN-1:0]  first_operand, second_operand, third_operand;
@@ -83,7 +83,6 @@ module vectorUnit
 
     assign accumulate_instruction = (vector_operation_i inside {VMACC, VNMSAC, VMADD, VNMSUB});
     assign reduction_instruction  = (vector_operation_i inside {VREDSUM, VREDMAXU, VREDMAX, VREDMINU, VREDMIN, VREDAND, VREDOR, VREDXOR});
-    assign compare_instruction    = (vector_operation_i inside {VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT});
     assign widening_instruction   = (vector_operation_i inside {VWMUL, VWMULU, VWMULSU});
     assign whole_reg_load_store   = (instruction_i[24:20] == 5'b01000 && instruction_operation_i inside {VLOAD, VSTORE});
     assign mask_instruction       = (vector_operation_i inside {VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT});
@@ -434,8 +433,6 @@ module vectorUnit
 // LOAD AND STORE UNIT
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [VLEN-1:0] lsu_data_read;
-
     vectorLSU #(
         .VLEN   (VLEN),
         .VLENB  (VLENB)
@@ -448,10 +445,8 @@ module vectorUnit
         .indexed_offsets_i      (first_operand),
         .write_data_i           (third_operand),
         .current_state          (state),
-        .cycle_count            (cycle_count),
         .instruction_operation_i(instruction_operation_i),
         .whole_reg_load_store   (whole_reg_load_store),
-        .vsew                   (vsew),
         .vlmul                  (vlmul_effective),
         .cycle_count_r          (cycle_count_r),
         .vl                     (vl),
@@ -527,7 +522,7 @@ module vectorUnit
             unique case (vsew_effective)
                 EW8:     res_scalar_o = {'0, result[7:0]};
                 EW16:    res_scalar_o = {'0, result[15:0]};
-                default: res_scalar_o = {'0, result[31:0]};
+                default: res_scalar_o =      result[31:0];
             endcase
             wr_en_scalar_o = 1'b1;
         end
@@ -538,3 +533,5 @@ module vectorUnit
     end
 
 endmodule
+/* verilator lint_on WIDTHEXPAND */
+/* verilator lint_on WIDTHTRUNC */

@@ -161,8 +161,10 @@ module execute
 // Load/Store signals
 //////////////////////////////////////////////////////////////////////////////
 
+    /* verilator lint_off UNUSEDSIGNAL */
     logic [31:0] mem_address_vector;
     logic [31:0] mem_address;
+    /* verilator lint_on UNUSEDSIGNAL */
 
     logic        mem_read_enable;
     logic        mem_read_enable_vector;
@@ -402,7 +404,6 @@ end
             .vector_operation_i     (vector_operation_i),
             .op1_scalar_i           (first_operand_i),
             .op2_scalar_i           (second_operand_i),
-            .op3_scalar_i           (third_operand_i),
             .hold_o                 (hold_vector),
             .vtype_o                (vtype_o),
             .vlen_o                 (vlen_o),

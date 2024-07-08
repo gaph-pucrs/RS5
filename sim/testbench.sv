@@ -35,7 +35,7 @@ module testbench
     localparam bit           USE_ZIHPM       = 1'b1;
     localparam bit           USE_ZKNE        = 1'b1;
     localparam bit           VEnable         = 1'b1;
-    localparam int           VLEN            = 512;
+    localparam int           VLEN            = 256;
     localparam int           MEM_WIDTH       = 16_777_536;
     localparam string        BIN_FILE        = "../app/conv/test.bin";
 

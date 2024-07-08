@@ -1,3 +1,4 @@
+/* verilator lint_off WIDTHTRUNC */
 module vectorLSU
     import RS5_pkg::*;
 #(
@@ -7,21 +8,23 @@ module vectorLSU
     input  logic                  clk,
     input  logic                  reset_n,
 
+    /* verilator lint_off UNUSEDSIGNAL */
     input  logic [31:0]           instruction_i,
+    /* verilator lint_on UNUSEDSIGNAL */
     input  logic [31:0]           base_address_i,
     input  logic [31:0]           stride_i,
     input  logic [VLEN-1:0]       indexed_offsets_i,
     input  logic [VLEN-1:0]       write_data_i,
 
     input  vector_states_e        current_state,
-    input  logic [ 4:0]           cycle_count,
 
     input  iType_e                instruction_operation_i,
     input  logic                  whole_reg_load_store,
-    input  vew_e                  vsew,
     input  vlmul_e                vlmul,
 
-    input  logic [4:0]            cycle_count_r,
+    /* verilator lint_off UNUSEDSIGNAL */
+    input  logic [3:0]            cycle_count_r,
+    /* verilator lint_on UNUSEDSIGNAL */
     input  logic[$bits(VLEN)-1:0] vl,
     input  logic[$bits(VLEN)-1:0] vl_curr_reg,
     input  logic                  vm,
@@ -40,7 +43,7 @@ module vectorLSU
     output logic [VLEN-1:0]       read_data_o
 );
 
-    vector_lsu_states_e next_state, state;
+    vector_lsu_states_e      next_state, state;
 
     logic                    vector_process_done;
 
@@ -54,18 +57,20 @@ module vectorLSU
 // Decoding
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [2:0] nf;
-    logic       mew;
-    logic [4:0] lumop;
+    // logic [2:0] nf;
+    // logic       mew;
+    // logic [4:0] lumop;
+    //vlmul_e     vlmul_effective;
+
     vew_e       width;
     addrModes_e addrMode;
-    vlmul_e     vlmul_effective;
 
-    assign nf       = instruction_i[31:29];
-    assign mew      = instruction_i[28];
-    assign lumop    = instruction_i[24:20];
+    // assign nf       = instruction_i[31:29];
+    // assign mew      = instruction_i[28];
+    // assign lumop    = instruction_i[24:20];
+    // assign vlmul_effective = (width/sew)*lmul;
+
     assign addrMode = addrModes_e'(instruction_i[27:26]);
-    //assign vlmul_effective = (width/sew)*lmul;
 
     always_comb
         unique case (instruction_i[14:12])
@@ -413,13 +418,13 @@ module vectorLSU
 // Temporal barrier
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [31:0] address_r;
-    vector_lsu_states_e state_r;
+    logic [1:0]              address_r;
+    vector_lsu_states_e      state_r;
     logic [$bits(VLENB)-1:0] elementsProcessedCycle_r;
     logic [$bits(VLENB)-1:0] elementsProcessedRegister_r;
 
     always @(posedge clk) begin
-        address_r <= address;
+        address_r <= address[1:0];
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
@@ -559,3 +564,4 @@ module vectorLSU
     end
 
 endmodule
+/* verilator lint_on WIDTHTRUNC */

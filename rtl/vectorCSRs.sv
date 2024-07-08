@@ -1,3 +1,5 @@
+/* verilator lint_off WIDTHEXPAND */
+/* verilator lint_off WIDTHTRUNC */
 module vectorCSRs
     import RS5_pkg::*;
 #(
@@ -9,8 +11,10 @@ module vectorCSRs
 
     input   iTypeVector_e           vector_operation_i,
     input   logic [31:0]            op1_scalar_i,
+    /* verilator lint_off UNUSEDSIGNAL */
     input   logic [31:0]            op2_scalar_i,
     input   logic [10:0]            zimm,
+    /* verilator lint_on UNUSEDSIGNAL */
     input   logic [4:0]             rs1,
     input   logic [4:0]             rd,
 
@@ -123,3 +127,5 @@ module vectorCSRs
                     : {vill, 23'b0, vma, vta, vsew, vlmul};
 
 endmodule
+/* verilator lint_on WIDTHEXPAND */
+/* verilator lint_on WIDTHTRUNC  */

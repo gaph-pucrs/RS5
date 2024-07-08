@@ -158,8 +158,8 @@ module CSRBank
     assign mcause = {mcause_interrupt, mcause_exc_code};
 
     logic       mstatus_mie, mstatus_ube, mstatus_mpie;
-    logic [1:0] mstatus_vs, mstatus_mpp, mstatus_fs, mstatus_xs;
-    logic       mstatus_mprv, mstatus_sum, mstatus_mxr, mstatus_tvm, mstatus_tw, mstatus_tsr, mstatus_sd;
+    logic [1:0] mstatus_vs,  mstatus_mpp, mstatus_fs, mstatus_xs;
+    logic       mstatus_sum, mstatus_tvm, mstatus_tw, mstatus_tsr, mstatus_sd;
 
     assign mstatus = {
                         mstatus_sd,
@@ -638,7 +638,8 @@ module CSRBank
         assign instructions_killed_counter = '0;
         assign nop_counter                 = '0;
         assign logic_counter               = '0;
-        assign arithmetic_counter          = '0;
+        assign lui_slt_counter             = '0;
+        assign addsub_counter              = '0;
         assign shift_counter               = '0;
         assign branch_counter              = '0;
         assign jump_counter                = '0;

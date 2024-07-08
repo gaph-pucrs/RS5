@@ -2,7 +2,7 @@
 CFLAGS_STRIP = -fdata-sections -ffunction-sections -fdata-sections -ffunction-sections
 
 #-mrvv-vector-bits=zvl
-GCC_RISCV = riscv64-elf-gcc -march=rv32im_zicsr_zve32x_zvl128b -mabi=ilp32 -O2 -mrvv-vector-bits=zvl -mrvv-max-lmul=m8 $(CFLAGS_STRIP) -DDEBUG_PORT -static -mcmodel=medany -fvisibility=hidden -nostdlib -nostartfiles -mno-relax -DPRINTF_DISABLE_SUPPORT_FLOAT=1
+GCC_RISCV = riscv64-elf-gcc -march=rv32im_zicsr_zve32x_zvl256b -mabi=ilp32 -O2 -mrvv-vector-bits=zvl $(CFLAGS_STRIP) -DDEBUG_PORT -static -mcmodel=medany -fvisibility=hidden -nostdlib -nostartfiles -mno-relax -DPRINTF_DISABLE_SUPPORT_FLOAT=1
 DUMP_RISCV = riscv64-elf-objdump #-Mno-aliases
 READ_RISCV = riscv64-elf-readelf
 OBJ_RISCV = riscv64-elf-objcopy

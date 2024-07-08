@@ -14,8 +14,9 @@ module mulNbits
     logic [N:0]       op_b;
     logic             sign_a;
     logic             sign_b;
+    /* verilator lint_off UNUSEDSIGNAL */
     logic [(2*N)+1:0] mac_result;
-
+    /* verilator lint_on UNUSEDSIGNAL */
 
     assign  sign_a = (first_operand_i [N-1] & signed_mode_i[0]),
             sign_b = (second_operand_i[N-1] & signed_mode_i[1]);
@@ -23,7 +24,7 @@ module mulNbits
     assign  op_a  = {sign_a, first_operand_i},
             op_b  = {sign_b, second_operand_i};
 
-    assign mac_result  = $signed(op_a) * $signed(op_b);  
+    assign mac_result  = $signed(op_a) * $signed(op_b);
 
     assign result_o = mac_result[(2*N)-1:0];
 

@@ -1,3 +1,5 @@
+/* verilator lint_off WIDTHEXPAND */
+/* verilator lint_off WIDTHTRUNC */
 module vectorALU
     import RS5_pkg::*;
 #(
@@ -11,8 +13,8 @@ module vectorALU
     input  logic [VLEN-1:0]       second_operand,
     input  logic [VLEN-1:0]       third_operand,
     input  vector_states_e        current_state,
-    input  logic [4:0]            cycle_count,
-    input  logic [4:0]            cycle_count_r,
+    input  logic [3:0]            cycle_count,
+    input  logic [3:0]            cycle_count_r,
     input  vlmul_e                vlmul,
     input  logic[$bits(VLEN)-1:0] vl,
     input  logic                  vm,
@@ -32,9 +34,9 @@ module vectorALU
     logic hold_mult;
     logic hold;
 
-    logic [(VLENB)  -1:0][ 7:0] first_operand_8b,  second_operand_8b,  third_operand_8b;
-    logic [(VLENB/2)-1:0][15:0] first_operand_16b, second_operand_16b, third_operand_16b;
-    logic [(VLENB/4)-1:0][31:0] first_operand_32b, second_operand_32b, third_operand_32b;
+    logic [(VLENB)  -1:0][ 7:0] first_operand_8b,  second_operand_8b;
+    logic [(VLENB/2)-1:0][15:0] first_operand_16b, second_operand_16b;
+    logic [(VLENB/4)-1:0][31:0] first_operand_32b, second_operand_32b;
 
     logic [VLEN-1:0] third_operand_r, result_mult_r;
 
@@ -45,7 +47,6 @@ module vectorALU
         for (int i = 0; i < VLENB; i++) begin
             first_operand_8b [i] = first_operand [(8*i)+:8];
             second_operand_8b[i] = second_operand[(8*i)+:8];
-            third_operand_8b [i] = third_operand [(8*i)+:8];
         end
     end
 
@@ -53,7 +54,6 @@ module vectorALU
         for (int i = 0; i < VLENB/2; i++) begin
             first_operand_16b [i] = first_operand [(16*i)+:16];
             second_operand_16b[i] = second_operand[(16*i)+:16];
-            third_operand_16b [i] = third_operand [(16*i)+:16];
         end
     end
 
@@ -61,7 +61,6 @@ module vectorALU
         for (int i = 0; i < VLENB/4; i++) begin
             first_operand_32b [i] = first_operand [(32*i)+:32];
             second_operand_32b[i] = second_operand[(32*i)+:32];
-            third_operand_32b [i] = third_operand [(32*i)+:32];
         end
     end
 
@@ -780,7 +779,7 @@ module vectorALU
 
     always @(posedge clk) begin
         if (!hold_mult) begin
-            result_mult_r   <= result_mult;
+            result_mult_r   <= result_mult[VLEN-1:0];
             third_operand_r <= third_operand;
         end
     end
@@ -940,7 +939,7 @@ module vectorALU
             VMAX:            result_o <= result_max;
             VMAXU:           result_o <= result_maxu;
             VMUL, VMULH,
-            VMULHU, VMULHSU: result_o <= result_mult;
+            VMULHU, VMULHSU: result_o <= result_mult[VLEN-1:0];
             VWMUL, VWMULU,
             VWMULSU:         result_o <= (widening_counter == 1'b1) ? result_mult[(2*VLEN)-1:VLEN] : result_mult[VLEN-1:0];
             VDIV, VDIVU:     result_o <= result_div;
@@ -960,3 +959,5 @@ module vectorALU
     end
 
 endmodule
+/* verilator lint_on WIDTHEXPAND */
+/* verilator lint_on WIDTHTRUNC  */
