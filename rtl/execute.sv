@@ -32,7 +32,9 @@ module execute
 #(
     parameter environment_e Environment = ASIC,
     parameter rv32_e        RV32        = RV32I,
-    parameter bit           ZKNEEnable  = 1'b1
+    parameter bit           ZKNEEnable  = 1'b1,
+    parameter bit           VEnable     = 1'b0,
+    parameter int           VLEN        = 64
 )
 (
     input   logic               clk,
@@ -51,6 +53,7 @@ module execute
     input   logic [31:0]        third_operand_i,
     input   iType_e             instruction_operation_i,
     input   logic               instruction_compressed_i,
+    input   iTypeVector_e       vector_operation_i,
     input   logic  [2:0]        tag_i,
     input   privilegeLevel_e    privilege_i,
 
@@ -69,6 +72,7 @@ module execute
     output  logic               mem_read_enable_o,
     output  logic  [3:0]        mem_write_enable_o,
     output  logic [31:0]        mem_write_data_o,
+    input   logic [31:0]        mem_read_data_i,
 
     output  logic [11:0]        csr_address_o,
     output  logic               csr_read_enable_o,
@@ -76,6 +80,9 @@ module execute
     output  logic               csr_write_enable_o,
     output  csrOperation_e      csr_operation_o,
     output  logic [31:0]        csr_data_o,
+
+    output  logic [31:0]        vtype_o,
+    output  logic [31:0]        vlen_o,
 
     output  logic               jump_o,
     output  logic [31:0]        jump_target_o,
@@ -157,31 +164,60 @@ module execute
 // Load/Store signals
 //////////////////////////////////////////////////////////////////////////////
 
-    assign mem_address_o[31:2]  = sum_result[31:2];
-    assign mem_address_o [1:0]  = '0;
-    assign mem_read_enable_o    = instruction_operation_i inside {LB, LBU, LH, LHU, LW};
+    /* verilator lint_off UNUSEDSIGNAL */
+    logic [31:0] mem_address_vector;
+    logic [31:0] mem_address;
+    /* verilator lint_on UNUSEDSIGNAL */
+
+    logic        mem_read_enable;
+    logic        mem_read_enable_vector;
+
+    logic  [3:0] mem_write_enable;
+    logic  [3:0] mem_write_enable_vector;
+
+    logic [31:0] mem_write_data;
+    logic [31:0] mem_write_data_vector;
+
+    always_comb begin
+        if (instruction_operation_i inside {VLOAD, VSTORE}) begin
+            mem_address_o      = {mem_address_vector[31:2], 2'b00};
+            mem_read_enable_o  = mem_read_enable_vector;
+            mem_write_enable_o = mem_write_enable_vector;
+            mem_write_data_o   = mem_write_data_vector;
+        end
+        else begin
+            mem_address_o      = mem_address;
+            mem_read_enable_o  = mem_read_enable;
+            mem_write_enable_o = mem_write_enable;
+            mem_write_data_o   = mem_write_data;
+        end
+    end
+
+    assign mem_address[31:2]  = sum_result[31:2];
+    assign mem_address [1:0]  = '0;
+    assign mem_read_enable    = instruction_operation_i inside {LB, LBU, LH, LHU, LW};
 
     always_comb begin
         unique case (instruction_operation_i)
-            SB:         mem_write_data_o = {4{third_operand_i[7:0]}};
-            SH:         mem_write_data_o = {2{third_operand_i[15:0]}};
-            default:    mem_write_data_o = third_operand_i;
+            SB:         mem_write_data = {4{third_operand_i[7:0]}};
+            SH:         mem_write_data = {2{third_operand_i[15:0]}};
+            default:    mem_write_data = third_operand_i;
         endcase
     end
 
     always_comb begin
         unique case (instruction_operation_i)
             SB: unique case (sum_result[1:0])
-                    2'b11:   mem_write_enable_o = 4'b1000;
-                    2'b10:   mem_write_enable_o = 4'b0100;
-                    2'b01:   mem_write_enable_o = 4'b0010;
-                    default: mem_write_enable_o = 4'b0001;
+                    2'b11:   mem_write_enable = 4'b1000;
+                    2'b10:   mem_write_enable = 4'b0100;
+                    2'b01:   mem_write_enable = 4'b0010;
+                    default: mem_write_enable = 4'b0001;
                 endcase
-            SH:              mem_write_enable_o = (sum_result[1])
+            SH:              mem_write_enable = (sum_result[1])
                                                 ? 4'b1100
                                                 : 4'b0011;
-            SW:              mem_write_enable_o = 4'b1111;
-            default:         mem_write_enable_o = 4'b0000;
+            SW:              mem_write_enable = 4'b1111;
+            default:         mem_write_enable = 4'b0000;
         endcase
 end
 
@@ -233,7 +269,6 @@ end
         endcase
     end
 
-
     always_comb begin
         // Raise exeption if CSR is read only and write enable is true
         if (csr_address_o[11:10] == 2'b11 && csr_write_enable == 1'b1) begin
@@ -256,8 +291,6 @@ end
     logic [31:0] mul_result;
     logic        hold_mul;
     logic        hold_div;
-
-    assign hold_o = (hold_mul | hold_div);
 
     if (RV32 == RV32M || RV32 == RV32ZMMUL) begin : gen_zmmul_on
 
@@ -355,6 +388,49 @@ end
     end
 
 //////////////////////////////////////////////////////////////////////////////
+// Vector Extension
+//////////////////////////////////////////////////////////////////////////////
+    logic [31:0] vector_scalar_result;
+    logic        vector_wr_en;
+    logic        hold_vector;
+
+    if (VEnable) begin : v_gen_on
+        iType_e vector_inst;
+
+        assign vector_inst = (killed) ? NOP : instruction_operation_i;
+        vectorUnit #(
+            .VLEN  (VLEN)
+        ) vector (
+            .clk                    (clk),
+            .reset_n                (reset_n),
+            .instruction_i          (instruction_i),
+            .instruction_operation_i(vector_inst),
+            .vector_operation_i     (vector_operation_i),
+            .op1_scalar_i           (first_operand_i),
+            .op2_scalar_i           (second_operand_i),
+            .hold_o                 (hold_vector),
+            .vtype_o                (vtype_o),
+            .vlen_o                 (vlen_o),
+            .mem_address_o          (mem_address_vector),
+            .mem_read_enable_o      (mem_read_enable_vector),
+            .mem_write_enable_o     (mem_write_enable_vector),
+            .mem_write_data_o       (mem_write_data_vector),
+            .mem_read_data_i        (mem_read_data_i),
+            .res_scalar_o           (vector_scalar_result),
+            .wr_en_scalar_o         (vector_wr_en)
+        );
+    end
+    else begin : v_gen_off
+        assign hold_vector  = '0;
+        assign vector_wr_en = '0;
+        assign vector_scalar_result     = '0;
+        assign mem_address_vector       = '0;
+        assign mem_read_enable_vector   = '0;
+        assign mem_write_enable_vector  = '0;
+        assign mem_write_data_vector    = '0;
+    end
+
+//////////////////////////////////////////////////////////////////////////////
 // Demux
 //////////////////////////////////////////////////////////////////////////////
 
@@ -376,6 +452,7 @@ end
             REM,REMU:               result = rem_result;
             MUL,MULH,MULHU,MULHSU:  result = mul_result;
             AES32ESI, AES32ESMI:    result = aes_result;
+            VECTOR, VLOAD, VSTORE:  result = vector_scalar_result;
             default:                result = sum_result;
         endcase
     end
@@ -386,14 +463,18 @@ end
             SB,SH,SW,
             BEQ,BNE,
             BLT,BLTU,
-            BGE,BGEU:  write_enable = 1'b0;
-            default:   write_enable = ~(killed | raise_exception_o);
+            BGE,BGEU:   write_enable = 1'b0;
+            VECTOR,
+            VLOAD,
+            VSTORE:     write_enable = vector_wr_en;
+            default:    write_enable = ~(killed | raise_exception_o);
         endcase
     end
 
 //////////////////////////////////////////////////////////////////////////////
 // Output Registers
 //////////////////////////////////////////////////////////////////////////////
+    assign hold_o = hold_div | hold_mul | hold_vector;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin

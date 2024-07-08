@@ -3,6 +3,10 @@
 <!--                                                                         -->
 <!-- Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.                   -->
 <!-- Copyright 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.   -->
+<!-- Product Version: Vivado v2023.2 (64-bit)                              -->
+<!--                                                                         -->
+<!-- Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.                   -->
+<!-- Copyright 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.   -->
 
 <Project Product="Vivado" Version="7" Minor="65" Path="/home/angelo.dalzotto/RS5/proto/RS5/RS5.xpr">
   <DefaultLaunch Dir="$PRUNDIR"/>
