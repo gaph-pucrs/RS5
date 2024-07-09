@@ -3,8 +3,14 @@
 module vectorALU
     import RS5_pkg::*;
 #(
-    parameter int VLEN  = 64,
-    parameter int VLENB = 8
+    parameter int VLEN            = 64,
+    parameter int VLENB           = 8,
+    parameter int V_LOGIC_ON      = 1'b1,
+    parameter int V_MINMAX_ON     = 1'b1,
+    parameter int V_REDLOGIC_ON   = 1'b1,
+    parameter int V_REDMINMAX_ON  = 1'b1,
+    parameter int V_REDSUM_ON     = 1'b1,
+    parameter int V_DIV_ON        = 1'b1
 ) (
     input  logic                  clk,
     input  logic                  reset_n,
@@ -92,34 +98,28 @@ module vectorALU
 
     logic [VLEN-1:0] result_and, result_or, result_xor;
 
-    always_comb begin
-        result_and = first_operand & second_operand;
-        result_or  = first_operand | second_operand;
-        result_xor = first_operand ^ second_operand;
+    if (V_LOGIC_ON) begin : v_logic_gen_on
+        always_comb begin
+            result_and = first_operand & second_operand;
+            result_or  = first_operand | second_operand;
+            result_xor = first_operand ^ second_operand;
+        end
+    end
+    else begin  : v_logic_gen_off
+        always_comb begin
+            result_and = '0;
+            result_or  = '0;
+            result_xor = '0;
+        end
     end
 
 //////////////////////////////////////////////////////////////////////////////
-// Reductions
+// Reductions General
 //////////////////////////////////////////////////////////////////////////////
 
-    logic                [ 7:0] second_operand_reductions_8b;
-    logic                [15:0] second_operand_reductions_16b;
-    logic                [31:0] second_operand_reductions_32b;
-
-    logic [(VLENB)  -1:0][ 7:0] result_redand_8b, result_redor_8b;
-    logic [(VLENB)  -1:0][ 7:0] result_redxor_8b, result_redsum_8b;
-    logic [(VLENB)  -1:0][ 7:0] result_redmin_8b, result_redminu_8b;
-    logic [(VLENB)  -1:0][ 7:0] result_redmax_8b, result_redmaxu_8b;
-
-    logic [(VLENB/2)-1:0][15:0] result_redand_16b, result_redor_16b;
-    logic [(VLENB/2)-1:0][15:0] result_redxor_16b, result_redsum_16b;
-    logic [(VLENB/2)-1:0][15:0] result_redmin_16b, result_redminu_16b;
-    logic [(VLENB/2)-1:0][15:0] result_redmax_16b, result_redmaxu_16b;
-
-    logic [(VLENB/4)-1:0][31:0] result_redand_32b, result_redor_32b;
-    logic [(VLENB/4)-1:0][31:0] result_redxor_32b, result_redsum_32b;
-    logic [(VLENB/4)-1:0][31:0] result_redmin_32b, result_redminu_32b;
-    logic [(VLENB/4)-1:0][31:0] result_redmax_32b, result_redmaxu_32b;
+    logic     [ 7:0] second_operand_reductions_8b;
+    logic     [15:0] second_operand_reductions_16b;
+    logic     [31:0] second_operand_reductions_32b;
 
     logic [VLEN-1:0] result_redand, result_redor;
     logic [VLEN-1:0] result_redxor, result_redsum;
@@ -139,246 +139,406 @@ module vectorALU
         end
     end
 
-    always_comb begin
-        for (int i = 0; i < VLENB; i++) begin
-            if (i == 0) begin
-                if (vm || mask_sew8[cycle_count_r][0]) begin
-                    result_redand_8b[i] = first_operand_8b[0] & second_operand_reductions_8b;
-                    result_redor_8b [i] = first_operand_8b[0] | second_operand_reductions_8b;
-                    result_redxor_8b[i] = first_operand_8b[0] ^ second_operand_reductions_8b;
-                    result_redsum_8b[i] = first_operand_8b[0] + second_operand_reductions_8b;
+//////////////////////////////////////////////////////////////////////////////
+// Reductions Min-Max
+//////////////////////////////////////////////////////////////////////////////
 
-                    result_redmin_8b [i] = ($signed(first_operand_8b[0]) > $signed(second_operand_reductions_8b))
-                                            ? second_operand_reductions_8b
-                                            : first_operand_8b [0];
-                    result_redminu_8b[i] = (first_operand_8b[0] > second_operand_reductions_8b)
-                                            ? second_operand_reductions_8b
-                                            : first_operand_8b [0];
-                    result_redmax_8b [i] = ($signed(first_operand_8b[0]) > $signed(second_operand_reductions_8b))
-                                            ? first_operand_8b [0]
-                                            : second_operand_reductions_8b;
-                    result_redmaxu_8b[i] = (first_operand_8b[0] > second_operand_reductions_8b)
-                                            ? first_operand_8b [0]
-                                            : second_operand_reductions_8b;
+    if (V_REDMINMAX_ON) begin : v_redminmax_gen_on
+
+        logic [(VLENB)  -1:0][ 7:0] result_redmin_8b,  result_redminu_8b;
+        logic [(VLENB)  -1:0][ 7:0] result_redmax_8b,  result_redmaxu_8b;
+        logic [(VLENB/2)-1:0][15:0] result_redmin_16b, result_redminu_16b;
+        logic [(VLENB/2)-1:0][15:0] result_redmax_16b, result_redmaxu_16b;
+        logic [(VLENB/4)-1:0][31:0] result_redmin_32b, result_redminu_32b;
+        logic [(VLENB/4)-1:0][31:0] result_redmax_32b, result_redmaxu_32b;
+
+        always_comb begin
+            for (int i = 0; i < VLENB; i++) begin
+                if (i == 0) begin
+                    if (vm || mask_sew8[cycle_count_r][0]) begin
+                        result_redmin_8b [i] = ($signed(first_operand_8b[0]) > $signed(second_operand_reductions_8b))
+                                                ? second_operand_reductions_8b
+                                                : first_operand_8b [0];
+                        result_redminu_8b[i] = (first_operand_8b[0] > second_operand_reductions_8b)
+                                                ? second_operand_reductions_8b
+                                                : first_operand_8b [0];
+                        result_redmax_8b [i] = ($signed(first_operand_8b[0]) > $signed(second_operand_reductions_8b))
+                                                ? first_operand_8b [0]
+                                                : second_operand_reductions_8b;
+                        result_redmaxu_8b[i] = (first_operand_8b[0] > second_operand_reductions_8b)
+                                                ? first_operand_8b [0]
+                                                : second_operand_reductions_8b;
+                    end
+                    else begin
+                        result_redmin_8b [i] = second_operand_reductions_8b;
+                        result_redminu_8b[i] = second_operand_reductions_8b;
+                        result_redmax_8b [i] = second_operand_reductions_8b;
+                        result_redmaxu_8b[i] = second_operand_reductions_8b;
+                    end
                 end
                 else begin
-                    result_redand_8b[i] = second_operand_reductions_8b;
-                    result_redor_8b [i] = second_operand_reductions_8b;
-                    result_redxor_8b[i] = second_operand_reductions_8b;
-                    result_redsum_8b[i] = second_operand_reductions_8b;
-
-                    result_redmin_8b [i] = second_operand_reductions_8b;
-                    result_redminu_8b[i] = second_operand_reductions_8b;
-                    result_redmax_8b [i] = second_operand_reductions_8b;
-                    result_redmaxu_8b[i] = second_operand_reductions_8b;
-                end
-            end
-            else begin
-                if (vm || mask_sew8[cycle_count_r][i]) begin
-                    result_redand_8b[i] = first_operand_8b[i] & result_redand_8b[i-1];
-                    result_redor_8b [i] = first_operand_8b[i] | result_redor_8b [i-1];
-                    result_redxor_8b[i] = first_operand_8b[i] ^ result_redxor_8b[i-1];
-                    result_redsum_8b[i] = first_operand_8b[i] + result_redsum_8b[i-1];
-
-                    result_redmin_8b [i] = ($signed(first_operand_8b[i]) > $signed(result_redmin_8b[i-1]))
-                                            ? result_redmin_8b[i-1]
-                                            : first_operand_8b[i];
-                    result_redminu_8b[i] = (first_operand_8b[i] > result_redminu_8b[i-1])
-                                            ? result_redminu_8b[i-1]
-                                            : first_operand_8b[i];
-                    result_redmax_8b [i] = ($signed(first_operand_8b[i]) > $signed(result_redmax_8b[i-1]))
-                                            ? first_operand_8b[i]
-                                            : result_redmax_8b[i-1];
-                    result_redmaxu_8b[i] = (first_operand_8b[i] > result_redmaxu_8b[i-1])
-                                            ? first_operand_8b[i]
-                                            : result_redmaxu_8b[i-1];
-                end
-                else begin
-                    result_redand_8b[i] = result_redand_8b[i-1];
-                    result_redor_8b [i] = result_redor_8b [i-1];
-                    result_redxor_8b[i] = result_redxor_8b[i-1];
-                    result_redsum_8b[i] = result_redsum_8b[i-1];
-
-                    result_redmin_8b [i] = result_redmin_8b [i-1];
-                    result_redminu_8b[i] = result_redminu_8b[i-1];
-                    result_redmax_8b [i] = result_redmax_8b [i-1];
-                    result_redmaxu_8b[i] = result_redmaxu_8b[i-1];
+                    if (vm || mask_sew8[cycle_count_r][i]) begin
+                        result_redmin_8b [i] = ($signed(first_operand_8b[i]) > $signed(result_redmin_8b[i-1]))
+                                                ? result_redmin_8b[i-1]
+                                                : first_operand_8b[i];
+                        result_redminu_8b[i] = (first_operand_8b[i] > result_redminu_8b[i-1])
+                                                ? result_redminu_8b[i-1]
+                                                : first_operand_8b[i];
+                        result_redmax_8b [i] = ($signed(first_operand_8b[i]) > $signed(result_redmax_8b[i-1]))
+                                                ? first_operand_8b[i]
+                                                : result_redmax_8b[i-1];
+                        result_redmaxu_8b[i] = (first_operand_8b[i] > result_redmaxu_8b[i-1])
+                                                ? first_operand_8b[i]
+                                                : result_redmaxu_8b[i-1];
+                    end
+                    else begin
+                        result_redmin_8b [i] = result_redmin_8b [i-1];
+                        result_redminu_8b[i] = result_redminu_8b[i-1];
+                        result_redmax_8b [i] = result_redmax_8b [i-1];
+                        result_redmaxu_8b[i] = result_redmaxu_8b[i-1];
+                    end
                 end
             end
         end
-    end
 
-    always_comb begin
-        for (int i = 0; i < VLENB/2; i++) begin
-            if (i == 0) begin
-                if (vm || mask_sew16[cycle_count_r][0]) begin
-                    result_redand_16b[i] = first_operand_16b[0] & second_operand_reductions_16b;
-                    result_redor_16b [i] = first_operand_16b[0] | second_operand_reductions_16b;
-                    result_redxor_16b[i] = first_operand_16b[0] ^ second_operand_reductions_16b;
-                    result_redsum_16b[i] = first_operand_16b[0] + second_operand_reductions_16b;
-
-                    result_redmin_16b [i] = ($signed(first_operand_16b[0]) > $signed(second_operand_reductions_16b))
-                                            ? second_operand_reductions_16b
-                                            : first_operand_16b[0];
-                    result_redminu_16b[i] = (first_operand_16b[0] > second_operand_reductions_16b)
-                                            ? second_operand_reductions_16b
-                                            : first_operand_16b[0];
-                    result_redmax_16b [i] = ($signed(first_operand_16b[0]) > $signed(second_operand_reductions_16b))
-                                            ? first_operand_16b[0]
-                                            : second_operand_reductions_16b;
-                    result_redmaxu_16b[i] = (first_operand_16b[0] > second_operand_reductions_16b)
-                                            ? first_operand_16b[0]
-                                            : second_operand_reductions_16b;
+        always_comb begin
+            for (int i = 0; i < VLENB/2; i++) begin
+                if (i == 0) begin
+                    if (vm || mask_sew16[cycle_count_r][0]) begin
+                        result_redmin_16b [i] = ($signed(first_operand_16b[0]) > $signed(second_operand_reductions_16b))
+                                                ? second_operand_reductions_16b
+                                                : first_operand_16b[0];
+                        result_redminu_16b[i] = (first_operand_16b[0] > second_operand_reductions_16b)
+                                                ? second_operand_reductions_16b
+                                                : first_operand_16b[0];
+                        result_redmax_16b [i] = ($signed(first_operand_16b[0]) > $signed(second_operand_reductions_16b))
+                                                ? first_operand_16b[0]
+                                                : second_operand_reductions_16b;
+                        result_redmaxu_16b[i] = (first_operand_16b[0] > second_operand_reductions_16b)
+                                                ? first_operand_16b[0]
+                                                : second_operand_reductions_16b;
+                    end
+                    else begin
+                        result_redmin_16b [i] = second_operand_reductions_16b;
+                        result_redminu_16b[i] = second_operand_reductions_16b;
+                        result_redmax_16b [i] = second_operand_reductions_16b;
+                        result_redmaxu_16b[i] = second_operand_reductions_16b;
+                    end
                 end
                 else begin
-                    result_redand_16b[i] = second_operand_reductions_16b;
-                    result_redor_16b [i] = second_operand_reductions_16b;
-                    result_redxor_16b[i] = second_operand_reductions_16b;
-                    result_redsum_16b[i] = second_operand_reductions_16b;
-
-                    result_redmin_16b [i] = second_operand_reductions_16b;
-                    result_redminu_16b[i] = second_operand_reductions_16b;
-                    result_redmax_16b [i] = second_operand_reductions_16b;
-                    result_redmaxu_16b[i] = second_operand_reductions_16b;
-                end
-            end
-            else begin
-                if (vm || mask_sew16[cycle_count_r][i]) begin
-                    result_redand_16b[i] = first_operand_16b[i] & result_redand_16b[i-1];
-                    result_redor_16b [i] = first_operand_16b[i] | result_redor_16b [i-1];
-                    result_redxor_16b[i] = first_operand_16b[i] ^ result_redxor_16b[i-1];
-                    result_redsum_16b[i] = first_operand_16b[i] + result_redsum_16b[i-1];
-
-                    result_redmin_16b [i] = ($signed(first_operand_16b[i]) > $signed(result_redmin_16b[i-1]))
-                                            ? result_redmin_16b[i-1]
-                                            : first_operand_16b[i];
-                    result_redminu_16b[i] = (first_operand_16b[i] > result_redminu_16b[i-1])
-                                            ? result_redminu_16b[i-1]
-                                            : first_operand_16b[i];
-                    result_redmax_16b [i] = ($signed(first_operand_16b[i]) > $signed(result_redmax_16b[i-1]))
-                                            ? first_operand_16b[i]
-                                            : result_redmax_16b[i-1];
-                    result_redmaxu_16b[i] = (first_operand_16b[i] > result_redmaxu_16b[i-1])
-                                            ? first_operand_16b[i]
-                                            : result_redmaxu_16b[i-1];
-                end
-                else begin
-                    result_redand_16b[i] = result_redand_16b[i-1];
-                    result_redor_16b [i] = result_redor_16b [i-1];
-                    result_redxor_16b[i] = result_redxor_16b[i-1];
-                    result_redsum_16b[i] = result_redsum_16b[i-1];
-
-                    result_redmin_16b [i] = result_redmin_16b [i-1];
-                    result_redminu_16b[i] = result_redminu_16b[i-1];
-                    result_redmax_16b [i] = result_redmax_16b [i-1];
-                    result_redmaxu_16b[i] = result_redmaxu_16b[i-1];
+                    if (vm || mask_sew16[cycle_count_r][i]) begin
+                        result_redmin_16b [i] = ($signed(first_operand_16b[i]) > $signed(result_redmin_16b[i-1]))
+                                                ? result_redmin_16b[i-1]
+                                                : first_operand_16b[i];
+                        result_redminu_16b[i] = (first_operand_16b[i] > result_redminu_16b[i-1])
+                                                ? result_redminu_16b[i-1]
+                                                : first_operand_16b[i];
+                        result_redmax_16b [i] = ($signed(first_operand_16b[i]) > $signed(result_redmax_16b[i-1]))
+                                                ? first_operand_16b[i]
+                                                : result_redmax_16b[i-1];
+                        result_redmaxu_16b[i] = (first_operand_16b[i] > result_redmaxu_16b[i-1])
+                                                ? first_operand_16b[i]
+                                                : result_redmaxu_16b[i-1];
+                    end
+                    else begin
+                        result_redmin_16b [i] = result_redmin_16b [i-1];
+                        result_redminu_16b[i] = result_redminu_16b[i-1];
+                        result_redmax_16b [i] = result_redmax_16b [i-1];
+                        result_redmaxu_16b[i] = result_redmaxu_16b[i-1];
+                    end
                 end
             end
         end
-    end
 
-    always_comb begin
-        for (int i = 0; i < VLENB/4; i++) begin
-            if (i == 0) begin
-                if (vm || mask_sew32[cycle_count_r][i]) begin
-                    result_redand_32b[i] = first_operand_32b[0] & second_operand_reductions_32b;
-                    result_redor_32b [i] = first_operand_32b[0] | second_operand_reductions_32b;
-                    result_redxor_32b[i] = first_operand_32b[0] ^ second_operand_reductions_32b;
-                    result_redsum_32b[i] = first_operand_32b[0] + second_operand_reductions_32b;
-
-                    result_redmin_32b [i] = ($signed(first_operand_32b[0]) > $signed(second_operand_reductions_32b))
-                                            ? second_operand_reductions_32b
-                                            : first_operand_32b [0];
-                    result_redminu_32b[i] = (first_operand_32b[0] > second_operand_reductions_32b)
-                                            ? second_operand_reductions_32b
-                                            : first_operand_32b [0];
-                    result_redmax_32b [i] = ($signed(first_operand_32b[0]) > $signed(second_operand_reductions_32b))
-                                            ? first_operand_32b [0]
-                                            : second_operand_reductions_32b;
-                    result_redmaxu_32b[i] = (first_operand_32b[0] > second_operand_reductions_32b)
-                                            ? first_operand_32b [0]
-                                            : second_operand_reductions_32b;
+        always_comb begin
+            for (int i = 0; i < VLENB/4; i++) begin
+                if (i == 0) begin
+                    if (vm || mask_sew32[cycle_count_r][i]) begin
+                        result_redmin_32b [i] = ($signed(first_operand_32b[0]) > $signed(second_operand_reductions_32b))
+                                                ? second_operand_reductions_32b
+                                                : first_operand_32b [0];
+                        result_redminu_32b[i] = (first_operand_32b[0] > second_operand_reductions_32b)
+                                                ? second_operand_reductions_32b
+                                                : first_operand_32b [0];
+                        result_redmax_32b [i] = ($signed(first_operand_32b[0]) > $signed(second_operand_reductions_32b))
+                                                ? first_operand_32b [0]
+                                                : second_operand_reductions_32b;
+                        result_redmaxu_32b[i] = (first_operand_32b[0] > second_operand_reductions_32b)
+                                                ? first_operand_32b [0]
+                                                : second_operand_reductions_32b;
+                    end
+                    else begin
+                        result_redmin_32b [i] = second_operand_reductions_32b;
+                        result_redminu_32b[i] = second_operand_reductions_32b;
+                        result_redmax_32b [i] = second_operand_reductions_32b;
+                        result_redmaxu_32b[i] = second_operand_reductions_32b;
+                    end
                 end
                 else begin
-                    result_redand_32b[i] = second_operand_reductions_32b;
-                    result_redor_32b [i] = second_operand_reductions_32b;
-                    result_redxor_32b[i] = second_operand_reductions_32b;
-                    result_redsum_32b[i] = second_operand_reductions_32b;
-
-                    result_redmin_32b [i] = second_operand_reductions_32b;
-                    result_redminu_32b[i] = second_operand_reductions_32b;
-                    result_redmax_32b [i] = second_operand_reductions_32b;
-                    result_redmaxu_32b[i] = second_operand_reductions_32b;
-                end
-            end
-            else begin
-                if (vm || mask_sew32[cycle_count_r][i]) begin
-                    result_redand_32b[i] = first_operand_32b[i] & result_redand_32b[i-1];
-                    result_redor_32b [i] = first_operand_32b[i] | result_redor_32b [i-1];
-                    result_redxor_32b[i] = first_operand_32b[i] ^ result_redxor_32b[i-1];
-                    result_redsum_32b[i] = first_operand_32b[i] + result_redsum_32b[i-1];
-
-                    result_redmin_32b [i] = ($signed(first_operand_32b[i]) > $signed(result_redmin_32b[i-1]))
-                                            ? result_redmin_32b[i-1]
-                                            : first_operand_32b[i];
-                    result_redminu_32b[i] = (first_operand_32b[i] > result_redminu_32b[i-1])
-                                            ? result_redminu_32b[i-1]
-                                            : first_operand_32b[i];
-                    result_redmax_32b [i] = ($signed(first_operand_32b[i]) > $signed(result_redmax_32b[i-1]))
-                                            ? first_operand_32b[i]
-                                            : result_redmax_32b[i-1];
-                    result_redmaxu_32b[i] = (first_operand_32b[i] > result_redmaxu_32b[i-1])
-                                            ? first_operand_32b[i]
-                                            : result_redmaxu_32b[i-1];
-                end
-                else begin
-                    result_redand_32b[i] = result_redand_32b[i-1];
-                    result_redor_32b [i] = result_redor_32b [i-1];
-                    result_redxor_32b[i] = result_redxor_32b[i-1];
-                    result_redsum_32b[i] = result_redsum_32b[i-1];
-
-                    result_redmin_32b [i] = result_redmin_32b [i-1];
-                    result_redminu_32b[i] = result_redminu_32b[i-1];
-                    result_redmax_32b [i] = result_redmax_32b [i-1];
-                    result_redmaxu_32b[i] = result_redmaxu_32b[i-1];
+                    if (vm || mask_sew32[cycle_count_r][i]) begin
+                        result_redmin_32b [i] = ($signed(first_operand_32b[i]) > $signed(result_redmin_32b[i-1]))
+                                                ? result_redmin_32b[i-1]
+                                                : first_operand_32b[i];
+                        result_redminu_32b[i] = (first_operand_32b[i] > result_redminu_32b[i-1])
+                                                ? result_redminu_32b[i-1]
+                                                : first_operand_32b[i];
+                        result_redmax_32b [i] = ($signed(first_operand_32b[i]) > $signed(result_redmax_32b[i-1]))
+                                                ? first_operand_32b[i]
+                                                : result_redmax_32b[i-1];
+                        result_redmaxu_32b[i] = (first_operand_32b[i] > result_redmaxu_32b[i-1])
+                                                ? first_operand_32b[i]
+                                                : result_redmaxu_32b[i-1];
+                    end
+                    else begin
+                        result_redmin_32b [i] = result_redmin_32b [i-1];
+                        result_redminu_32b[i] = result_redminu_32b[i-1];
+                        result_redmax_32b [i] = result_redmax_32b [i-1];
+                        result_redmaxu_32b[i] = result_redmaxu_32b[i-1];
+                    end
                 end
             end
         end
+
+        always_comb begin
+            unique case (vsew)
+                EW8: begin
+                    result_redmin  = {'0, result_redmin_8b [vl-1]};
+                    result_redminu = {'0, result_redminu_8b[vl-1]};
+                    result_redmax  = {'0, result_redmax_8b [vl-1]};
+                    result_redmaxu = {'0, result_redmaxu_8b[vl-1]};
+                end
+                EW16: begin
+                    result_redmin  = {'0, result_redmin_16b [vl-1]};
+                    result_redminu = {'0, result_redminu_16b[vl-1]};
+                    result_redmax  = {'0, result_redmax_16b [vl-1]};
+                    result_redmaxu = {'0, result_redmaxu_16b[vl-1]};
+                end
+                default: begin
+                    result_redmin  = {'0, result_redmin_32b [vl-1]};
+                    result_redminu = {'0, result_redminu_32b[vl-1]};
+                    result_redmax  = {'0, result_redmax_32b [vl-1]};
+                    result_redmaxu = {'0, result_redmaxu_32b[vl-1]};
+                end
+            endcase
+        end
+    end
+    else begin : v_redminmax_gen_off
+        always_comb begin
+            result_redmin  = '0;
+            result_redminu = '0;
+            result_redmax  = '0;
+            result_redmaxu = '0;
+        end
     end
 
-    always_comb begin
-        unique case (vsew)
-            EW8: begin
-                result_redand  = {'0, result_redand_8b [vl-1]};
-                result_redor   = {'0, result_redor_8b  [vl-1]};
-                result_redxor  = {'0, result_redxor_8b [vl-1]};
-                result_redsum  = {'0, result_redsum_8b [vl-1]};
-                result_redmin  = {'0, result_redmin_8b [vl-1]};
-                result_redminu = {'0, result_redminu_8b[vl-1]};
-                result_redmax  = {'0, result_redmax_8b [vl-1]};
-                result_redmaxu = {'0, result_redmaxu_8b[vl-1]};
+//////////////////////////////////////////////////////////////////////////////
+// Reductions Logic
+//////////////////////////////////////////////////////////////////////////////
+
+    if (V_REDLOGIC_ON) begin : v_redlogic_gen_on
+
+        logic [(VLENB)  -1:0][ 7:0] result_redand_8b,  result_redor_8b,  result_redxor_8b;
+        logic [(VLENB/2)-1:0][15:0] result_redand_16b, result_redor_16b, result_redxor_16b;
+        logic [(VLENB/4)-1:0][31:0] result_redand_32b, result_redor_32b, result_redxor_32b;
+
+        always_comb begin
+            for (int i = 0; i < VLENB; i++) begin
+                if (i == 0) begin
+                    if (vm || mask_sew8[cycle_count_r][0]) begin
+                        result_redand_8b[i] = first_operand_8b[0] & second_operand_reductions_8b;
+                        result_redor_8b [i] = first_operand_8b[0] | second_operand_reductions_8b;
+                        result_redxor_8b[i] = first_operand_8b[0] ^ second_operand_reductions_8b;
+                    end
+                    else begin
+                        result_redand_8b[i] = second_operand_reductions_8b;
+                        result_redor_8b [i] = second_operand_reductions_8b;
+                        result_redxor_8b[i] = second_operand_reductions_8b;
+                    end
+                end
+                else begin
+                    if (vm || mask_sew8[cycle_count_r][i]) begin
+                        result_redand_8b[i] = first_operand_8b[i] & result_redand_8b[i-1];
+                        result_redor_8b [i] = first_operand_8b[i] | result_redor_8b [i-1];
+                        result_redxor_8b[i] = first_operand_8b[i] ^ result_redxor_8b[i-1];
+                    end
+                    else begin
+                        result_redand_8b[i] = result_redand_8b[i-1];
+                        result_redor_8b [i] = result_redor_8b [i-1];
+                        result_redxor_8b[i] = result_redxor_8b[i-1];
+                    end
+                end
             end
-            EW16: begin
-                result_redand  = {'0, result_redand_16b [vl-1]};
-                result_redor   = {'0, result_redor_16b  [vl-1]};
-                result_redxor  = {'0, result_redxor_16b [vl-1]};
-                result_redsum  = {'0, result_redsum_16b [vl-1]};
-                result_redmin  = {'0, result_redmin_16b [vl-1]};
-                result_redminu = {'0, result_redminu_16b[vl-1]};
-                result_redmax  = {'0, result_redmax_16b [vl-1]};
-                result_redmaxu = {'0, result_redmaxu_16b[vl-1]};
+        end
+
+        always_comb begin
+            for (int i = 0; i < VLENB/2; i++) begin
+                if (i == 0) begin
+                    if (vm || mask_sew16[cycle_count_r][0]) begin
+                        result_redand_16b[i] = first_operand_16b[0] & second_operand_reductions_16b;
+                        result_redor_16b [i] = first_operand_16b[0] | second_operand_reductions_16b;
+                        result_redxor_16b[i] = first_operand_16b[0] ^ second_operand_reductions_16b;
+                    end
+                    else begin
+                        result_redand_16b[i] = second_operand_reductions_16b;
+                        result_redor_16b [i] = second_operand_reductions_16b;
+                        result_redxor_16b[i] = second_operand_reductions_16b;
+                    end
+                end
+                else begin
+                    if (vm || mask_sew16[cycle_count_r][i]) begin
+                        result_redand_16b[i] = first_operand_16b[i] & result_redand_16b[i-1];
+                        result_redor_16b [i] = first_operand_16b[i] | result_redor_16b [i-1];
+                        result_redxor_16b[i] = first_operand_16b[i] ^ result_redxor_16b[i-1];
+                    end
+                end
             end
-            default: begin
-                result_redand  = {'0, result_redand_32b [vl-1]};
-                result_redor   = {'0, result_redor_32b  [vl-1]};
-                result_redxor  = {'0, result_redxor_32b [vl-1]};
-                result_redsum  = {'0, result_redsum_32b [vl-1]};
-                result_redmin  = {'0, result_redmin_32b [vl-1]};
-                result_redminu = {'0, result_redminu_32b[vl-1]};
-                result_redmax  = {'0, result_redmax_32b [vl-1]};
-                result_redmaxu = {'0, result_redmaxu_32b[vl-1]};
+        end
+
+        always_comb begin
+            for (int i = 0; i < VLENB/4; i++) begin
+                if (i == 0) begin
+                    if (vm || mask_sew32[cycle_count_r][i]) begin
+                        result_redand_32b[i] = first_operand_32b[0] & second_operand_reductions_32b;
+                        result_redor_32b [i] = first_operand_32b[0] | second_operand_reductions_32b;
+                        result_redxor_32b[i] = first_operand_32b[0] ^ second_operand_reductions_32b;
+                    end
+                    else begin
+                        result_redand_32b[i] = second_operand_reductions_32b;
+                        result_redor_32b [i] = second_operand_reductions_32b;
+                        result_redxor_32b[i] = second_operand_reductions_32b;
+                    end
+                end
+                else begin
+                    if (vm || mask_sew32[cycle_count_r][i]) begin
+                        result_redand_32b[i] = first_operand_32b[i] & result_redand_32b[i-1];
+                        result_redor_32b [i] = first_operand_32b[i] | result_redor_32b [i-1];
+                        result_redxor_32b[i] = first_operand_32b[i] ^ result_redxor_32b[i-1];
+                    end
+                    else begin
+                        result_redand_32b[i] = result_redand_32b[i-1];
+                        result_redor_32b [i] = result_redor_32b [i-1];
+                        result_redxor_32b[i] = result_redxor_32b[i-1];
+                    end
+                end
             end
-        endcase
+        end
+
+        always_comb begin
+            unique case (vsew)
+                EW8: begin
+                    result_redand  = {'0, result_redand_8b [vl-1]};
+                    result_redor   = {'0, result_redor_8b  [vl-1]};
+                    result_redxor  = {'0, result_redxor_8b [vl-1]};
+                end
+                EW16: begin
+                    result_redand  = {'0, result_redand_16b [vl-1]};
+                    result_redor   = {'0, result_redor_16b  [vl-1]};
+                    result_redxor  = {'0, result_redxor_16b [vl-1]};
+                end
+                default: begin
+                    result_redand  = {'0, result_redand_32b [vl-1]};
+                    result_redor   = {'0, result_redor_32b  [vl-1]};
+                    result_redxor  = {'0, result_redxor_32b [vl-1]};
+                end
+            endcase
+        end
+    end
+    else begin : v_redlogic_gen_off
+        always_comb begin
+            result_redand  = '0;
+            result_redor   = '0;
+            result_redxor  = '0;
+        end
+    end
+
+//////////////////////////////////////////////////////////////////////////////
+// Reductions Sum
+//////////////////////////////////////////////////////////////////////////////
+
+    if (V_REDSUM_ON) begin : v_redsum_gen_on
+        logic [(VLENB)  -1:0][ 7:0] result_redsum_8b;
+        logic [(VLENB/2)-1:0][15:0] result_redsum_16b;
+        logic [(VLENB/4)-1:0][31:0] result_redsum_32b;
+
+        always_comb begin
+            for (int i = 0; i < VLENB; i++) begin
+                if (i == 0) begin
+                    if (vm || mask_sew8[cycle_count_r][0]) begin
+                        result_redsum_8b[i] = first_operand_8b[0] + second_operand_reductions_8b;
+                    end
+                    else begin
+                        result_redsum_8b[i] = second_operand_reductions_8b;
+                    end
+                end
+                else begin
+                    if (vm || mask_sew8[cycle_count_r][i]) begin
+                        result_redsum_8b[i] = first_operand_8b[i] + result_redsum_8b[i-1];
+                    end
+                    else begin
+                        result_redsum_8b[i] = result_redsum_8b[i-1];
+                    end
+                end
+            end
+        end
+
+        always_comb begin
+            for (int i = 0; i < VLENB/2; i++) begin
+                if (i == 0) begin
+                    if (vm || mask_sew16[cycle_count_r][0]) begin
+                        result_redsum_16b[i] = first_operand_16b[0] + second_operand_reductions_16b;
+                    end
+                    else begin
+                        result_redsum_16b[i] = second_operand_reductions_16b;
+                    end
+                end
+                else begin
+                    if (vm || mask_sew16[cycle_count_r][i]) begin
+                        result_redsum_16b[i] = first_operand_16b[i] + result_redsum_16b[i-1];
+                    end
+                    else begin
+                        result_redsum_16b[i] = result_redsum_16b[i-1];
+                    end
+                end
+            end
+        end
+
+        always_comb begin
+            for (int i = 0; i < VLENB/4; i++) begin
+                if (i == 0) begin
+                    if (vm || mask_sew32[cycle_count_r][i]) begin
+                        result_redsum_32b[i] = first_operand_32b[0] + second_operand_reductions_32b;
+                    end
+                    else begin
+                        result_redsum_32b[i] = second_operand_reductions_32b;
+                    end
+                end
+                else begin
+                    if (vm || mask_sew32[cycle_count_r][i]) begin
+                        result_redsum_32b[i] = first_operand_32b[i] + result_redsum_32b[i-1];
+                    end
+                    else begin
+                        result_redsum_32b[i] = result_redsum_32b[i-1];
+                    end
+                end
+            end
+        end
+
+        always_comb begin
+            unique case (vsew)
+                EW8: begin
+                    result_redsum  = {'0, result_redsum_8b [vl-1]};
+                end
+                EW16: begin
+                    result_redsum  = {'0, result_redsum_16b [vl-1]};
+                end
+                default: begin
+                    result_redsum  = {'0, result_redsum_32b [vl-1]};
+                end
+            endcase
+        end
+    end
+    else begin : v_redsum_gen_off
+        assign result_redsum = '0;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -592,35 +752,45 @@ module vectorALU
 
     logic [VLEN-1:0] result_minu, result_min, result_maxu, result_max;
 
-    always_comb begin
-        unique case (vsew)
-            EW8: begin
-                for (int i = 0; i < VLENB; i++) begin
-                    result_minu[(8*i)+:8] = (greater_than_8b[i])         ? second_operand_8b[i] : first_operand_8b [i];
-                    result_min [(8*i)+:8] = (greater_than_signed_8b[i])  ? second_operand_8b[i] : first_operand_8b [i];
-                    result_maxu[(8*i)+:8] = (greater_than_8b[i])         ? first_operand_8b [i] : second_operand_8b[i];
-                    result_max [(8*i)+:8] = (greater_than_signed_8b[i])  ? first_operand_8b [i] : second_operand_8b[i];
+    if (V_MINMAX_ON) begin : v_minmax_gen_on
+        always_comb begin
+            unique case (vsew)
+                EW8: begin
+                    for (int i = 0; i < VLENB; i++) begin
+                        result_minu[(8*i)+:8] = (greater_than_8b[i])         ? second_operand_8b[i] : first_operand_8b [i];
+                        result_min [(8*i)+:8] = (greater_than_signed_8b[i])  ? second_operand_8b[i] : first_operand_8b [i];
+                        result_maxu[(8*i)+:8] = (greater_than_8b[i])         ? first_operand_8b [i] : second_operand_8b[i];
+                        result_max [(8*i)+:8] = (greater_than_signed_8b[i])  ? first_operand_8b [i] : second_operand_8b[i];
+                    end
                 end
-            end
 
-            EW16: begin
-                for (int i = 0; i < VLENB/2; i++) begin
-                    result_minu[(16*i)+:16] = (greater_than_16b[i])         ? second_operand_16b[i] : first_operand_16b [i];
-                    result_min [(16*i)+:16] = (greater_than_signed_16b[i])  ? second_operand_16b[i] : first_operand_16b [i];
-                    result_maxu[(16*i)+:16] = (greater_than_16b[i])         ? first_operand_16b [i] : second_operand_16b[i];
-                    result_max [(16*i)+:16] = (greater_than_signed_16b[i])  ? first_operand_16b [i] : second_operand_16b[i];
+                EW16: begin
+                    for (int i = 0; i < VLENB/2; i++) begin
+                        result_minu[(16*i)+:16] = (greater_than_16b[i])         ? second_operand_16b[i] : first_operand_16b [i];
+                        result_min [(16*i)+:16] = (greater_than_signed_16b[i])  ? second_operand_16b[i] : first_operand_16b [i];
+                        result_maxu[(16*i)+:16] = (greater_than_16b[i])         ? first_operand_16b [i] : second_operand_16b[i];
+                        result_max [(16*i)+:16] = (greater_than_signed_16b[i])  ? first_operand_16b [i] : second_operand_16b[i];
+                    end
                 end
-            end
 
-            default: begin
-                for (int i = 0; i < VLENB/4; i++) begin
-                    result_minu[(32*i)+:32] = (greater_than_32b[i])         ? second_operand_32b[i] : first_operand_32b [i];
-                    result_min [(32*i)+:32] = (greater_than_signed_32b[i])  ? second_operand_32b[i] : first_operand_32b [i];
-                    result_maxu[(32*i)+:32] = (greater_than_32b[i])         ? first_operand_32b [i] : second_operand_32b[i];
-                    result_max [(32*i)+:32] = (greater_than_signed_32b[i])  ? first_operand_32b [i] : second_operand_32b[i];
+                default: begin
+                    for (int i = 0; i < VLENB/4; i++) begin
+                        result_minu[(32*i)+:32] = (greater_than_32b[i])         ? second_operand_32b[i] : first_operand_32b [i];
+                        result_min [(32*i)+:32] = (greater_than_signed_32b[i])  ? second_operand_32b[i] : first_operand_32b [i];
+                        result_maxu[(32*i)+:32] = (greater_than_32b[i])         ? first_operand_32b [i] : second_operand_32b[i];
+                        result_max [(32*i)+:32] = (greater_than_signed_32b[i])  ? first_operand_32b [i] : second_operand_32b[i];
+                    end
                 end
-            end
-        endcase
+            endcase
+        end
+    end
+    else begin : v_minmax_gen_off
+        always_comb begin
+            result_minu = '0;
+            result_min  = '0;
+            result_maxu = '0;
+            result_max  = '0;
+        end
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -798,36 +968,56 @@ module vectorALU
     logic [VLEN-1:0] result_div;
     logic [VLEN-1:0] result_rem;
 
-    assign div_enable = (vector_operation_i inside {VDIV, VDIVU, VREM, VREMU} && current_state == V_EXEC);
-    assign div_signed = (vector_operation_i inside {VDIV, VREM});
+    logic  div_enable_8b;
+    logic  div_enable_16b;
+    logic  div_enable_32b;
 
-    assign hold_div = (|hold_div_8b) | (|hold_div_16b) | (|hold_div_32b);
+    if (V_DIV_ON) begin : v_div_common_gen_on
+        assign div_enable     = (vector_operation_i inside {VDIV, VDIVU, VREM, VREMU} && current_state == V_EXEC);
+        assign div_enable_8b  = (div_enable && vsew == EW8);
+        assign div_enable_16b = (div_enable && vsew == EW16);
+        assign div_enable_32b = (div_enable && vsew == EW32);
+        assign div_signed     = (vector_operation_i inside {VDIV, VREM});
+        assign hold_div       = (|hold_div_8b) | (|hold_div_16b) | (|hold_div_32b);
+    end
+    else begin : v_div_common_gen_off
+        assign div_enable     = 1'b0;
+        assign div_enable_8b  = 1'b0;
+        assign div_enable_16b = 1'b0;
+        assign div_enable_32b = 1'b0;
+        assign div_signed     = 1'b0;
+        assign hold_div       = 1'b0;
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 // Division 8 bits
 //////////////////////////////////////////////////////////////////////////////
 
-    logic                  div_enable_8b;
     logic [VLENB-1:0][7:0] div_result_8b;
     logic [VLENB-1:0][7:0] rem_result_8b;
 
-    assign div_enable_8b = (div_enable && vsew == EW8);
-
     generate
         for (genvar i_div8b = 0; i_div8b < VLENB; i_div8b++) begin : DIV8B_LOOP
-            div #(
-                .N(8)
-            ) div8b (
-                .clk              (clk),
-                .reset_n          (reset_n),
-                .first_operand_i  (first_operand_8b [i_div8b]),
-                .second_operand_i (second_operand_8b[i_div8b]),
-                .enable_i         (div_enable_8b),
-                .signed_i         (div_signed),
-                .hold_o           (hold_div_8b[i_div8b]),
-                .div_result_o     (div_result_8b[i_div8b]),
-                .rem_result_o     (rem_result_8b[i_div8b])
-            );
+            if (V_DIV_ON) begin : v_div_8b_gen_on
+                div #(
+                    .N(8)
+                ) div8b (
+                    .clk              (clk),
+                    .reset_n          (reset_n),
+                    .first_operand_i  (first_operand_8b [i_div8b]),
+                    .second_operand_i (second_operand_8b[i_div8b]),
+                    .enable_i         (div_enable_8b),
+                    .signed_i         (div_signed),
+                    .hold_o           (hold_div_8b[i_div8b]),
+                    .div_result_o     (div_result_8b[i_div8b]),
+                    .rem_result_o     (rem_result_8b[i_div8b])
+                );
+            end
+            else begin : v_div_8b_gen_off
+                assign div_result_8b[i_div8b] = '0;
+                assign rem_result_8b[i_div8b] = '0;
+                assign hold_div_8b  [i_div8b] = '0;
+            end
         end
     endgenerate
 
@@ -835,27 +1025,31 @@ module vectorALU
 // Division 16 bits
 //////////////////////////////////////////////////////////////////////////////
 
-    logic                       div_enable_16b;
     logic [(VLENB/2)-1:0][15:0] div_result_16b;
     logic [(VLENB/2)-1:0][15:0] rem_result_16b;
 
-    assign div_enable_16b = (div_enable && vsew == EW16);
-
     generate
         for (genvar i_div16b = 0; i_div16b < VLENB/2; i_div16b++) begin : DIV16B_LOOP
-            div #(
-                .N(16)
-            ) div16b (
-                .clk              (clk),
-                .reset_n          (reset_n),
-                .first_operand_i  (first_operand_16b [i_div16b]),
-                .second_operand_i (second_operand_16b[i_div16b]),
-                .enable_i         (div_enable_16b),
-                .signed_i         (div_signed),
-                .hold_o           (hold_div_16b[i_div16b]),
-                .div_result_o     (div_result_16b[i_div16b]),
-                .rem_result_o     (rem_result_16b[i_div16b])
-            );
+            if (V_DIV_ON) begin : v_div_16b_gen_on
+                div #(
+                    .N(16)
+                ) div16b (
+                    .clk              (clk),
+                    .reset_n          (reset_n),
+                    .first_operand_i  (first_operand_16b [i_div16b]),
+                    .second_operand_i (second_operand_16b[i_div16b]),
+                    .enable_i         (div_enable_16b),
+                    .signed_i         (div_signed),
+                    .hold_o           (hold_div_16b[i_div16b]),
+                    .div_result_o     (div_result_16b[i_div16b]),
+                    .rem_result_o     (rem_result_16b[i_div16b])
+                );
+            end
+            else begin : v_div_16b_gen_off
+                assign div_result_16b[i_div16b] = '0;
+                assign rem_result_16b[i_div16b] = '0;
+                assign hold_div_16b  [i_div16b] = '0;
+            end
         end
     endgenerate
 
@@ -863,27 +1057,32 @@ module vectorALU
 // Division 32 bits
 //////////////////////////////////////////////////////////////////////////////
 
-    logic                       div_enable_32b;
     logic [(VLENB/4)-1:0][31:0] div_result_32b;
     logic [(VLENB/4)-1:0][31:0] rem_result_32b;
 
-    assign div_enable_32b = (div_enable && vsew == EW32);
 
     generate
         for (genvar i_div32b = 0; i_div32b < VLENB/4; i_div32b++) begin : DIV32B_LOOP
-            div #(
-                .N(32)
-            ) div32b (
-                .clk              (clk),
-                .reset_n          (reset_n),
-                .first_operand_i  (first_operand_32b [i_div32b]),
-                .second_operand_i (second_operand_32b[i_div32b]),
-                .enable_i         (div_enable_32b),
-                .signed_i         (div_signed),
-                .hold_o           (hold_div_32b[i_div32b]),
-                .div_result_o     (div_result_32b[i_div32b]),
-                .rem_result_o     (rem_result_32b[i_div32b])
-            );
+            if (V_DIV_ON) begin : v_div_32b_gen_on
+                div #(
+                    .N(32)
+                ) div32b (
+                    .clk              (clk),
+                    .reset_n          (reset_n),
+                    .first_operand_i  (first_operand_32b [i_div32b]),
+                    .second_operand_i (second_operand_32b[i_div32b]),
+                    .enable_i         (div_enable_32b),
+                    .signed_i         (div_signed),
+                    .hold_o           (hold_div_32b[i_div32b]),
+                    .div_result_o     (div_result_32b[i_div32b]),
+                    .rem_result_o     (rem_result_32b[i_div32b])
+                );
+            end
+            else begin : v_div_32b_gen_off
+                assign div_result_32b[i_div32b] = '0;
+                assign rem_result_32b[i_div32b] = '0;
+                assign hold_div_32b  [i_div32b] = '0;
+            end
         end
     endgenerate
 
@@ -891,27 +1090,32 @@ module vectorALU
 // Division Demux
 //////////////////////////////////////////////////////////////////////////////
 
-    always_comb begin
-        unique case (vsew)
-            EW8: begin
-                for (int i = 0; i < VLENB; i++) begin
-                    result_div[(8*i)+:8] = div_result_8b[i];
-                    result_rem[(8*i)+:8] = rem_result_8b[i];
+    if (V_DIV_ON) begin : v_div_mux_gen_on
+        always_comb begin
+            unique case (vsew)
+                EW8: begin
+                    for (int i = 0; i < VLENB; i++) begin
+                        result_div[(8*i)+:8] = div_result_8b[i];
+                        result_rem[(8*i)+:8] = rem_result_8b[i];
+                    end
                 end
-            end
-            EW16: begin
-                for (int i = 0; i < VLENB/2; i++) begin
-                    result_div[(16*i)+:16] = div_result_16b[i];
-                    result_rem[(16*i)+:16] = rem_result_16b[i];
+                EW16: begin
+                    for (int i = 0; i < VLENB/2; i++) begin
+                        result_div[(16*i)+:16] = div_result_16b[i];
+                        result_rem[(16*i)+:16] = rem_result_16b[i];
+                    end
                 end
-            end
-            default: begin
-                for (int i = 0; i < VLENB/4; i++)begin
-                    result_div[(32*i)+:32] = div_result_32b[i];
-                    result_rem[(32*i)+:32] = rem_result_32b[i];
+                default: begin
+                    for (int i = 0; i < VLENB/4; i++)begin
+                        result_div[(32*i)+:32] = div_result_32b[i];
+                        result_rem[(32*i)+:32] = rem_result_32b[i];
+                    end
                 end
-            end
-        endcase
+            endcase
+        end
+    end else begin : v_div_mux_gen_off
+        assign result_div = '0;
+        assign result_rem = '0;
     end
 
 //////////////////////////////////////////////////////////////////////////////
