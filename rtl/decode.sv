@@ -250,103 +250,109 @@ module decode
 //  Decode Vector Instruction
 //////////////////////////////////////////////////////////////////////////////
 
-    iTypeVector_e decode_vector_opcfg;
-    iTypeVector_e decode_vector_opi;
-    iTypeVector_e decode_vector_opm;
-
     iTypeVector_e vector_operation;
-    opCat_e opCat;
 
-    assign opCat = opCat_e'(funct3);
+    if (VEnable) begin : v_enable_decode_gen_on
+        iTypeVector_e decode_vector_opcfg;
+        iTypeVector_e decode_vector_opi;
+        iTypeVector_e decode_vector_opm;
 
-    always_comb begin
-        unique case (instruction[31:30]) inside
-            2'b0?:      decode_vector_opcfg = VSETVLI;
-            2'b11:      decode_vector_opcfg = VSETIVLI;
-            2'b10:      decode_vector_opcfg = VSETVL;
-            default:    decode_vector_opcfg = VNOP;
-        endcase
-    end
+        opCat_e opCat;
 
-    always_comb begin
-        unique case (funct7[6:1]) inside
-            6'b000000:     decode_vector_opi = VADD;
-            6'b000010:     decode_vector_opi = VSUB;
-            6'b000011:     decode_vector_opi = VRSUB;
-            6'b000100:     decode_vector_opi = VMINU;
-            6'b000101:     decode_vector_opi = VMIN;
-            6'b000110:     decode_vector_opi = VMAXU;
-            6'b000111:     decode_vector_opi = VMAX;
-            6'b001001:     decode_vector_opi = VAND;
-            6'b001010:     decode_vector_opi = VOR;
-            6'b001011:     decode_vector_opi = VXOR;
-            6'b010111:     decode_vector_opi = VMV;
-            6'b011000:     decode_vector_opi = VMSEQ;
-            6'b011001:     decode_vector_opi = VMSNE;
-            6'b011010:     decode_vector_opi = VMSLTU;
-            6'b011011:     decode_vector_opi = VMSLT;
-            6'b011100:     decode_vector_opi = VMSLEU;
-            6'b011101:     decode_vector_opi = VMSLE;
-            6'b011110:     decode_vector_opi = VMSGTU;
-            6'b011111:     decode_vector_opi = VMSGT;
-            6'b100101:     decode_vector_opi = VSLL;
-            6'b100111:     decode_vector_opi = VMVR;
-            6'b101000:     decode_vector_opi = VSRL;
-            6'b101001:     decode_vector_opi = VSRA;
-            default:       decode_vector_opi = VNOP;
-        endcase
-    end
+        assign opCat = opCat_e'(funct3);
 
-    always_comb begin
-        unique case (funct7[6:1]) inside
-            6'b000000:     decode_vector_opm = VREDSUM;
-            6'b000001:     decode_vector_opm = VREDAND;
-            6'b000010:     decode_vector_opm = VREDOR;
-            6'b000011:     decode_vector_opm = VREDXOR;
-            6'b000100:     decode_vector_opm = VREDMINU;
-            6'b000101:     decode_vector_opm = VREDMIN;
-            6'b000110:     decode_vector_opm = VREDMAXU;
-            6'b000111:     decode_vector_opm = VREDMAX;
-            6'b010000:     decode_vector_opm = (rs2_o == '0)
-                                             ? VMVSX
-                                             : VMVXS;
-            6'b100000:     decode_vector_opm = VDIVU;
-            6'b100001:     decode_vector_opm = VDIV;
-            6'b100010:     decode_vector_opm = VREMU;
-            6'b100011:     decode_vector_opm = VREM;
-            6'b100100:     decode_vector_opm = VMULHU;
-            6'b100101:     decode_vector_opm = VMUL;
-            6'b100110:     decode_vector_opm = VMULHSU;
-            6'b100111:     decode_vector_opm = VMULH;
-            6'b101101:     decode_vector_opm = VMACC;
-            6'b101111:     decode_vector_opm = VNMSAC;
-            6'b101001:     decode_vector_opm = VMADD;
-            6'b101011:     decode_vector_opm = VNMSUB;
-            6'b111000:     decode_vector_opm = VWMULU;
-            6'b111010:     decode_vector_opm = VWMULSU;
-            6'b111011:     decode_vector_opm = VWMUL;
-            default:       decode_vector_opm = VNOP;
-        endcase
-    end
-
-    always_comb begin
-        if (instruction_operation == VECTOR) begin
-            unique case (opCat) inside
-                OPCFG:               vector_operation = decode_vector_opcfg;
-                OPIVV, OPIVX, OPIVI: vector_operation = decode_vector_opi;
-                OPMVV, OPMVX:        vector_operation = decode_vector_opm;
-                default:             vector_operation = VNOP;
+        always_comb begin
+            unique case (instruction[31:30]) inside
+                2'b0?:      decode_vector_opcfg = VSETVLI;
+                2'b11:      decode_vector_opcfg = VSETIVLI;
+                2'b10:      decode_vector_opcfg = VSETVL;
+                default:    decode_vector_opcfg = VNOP;
             endcase
         end
-        else begin
-            vector_operation = VNOP;
+
+        always_comb begin
+            unique case (funct7[6:1]) inside
+                6'b000000:     decode_vector_opi = VADD;
+                6'b000010:     decode_vector_opi = VSUB;
+                6'b000011:     decode_vector_opi = VRSUB;
+                6'b000100:     decode_vector_opi = VMINU;
+                6'b000101:     decode_vector_opi = VMIN;
+                6'b000110:     decode_vector_opi = VMAXU;
+                6'b000111:     decode_vector_opi = VMAX;
+                6'b001001:     decode_vector_opi = VAND;
+                6'b001010:     decode_vector_opi = VOR;
+                6'b001011:     decode_vector_opi = VXOR;
+                6'b010111:     decode_vector_opi = VMV;
+                6'b011000:     decode_vector_opi = VMSEQ;
+                6'b011001:     decode_vector_opi = VMSNE;
+                6'b011010:     decode_vector_opi = VMSLTU;
+                6'b011011:     decode_vector_opi = VMSLT;
+                6'b011100:     decode_vector_opi = VMSLEU;
+                6'b011101:     decode_vector_opi = VMSLE;
+                6'b011110:     decode_vector_opi = VMSGTU;
+                6'b011111:     decode_vector_opi = VMSGT;
+                6'b100101:     decode_vector_opi = VSLL;
+                6'b100111:     decode_vector_opi = VMVR;
+                6'b101000:     decode_vector_opi = VSRL;
+                6'b101001:     decode_vector_opi = VSRA;
+                default:       decode_vector_opi = VNOP;
+            endcase
         end
+
+        always_comb begin
+            unique case (funct7[6:1]) inside
+                6'b000000:     decode_vector_opm = VREDSUM;
+                6'b000001:     decode_vector_opm = VREDAND;
+                6'b000010:     decode_vector_opm = VREDOR;
+                6'b000011:     decode_vector_opm = VREDXOR;
+                6'b000100:     decode_vector_opm = VREDMINU;
+                6'b000101:     decode_vector_opm = VREDMIN;
+                6'b000110:     decode_vector_opm = VREDMAXU;
+                6'b000111:     decode_vector_opm = VREDMAX;
+                6'b010000:     decode_vector_opm = (rs2_o == '0)
+                                                ? VMVSX
+                                                : VMVXS;
+                6'b100000:     decode_vector_opm = VDIVU;
+                6'b100001:     decode_vector_opm = VDIV;
+                6'b100010:     decode_vector_opm = VREMU;
+                6'b100011:     decode_vector_opm = VREM;
+                6'b100100:     decode_vector_opm = VMULHU;
+                6'b100101:     decode_vector_opm = VMUL;
+                6'b100110:     decode_vector_opm = VMULHSU;
+                6'b100111:     decode_vector_opm = VMULH;
+                6'b101101:     decode_vector_opm = VMACC;
+                6'b101111:     decode_vector_opm = VNMSAC;
+                6'b101001:     decode_vector_opm = VMADD;
+                6'b101011:     decode_vector_opm = VNMSUB;
+                6'b111000:     decode_vector_opm = VWMULU;
+                6'b111010:     decode_vector_opm = VWMULSU;
+                6'b111011:     decode_vector_opm = VWMUL;
+                default:       decode_vector_opm = VNOP;
+            endcase
+        end
+
+        always_comb begin
+            if (instruction_operation == VECTOR) begin
+                unique case (opCat) inside
+                    OPCFG:               vector_operation = decode_vector_opcfg;
+                    OPIVV, OPIVX, OPIVI: vector_operation = decode_vector_opi;
+                    OPMVV, OPMVX:        vector_operation = decode_vector_opm;
+                    default:             vector_operation = VNOP;
+                endcase
+            end
+            else begin
+                vector_operation = VNOP;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n)
+            if (instruction_operation == VECTOR && vector_operation == VNOP)
+                $display("INVALID VECTOR INST!!!");
+
     end
-
-    always_ff @(posedge clk or negedge reset_n)
-        if (instruction_operation == VECTOR && vector_operation == VNOP)
-            $display("INVALID VECTOR INST!!!");
-
+    else begin : v_enable_decode_gen_on
+        assign vector_operation = VNOP;
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 //  Decodes the instruction format
@@ -544,7 +550,7 @@ module decode
             exc_misaligned_fetch_o  <= 1'b0;
             exc_inst_access_fault_o <= 1'b0;
             vector_operation_o      <= VNOP;
-        end 
+        end
         else if (enable) begin
             first_operand_o         <= first_operand;
             second_operand_o        <= second_operand;
