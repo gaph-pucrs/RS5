@@ -399,7 +399,8 @@ end
 
         assign vector_inst = (killed) ? NOP : instruction_operation_i;
         vectorUnit #(
-            .VLEN  (VLEN)
+            .Environment (Environment),
+            .VLEN        (VLEN)
         ) vector (
             .clk                    (clk),
             .reset_n                (reset_n),

@@ -10,6 +10,8 @@ module RS5_FPGA_Platform
     parameter bit           XOSVMEnable = 1'b0,
     parameter bit           ZIHPMEnable = 1'b0,
     parameter bit           ZKNEEnable  = 1'b0,
+    parameter bit           VEnable     = 1'b0,
+    parameter int           VLEN        = 64,
     parameter int           CLKS_PER_BIT_UART = 868
 )
 (
@@ -18,7 +20,7 @@ module RS5_FPGA_Platform
     input  logic       BTND,
     input  logic       UART_RX,
     output logic       UART_TX
-); 
+);
     logic [31:0]            cpu_instruction_address, cpu_instruction;
     logic [31:0]            cpu_data_address, cpu_data_in, cpu_data_out;
     logic                   cpu_operation_enable, enable_ram, enable_peripherals, enable_rtc, enable_plic;
@@ -32,13 +34,13 @@ module RS5_FPGA_Platform
     logic                   interrupt_ack;
     logic [31:0]            irq;
     logic [i_cnt:1]         irq_peripherals, iack_peripherals;
-    
+
     assign irq = {20'h0, mei, 3'h0, mti, 7'h0};
 
 //////////////////////////////////////////////////////////////////////////////
 // Control
 //////////////////////////////////////////////////////////////////////////////
-    
+
     always_comb begin
         if (cpu_operation_enable) begin
             if (cpu_data_address[31:28] < 4'h2) begin
@@ -105,21 +107,23 @@ module RS5_FPGA_Platform
         .XOSVMEnable    (XOSVMEnable),
         .ZIHPMEnable    (ZIHPMEnable),
         .ZKNEEnable     (ZKNEEnable),
-        .COMPRESSED     (COMPRESSED)
+        .COMPRESSED     (COMPRESSED),
+        .VEnable        (VEnable),
+        .VLEN           (VLEN)
     ) dut (
-        .clk                    (clk), 
+        .clk                    (clk),
         .reset_n                (reset_n),
         .sys_reset_i            (1'b0),
         .stall                  (stall),
-        .instruction_i          (cpu_instruction), 
-        .mem_data_i             (cpu_data_in), 
+        .instruction_i          (cpu_instruction),
+        .mem_data_i             (cpu_data_in),
         .mtime_i                (mtime),
         .irq_i                  (irq),
-        .instruction_address_o  (cpu_instruction_address), 
-        .mem_operation_enable_o (cpu_operation_enable), 
+        .instruction_address_o  (cpu_instruction_address),
+        .mem_operation_enable_o (cpu_operation_enable),
         .mem_write_enable_o     (cpu_write_enable),
-        .mem_address_o          (cpu_data_address), 
-        .mem_data_o             (cpu_data_out), 
+        .mem_address_o          (cpu_data_address),
+        .mem_data_o             (cpu_data_out),
         .interrupt_ack_o        (interrupt_ack)
     );
 
@@ -154,7 +158,7 @@ module RS5_FPGA_Platform
         .addr_i     (cpu_data_address[3:0]),
         .we_i       ({4'h0, cpu_write_enable}),
         .data_i     ({32'h0, cpu_data_out}),
-        .data_o     (data_rtc),     
+        .data_o     (data_rtc),
         .mti_o      (mti),
         .mtime_o    (mtime)
     );
@@ -172,7 +176,7 @@ module RS5_FPGA_Platform
         .we_i    (cpu_write_enable),
         .addr_i  (cpu_data_address[23:0]),
         .data_i  (cpu_data_out),
-        .data_o  (data_plic),     
+        .data_o  (data_plic),
         .irq_i   (irq_peripherals),
         .iack_i  (interrupt_ack),
         .irq_o   (mei),
@@ -187,13 +191,13 @@ module RS5_FPGA_Platform
         .i_cnt(i_cnt),
         .CLKS_PER_BIT_UART(CLKS_PER_BIT_UART)
     ) Peripherals1 (
-        .clk            (clk), 
-        .reset_n        (reset_n), 
+        .clk            (clk),
+        .reset_n        (reset_n),
         .stall_o        (stall),
-        .enable_i       (enable_peripherals), 
+        .enable_i       (enable_peripherals),
         .write_enable_i (cpu_write_enable),
-        .data_address_i (cpu_data_address), 
-        .data_i         (cpu_data_out), 
+        .data_address_i (cpu_data_address),
+        .data_i         (cpu_data_out),
         .data_o         (data_peripherals),
         .BTND           (BTND),
         .UART_TX        (UART_TX),

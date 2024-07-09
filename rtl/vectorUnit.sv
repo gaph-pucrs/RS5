@@ -3,6 +3,7 @@
 module vectorUnit
     import RS5_pkg::*;
 #(
+    parameter environment_e Environment = ASIC,
     parameter int           VLEN        = 64
 )
 (
@@ -360,8 +361,9 @@ module vectorUnit
     end
 
     vectorRegbank #(
-        .VLEN   (VLEN),
-        .VLENB  (VLENB)
+        .Environment (Environment),
+        .VLEN        (VLEN),
+        .VLENB       (VLENB)
     ) vectorRegbank1 (
         .clk      (clk),
         .reset_n  (reset_n),
