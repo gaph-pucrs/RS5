@@ -118,9 +118,9 @@ module vectorUnit
 // MASKs
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [ VLENB   -1:0] mask_sew8 [8];
-    logic [(VLENB/2)-1:0] mask_sew16[8];
-    logic [(VLENB/4)-1:0] mask_sew32[8];
+    logic [7:0][ VLENB   -1:0] mask_sew8;
+    logic [7:0][(VLENB/2)-1:0] mask_sew16;
+    logic [7:0][(VLENB/4)-1:0] mask_sew32;
 
     always_comb begin
         for (int i = 0; i < 8; i++) begin
@@ -190,7 +190,7 @@ module vectorUnit
                     vsew_effective = EW32;
                 default: begin
                     vsew_effective = vsew;
-                    $error("Widening operations with VSEW=32b are not supported");
+                    //$error("Widening operations with VSEW=32b are not supported");
                 end
             endcase
         end
@@ -229,7 +229,7 @@ module vectorUnit
                     vlmul_effective = LMUL_8;
                 LMUL_8: begin
                     vlmul_effective = LMUL_8;
-                    $error("Widening operations with LMUL=8 are not supported");
+                    //$error("Widening operations with LMUL=8 are not supported");
                 end
                 default:
                     vlmul_effective = vlmul;

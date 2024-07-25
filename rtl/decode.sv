@@ -345,7 +345,7 @@ module decode
             end
         end
 
-        always_ff @(posedge clk or negedge reset_n)
+        always_ff @(posedge clk)
             if (instruction_operation == VECTOR && vector_operation == VNOP)
                 $display("INVALID VECTOR INST!!!");
 

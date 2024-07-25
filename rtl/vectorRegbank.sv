@@ -22,16 +22,32 @@ module vectorRegbank
     output  logic [VLEN-1:0]  vs3_data
 );
 
-    if (Environment == FPGA) begin : gen_vector_regbank_fpga
+    //////////////////////////////////////////////////////////////////////////////
+    // V0 (Mask)
+    //////////////////////////////////////////////////////////////////////////////
 
-        DRAM_Vector_RegBank VectorRegBankA (
-            .clk        (clk),
-            .we         (enable),
-            .a          (vd_addr),
-            .d          (result),
-            .dpra       (5'b0),
-            .dpo        (v0_mask)
-        );
+    logic [VLEN-1:0] v0;
+
+    always_ff @(posedge clk  or negedge reset_n) begin
+        if (!reset_n) begin
+            v0 <= '0;
+        end
+        else if (vd_addr == 0) begin
+            for (int i = 0; i < VLENB; i++) begin
+                if (enable[i]) begin
+                    v0[(8*i)+:8]  <= result[(8*i)+:8];
+                end
+            end
+        end
+    end
+
+    assign v0_mask = v0;
+
+    //////////////////////////////////////////////////////////////////////////////
+    // RegBank
+    //////////////////////////////////////////////////////////////////////////////
+
+    if (Environment == FPGA) begin : gen_vector_regbank_fpga
 
         DRAM_Vector_RegBank VectorRegBankB (
             .clk        (clk),
@@ -62,13 +78,12 @@ module vectorRegbank
 
     end
     else begin : gen_vector_regbank_asic
-        logic [31:0][VLEN-1:0] regfile;
+        logic [31:1][VLEN-1:0] regfile;
 
         //////////////////////////////////////////////////////////////////////////////
         // Reads
         //////////////////////////////////////////////////////////////////////////////
 
-        assign v0_mask  = regfile[0];
         assign vs1_data = regfile[vs1_addr];
         assign vs2_data = regfile[vs2_addr];
         assign vs3_data = regfile[vs3_addr];
@@ -77,12 +92,12 @@ module vectorRegbank
         // Reset and Write control
         //////////////////////////////////////////////////////////////////////////////
 
-        for (genvar j = 0; j < 32 ; j++) begin : gen_vectorRegfile
+        for (genvar j = 1; j < 32 ; j++) begin : gen_vectorRegfile
             always_ff @(posedge clk  or negedge reset_n) begin
                 if (!reset_n) begin
                     regfile[j] <= '0;
                 end
-                else if (vd_addr == j && enable != '0) begin
+                else if (vd_addr == j) begin
                     for (int i = 0; i < VLENB; i++) begin
                         if (enable[i]) begin
                             regfile[j][(8*i)+:8]  <= result[(8*i)+:8];

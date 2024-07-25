@@ -44,7 +44,7 @@ module fetch  #(
     /* verilator lint_off UNUSEDSIGNAL */
     input   logic           hazard_i,
     /* verilator lint_on UNUSEDSIGNAL */
-    
+
     output  logic           jump_misaligned_o,
     output  logic           jumped_o,
     output  logic           jumped_r_o,
@@ -77,11 +77,15 @@ module fetch  #(
 
     if (COMPRESSED) begin : gen_pc_c
         always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n | sys_reset) begin
+            if (!reset_n) begin
                 pc <= start_address;
                 jump_misaligned <= 1'b0;
             end
-            else if (machine_return_i) begin                              
+            else if (sys_reset) begin
+                pc <= start_address;
+                jump_misaligned <= 1'b0;
+            end
+            else if (machine_return_i) begin
                 pc <= {mepc_i[31:2], 1'b0, mepc_i[0]};
                 if (mepc_i[1:0] != '0)
                     jump_misaligned <= 1'b1;
@@ -115,10 +119,13 @@ module fetch  #(
     end
     else begin : gen_pc_nc
         always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n | sys_reset) begin
+            if (!reset_n) begin
                 pc <= start_address;
             end
-            else if (machine_return_i) begin                              
+            else if (sys_reset) begin
+                pc <= start_address;
+            end
+            else if (machine_return_i) begin
                 pc <= mepc_i;
             end
             else if ((exception_raised_i || interrupt_ack_i)) begin
@@ -138,7 +145,7 @@ module fetch  #(
     end
 
 //////////////////////////////////////////////////////////////////////////////
-// Sensitive Outputs 
+// Sensitive Outputs
 //////////////////////////////////////////////////////////////////////////////
 
     assign jumped = machine_return_i || exception_raised_i || interrupt_ack_i || jump_i;
@@ -196,7 +203,7 @@ module fetch  #(
     end
 
 //////////////////////////////////////////////////////////////////////////////
-// Non-Sensitive Outputs 
+// Non-Sensitive Outputs
 //////////////////////////////////////////////////////////////////////////////
 
     /* Not used when compressed is disabled */
@@ -223,7 +230,7 @@ module fetch  #(
     end
 
 //////////////////////////////////////////////////////////////////////////////
-// TAG Calculator 
+// TAG Calculator
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk or negedge reset_n) begin
@@ -249,5 +256,5 @@ module fetch  #(
             end
         end
     end
-    
+
 endmodule

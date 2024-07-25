@@ -5,42 +5,42 @@ module vectorLSU
     parameter int VLEN  = 64,
     parameter int VLENB = 8
 ) (
-    input  logic                  clk,
-    input  logic                  reset_n,
+    input  logic                      clk,
+    input  logic                      reset_n,
 
     /* verilator lint_off UNUSEDSIGNAL */
-    input  logic [31:0]           instruction_i,
+    input  logic [31:0]               instruction_i,
     /* verilator lint_on UNUSEDSIGNAL */
-    input  logic [31:0]           base_address_i,
-    input  logic [31:0]           stride_i,
-    input  logic [VLEN-1:0]       indexed_offsets_i,
-    input  logic [VLEN-1:0]       write_data_i,
+    input  logic [31:0]               base_address_i,
+    input  logic [31:0]               stride_i,
+    input  logic [VLEN-1:0]           indexed_offsets_i,
+    input  logic [VLEN-1:0]           write_data_i,
 
-    input  vector_states_e        current_state,
+    input  vector_states_e            current_state,
 
-    input  iType_e                instruction_operation_i,
-    input  logic                  whole_reg_load_store,
-    input  vlmul_e                vlmul,
+    input  iType_e                    instruction_operation_i,
+    input  logic                      whole_reg_load_store,
+    input  vlmul_e                    vlmul,
 
     /* verilator lint_off UNUSEDSIGNAL */
-    input  logic [3:0]            cycle_count_r,
+    input  logic [3:0]                cycle_count_r,
     /* verilator lint_on UNUSEDSIGNAL */
-    input  logic[$bits(VLEN)-1:0] vl,
-    input  logic[$bits(VLEN)-1:0] vl_curr_reg,
-    input  logic                  vm,
-    input  logic [ VLENB   -1:0]  mask_sew8 [8],
-    input  logic [(VLENB/2)-1:0]  mask_sew16[8],
-    input  logic [(VLENB/4)-1:0]  mask_sew32[8],
+    input  logic[$bits(VLEN)-1:0]     vl,
+    input  logic[$bits(VLEN)-1:0]     vl_curr_reg,
+    input  logic                      vm,
+    input  logic [7:0][ VLENB   -1:0] mask_sew8,
+    input  logic [7:0][(VLENB/2)-1:0] mask_sew16,
+    input  logic [7:0][(VLENB/4)-1:0] mask_sew32,
 
-    output logic                  hold_o,
+    output logic                      hold_o,
 
-    output logic [31:0]           mem_address_o,
-    output logic                  mem_read_enable_o,
-    output logic [ 3:0]           mem_write_enable_o,
-    output logic [31:0]           mem_write_data_o,
-    input  logic [31:0]           mem_read_data_i,
+    output logic [31:0]               mem_address_o,
+    output logic                      mem_read_enable_o,
+    output logic [ 3:0]               mem_write_enable_o,
+    output logic [31:0]               mem_write_data_o,
+    input  logic [31:0]               mem_read_data_i,
 
-    output logic [VLEN-1:0]       read_data_o
+    output logic [VLEN-1:0]           read_data_o
 );
 
     vector_lsu_states_e      next_state, state;
@@ -455,19 +455,22 @@ module vectorLSU
 // STAGE 2 - Read Data Control
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [ 7:0]     read_data_8b  [3:0];
-    logic [15:0]     read_data_16b [1:0];
-    logic [VLEN-1:0] read_data;
+    logic [3:0][ 7:0] read_data_8b;
+    logic [1:0][15:0] read_data_16b;
+    logic [VLEN-1:0]  read_data;
 
     always_comb begin
         if (addrMode != UNIT_STRIDED || (addrMode == UNIT_STRIDED && state_r == VLSU_FIRST_CYCLE)) begin
             case (address_r[1:0])
                 2'b11: begin
                     read_data_8b[0] = mem_read_data_i[31:24];
+                    read_data_8b[1] = mem_read_data_i[31:24];
+                    read_data_8b[2] = mem_read_data_i[31:24];
                 end
                 2'b10: begin
                     read_data_8b[0] = mem_read_data_i[23:16];
                     read_data_8b[1] = mem_read_data_i[31:24];
+                    read_data_8b[2] = mem_read_data_i[31:24];
                 end
                 2'b01: begin
                     read_data_8b[0] = mem_read_data_i[15: 8];
@@ -478,7 +481,6 @@ module vectorLSU
                     read_data_8b[0] = mem_read_data_i[ 7: 0];
                     read_data_8b[1] = mem_read_data_i[15: 8];
                     read_data_8b[2] = mem_read_data_i[23:16];
-                    read_data_8b[3] = mem_read_data_i[31:24];
                 end
             endcase
         end
@@ -486,10 +488,10 @@ module vectorLSU
             read_data_8b[0] = mem_read_data_i[ 7: 0];
             read_data_8b[1] = mem_read_data_i[15: 8];
             read_data_8b[2] = mem_read_data_i[23:16];
-            read_data_8b[3] = mem_read_data_i[31:24];
         end
     end
 
+    assign read_data_8b [3] = mem_read_data_i[31:24];
     assign read_data_16b[1] = mem_read_data_i[31:16];
 
     always_comb begin

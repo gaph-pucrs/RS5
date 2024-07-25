@@ -12,29 +12,29 @@ module vectorALU
     parameter int V_REDSUM_ON     = 1'b1,
     parameter int V_DIV_ON        = 1'b1
 ) (
-    input  logic                  clk,
-    input  logic                  reset_n,
+    input  logic                        clk,
+    input  logic                        reset_n,
 
-    input  logic [VLEN-1:0]       first_operand,
-    input  logic [VLEN-1:0]       second_operand,
-    input  logic [VLEN-1:0]       third_operand,
-    input  vector_states_e        current_state,
-    input  logic [3:0]            cycle_count,
-    input  logic [3:0]            cycle_count_r,
-    input  vlmul_e                vlmul,
-    input  logic[$bits(VLEN)-1:0] vl,
-    input  logic                  vm,
-    input  logic [ VLENB   -1:0]  mask_sew8 [8],
-    input  logic [(VLENB/2)-1:0]  mask_sew16[8],
-    input  logic [(VLENB/4)-1:0]  mask_sew32[8],
+    input  logic [VLEN-1:0]             first_operand,
+    input  logic [VLEN-1:0]             second_operand,
+    input  logic [VLEN-1:0]             third_operand,
+    input  vector_states_e              current_state,
+    input  logic [3:0]                  cycle_count,
+    input  logic [3:0]                  cycle_count_r,
+    input  vlmul_e                      vlmul,
+    input  logic[$bits(VLEN)-1:0]       vl,
+    input  logic                        vm,
+    input  logic [7:0][ VLENB   -1:0]   mask_sew8,
+    input  logic [7:0][(VLENB/2)-1:0]   mask_sew16,
+    input  logic [7:0][(VLENB/4)-1:0]   mask_sew32,
 
-    input  iTypeVector_e          vector_operation_i,
-    input  vew_e                  vsew,
+    input  iTypeVector_e                vector_operation_i,
+    input  vew_e                        vsew,
 
-    output logic                  hold_o,
-    output logic                  hold_widening_o,
-    output logic [VLEN-1:0]       result_mask_o,
-    output logic [VLEN-1:0]       result_o
+    output logic                        hold_o,
+    output logic                        hold_widening_o,
+    output logic [VLEN-1:0]             result_mask_o,
+    output logic [VLEN-1:0]             result_o
 );
 
     logic hold_mult;
@@ -389,6 +389,11 @@ module vectorALU
                         result_redand_16b[i] = first_operand_16b[i] & result_redand_16b[i-1];
                         result_redor_16b [i] = first_operand_16b[i] | result_redor_16b [i-1];
                         result_redxor_16b[i] = first_operand_16b[i] ^ result_redxor_16b[i-1];
+                    end
+                    else begin
+                        result_redand_16b[i] = result_redand_16b[i-1];
+                        result_redor_16b [i] = result_redor_16b [i-1];
+                        result_redxor_16b[i] = result_redxor_16b[i-1];
                     end
                 end
             end
@@ -921,6 +926,7 @@ module vectorALU
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
+        result_mult = '0;
         unique case (vsew)
             EW8:
                 for (int i = 0; i < VLENB; i++)

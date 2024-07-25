@@ -33,9 +33,7 @@ module CSRBank
     parameter bit       COMPRESSED     = 1'b0,
     parameter rv32_e    RV32           = RV32I,
     parameter bit       VEnable        = 1'b0,
-    parameter int       VLEN           = 128,
-    parameter bit       PROFILING      = 1'b0,
-    parameter string    PROFILING_FILE = "./debug/Report.txt"
+    parameter int       VLEN           = 128
 )
 (
     input   logic               clk,
@@ -264,7 +262,27 @@ module CSRBank
         //////////////////////////////////////////////////////////////////////////////
         // Reset
         //////////////////////////////////////////////////////////////////////////////
-        if (!reset_n | sys_reset) begin
+        if (!reset_n) begin
+            mstatus_mie      <= '0;
+            misa             <= MISA_VALUE;
+            //medeleg        <= '0;
+            //mideleg        <= '0;
+            mie              <= '0;
+            mtvec_r          <= '0;
+            //mcounteren     <= '0;
+            //mstatush       <= '0;
+            mscratch         <= '0;
+            mepc_r           <= '0;
+            mcause_interrupt <= '0;
+            mcause_exc_code  <= '0;
+            mtval            <= '0;
+            mcycle           <= '0;
+            minstret         <= '0;
+            privilege        <= privilegeLevel_e'(2'b11);
+            mstatus_mpp      <= '1;
+            mstatus_mpie     <= '0;
+        end
+        else if (sys_reset) begin
             mstatus_mie      <= '0;
             misa             <= MISA_VALUE;
             //medeleg        <= '0;
@@ -459,7 +477,16 @@ module CSRBank
 
     if (XOSVMEnable == 1'b1) begin : gen_xosvm_csr_on
         always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n | sys_reset) begin
+            if (!reset_n) begin
+                mvmctl      <= '0;
+                mvmdo       <= '0;
+                mvmds       <= '0;
+                mvmdm       <= '0;
+                mvmio       <= '0;
+                mvmis       <= '0;
+                mvmim       <= '0;
+            end
+            else if (sys_reset) begin
                 mvmctl      <= '0;
                 mvmdo       <= '0;
                 mvmds       <= '0;
@@ -543,9 +570,37 @@ module CSRBank
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     if (ZIHPMEnable == 1'b1) begin : gen_zihpm_csr_on
+        int fd;
 
         always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n | sys_reset) begin
+            if (!reset_n) begin
+                instructions_killed_counter <= '0;
+                nop_counter                 <= '0;
+                logic_counter               <= '0;
+                addsub_counter              <= '0;
+                shift_counter               <= '0;
+                branch_counter              <= '0;
+                jump_counter                <= '0;
+                load_counter                <= '0;
+                store_counter               <= '0;
+                sys_counter                 <= '0;
+                lui_slt_counter             <= '0;
+                csr_counter                 <= '0;
+                mul_counter                 <= '0;
+                div_counter                 <= '0;
+
+                if (COMPRESSED == 1'b1) begin
+                    jump_misaligned_counter     <= '0;
+                    compressed_counter          <= '0;
+                end
+
+                hazard_counter              <= '0;
+                stall_counter               <= '0;
+                interrupt_ack_counter       <= '0;
+                raise_exception_counter     <= '0;
+                context_switch_counter      <= '0;
+            end
+            else if (sys_reset) begin
                 instructions_killed_counter <= '0;
                 nop_counter                 <= '0;
                 logic_counter               <= '0;
@@ -608,49 +663,45 @@ module CSRBank
             end
         end
 
-        if (PROFILING) begin : gen_csr_dbg
-            int fd;
+        initial begin
+            fd = $fopen ("./debug/Report.txt", "w");
+            if (fd == 0) begin
+                $display("Error opening profiling file");
+            end
+        end
 
-            initial begin
-                fd = $fopen (PROFILING_FILE, "w");
-                if (fd == 0) begin
-                    $display("Error opening file %s", PROFILING_FILE);
-                end
+        final begin
+            $fwrite(fd,"Clock Cycles:            %0d\n", mcycle);
+            $fwrite(fd,"Instructions Retired:    %0d\n", minstret);
+            if (COMPRESSED == 1'b1) begin
+                $fwrite(fd,"Instructions Compressed: %0d\n", compressed_counter);
+            end
+            $fwrite(fd,"Instructions Killed:     %0d\n", instructions_killed_counter);
+            $fwrite(fd,"Context Switches:        %0d\n", context_switch_counter);
+            $fwrite(fd,"Exceptions Raised:       %0d\n", raise_exception_counter);
+            $fwrite(fd,"Interrupts Acked:        %0d\n", interrupt_ack_counter);
+            if (COMPRESSED == 1'b1) begin
+                $fwrite(fd,"Misaligned Jumps:        %0d\n", jump_misaligned_counter);
             end
 
-            final begin
-                $fwrite(fd,"Clock Cycles:            %0d\n", mcycle);
-                $fwrite(fd,"Instructions Retired:    %0d\n", minstret);
-                if (COMPRESSED == 1'b1) begin
-                    $fwrite(fd,"Instructions Compressed: %0d\n", compressed_counter);
-                end
-                $fwrite(fd,"Instructions Killed:     %0d\n", instructions_killed_counter);
-                $fwrite(fd,"Context Switches:        %0d\n", context_switch_counter);
-                $fwrite(fd,"Exceptions Raised:       %0d\n", raise_exception_counter);
-                $fwrite(fd,"Interrupts Acked:        %0d\n", interrupt_ack_counter);
-                if (COMPRESSED == 1'b1) begin
-                    $fwrite(fd,"Misaligned Jumps:        %0d\n", jump_misaligned_counter);
-                end
+            $fwrite(fd,"\nCYCLES WITH::\n");
+            $fwrite(fd,"HAZARDS:                 %0d\n", hazard_counter);
+            $fwrite(fd,"STALL:                   %0d\n", stall_counter);
 
-                $fwrite(fd,"\nCYCLES WITH::\n");
-                $fwrite(fd,"HAZARDS:                 %0d\n", hazard_counter);
-                $fwrite(fd,"STALL:                   %0d\n", stall_counter);
-
-                $fwrite(fd,"\nINSTRUCTION COUNTERS:\n");
-                $fwrite(fd,"NOP:                     %0d\n", nop_counter);
-                $fwrite(fd,"LUI_SLT:                 %0d\n", lui_slt_counter);
-                $fwrite(fd,"LOGIC:                   %0d\n", logic_counter);
-                $fwrite(fd,"ADDSUB:                  %0d\n", addsub_counter);
-                $fwrite(fd,"SHIFT:                   %0d\n", shift_counter);
-                $fwrite(fd,"BRANCH:                  %0d\n", branch_counter);
-                $fwrite(fd,"JUMP:                    %0d\n", jump_counter);
-                $fwrite(fd,"LOAD:                    %0d\n", load_counter);
-                $fwrite(fd,"STORE:                   %0d\n", store_counter);
-                $fwrite(fd,"SYS:                     %0d\n", sys_counter);
-                $fwrite(fd,"CSR:                     %0d\n", csr_counter);
-                $fwrite(fd,"MUL:                     %0d\n", mul_counter);
-                $fwrite(fd,"DIV:                     %0d\n", div_counter);
-            end
+            $fwrite(fd,"\nINSTRUCTION COUNTERS:\n");
+            $fwrite(fd,"NOP:                     %0d\n", nop_counter);
+            $fwrite(fd,"LUI_SLT:                 %0d\n", lui_slt_counter);
+            $fwrite(fd,"LOGIC:                   %0d\n", logic_counter);
+            $fwrite(fd,"ADDSUB:                  %0d\n", addsub_counter);
+            $fwrite(fd,"SHIFT:                   %0d\n", shift_counter);
+            $fwrite(fd,"BRANCH:                  %0d\n", branch_counter);
+            $fwrite(fd,"JUMP:                    %0d\n", jump_counter);
+            $fwrite(fd,"LOAD:                    %0d\n", load_counter);
+            $fwrite(fd,"STORE:                   %0d\n", store_counter);
+            $fwrite(fd,"SYS:                     %0d\n", sys_counter);
+            $fwrite(fd,"CSR:                     %0d\n", csr_counter);
+            $fwrite(fd,"MUL:                     %0d\n", mul_counter);
+            $fwrite(fd,"DIV:                     %0d\n", div_counter);
         end
     end
     else begin : gen_zihpm_csr_off

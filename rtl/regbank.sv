@@ -13,9 +13,9 @@
  * Defines a Regbank with 32 regs of 32 bits.
  *
  * \detailed
- * The Register Bank is composed by 32 registers of 32 bits each. 
+ * The Register Bank is composed by 32 registers of 32 bits each.
  * It has two read ports and one write port, the registers are indexed by
- * direct codification . The ZERO(0) register is read-only and holds the 
+ * direct codification . The ZERO(0) register is read-only and holds the
  * value 0 and the other 31 registers are read-write registers.
  */
 
@@ -23,12 +23,8 @@
 
 module regbank
     import RS5_pkg::*;
-#(
-    parameter bit    DEBUG    = 1'b0,
-    parameter string DBG_FILE = "./debug/regBank.txt"
-)
 (
-    input   logic         clk, 
+    input   logic         clk,
     input   logic         reset_n,
 
     input   logic [4:0]   rs1,
@@ -64,24 +60,25 @@ module regbank
     end
 
 //////////////////////////////////////////////////////////////////////////////
-// DEBUG 
+// DEBUG
 //////////////////////////////////////////////////////////////////////////////
-    if (DEBUG) begin : gen_reg_dbg
-        int fd;
+    /*
+    localparam string DBG_FILE = "./debug/regBank.txt"
 
-        initial begin
-            fd = $fopen (DBG_FILE, "w");
-            if (fd == 0) begin
-                $display("Error opening file %s", DBG_FILE);
-            end
-        end
+    int fd;
 
-        always_ff @(posedge clk) begin
-            $fwrite(fd,"[%0d] %02d - %8h \t %02d - %8h\n", $time(), rs1, data1_o, rs2, data2_o);
-            if (rd != '0 && enable == 1'b1) begin
-                $fwrite(fd,"[%0d] --------------------------------- %02d - %8h\n", $time, rd, data_i);
-            end
+    initial begin
+        fd = $fopen (DBG_FILE, "w");
+        if (fd == 0) begin
+            $display("Error opening file %s", DBG_FILE);
         end
     end
 
+    always_ff @(posedge clk) begin
+        $fwrite(fd,"[%0d] %02d - %8h \t %02d - %8h\n", $time(), rs1, data1_o, rs2, data2_o);
+        if (rd != '0 && enable == 1'b1) begin
+            $fwrite(fd,"[%0d] --------------------------------- %02d - %8h\n", $time, rd, data_i);
+        end
+    end
+    */
 endmodule
