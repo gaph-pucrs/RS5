@@ -552,8 +552,9 @@ module vectorALU
 
     logic [VLEN-1:0] subtraend, subtraend_neg;
     logic [VLEN-1:0] subtraend_8b, subtraend_16b, subtraend_32b;
-    logic [VLEN-1:0] summand_1, summand_2, summand_2_8b, summand_2_16b, summand_2_32b;
-    logic [VLEN-1:0] result_add_8b, result_add_16b, result_add_32b;
+    logic [VLEN-1:0] summand_1, summand_2, summand_2_int;
+    logic      [8:0] result_add_bytes [VLENB-1:0];
+    logic            adder_carry [VLENB-1:0];
     logic [VLEN-1:0] result_add;
 
     always_comb begin
@@ -587,39 +588,45 @@ module vectorALU
         endcase
     end
 
-    assign summand_2 =  (vector_operation_i inside {VMACC, VMADD})
-                        ? result_mult_r
-                        : second_operand;
+    assign summand_2_int =  (vector_operation_i inside {VMACC, VMADD})
+                            ? result_mult_r
+                            : second_operand;
 
     always_comb begin
         if (vector_operation_i inside {VSUB, VRSUB, VNMSAC, VNMSUB}) begin
-            summand_2_8b  = subtraend_8b;
-            summand_2_16b = subtraend_16b;
-            summand_2_32b = subtraend_32b;
+            unique case (vsew)
+                EW8:    summand_2 = subtraend_8b;
+                EW16:   summand_2 = subtraend_16b;
+                default:summand_2 = subtraend_32b;
+            endcase
         end
         else begin
-            summand_2_8b  = summand_2;
-            summand_2_16b = summand_2;
-            summand_2_32b = summand_2;
+            summand_2 = summand_2_int;
         end
     end
 
     always_comb begin
-        for (int i = 0; i < VLENB; i++)
-            result_add_8b[(8*i)+:8]    = summand_1[(8*i)+:8]   + summand_2_8b[(8*i)+:8];
-        for (int i = 0; i < VLENB/2; i++)
-            result_add_16b[(16*i)+:16] = summand_1[(16*i)+:16] + summand_2_16b[(16*i)+:16];
-        for (int i = 0; i < VLENB/4; i++)
-            result_add_32b[(32*i)+:32] = summand_1[(32*i)+:32] + summand_2_32b[(32*i)+:32];
+        for (int i = 0; i < VLENB; i++) begin
+            case (vsew)
+                EW16:    adder_carry[i] = (i%2 == 0) ? 1'b0 : result_add_bytes[i-1][8];
+                EW32:    adder_carry[i] = (i%4 == 0) ? 1'b0 : result_add_bytes[i-1][8];
+                default: adder_carry[i] = 1'b0;
+            endcase
+        end
     end
 
     always_comb begin
-        unique case (vsew)
-            EW8:    result_add = result_add_8b;
-            EW16:   result_add = result_add_16b;
-            default:result_add = result_add_32b;
-        endcase
+        for (int i = 0; i < VLENB; i++) begin
+            result_add_bytes[i] = {1'b0, summand_1[(8*i)+:8]} + {1'b0, summand_2[(8*i)+:8]} + adder_carry[i];
+        end
     end
+
+    always_comb begin
+        for (int i = 0; i < VLENB; i++) begin
+            result_add[(8*i)+:8] = result_add_bytes[i][7:0];
+        end
+    end
+
 
 //////////////////////////////////////////////////////////////////////////////
 // Shifts
