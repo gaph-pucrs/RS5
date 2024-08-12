@@ -16,15 +16,15 @@
 
 
 //// Main defines
-#include "params/dataset120_eval_int.h" // 3923 
+#include "params/dataset120_eval_int.h" // 3923
 #define BATCH_SIZE 32
 #define DATASET_UNITS 1
 #define INPUT_SIZE 120
 #define NUM_FILTERS 64
 #define KERNEL_SIZE 5
-#define CONV0_INPUT_SIZE 120 
+#define CONV0_INPUT_SIZE 120
 #define CONV3_INPUT_SIZE 116
-#define CONV6_INPUT_SIZE 112 
+#define CONV6_INPUT_SIZE 112
 #define FC1_OUTPUT_SIZE 128
 #define FC2_OUTPUT_SIZE 5
 
@@ -37,14 +37,10 @@
 #define MULTIP_fc1 1000
 #define MULTIP_fc2 1000
 
-
-
 int main(){
-    static int input_vector[INPUT_SIZE];
     int i = 0;
+    static int input_vector[INPUT_SIZE];
     int targetLabel;
-
-
 
     for(int datasetIndex = 0 ; datasetIndex < DATASET_UNITS ; datasetIndex++ ){
         int startingIndex = datasetIndex * 121; //input + label
@@ -56,41 +52,34 @@ int main(){
             input_vector[i] = dataset120[startingIndex + i];
         }
 
-
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// LAYER 1
     // CONVOLUTION 1
         static int INTconv0_featureMap[NUM_FILTERS][CONV0_INPUT_SIZE-4];
         static int INTconv0_currentKernel[KERNEL_SIZE];
         int INTconv0_current_bias = 0;
 
-        //printf(" Conv0 #################################################################\n");
         for (int k = 0; k < NUM_FILTERS; k++)
         {
             // Load Current Weights
             for (i = 0; i < KERNEL_SIZE; i++)
             {
                 INTconv0_currentKernel[i] = (int) (conv0_weights[i + (k * KERNEL_SIZE)]);
-                // printf("(%d, %d) %d\n", k, i, INTconv0_currentKernel[i]);
             }
 
             // Load Current Bias
             INTconv0_current_bias = (int) (conv0_bias[k]);
-
 
             // Perform Kernel operation
             for (i = 0; i <= sizeof(input_vector)/sizeof(input_vector[0])-KERNEL_SIZE; i++)
             {
                 int INTtotalSum = 0;
                 for (int j = 0; j < KERNEL_SIZE; j++)
-                {                
-                // printf("%d + (%d * %d (%d)),     ", INTtotalSum, (input_vector[i+j]), INTconv0_currentKernel[j], j);
+                {
                 INTtotalSum += (input_vector[i+j]) * INTconv0_currentKernel[j];
                 }
                 INTconv0_featureMap[k][i] = INTtotalSum + INTconv0_current_bias * MULTIP_conv1 ;  // moraes
-                // printf("\n%d + %d * %d = %d (%d, %d)\n", INTtotalSum, INTconv0_current_bias, MULTIP_conv1, INTconv0_featureMap[k][i], k, i);
             }
         }
-        //printf("############################# CONV1 - DONE\n");
 
     //////////////////////////////// INT HANDLER
     // divide the feature map items by MULTIP_conv1
@@ -99,11 +88,8 @@ int main(){
             for (int j = 0; j < CONV0_INPUT_SIZE-4; j++)
             {
                 INTconv0_featureMap[i][j] = (INTconv0_featureMap[i][j])/(MULTIP_conv1);
-                // printf("%d\n", INTconv0_featureMap[i][j]);
             }
-
         }
-        //printf("############################# CONV1 - DIVISION DONE\n");
 
     ///// RELU
         for (int i = 0; i < NUM_FILTERS; i++)
@@ -111,13 +97,9 @@ int main(){
             for (int j = 0; j < CONV0_INPUT_SIZE-4; j++)
             {
                 if (INTconv0_featureMap[i][j] <= 0)
-                    INTconv0_featureMap[i][j] = 0;     
-                //printf("%d\n", INTconv0_featureMap[i][j]);
+                    INTconv0_featureMap[i][j] = 0;
             }
-
         }
-
-        //printf("############################# CONV1 - RELU DONE\n");
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// LAYER 3
     // CONVOLUTION 3
@@ -137,21 +119,18 @@ int main(){
                 }
                 INTconv3_totalSum += ( (int) conv3_bias[filterToGenerate])* MULTIP_conv3 ;  // moraes;
                 INTconv3_featureMap[filterToGenerate][inputOffset] = INTconv3_totalSum;
-                // printf("%d\n", INTconv3_featureMap[filterToGenerate][inputOffset]);
             }
         }
-
 
     //////////////////////////////// INT HANDLER
     // divide the feature map items by MULTIP_conv3
         for (int i = 0; i < NUM_FILTERS; i++)
         {
             for (int j = 0; j < CONV3_INPUT_SIZE-4; j++)
-            {           
+            {
                 INTconv3_featureMap[i][j] = (INTconv3_featureMap[i][j])/(MULTIP_conv3);
             }
         }
-
 
     ///// RELU
         for (int i = 0; i < NUM_FILTERS; i++)
@@ -163,11 +142,10 @@ int main(){
             }
         }
 
-
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// LAYER 6
     // CONVOLUTION 6
 
-        static int INTconv6_featureMap[NUM_FILTERS][CONV6_INPUT_SIZE-4]; 
+        static int INTconv6_featureMap[NUM_FILTERS][CONV6_INPUT_SIZE-4];
         int INTconv6_totalSum = 0;
 
         for (int filterToGenerate = 0 ; filterToGenerate < NUM_FILTERS ; filterToGenerate ++ ){
@@ -180,39 +158,30 @@ int main(){
                         INTconv6_totalSum += ((INTconv3_featureMap[filterIn][indexIn] * MULTIP_conv6)/MULTIP_conv3) * ((int) (conv6_weights[weightIndex]));
                     }
                 }
-
                 INTconv6_totalSum += ( (int) conv6_bias[filterToGenerate]) * MULTIP_conv6 ;  // moraes
                 INTconv6_featureMap[filterToGenerate][inputOffset] = INTconv6_totalSum;
             }
         }
-        
 
     //////////////////////////////// INT HANDLER
     // divide the feature map items by MULTIP_conv6
         for (int i = 0; i < NUM_FILTERS; i++)
         {
             for (int j = 0; j < CONV6_INPUT_SIZE-4; j++)
-            {            
+            {
                 INTconv6_featureMap[i][j] = (INTconv6_featureMap[i][j]/(MULTIP_conv6)); // 5000
             }
         }
 
-        
     /////////////////////////// RELU
         for (int i = 0; i < NUM_FILTERS; i++)
         {
             for (int j = 0; j < CONV6_INPUT_SIZE-4; j++)
             {
                 if (INTconv6_featureMap[i][j] <= 0)
-                    INTconv6_featureMap[i][j] = 0; 
+                    INTconv6_featureMap[i][j] = 0;
             }
         }
-
-
-
-
-
-
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// LAYER 2
     ////////////////////////////////////////// FC Layer
@@ -229,7 +198,7 @@ int main(){
                 index++;
             }
         }
-        
+
     /////// FC 1 (6912 > 128)
 
         static int INTfc1_out_vector[FC1_OUTPUT_SIZE];
@@ -246,28 +215,22 @@ int main(){
             INTfc1_out_vector[outputIndex] = INTtotalValue + ((int) fc1_bias[outputIndex]) * MULTIP_fc1 ;  // moraes
         }
 
-
     //////////////////////////////// INT HANDLER
     // divide the feature map items by MULTIP_fc1
         for (int i = 0; i < FC1_OUTPUT_SIZE; i++)
-        {         
+        {
             INTfc1_out_vector[i] = INTfc1_out_vector[i] / MULTIP_fc1;
         }
 
-
-
-        
     ////////////////// RELU
         for (int i = 0; i < FC1_OUTPUT_SIZE ; i++){
-            if ( INTfc1_out_vector[i] < 0 ) INTfc1_out_vector[i] = 0;        
+            if ( INTfc1_out_vector[i] < 0 ) INTfc1_out_vector[i] = 0;
         }
-
-
 
     ///////////////// FC 1 (128 > 5)
         static int INTfc2_out_vector[FC2_OUTPUT_SIZE];
         int INTfc2_totalValue;
-        
+
         for (int outputIndex = 0; outputIndex < FC2_OUTPUT_SIZE; outputIndex++){
             INTfc2_totalValue = 0;
             // if ( datasetIndex == 4)  printf("totalvalue------");
@@ -280,21 +243,15 @@ int main(){
             // if ( datasetIndex == 4) printf("%f  %d \n ",fc2_out_vector[outputIndex],INTfc2_out_vector[outputIndex]);
         }
 
-
-        
     //////////////////////////////// INT HANDLER
     // divide the feature map items by MULTIP_fc2
         for (int i = 0; i < FC2_OUTPUT_SIZE; i++)
-        {   
-            INTfc2_out_vector[i] = INTfc2_out_vector[i] / (MULTIP_fc2*MULTIP_fc2);            
+        {
+            INTfc2_out_vector[i] = INTfc2_out_vector[i] / (MULTIP_fc2*MULTIP_fc2);
         }
-
-
-
 
     ////////////////////////// Result Classes
         //printf("\n############################################################## RESULT CLASSES");
-
 
         int maxValue =  INTfc2_out_vector[0];
         int calculatedLabel = 0;
@@ -306,7 +263,6 @@ int main(){
         }
 
         printf("%d,%d,",calculatedLabel,targetLabel);
-
     }
     return 0;
 }

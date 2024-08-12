@@ -30,6 +30,7 @@ module CSRBank
 #(
     parameter bit       XOSVMEnable    = 1'b1,
     parameter bit       ZIHPMEnable    = 1'b0,
+<<<<<<< HEAD
     parameter bit       COMPRESSED     = 1'b1,
     `ifdef DEBUG
     parameter bit       PROFILING      = 1'b0,
@@ -37,6 +38,14 @@ module CSRBank
     `endif
     parameter rv32_e    RV32           = RV32M
 
+=======
+    parameter bit       COMPRESSED     = 1'b0,
+    parameter rv32_e    RV32           = RV32I,
+    parameter bit       VEnable        = 1'b0,
+    parameter int       VLEN           = 128,
+    parameter bit       PROFILING      = 1'b0,
+    parameter string    PROFILING_FILE = "./debug/Report.txt"
+>>>>>>> origin/master
 )
 (
     input   logic               clk,
@@ -57,6 +66,9 @@ module CSRBank
     input   logic               hazard,
     input   logic               stall,
     input   logic               hold,
+
+    input   logic [31:0]        vtype_i,
+    input   logic [31:0]        vlen_i,
     /* verilator lint_on UNUSEDSIGNAL */
 
     input   logic               raise_exception_i,
@@ -107,14 +119,14 @@ module CSRBank
         6'b0,
         XOSVMEnable,    // X - Non-standard extensions present
         1'b0,
-        1'b0,           // V - Vector extension 
+        VEnable,           // V - Vector extension
         1'b1,           // U - User mode implemented
         1'b0,
         1'b0,           // S - Supervisor mode implemented
         2'b0,
         1'b0,           // P - Packed-SIMD extension
         1'b0,
-        1'b0,           // N - User level interrupts supported 
+        1'b0,           // N - User level interrupts supported
         (RV32==RV32M),  // M - Integer Multiply/Divide extension
         3'b0,
         1'b1,           // I - RV32I/64I/128I base ISA
@@ -169,26 +181,26 @@ module CSRBank
     logic [1:0] mstatus_mpp;
 
     assign mstatus = {
-                        1'b0, 
-                        8'b0, 
-                        1'b0, 
-                        1'b0, 
-                        1'b0, 
-                        1'b0, // mstatus_mxr 
-                        1'b0, 
+                        1'b0,
+                        8'b0,
+                        1'b0,
+                        1'b0,
+                        1'b0,
+                        1'b0, // mstatus_mxr
+                        1'b0,
                         1'b0, // mstatus_mprv
-                        2'b0, 
-                        2'b0, 
-                        mstatus_mpp, 
-                        2'b0, 
+                        2'b0,
+                        2'b0,
+                        mstatus_mpp,
+                        2'b0,
                         1'b0, // mstatus_spp
-                        mstatus_mpie, 
-                        1'b0, 
-                        1'b0, 
-                        1'b0, 
-                        mstatus_mie, 
-                        1'b0, 
-                        1'b0, 
+                        mstatus_mpie,
+                        1'b0,
+                        1'b0,
+                        1'b0,
+                        mstatus_mie,
+                        1'b0,
+                        1'b0,
                         1'b0
                     };
 
@@ -457,6 +469,12 @@ module CSRBank
                 MVMIS:          out = mvmis[31:0];
                 MVMIM:          out = mvmim[31:0];
 
+                // Vector Extension CSRs
+                VSTART:         out = '0;
+                VLENBYTES:      out = VLEN/8;
+                VTYPE:          out = vtype_i;
+                VL:             out = vlen_i;
+
                 default:        out = '0;
             endcase
         end
@@ -636,7 +654,7 @@ module CSRBank
                 raise_exception_counter     <= (raise_exception_i)                                                  ? raise_exception_counter + 1 : raise_exception_counter;
                 context_switch_counter      <= (jump_i || raise_exception_i || machine_return_i || interrupt_ack_i) ? context_switch_counter  + 1 : context_switch_counter;
                 nop_counter                 <= (instruction_operation_i == NOP && !hold && !killed)                 ? nop_counter             + 1 : nop_counter;
-                
+
                 if (COMPRESSED == 1'b1) begin
                     jump_misaligned_counter <= jump_misaligned_counter + ((jump_misaligned_i && !hold) ? 1 : 0);
                 end
@@ -712,6 +730,7 @@ module CSRBank
         assign instructions_killed_counter = '0;
         assign nop_counter                 = '0;
         assign logic_counter               = '0;
+        assign lui_slt_counter             = '0;
         assign addsub_counter              = '0;
         assign shift_counter               = '0;
         assign branch_counter              = '0;
@@ -719,7 +738,6 @@ module CSRBank
         assign load_counter                = '0;
         assign store_counter               = '0;
         assign sys_counter                 = '0;
-        assign lui_slt_counter             = '0;
         assign csr_counter                 = '0;
         assign mul_counter                 = '0;
         assign div_counter                 = '0;

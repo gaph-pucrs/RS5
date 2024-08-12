@@ -35,6 +35,8 @@ module testbench
     localparam bit           USE_XOSVM       = 1'b1;
     localparam bit           USE_ZIHPM       = 1'b1;
     localparam bit           USE_ZKNE        = 1'b1;
+    localparam bit           VEnable         = 1'b1;
+    localparam int           VLEN            = 256;
 
     `ifdef DEBUG
     localparam bit           PROFILING       = 1'b1;
@@ -164,6 +166,8 @@ module testbench
         .Environment    (ASIC),
         .RV32           (INSTRUCTION_SET),
         .COMPRESSED     (COMPRESSED),
+        .VEnable        (VEnable),
+        .VLEN           (VLEN),
         .XOSVMEnable    (USE_XOSVM),
         .ZIHPMEnable    (USE_ZIHPM),
         `ifdef DEBUG

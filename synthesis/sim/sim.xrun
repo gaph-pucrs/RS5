@@ -1,2 +1,0 @@
--smartorder -top PUCRS_RV_tb
-./testbench.sv
