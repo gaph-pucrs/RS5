@@ -53,7 +53,10 @@ module execute
     input   logic [31:0]        third_operand_i,
     input   iType_e             instruction_operation_i,
     input   logic               instruction_compressed_i,
+    /* Not used if VEnable is 0 */
+    /* verilator lint_off UNUSEDSIGNAL */
     input   iTypeVector_e       vector_operation_i,
+    /* verilator lint_on UNUSEDSIGNAL */
     input   logic  [2:0]        tag_i,
     input   privilegeLevel_e    privilege_i,
 
@@ -72,7 +75,10 @@ module execute
     output  logic               mem_read_enable_o,
     output  logic  [3:0]        mem_write_enable_o,
     output  logic [31:0]        mem_write_data_o,
+    /* Not used if VEnable is 0 */
+    /* verilator lint_off UNUSEDSIGNAL */
     input   logic [31:0]        mem_read_data_i,
+    /* verilator lint_on UNUSEDSIGNAL */
 
     output  logic [11:0]        csr_address_o,
     output  logic               csr_read_enable_o,
@@ -429,6 +435,8 @@ end
         assign mem_read_enable_vector   = '0;
         assign mem_write_enable_vector  = '0;
         assign mem_write_data_vector    = '0;
+        assign vtype_o = '0;
+        assign vlen_o  = '0;
     end
 
 //////////////////////////////////////////////////////////////////////////////
