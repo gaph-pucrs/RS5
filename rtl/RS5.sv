@@ -33,7 +33,8 @@ module RS5
     parameter bit           ZKNEEnable     = 1'b0,
     parameter bit           DEBUG          = 1'b0,
     parameter string        DBG_REG_FILE   = "./debug/regBank.txt",
-    parameter bit           PROFILING      = 1'b0
+    parameter bit           PROFILING      = 1'b0,
+    parameter string        PROFILING_FILE = "./debug/Report.txt"
 )
 (
     input  logic                    clk,
@@ -436,13 +437,14 @@ module RS5
 /////////////////////////////////////////////////////////// CSRs BANK ///////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     CSRBank #(
-      .XOSVMEnable(XOSVMEnable ),
-      .ZIHPMEnable(ZIHPMEnable ),
-      .COMPRESSED (COMPRESSED  ),
-      .RV32       (RV32        ),
-      .VEnable    (VEnable     ),
-      .VLEN       (VLEN        ),
-      .PROFILING  (PROFILING   )
+      .XOSVMEnable   (XOSVMEnable   ),
+      .ZIHPMEnable   (ZIHPMEnable   ),
+      .COMPRESSED    (COMPRESSED    ),
+      .RV32          (RV32          ),
+      .VEnable       (VEnable       ),
+      .VLEN          (VLEN          ),
+      .PROFILING     (PROFILING     ),
+      .PROFILING_FILE(PROFILING_FILE)
     ) CSRBank1 (
         .clk                        (clk),
         .reset_n                    (reset_n),
