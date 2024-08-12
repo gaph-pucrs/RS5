@@ -98,20 +98,21 @@ module vectorUnit
         .VLEN   (VLEN),
         .VLENB  (VLENB)
     ) vectorCSRs1 (
-        .clk                (clk),
-        .reset_n            (reset_n),
-        .vector_operation_i (vector_operation_i),
-        .op1_scalar_i       (op1_scalar_i),
-        .op2_scalar_i       (op2_scalar_i),
-        .zimm               (zimm),
-        .rs1                (rs1),
-        .rd                 (rd),
-        .vtype_o            (vtype_o),
-        .vlen_o             (vlen_o),
-        .vsew               (vsew),
-        .vlmul              (vlmul),
-        .vl                 (vl),
-        .vl_next            (vl_next)
+        .clk                    (clk),
+        .reset_n                (reset_n),
+        .instruction_operation_i(instruction_operation_i),
+        .vector_operation_i     (vector_operation_i),
+        .op1_scalar_i           (op1_scalar_i),
+        .op2_scalar_i           (op2_scalar_i),
+        .zimm                   (zimm),
+        .rs1                    (rs1),
+        .rd                     (rd),
+        .vtype_o                (vtype_o),
+        .vlen_o                 (vlen_o),
+        .vsew                   (vsew),
+        .vlmul                  (vlmul),
+        .vl                     (vl),
+        .vl_next                (vl_next)
     );
 
 //////////////////////////////////////////////////////////////////////////////

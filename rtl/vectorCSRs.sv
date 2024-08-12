@@ -9,6 +9,7 @@ module vectorCSRs
     input   logic                   clk,
     input   logic                   reset_n,
 
+    input   iType_e                 instruction_operation_i,
     input   iTypeVector_e           vector_operation_i,
     input   logic [31:0]            op1_scalar_i,
     /* verilator lint_off UNUSEDSIGNAL */
@@ -102,7 +103,7 @@ module vectorCSRs
             vlmul       <= LMUL_1;
             vl          <= '0;
         end
-        else if (vector_operation_i inside {VSETVL, VSETVLI, VSETIVLI}) begin
+        else if (instruction_operation_i == VECTOR && vector_operation_i inside {VSETVL, VSETVLI, VSETIVLI}) begin
             cfg_error_r <= cfg_error;
             vill        <= vill_next | cfg_error;
             vma         <= vma_next;

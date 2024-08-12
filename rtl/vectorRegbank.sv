@@ -78,7 +78,7 @@ module vectorRegbank
 
     end
     else begin : gen_vector_regbank_asic
-        logic [31:1][VLEN-1:0] regfile;
+        logic [31:0][VLEN-1:0] regfile;
 
         //////////////////////////////////////////////////////////////////////////////
         // Reads
@@ -92,7 +92,7 @@ module vectorRegbank
         // Reset and Write control
         //////////////////////////////////////////////////////////////////////////////
 
-        for (genvar j = 1; j < 32 ; j++) begin : gen_vectorRegfile
+        for (genvar j = 0; j < 32 ; j++) begin : gen_vectorRegfile
             always_ff @(posedge clk  or negedge reset_n) begin
                 if (!reset_n) begin
                     regfile[j] <= '0;

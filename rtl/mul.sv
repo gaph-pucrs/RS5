@@ -16,6 +16,7 @@ module mul
     input   logic [ 1:0] signed_mode_i,
     input   logic        enable_i,
     input   logic        mul_low_i,
+    input   logic        single_cycle_i,
 
     output  logic        hold_o,
     output  logic [31:0] result_o
@@ -64,8 +65,8 @@ module mul
             ALBL: begin
                 op_a           = first_operand_i[15:0];
                 op_b           = second_operand_i[15:0];
-                sign_a         = 1'b0;
-                sign_b         = 1'b0;
+                sign_a         = (single_cycle_i) ? (first_operand_i [31] & signed_mode_i[0]) : 1'b0;
+                sign_b         = (single_cycle_i) ? (second_operand_i[31] & signed_mode_i[1]) : 1'b0;
                 accum          = '0;
                 mac_result_partial = mac_result;
                 if (start == 1'b1) begin

@@ -809,7 +809,18 @@ module vectorALU
 // Multiplication_common
 //////////////////////////////////////////////////////////////////////////////
 
+    logic [ VLENB-1   :0][15:0] mult_result_8b;
+
+    logic [(VLENB/2)-1:0][15:0] mult_op_a_16b;
+    logic [(VLENB/2)-1:0][15:0] mult_op_b_16b;
+    logic [(VLENB/2)-1:0][31:0] mult_result_16b;
+
+    logic [(VLENB/4)-1:0][31:0] mult_op_a_32b;
+    logic [(VLENB/4)-1:0][31:0] mult_op_b_32b;
+    logic [(VLENB/4)-1:0][31:0] mult_result_32b;
+
     logic [(2*VLEN)-1:0] result_mult;
+
     logic [1:0] mult_signed_mode;
 
     always_comb begin
@@ -824,27 +835,24 @@ module vectorALU
 // Multiplication 8 bits
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [VLENB-1:0][ 7:0] mult_op_a_8b;
-    logic [VLENB-1:0][ 7:0] mult_op_b_8b;
-    logic [VLENB-1:0][15:0] mult_result_8b;
-
-    always_comb begin
-        for (int i = 0; i < VLENB; i++) begin
-            mult_op_a_8b[i] = first_operand_8b [i];
-            mult_op_b_8b[i] = second_operand_8b[i];
-        end
-    end
-
     generate
         for (genvar i_mul8b = 0; i_mul8b < VLENB; i_mul8b++) begin : MUL8B_LOOP
-            mulNbits #(
-                .N(8)
-            ) mul8b (
-                .first_operand_i (mult_op_a_8b[i_mul8b]),
-                .second_operand_i(mult_op_b_8b[i_mul8b]),
-                .signed_mode_i   (mult_signed_mode),
-                .result_o        (mult_result_8b[i_mul8b])
-            );
+            if (i_mul8b < VLENB/4) begin
+                assign mult_result_8b[i_mul8b] = {mult_result_32b[i_mul8b][15:0]};
+            end
+            else if (i_mul8b < VLENB/2) begin
+                assign mult_result_8b[i_mul8b] = {mult_result_16b[i_mul8b][15:0]};
+            end
+            else begin
+                mulNbits #(
+                    .N(8)
+                ) mul8b (
+                    .first_operand_i (first_operand_8b [i_mul8b]),
+                    .second_operand_i(second_operand_8b[i_mul8b]),
+                    .signed_mode_i   (mult_signed_mode),
+                    .result_o        (mult_result_8b[i_mul8b])
+                );
+            end
         end
     endgenerate
 
@@ -852,27 +860,40 @@ module vectorALU
 // Multiplication 16 bits
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [(VLENB/2)-1:0][15:0] mult_op_a_16b;
-    logic [(VLENB/2)-1:0][15:0] mult_op_b_16b;
-    logic [(VLENB/2)-1:0][31:0] mult_result_16b;
-
     always_comb begin
         for (int i = 0; i < VLENB/2; i++) begin
-            mult_op_a_16b[i] = first_operand_16b [i];
-            mult_op_b_16b[i] = second_operand_16b[i];
+            if (i < VLENB/4) begin
+                mult_op_a_16b[i] = first_operand_16b [i];
+                mult_op_b_16b[i] = second_operand_16b[i];
+            end
+            else begin
+                if (vsew == EW8) begin
+                    mult_op_a_16b[i] = {{8{first_operand_8b [i][7] & mult_signed_mode[0]}}, first_operand_8b [i]};
+                    mult_op_b_16b[i] = {{8{second_operand_8b[i][7] & mult_signed_mode[1]}}, second_operand_8b[i]};
+                end
+                else begin
+                    mult_op_a_16b[i] = first_operand_16b [i];
+                    mult_op_b_16b[i] = second_operand_16b[i];
+                end
+            end
         end
     end
 
     generate
         for (genvar i_mul16b = 0; i_mul16b < VLENB/2; i_mul16b++) begin : MUL16B_LOOP
-            mulNbits #(
-                .N(16)
-            ) mul16b (
-                .first_operand_i (mult_op_a_16b[i_mul16b]),
-                .second_operand_i(mult_op_b_16b[i_mul16b]),
-                .signed_mode_i   (mult_signed_mode),
-                .result_o        (mult_result_16b[i_mul16b])
-            );
+            if (i_mul16b < VLENB/4) begin
+                assign mult_result_16b[i_mul16b] = {mult_result_32b[i_mul16b][31:0]};
+            end
+            else begin
+                mulNbits #(
+                    .N(16)
+                ) mul16b (
+                    .first_operand_i (mult_op_a_16b[i_mul16b]),
+                    .second_operand_i(mult_op_b_16b[i_mul16b]),
+                    .signed_mode_i   (mult_signed_mode),
+                    .result_o        (mult_result_16b[i_mul16b])
+                );
+            end
         end
     endgenerate
 
@@ -880,21 +901,28 @@ module vectorALU
 // Multiplication 32 bits
 //////////////////////////////////////////////////////////////////////////////
 
-    logic                 mult_enable, mult_low;
+    logic                 mult_enable, mult_low, ended_acc;
     logic [(VLENB/4)-1:0] hold_mult_int;
-
-    logic [(VLENB/4)-1:0][31:0] mult_op_a_32b;
-    logic [(VLENB/4)-1:0][31:0] mult_op_b_32b;
-    logic [(VLENB/4)-1:0][31:0] mult_result_32b;
 
     always_comb begin
         for (int i = 0; i < VLENB/4; i++) begin
-            mult_op_a_32b[i] = first_operand_32b [i];
-            mult_op_b_32b[i] = second_operand_32b[i];
+            unique case (vsew)
+                EW8: begin
+                    mult_op_a_32b[i] = {{24{first_operand_8b [i][7] & mult_signed_mode[0]}}, first_operand_8b [i]};
+                    mult_op_b_32b[i] = {{24{second_operand_8b[i][7] & mult_signed_mode[1]}}, second_operand_8b[i]};
+                end
+                EW16: begin
+                    mult_op_a_32b[i] = {{16{mult_op_a_16b[i][15] & mult_signed_mode[0]}}, mult_op_a_16b[i]};
+                    mult_op_b_32b[i] = {{16{mult_op_b_16b[i][15] & mult_signed_mode[1]}}, mult_op_b_16b[i]};
+                end
+                default: begin
+                    mult_op_a_32b[i] = first_operand_32b [i];
+                    mult_op_b_32b[i] = second_operand_32b[i];
+                end
+            endcase
         end
     end
 
-    logic ended_acc;
     assign ended_acc = (vector_operation_i inside {VMACC, VNMSAC, VMADD, VNMSUB})
                         &&  (
                                 (vlmul == LMUL_1  && cycle_count > 1)
@@ -922,6 +950,7 @@ module vectorALU
                 .signed_mode_i   (mult_signed_mode),
                 .enable_i        (mult_enable),
                 .mul_low_i       (mult_low),
+                .single_cycle_i  (vsew inside {EW8, EW16}),
                 .hold_o          (hold_mult_int[i_mul32b]),
                 .result_o        (mult_result_32b[i_mul32b])
             );

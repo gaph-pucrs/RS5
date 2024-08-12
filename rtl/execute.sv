@@ -317,6 +317,7 @@ end
             .signed_mode_i    (signed_mode_mul),
             .enable_i         (enable_mul),
             .mul_low_i        (mul_low),
+            .single_cycle_i   (1'b0),
             .hold_o           (hold_mul),
             .result_o         (mul_result)
         );
