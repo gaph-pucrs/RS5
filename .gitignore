@@ -39,3 +39,4 @@ sim/obj_dir
 **/.Xil
 *.fst
 *.dcp
+.vscode
