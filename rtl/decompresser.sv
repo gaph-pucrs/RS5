@@ -1,5 +1,4 @@
 `include "RS5_pkg.sv"
-
     
 module decompresser 
     import RS5_pkg::*;
