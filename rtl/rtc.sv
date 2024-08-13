@@ -35,7 +35,7 @@ module rtc (
     logic [63:0] mtimecmp;
     logic intr;
 
-    assign intr = (mtimecmp >= mtime);
+    assign intr = (mtime >= mtimecmp);
     assign mtime_o = mtime;
 
     always_ff @(posedge clk or negedge reset_n) begin
