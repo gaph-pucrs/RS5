@@ -23,20 +23,20 @@
 module RS5
     import RS5_pkg::*;
 #(
+`ifndef SYNTH
+    parameter bit           DEBUG          = 1'b0,
+    parameter string        DBG_REG_FILE   = "./debug/regBank.txt",
+    parameter bit           PROFILING      = 1'b0,
+    parameter string        PROFILING_FILE = "./debug/Report.txt",
+`endif
     parameter environment_e Environment    = ASIC,
-    parameter rv32_e        RV32           = RV32M,
+    parameter rv32_e        RV32           = RV32I,
     parameter bit           COMPRESSED     = 1'b0,
     parameter bit           VEnable        = 1'b0,
     parameter int           VLEN           = 64,
     parameter bit           XOSVMEnable    = 1'b0,
     parameter bit           ZIHPMEnable    = 1'b0,
-    `ifdef DEBUG
-    parameter bit           DEBUG          = 1'b0,
-    parameter string        DBG_REG_FILE   = "./debug/regBank.txt",
-    parameter bit           PROFILING      = 1'b0,
-    parameter string        PROFILING_FILE = "./debug/Report.txt",
-    `endif
-    parameter bit           ZKNEEnable     = 1'b1
+    parameter bit           ZKNEEnable     = 1'b0
 )
 (
     input  logic                    clk,
@@ -354,10 +354,10 @@ module RS5
     end
     else begin : RegFileFF_blk
         regbank #(
-            `ifdef DEBUG
+        `ifndef SYNTH
             .DEBUG      (DEBUG       ),
             .DBG_FILE   (DBG_REG_FILE)
-            `endif
+        `endif
         ) regbankff (
             .clk        (clk),
             .reset_n    (reset_n),
@@ -376,7 +376,7 @@ module RS5
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     execute #(
-        .Environment  (Environment),
+        .Environment (Environment),
         .RV32        (RV32),
         .ZKNEEnable  (ZKNEEnable),
         .VEnable     (VEnable),
@@ -441,16 +441,16 @@ module RS5
 /////////////////////////////////////////////////////////// CSRs BANK ///////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     CSRBank #(
-      .XOSVMEnable   (XOSVMEnable   ),
-      .ZIHPMEnable   (ZIHPMEnable   ),
-      .COMPRESSED    (COMPRESSED    ),
-      `ifdef DEBUG
-      .PROFILING     (PROFILING     ),
-      .PROFILING_FILE(PROFILING_FILE),
-      `endif
-      .VEnable       (VEnable       ),
-      .VLEN          (VLEN          ),
-      .RV32          (RV32          )
+    `ifndef SYNTH
+        .PROFILING     (PROFILING     ),
+        .PROFILING_FILE(PROFILING_FILE),
+    `endif
+        .XOSVMEnable   (XOSVMEnable   ),
+        .ZIHPMEnable   (ZIHPMEnable   ),
+        .COMPRESSED    (COMPRESSED    ),
+        .RV32          (RV32          ),
+        .VEnable       (VEnable       ),
+        .VLEN          (VLEN          )
     ) CSRBank1 (
         .clk                        (clk),
         .reset_n                    (reset_n),

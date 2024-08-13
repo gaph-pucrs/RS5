@@ -24,10 +24,12 @@
 module RAM_mem
     import RS5_pkg::*;
 #(
-    parameter int    MEM_WIDTH  = 65536,
-    parameter string BIN_FILE   = "../app/berkeley_suite/test.bin",
+`ifndef SYNTH
     parameter        DEBUG      = 0,
-    parameter string DEBUG_FILE = "./debug/"
+    parameter string DEBUG_PATH = "./debug/",
+`endif
+    parameter int    MEM_WIDTH  = 65536,
+    parameter string BIN_FILE   = "../app/berkeley_suite/test.bin"
 )
 (
     input  logic                             clk,
@@ -47,7 +49,9 @@ module RAM_mem
 
     reg [7:0] RAM [0:MEM_WIDTH-1];
     int fd;
+`ifndef SYNTH
     int fd_r_a, fd_r_b, fd_w_a, fd_w_b;
+`endif
 
     initial begin
         fd = $fopen (BIN_FILE, "r");
@@ -58,12 +62,14 @@ module RAM_mem
 
         void'($fread(RAM, fd));
 
+    `ifndef SYNTH
         if (DEBUG) begin
-            fd_r_a = $fopen ({DEBUG_FILE, "_A_reads.txt"}, "w");
-            fd_r_b = $fopen ({DEBUG_FILE, "_B_reads.txt"}, "w");
-            fd_w_a = $fopen ({DEBUG_FILE, "_A_writes.txt"}, "w");
-            fd_w_b = $fopen ({DEBUG_FILE, "_B_writes.txt"}, "w");
+            fd_r_a = $fopen ({DEBUG_PATH, "_A_reads.txt"}, "w");
+            fd_r_b = $fopen ({DEBUG_PATH, "_B_reads.txt"}, "w");
+            fd_w_a = $fopen ({DEBUG_PATH, "_A_writes.txt"}, "w");
+            fd_w_b = $fopen ({DEBUG_PATH, "_B_writes.txt"}, "w");
         end
+    `endif
     end
 
     /* Write */
@@ -82,6 +88,7 @@ module RAM_mem
                 RAM[addrA_i]   <= dataA_i[7:0];
             end
 
+        `ifndef SYNTH
             if (DEBUG) begin
                 if (weA_i != '0) begin
                     $fwrite(fd_w_a,"[%0d] ", $time);
@@ -92,6 +99,7 @@ module RAM_mem
                     $fwrite(fd_w_a," --> 0x%4h\n", addrA_i);
                 end
             end
+        `endif
         end
 
         if (enB_i == 1'b1) begin
@@ -108,6 +116,7 @@ module RAM_mem
                 RAM[addrB_i]   <= dataB_i[7:0];
             end
 
+        `ifndef SYNTH
             if (DEBUG) begin
                 if (weB_i != '0) begin
                     $fwrite(fd_w_b,"[%0d] ", $time);
@@ -118,6 +127,7 @@ module RAM_mem
                     $fwrite(fd_w_b," --> 0x%4h\n", addrB_i);
                 end
             end
+        `endif
         end
     end
 
@@ -130,12 +140,14 @@ module RAM_mem
                 dataA_o[15:8]  <= RAM[addrA_i+1];
                 dataA_o[7:0]   <= RAM[addrA_i];
 
+            `ifndef SYNTH
                 if (DEBUG) begin
                     if (addrA_i != '0) begin
                         $fwrite(fd_r_a,"[%0d] %h %h %h %h <-- 0x%4h\n",
                             $time, RAM[addrA_i+3], RAM[addrA_i+2], RAM[addrA_i+1], RAM[addrA_i], addrA_i);
                     end
                 end
+            `endif
             end
         end
 
@@ -146,12 +158,14 @@ module RAM_mem
                 dataB_o[15:8]  <= RAM[addrB_i+1];
                 dataB_o[7:0]   <= RAM[addrB_i];
 
+            `ifndef SYNTH
                 if (DEBUG) begin
                     if (addrB_i != '0) begin
                         $fwrite(fd_r_b,"[%0d] %h %h %h %h <-- 0x%4h\n",
                             $time, RAM[addrB_i+3], RAM[addrB_i+2], RAM[addrB_i+1], RAM[addrB_i], addrB_i);
                     end
                 end
+            `endif
             end
         end
     end

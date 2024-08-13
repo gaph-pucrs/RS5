@@ -31,8 +31,8 @@ module execute
     import RS5_pkg::*;
 #(
     parameter environment_e Environment = ASIC,
-    parameter rv32_e        RV32        = RV32M,
-    parameter bit           ZKNEEnable  = 1'b1,
+    parameter rv32_e        RV32        = RV32I,
+    parameter bit           ZKNEEnable  = 1'b0,
     parameter bit           VEnable     = 1'b0,
     parameter int           VLEN        = 64
 )

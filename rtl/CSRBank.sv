@@ -28,24 +28,16 @@
 module CSRBank
     import RS5_pkg::*;
 #(
-    parameter bit       XOSVMEnable    = 1'b1,
-    parameter bit       ZIHPMEnable    = 1'b0,
-<<<<<<< HEAD
-    parameter bit       COMPRESSED     = 1'b1,
-    `ifdef DEBUG
+`ifndef SYNTH
     parameter bit       PROFILING      = 1'b0,
     parameter string    PROFILING_FILE = "./debug/Report.txt",
-    `endif
-    parameter rv32_e    RV32           = RV32M
-
-=======
+`endif
+    parameter bit       XOSVMEnable    = 1'b0,
+    parameter bit       ZIHPMEnable    = 1'b0,
     parameter bit       COMPRESSED     = 1'b0,
     parameter rv32_e    RV32           = RV32I,
     parameter bit       VEnable        = 1'b0,
-    parameter int       VLEN           = 128,
-    parameter bit       PROFILING      = 1'b0,
-    parameter string    PROFILING_FILE = "./debug/Report.txt"
->>>>>>> origin/master
+    parameter int       VLEN           = 64
 )
 (
     input   logic               clk,
@@ -564,8 +556,8 @@ module CSRBank
 
     always_ff @(posedge clk or negedge reset_n) begin
         if(!reset_n) begin
-            Interruption_Code <= 0;
-            interrupt_pending_o <= 0;
+            Interruption_Code   <= NO_INT;
+            interrupt_pending_o <= 1'b0;
         end
         else begin
             if (mstatus_mie && (mie & mip) != '0 && !interrupt_ack_i) begin
@@ -679,7 +671,8 @@ module CSRBank
                 end
             end
         end
-        `ifdef DEBUG
+        
+    `ifndef SYNTH
         if (PROFILING) begin : gen_csr_dbg
             int fd;
 
@@ -724,7 +717,7 @@ module CSRBank
                 $fwrite(fd,"DIV:                     %0d\n", div_counter);
             end
         end
-        `endif
+    `endif
     end
     else begin : gen_zihpm_csr_off
         assign instructions_killed_counter = '0;
