@@ -38,8 +38,10 @@ module testbench
     localparam bit           VEnable         = 1'b1;
     localparam int           VLEN            = 256;
 
+`ifndef SYNTH
     localparam bit           PROFILING       = 1'b1;
     localparam bit           DEBUG           = 1'b0;
+`endif
 
     localparam int           MEM_WIDTH       = 65_536;
     localparam string        BIN_FILE        = "../app/riscv-tests/test.bin";
@@ -161,16 +163,18 @@ module testbench
 //////////////////////////////////////////////////////////////////////////////
 
     RS5 #(
-        .Environment    (ASIC),
-        .RV32           (INSTRUCTION_SET),
-        .COMPRESSED     (COMPRESSED),
-        .VEnable        (VEnable),
-        .VLEN           (VLEN),
-        .XOSVMEnable    (USE_XOSVM),
-        .ZIHPMEnable    (USE_ZIHPM),
-        .ZKNEEnable     (USE_ZKNE),
-	    .DEBUG          (DEBUG),
-	    .PROFILING      (PROFILING)
+    `ifndef SYNTH
+	    .DEBUG      (DEBUG          ),
+	    .PROFILING  (PROFILING      ),
+    `endif
+        .Environment(ASIC           ),
+        .RV32       (INSTRUCTION_SET),
+        .COMPRESSED (COMPRESSED     ),
+        .VEnable    (VEnable        ),
+        .VLEN       (VLEN           ),
+        .XOSVMEnable(USE_XOSVM      ),
+        .ZIHPMEnable(USE_ZIHPM      ),
+        .ZKNEEnable (USE_ZKNE       )
     ) dut (
         .clk                    (clk),
         .reset_n                (reset_n),
@@ -193,9 +197,12 @@ module testbench
 //////////////////////////////////////////////////////////////////////////////
 
     RAM_mem #(
-        .MEM_WIDTH(MEM_WIDTH),
-        .BIN_FILE (BIN_FILE),
-	.DEBUG    (DEBUG)
+    `ifndef SYNTH
+        .DEBUG     (DEBUG     ),
+        .DEBUG_PATH("./debug/"),
+    `endif
+        .MEM_WIDTH(MEM_WIDTH  ),
+        .BIN_FILE (BIN_FILE   )
     ) RAM_MEM (
         .clk        (clk),
 

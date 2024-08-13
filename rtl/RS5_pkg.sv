@@ -150,7 +150,7 @@ package RS5_pkg;
     } exceptionCode_e;
 
     typedef enum  logic[4:0] {
-        S_SW_INT = 1, M_SW_INT = 3, S_TIM_INT = 5, M_TIM_INT = 7, S_EXT_INT = 9,
+        NO_INT = 0, S_SW_INT = 1, M_SW_INT = 3, S_TIM_INT = 5, M_TIM_INT = 7, S_EXT_INT = 9,
         M_EXT_INT = 11
     } interruptionCode_e;
 

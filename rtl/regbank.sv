@@ -24,8 +24,10 @@
 module regbank
     import RS5_pkg::*;
 #(
+`ifndef SYNTH
     parameter bit    DEBUG    = 1'b0,
     parameter string DBG_FILE = "./debug/regBank.txt"
+`endif
 )
 (
     input   logic         clk, 
@@ -66,6 +68,7 @@ module regbank
 //////////////////////////////////////////////////////////////////////////////
 // DEBUG 
 //////////////////////////////////////////////////////////////////////////////
+`ifndef SYNTH
     if (DEBUG) begin : gen_reg_dbg
         int fd;
 
@@ -83,5 +86,6 @@ module regbank
             end
         end
     end
+`endif
 
 endmodule

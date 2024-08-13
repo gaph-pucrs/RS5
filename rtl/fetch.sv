@@ -77,7 +77,11 @@ module fetch  #(
 
     if (COMPRESSED) begin : gen_pc_c
         always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n | sys_reset) begin
+            if (!reset_n) begin
+                pc <= start_address;
+                jump_misaligned <= 1'b0;
+            end
+            else if (sys_reset)begin
                 pc <= start_address;
                 jump_misaligned <= 1'b0;
             end
@@ -115,7 +119,10 @@ module fetch  #(
     end
     else begin : gen_pc_nc
         always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n | sys_reset) begin
+            if (!reset_n) begin
+                pc <= start_address;
+            end
+            else if (sys_reset) begin
                 pc <= start_address;
             end
             else if (machine_return_i) begin                              

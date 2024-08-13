@@ -1,3 +1,5 @@
+`include "RS5_pkg.sv"
+
 /* verilator lint_off WIDTHTRUNC */
 module vectorLSU
     import RS5_pkg::*;

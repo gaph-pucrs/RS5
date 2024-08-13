@@ -34,15 +34,18 @@ module align
 
     logic hazard_r;
     logic jumped_r;
+    logic enable_r;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             hazard_r <= 1'b0;
             jumped_r <= 1'b0;
+            enable_r <= 1'b0;
         end
         else if (enable_i) begin
             hazard_r <= hazard_i;
             jumped_r <= jumped_i;
+            enable_r <= enable_i;
         end
     end
 
@@ -143,7 +146,7 @@ module align
             compressed_o  <= 1'b0;
             instruction_o <= '0;
         end
-        else if (enable_i && !hazard_i) begin
+        else if (enable_i && !hazard_i && enable_r) begin
             pc_o          <= pc;
             compressed_o  <= compressed;
             instruction_o <= instruction;
