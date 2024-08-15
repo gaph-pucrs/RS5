@@ -304,9 +304,9 @@ module vectorUnit
 
     // ADDRESS CALCULATION
     always_comb begin
-        vs1_addr = rs1 + cycle_count;
-        vs2_addr = rs2 + cycle_count;
-        vs3_addr = rd  + cycle_count;
+        vs1_addr = cycle_count + ((instruction_operation_i == VSTORE) ? rd : rs1);
+        vs2_addr = cycle_count + rs2;
+        vs3_addr = cycle_count + rd;
     end
 
     always_ff @(posedge clk) begin
@@ -424,11 +424,16 @@ module vectorUnit
 
     always_ff @(posedge clk) begin
         if (!hold) begin
-            unique case (opCat)
-                OPIVX, OPFVF, OPMVX: second_operand <= scalar_replicated;
-                OPIVI:               second_operand <= imm_replicated;
-                default:             second_operand <= vs1_data;
-            endcase
+            if (instruction_operation_i == VSTORE) begin
+                second_operand <= vs1_data;
+            end
+            else begin
+                unique case (opCat)
+                    OPIVX, OPFVF, OPMVX: second_operand <= scalar_replicated;
+                    OPIVI:               second_operand <= imm_replicated;
+                    default:             second_operand <= vs1_data;
+                endcase
+            end
         end
     end
 
@@ -446,7 +451,7 @@ module vectorUnit
         .base_address_i         (op1_scalar_i),
         .stride_i               (op2_scalar_i),
         .indexed_offsets_i      (first_operand),
-        .write_data_i           (third_operand),
+        .write_data_i           (second_operand),
         .current_state          (state),
         .instruction_operation_i(instruction_operation_i),
         .whole_reg_load_store   (whole_reg_load_store),
