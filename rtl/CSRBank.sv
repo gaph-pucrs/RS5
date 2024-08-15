@@ -152,6 +152,7 @@ module CSRBank
     logic [31:0] load_counter, store_counter;
     logic [31:0] sys_counter, csr_counter;
     logic [31:0] compressed_counter, jump_misaligned_counter;
+    logic [31:0] mcountinhibit;
     interruptionCode_e Interruption_Code;
 
     /* Signals enabled with ZIHPM */
@@ -217,32 +218,33 @@ module CSRBank
     always_comb begin
         wmask = '1;
         case (CSR)
-            MSTATUS:    begin current_val = mstatus;         wmask = 32'h007E19AA; end
-            MISA:       begin current_val = misa;            wmask = 32'h00301000; end
+            MSTATUS:       begin current_val = mstatus;         wmask = 32'h007E19AA; end
+            MISA:          begin current_val = misa;            wmask = 32'h00301000; end
             // MEDELEG:    begin current_val = medeleg;         wmask = '1; end
             // MIDELEG:    begin current_val = mideleg;         wmask = '1; end
-            MIE:        begin current_val = mie;             wmask = 32'h00000888; end
-            MTVEC:      begin current_val = mtvec_r;         wmask = COMPRESSED ? 32'hFFFFFFFE : 32'hFFFFFFFC; end
+            MIE:           begin current_val = mie;             wmask = 32'h00000888; end
+            MTVEC:         begin current_val = mtvec_r;         wmask = COMPRESSED ? 32'hFFFFFFFE : 32'hFFFFFFFC; end
             // MCOUNTEREN: begin current_val = mcounteren;      wmask = '1; end
             // MSTATUSH:   begin current_val = mstatush;        wmask = '1; end
-            MSCRATCH:   begin current_val = mscratch;        wmask = 32'hFFFFFFFF; end
-            MEPC:       begin current_val = mepc_r;          wmask = COMPRESSED ? 32'hFFFFFFFE : 32'hFFFFFFFC; end
-            MCAUSE:     begin current_val = mcause;          wmask = 32'hFFFFFFFF; end
-            MTVAL:      begin current_val = mtval;           wmask = 32'hFFFFFFFF; end
-            MCYCLE:     begin current_val = mcycle[31:0];    wmask = 32'hFFFFFFFF; end
-            MCYCLEH:    begin current_val = mcycle[63:32];   wmask = 32'hFFFFFFFF; end
-            MINSTRET:   begin current_val = minstret[31:0];  wmask = 32'hFFFFFFFF; end
-            MINSTRETH:  begin current_val = minstret[63:32]; wmask = 32'hFFFFFFFF; end
+            MSCRATCH:      begin current_val = mscratch;        wmask = 32'hFFFFFFFF; end
+            MEPC:          begin current_val = mepc_r;          wmask = COMPRESSED ? 32'hFFFFFFFE : 32'hFFFFFFFC; end
+            MCAUSE:        begin current_val = mcause;          wmask = 32'hFFFFFFFF; end
+            MTVAL:         begin current_val = mtval;           wmask = 32'hFFFFFFFF; end
+            MCYCLE:        begin current_val = mcycle[31:0];    wmask = 32'hFFFFFFFF; end
+            MCYCLEH:       begin current_val = mcycle[63:32];   wmask = 32'hFFFFFFFF; end
+            MINSTRET:      begin current_val = minstret[31:0];  wmask = 32'hFFFFFFFF; end
+            MINSTRETH:     begin current_val = minstret[63:32]; wmask = 32'hFFFFFFFF; end
+            MCOUNTINHIBIT: begin current_val = mcountinhibit;   wmask = 32'hFFFFFFFF; end
 
-            MVMDO:      begin current_val = mvmdo;           wmask = 32'hFFFFFFFC; end
-            MVMDS:      begin current_val = mvmds;           wmask = 32'hFFFFFFFC; end
-            MVMDM:      begin current_val = mvmdm;           wmask = 32'hFFFFFFFC; end
-            MVMIO:      begin current_val = mvmio;           wmask = 32'hFFFFFFFC; end
-            MVMIS:      begin current_val = mvmis;           wmask = 32'hFFFFFFFC; end
-            MVMIM:      begin current_val = mvmim;           wmask = 32'hFFFFFFFC; end
-            MVMCTL:     begin current_val = {31'b0, mvmctl}; wmask = 32'h00000001; end
+            MVMDO:         begin current_val = mvmdo;           wmask = 32'hFFFFFFFC; end
+            MVMDS:         begin current_val = mvmds;           wmask = 32'hFFFFFFFC; end
+            MVMDM:         begin current_val = mvmdm;           wmask = 32'hFFFFFFFC; end
+            MVMIO:         begin current_val = mvmio;           wmask = 32'hFFFFFFFC; end
+            MVMIS:         begin current_val = mvmis;           wmask = 32'hFFFFFFFC; end
+            MVMIM:         begin current_val = mvmim;           wmask = 32'hFFFFFFFC; end
+            MVMCTL:        begin current_val = {31'b0, mvmctl}; wmask = 32'h00000001; end
 
-            default:    begin current_val = '0;              wmask = 32'h00000000; end
+            default:       begin current_val = '0;              wmask = 32'h00000000; end
         endcase
     end
 
@@ -267,6 +269,7 @@ module CSRBank
         // Reset
         //////////////////////////////////////////////////////////////////////////////
         if (!reset_n) begin
+            mcountinhibit    <= '0;
             mstatus_mie      <= '0;
             misa             <= MISA_VALUE;
             //medeleg        <= '0;
@@ -287,6 +290,7 @@ module CSRBank
             mstatus_mpie     <= '0;
         end
         else if(sys_reset) begin
+            mcountinhibit    <= '0;
             mstatus_mie      <= '0;
             misa             <= MISA_VALUE;
             //medeleg        <= '0;
@@ -375,6 +379,7 @@ module CSRBank
                     MCYCLEH:        mcycle[63:32]       <= wr_data;
                     MINSTRET:       minstret[31:0]      <= wr_data;
                     MINSTRETH:      minstret[63:32]     <= wr_data;
+                    MCOUNTINHIBIT:  mcountinhibit       <= wr_data;
                     MCAUSE: begin
                                     mcause_interrupt    <= wr_data[31];
                                     mcause_exc_code     <= wr_data[30:0];
@@ -448,10 +453,14 @@ module CSRBank
                 MHPMCOUNTER19:  out = lui_slt_counter;
                 MHPMCOUNTER20:  out = compressed_counter;
                 MHPMCOUNTER21:  out = jump_misaligned_counter;
+                MHPMCOUNTER22:  out = mul_counter;
+                MHPMCOUNTER23:  out = div_counter;
 
                 CYCLEH:         out = mcycle[63:32];
                 TIMEH:          out = mtime_i[63:32];
                 INSTRETH:       out = minstret[63:32];
+
+                MCOUNTINHIBIT:  out = mcountinhibit;
 
                 MVMCTL:         out = {31'b0,mvmctl};
                 MVMDO:          out = mvmdo[31:0];
@@ -637,36 +646,36 @@ module CSRBank
                 context_switch_counter      <= '0;
             end
             else begin
-                instructions_killed_counter <= (killed) ? instructions_killed_counter  + 1 : instructions_killed_counter;
+                instructions_killed_counter <= (killed                                                               && !mcountinhibit[ 3]) ? instructions_killed_counter  + 1 : instructions_killed_counter;
 
-                hazard_counter              <= (hazard && !hold) ? hazard_counter + 1 : hazard_counter;
-                stall_counter               <= (stall)           ? stall_counter  + 1 : stall_counter;
+                hazard_counter              <= (hazard && !hold                                                      && !mcountinhibit[ 7]) ? hazard_counter + 1 : hazard_counter;
+                stall_counter               <= (stall                                                                && !mcountinhibit[ 8]) ? stall_counter  + 1 : stall_counter;
 
-                interrupt_ack_counter       <= (interrupt_ack_i)                                                    ? interrupt_ack_counter   + 1 : interrupt_ack_counter;
-                raise_exception_counter     <= (raise_exception_i)                                                  ? raise_exception_counter + 1 : raise_exception_counter;
-                context_switch_counter      <= (jump_i || raise_exception_i || machine_return_i || interrupt_ack_i) ? context_switch_counter  + 1 : context_switch_counter;
-                nop_counter                 <= (instruction_operation_i == NOP && !hold && !killed)                 ? nop_counter             + 1 : nop_counter;
+                interrupt_ack_counter       <= (interrupt_ack_i                                                      && !mcountinhibit[ 6]) ? interrupt_ack_counter   + 1 : interrupt_ack_counter;
+                raise_exception_counter     <= (raise_exception_i                                                    && !mcountinhibit[ 5]) ? raise_exception_counter + 1 : raise_exception_counter;
+                context_switch_counter      <= ((jump_i || raise_exception_i || machine_return_i || interrupt_ack_i) && !mcountinhibit[ 4]) ? context_switch_counter  + 1 : context_switch_counter;
+                nop_counter                 <= (instruction_operation_i == NOP && !hold && !killed                   && !mcountinhibit[ 9]) ? nop_counter             + 1 : nop_counter;
 
                 if (COMPRESSED == 1'b1) begin
-                    jump_misaligned_counter <= jump_misaligned_counter + ((jump_misaligned_i && !hold) ? 1 : 0);
+                    jump_misaligned_counter <= jump_misaligned_counter + ((jump_misaligned_i && !hold && !mcountinhibit[21]) ? 1 : 0);
                 end
 
                 if (!killed && !hold) begin
-                    logic_counter           <= (instruction_operation_i inside {XOR, OR, AND})                                  ? logic_counter   + 1 : logic_counter;
-                    addsub_counter          <= (instruction_operation_i inside {ADD, SUB})                                      ? addsub_counter  + 1 : addsub_counter;
-                    lui_slt_counter         <= (instruction_operation_i inside {SLTU, SLT, LUI})                                ? lui_slt_counter + 1 : lui_slt_counter;
-                    shift_counter           <= (instruction_operation_i inside {SLL, SRL, SRA})                                 ? shift_counter   + 1 : shift_counter;
-                    branch_counter          <= (instruction_operation_i inside {BEQ, BNE, BLT, BLTU, BGE, BGEU})                ? branch_counter  + 1 : branch_counter;
-                    jump_counter            <= (instruction_operation_i inside {JAL, JALR})                                     ? jump_counter    + 1 : jump_counter;
-                    load_counter            <= (instruction_operation_i inside {LB, LBU, LH, LHU, LW})                          ? load_counter    + 1 : load_counter;
-                    store_counter           <= (instruction_operation_i inside {SB, SH, SW})                                    ? store_counter   + 1 : store_counter;
-                    sys_counter             <= (instruction_operation_i inside {SRET, MRET, WFI, ECALL, EBREAK})                ? sys_counter     + 1 : sys_counter;
-                    csr_counter             <= (instruction_operation_i inside {CSRRW, CSRRWI, CSRRS, CSRRSI, CSRRC, CSRRCI})   ? csr_counter     + 1 : csr_counter;
-                    mul_counter             <= (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU})                      ? mul_counter     + 1 : mul_counter;
-                    div_counter             <= (instruction_operation_i inside {DIV, DIVU, REM, REMU})                          ? div_counter     + 1 : div_counter;
+                    logic_counter           <= (instruction_operation_i inside {XOR, OR, AND})                                && !mcountinhibit[10] ? logic_counter   + 1 : logic_counter;
+                    addsub_counter          <= (instruction_operation_i inside {ADD, SUB})                                    && !mcountinhibit[11] ? addsub_counter  + 1 : addsub_counter;
+                    lui_slt_counter         <= (instruction_operation_i inside {SLTU, SLT, LUI})                              && !mcountinhibit[19] ? lui_slt_counter + 1 : lui_slt_counter;
+                    shift_counter           <= (instruction_operation_i inside {SLL, SRL, SRA})                               && !mcountinhibit[12] ? shift_counter   + 1 : shift_counter;
+                    branch_counter          <= (instruction_operation_i inside {BEQ, BNE, BLT, BLTU, BGE, BGEU})              && !mcountinhibit[13] ? branch_counter  + 1 : branch_counter;
+                    jump_counter            <= (instruction_operation_i inside {JAL, JALR})                                   && !mcountinhibit[14] ? jump_counter    + 1 : jump_counter;
+                    load_counter            <= (instruction_operation_i inside {LB, LBU, LH, LHU, LW})                        && !mcountinhibit[15] ? load_counter    + 1 : load_counter;
+                    store_counter           <= (instruction_operation_i inside {SB, SH, SW})                                  && !mcountinhibit[16] ? store_counter   + 1 : store_counter;
+                    sys_counter             <= (instruction_operation_i inside {SRET, MRET, WFI, ECALL, EBREAK})              && !mcountinhibit[17] ? sys_counter     + 1 : sys_counter;
+                    csr_counter             <= (instruction_operation_i inside {CSRRW, CSRRWI, CSRRS, CSRRSI, CSRRC, CSRRCI}) && !mcountinhibit[18] ? csr_counter     + 1 : csr_counter;
+                    mul_counter             <= (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU})                    && !mcountinhibit[22] ? mul_counter     + 1 : mul_counter;
+                    div_counter             <= (instruction_operation_i inside {DIV, DIVU, REM, REMU})                        && !mcountinhibit[23] ? div_counter     + 1 : div_counter;
 
                     if (COMPRESSED == 1'b1) begin
-                        compressed_counter  <= compressed_counter + (instruction_compressed_i ? 1 : 0);
+                        compressed_counter  <= compressed_counter + (instruction_compressed_i && !mcountinhibit[20] ? 1 : 0);
                     end
                 end
             end
