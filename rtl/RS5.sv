@@ -264,6 +264,7 @@ module RS5
             .enable_i           (enable_prefetch),
             .hazard_i           (hazard),
             .jumped_i           (jumped),
+            .jump_i             (jump),
             .tag_i              (tag_prefetch),
             .pc_i               (pc_prefetch),
             .instruction_i      (instruction_i),
