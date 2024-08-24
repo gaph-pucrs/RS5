@@ -716,7 +716,6 @@ module CSRBank
         assign load_counter                = '0;
         assign store_counter               = '0;
         assign sys_counter                 = '0;
-        assign lui_slt_counter             = '0;
         assign csr_counter                 = '0;
         assign mul_counter                 = '0;
         assign div_counter                 = '0;
