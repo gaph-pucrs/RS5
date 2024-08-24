@@ -17,7 +17,6 @@ module vectorALU
 
     input  logic [VLEN-1:0]             first_operand,
     input  logic [VLEN-1:0]             second_operand,
-    input  logic [VLEN-1:0]             third_operand,
     input  vector_states_e              current_state,
     input  logic [3:0]                  cycle_count,
     input  logic [3:0]                  cycle_count_r,
@@ -33,6 +32,7 @@ module vectorALU
 
     output logic                        hold_o,
     output logic                        hold_widening_o,
+    output logic                        hold_accumulation_o,
     output logic [VLEN-1:0]             result_mask_o,
     output logic [VLEN-1:0]             result_o
 );
@@ -48,7 +48,7 @@ module vectorALU
     logic [(VLENB/2)-1:0][15:0] first_operand_16b, second_operand_16b;
     logic [(VLENB/4)-1:0][31:0] first_operand_32b, second_operand_32b;
 
-    logic [VLEN-1:0] third_operand_r, result_mult_r;
+    logic [VLEN-1:0] result_mult_r;
 
 //////////////////////////////////////////////////////////////////////////////
 // Operands Control
@@ -95,6 +95,28 @@ module vectorALU
     end
 
     assign hold_widening_o = widening_instruction & !widening_counter && current_state == V_EXEC;
+
+//////////////////////////////////////////////////////////////////////////////
+// Accumulation Control
+//////////////////////////////////////////////////////////////////////////////
+    logic accumulate_instruction;
+    logic accumulate_counter;
+
+    assign accumulate_instruction = (vector_operation_i inside {VMACC, VNMSAC, VMADD, VNMSUB});
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            accumulate_counter <= 1'b0;
+        end
+        else if (accumulate_instruction && !hold && current_state == V_EXEC) begin
+            accumulate_counter <= accumulate_counter + 1'b1;
+        end
+        else begin
+            accumulate_counter <= 1'b0;
+        end
+    end
+
+    assign hold_accumulation_o = accumulate_instruction && !hold && current_state == V_EXEC && !accumulate_counter;
 
 //////////////////////////////////////////////////////////////////////////////
 // Logical
@@ -166,6 +188,7 @@ module vectorALU
         //  8 Bits
         // *********************************
         always_comb begin
+            // First Level
             for (int i = 0; i < VLENB; i++) begin
                 if (i == 0) begin
                     if ((vm || mask_sew8[cycle_count_r][0]) && i < vl) begin
@@ -204,9 +227,8 @@ module vectorALU
                     end
                 end
             end
-        end
 
-        always_comb begin
+            // Other Levels
             for (int i = 0; i < TREE_LEVELS_8b; i++) begin
                 for (int j = 0; j < VLENB/(2**(i+1)); j++) begin
                     result_redmin_8b [i+1][j] = ($signed(result_redmin_8b[i][2*j]) > $signed(result_redmin_8b[i][2*j+1]))
@@ -229,6 +251,7 @@ module vectorALU
         //  16 Bits
         // *********************************
         always_comb begin
+            // First Level
             for (int i = 0; i < VLENB/2; i++) begin
                 if (i == 0) begin
                     if ((vm || mask_sew16[cycle_count_r][0]) && i < vl) begin
@@ -267,9 +290,8 @@ module vectorALU
                     end
                 end
             end
-        end
 
-        always_comb begin
+            // Other Levels
             for (int i = 0; i < TREE_LEVELS_16b; i++) begin
                 for (int j = 0; j < (VLENB/2)/(2**(i+1)); j++) begin
                     result_redmin_16b [i+1][j] = ($signed(result_redmin_16b[i][2*j]) > $signed(result_redmin_16b[i][2*j+1]))
@@ -292,6 +314,7 @@ module vectorALU
         //  32 Bits
         // *********************************
         always_comb begin
+            // First Level
             for (int i = 0; i < VLENB/4; i++) begin
                 if (i == 0) begin
                     if ((vm || mask_sew32[cycle_count_r][0]) && i < vl) begin
@@ -330,9 +353,8 @@ module vectorALU
                     end
                 end
             end
-        end
 
-        always_comb begin
+            // Other Levels
             for (int i = 0; i < TREE_LEVELS_32b; i++) begin
                 for (int j = 0; j < (VLENB/4)/(2**(i+1)); j++) begin
                     result_redmin_32b [i+1][j] = ($signed(result_redmin_32b[i][2*j]) > $signed(result_redmin_32b[i][2*j+1]))
@@ -406,6 +428,7 @@ module vectorALU
         //  8 Bits
         // *********************************
         always_comb begin
+            // First Level
             for (int i = 0; i < VLENB; i++) begin
                 if (i == 0) begin
                     if ((vm || mask_sew8[cycle_count_r][0]) && i < vl) begin
@@ -432,9 +455,8 @@ module vectorALU
                     end
                 end
             end
-        end
 
-        always_comb begin
+            // Other Levels
             for (int i = 0; i < TREE_LEVELS_8b; i++) begin
                 for (int j = 0; j < VLENB/(2**(i+1)); j++) begin
                     result_redand_8b[i+1][j] = result_redand_8b[i][2*j] & result_redand_8b[i][2*j+1];
@@ -448,6 +470,7 @@ module vectorALU
         //  16 Bits
         // *********************************
         always_comb begin
+            // First Level
             for (int i = 0; i < VLENB/2; i++) begin
                 if (i == 0) begin
                     if ((vm || mask_sew16[cycle_count_r][0]) && i < vl) begin
@@ -474,9 +497,8 @@ module vectorALU
                     end
                 end
             end
-        end
 
-        always_comb begin
+            // Other Levels
             for (int i = 0; i < TREE_LEVELS_16b; i++) begin
                 for (int j = 0; j < (VLENB/2)/(2**(i+1)); j++) begin
                     result_redand_16b[i+1][j] = result_redand_16b[i][2*j] & result_redand_16b[i][2*j+1];
@@ -486,10 +508,12 @@ module vectorALU
             end
         end
 
+
         // *********************************
         //  32 Bits
         // *********************************
         always_comb begin
+            // First Level
             for (int i = 0; i < VLENB/4; i++) begin
                 if (i == 0) begin
                     if ((vm || mask_sew32[cycle_count_r][0]) && i < vl) begin
@@ -516,9 +540,8 @@ module vectorALU
                     end
                 end
             end
-        end
 
-        always_comb begin
+            // Other Levels
             for (int i = 0; i < TREE_LEVELS_32b; i++) begin
                 for (int j = 0; j < (VLENB/4)/(2**(i+1)); j++) begin
                     result_redand_32b[i+1][j] = result_redand_32b[i][2*j] & result_redand_32b[i][2*j+1];
@@ -573,6 +596,7 @@ module vectorALU
         //  8 Bits
         // *********************************
         always_comb begin
+            // First Level
             for (int i = 0; i < VLENB; i++) begin
                 if (i == 0) begin
                     if ((vm || mask_sew8[cycle_count_r][0]) && i < vl) begin
@@ -591,9 +615,8 @@ module vectorALU
                     end
                 end
             end
-        end
 
-        always_comb begin
+            // Other Levels
             for (int i = 0; i < TREE_LEVELS_8b; i++) begin
                 for (int j = 0; j < VLENB/(2**(i+1)); j++) begin
                     result_redsum_8b[i+1][j] = result_redsum_8b[i][2*j] + result_redsum_8b[i][2*j+1];
@@ -605,6 +628,7 @@ module vectorALU
         //  16 Bits
         // *********************************
         always_comb begin
+            // First Level
             for (int i = 0; i < VLENB/2; i++) begin
                 if (i == 0) begin
                     if ((vm || mask_sew16[cycle_count_r][0]) && i < vl) begin
@@ -623,9 +647,8 @@ module vectorALU
                     end
                 end
             end
-        end
 
-        always_comb begin
+            // Other Levels
             for (int i = 0; i < TREE_LEVELS_16b; i++) begin
                 for (int j = 0; j < (VLENB/2)/(2**(i+1)); j++) begin
                     result_redsum_16b[i+1][j] = result_redsum_16b[i][2*j] + result_redsum_16b[i][2*j+1];
@@ -633,10 +656,15 @@ module vectorALU
             end
         end
 
+        always_comb begin
+
+        end
+
         // *********************************
         //  32 Bits
         // *********************************
         always_comb begin
+            // First Level
             for (int i = 0; i < VLENB/4; i++) begin
                 if (i == 0) begin
                     if ((vm || mask_sew32[cycle_count_r][0]) && i < vl) begin
@@ -655,9 +683,8 @@ module vectorALU
                     end
                 end
             end
-        end
 
-        always_comb begin
+            // Other Levels
             for (int i = 0; i < TREE_LEVELS_32b; i++) begin
                 for (int j = 0; j < (VLENB/4)/(2**(i+1)); j++) begin
                     result_redsum_32b[i+1][j] = result_redsum_32b[i][2*j] + result_redsum_32b[i][2*j+1];
@@ -694,7 +721,9 @@ module vectorALU
     logic [VLEN-1:0] subtraend_8b, subtraend_16b, subtraend_32b;
     logic [VLEN-1:0] summand_1, summand_2, summand_2_int;
     logic      [8:0] result_add_bytes [VLENB-1:0];
+    /* verilator lint_off UNOPTFLAT */
     logic            adder_carry [VLENB-1:0];
+    /* verilator lint_on UNOPTFLAT */
     logic [VLEN-1:0] result_add;
 
     always_comb begin
@@ -720,10 +749,6 @@ module vectorALU
     always_comb begin
         unique case (vector_operation_i)
             VRSUB:   summand_1 = second_operand;
-            VNMSAC,
-            VMACC,
-            VMADD,
-            VNMSUB:  summand_1 = third_operand_r;
             default: summand_1 = first_operand;
         endcase
     end
@@ -977,13 +1002,13 @@ module vectorALU
 
     generate
         for (genvar i_mul8b = 0; i_mul8b < VLENB; i_mul8b++) begin : MUL8B_LOOP
-            if (i_mul8b < VLENB/4) begin
+            if (i_mul8b < VLENB/4) begin : g8b_mul_using_32b_multplier_blk
                 assign mult_result_8b[i_mul8b] = {mult_result_32b[i_mul8b][15:0]};
             end
-            else if (i_mul8b < VLENB/2) begin
+            else if (i_mul8b < VLENB/2) begin : g8b_mul_using_16b_multplier_blk
                 assign mult_result_8b[i_mul8b] = {mult_result_16b[i_mul8b][15:0]};
             end
-            else begin
+            else begin : g8b_multplier_blk
                 mulNbits #(
                     .N(8)
                 ) mul8b (
@@ -1002,11 +1027,11 @@ module vectorALU
 
     always_comb begin
         for (int i = 0; i < VLENB/2; i++) begin
-            if (i < VLENB/4) begin
+            if (i < VLENB/4) begin : g16b_mul_operands_to_32b_multiplier_blk
                 mult_op_a_16b[i] = first_operand_16b [i];
                 mult_op_b_16b[i] = second_operand_16b[i];
             end
-            else begin
+            else begin  : g16b_mul_operands_blk
                 if (vsew == EW8) begin
                     mult_op_a_16b[i] = {{8{first_operand_8b [i][7] & mult_signed_mode[0]}}, first_operand_8b [i]};
                     mult_op_b_16b[i] = {{8{second_operand_8b[i][7] & mult_signed_mode[1]}}, second_operand_8b[i]};
@@ -1021,10 +1046,10 @@ module vectorALU
 
     generate
         for (genvar i_mul16b = 0; i_mul16b < VLENB/2; i_mul16b++) begin : MUL16B_LOOP
-            if (i_mul16b < VLENB/4) begin
+            if (i_mul16b < VLENB/4) begin : g16b_mul_using_32b_multplier_blk
                 assign mult_result_16b[i_mul16b] = {mult_result_32b[i_mul16b][31:0]};
             end
-            else begin
+            else begin : g16b_multplier_blk
                 mulNbits #(
                     .N(16)
                 ) mul16b (
@@ -1131,8 +1156,7 @@ module vectorALU
 
     always @(posedge clk) begin
         if (!hold_mult) begin
-            result_mult_r   <= result_mult[VLEN-1:0];
-            third_operand_r <= third_operand;
+            result_mult_r <= result_mult[VLEN-1:0];
         end
     end
 
@@ -1306,7 +1330,7 @@ module vectorALU
 
     assign hold   = hold_mult | hold_div;
 
-    assign hold_o = hold | hold_widening_o;
+    assign hold_o = hold | hold_widening_o | hold_accumulation_o;
 
 //////////////////////////////////////////////////////////////////////////////
 // Result Demux

@@ -10,7 +10,6 @@ module vectorRegbank
 
     input   logic [4:0]       vs1_addr,
     input   logic [4:0]       vs2_addr,
-    input   logic [4:0]       vs3_addr,
 
     input   logic [VLENB-1:0] enable,
     input   logic [4:0]       vd_addr,
@@ -18,8 +17,7 @@ module vectorRegbank
 
     output  logic [VLEN-1:0]  v0_mask,
     output  logic [VLEN-1:0]  vs1_data,
-    output  logic [VLEN-1:0]  vs2_data,
-    output  logic [VLEN-1:0]  vs3_data
+    output  logic [VLEN-1:0]  vs2_data
 );
 
     //////////////////////////////////////////////////////////////////////////////
@@ -49,7 +47,7 @@ module vectorRegbank
 
     if (Environment == FPGA) begin : gen_vector_regbank_fpga
 
-        DRAM_Vector_RegBank VectorRegBankB (
+        DRAM_Vector_RegBank VectorRegBankA (
             .clk        (clk),
             .we         (enable),
             .a          (vd_addr),
@@ -58,22 +56,13 @@ module vectorRegbank
             .dpo        (vs1_data)
         );
 
-        DRAM_Vector_RegBank VectorRegBankC (
+        DRAM_Vector_RegBank VectorRegBankB (
             .clk        (clk),
             .we         (enable),
             .a          (vd_addr),
             .d          (result),
             .dpra       (vs2_addr),
             .dpo        (vs2_data)
-        );
-
-        DRAM_Vector_RegBank VectorRegBankD (
-            .clk        (clk),
-            .we         (enable),
-            .a          (vd_addr),
-            .d          (result),
-            .dpra       (vs3_addr),
-            .dpo        (vs3_data)
         );
 
     end
@@ -86,7 +75,6 @@ module vectorRegbank
 
         assign vs1_data = regfile[vs1_addr];
         assign vs2_data = regfile[vs2_addr];
-        assign vs3_data = regfile[vs3_addr];
 
         //////////////////////////////////////////////////////////////////////////////
         // Reset and Write control

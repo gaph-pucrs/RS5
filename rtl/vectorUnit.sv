@@ -57,12 +57,13 @@ module vectorUnit
     logic [VLEN-1:0]  scalar_replicated, imm_replicated;
     logic [VLEN-1:0]  v0_mask;
 
-    logic [4:0]       vs1_addr, vs2_addr, vs3_addr;
-    logic [VLEN-1:0]  vs1_data, vs2_data, vs3_data;
+    logic [4:0]       rs1_addr, rs2_addr, rd_addr;
+    logic [4:0]       vs1_addr, vs2_addr;
+    logic [VLEN-1:0]  vs1_data, vs2_data;
     logic [3:0]       cycle_count, cycle_count_r, cycle_count_vd;
-    logic             hold, hold_widening, hold_alu, hold_lsu;
+    logic             hold, hold_widening, hold_accumulation, hold_alu, hold_lsu;
 
-    logic [VLEN-1:0]  first_operand, second_operand, third_operand;
+    logic [VLEN-1:0]  first_operand, second_operand;
 
     logic [4:0]       vd_addr, vd_addr_r;
     logic [VLEN-1:0]  result_alu, result_alu_mask, result_lsu, result;
@@ -250,13 +251,13 @@ module vectorUnit
             cycle_count <= 0;
         else if (next_state == V_IDLE)
             cycle_count <= 0;
-        else if (next_state == V_EXEC && hold == 1'b0)
+        else if ((next_state == V_EXEC && hold == 1'b0) || hold_accumulation)
             cycle_count <= cycle_count + 1;
 
     always_ff @(posedge clk or negedge reset_n)
         if (!reset_n)
             cycle_count_vd <= 0;
-        else if ((next_state == V_IDLE) || (accumulate_instruction && state == V_IDLE && next_state == V_EXEC))
+        else if (next_state == V_IDLE)
             cycle_count_vd <= 0;
         else if (next_state == V_EXEC && (!hold || hold_widening))
             cycle_count_vd <= cycle_count_vd + 1;
@@ -264,7 +265,7 @@ module vectorUnit
     always_ff @(posedge clk or negedge reset_n)
         if (!reset_n)
             cycle_count_r <= 0;
-        else if (widening_instruction || accumulate_instruction)
+        else if (widening_instruction)
             cycle_count_r <= cycle_count_vd;
         else if (!hold)
             cycle_count_r <= cycle_count;
@@ -280,7 +281,7 @@ module vectorUnit
             vl_curr_reg <= 0;
         else if (whole_reg_load_store)
             vl_curr_reg <= '1;
-        else if ((state == V_IDLE && next_state == V_EXEC) || (accumulate_instruction && cycle_count_vd == 0))
+        else if (state == V_IDLE && next_state == V_EXEC)
             vl_curr_reg <= vl;
         else if (next_state == V_EXEC && (hold == 1'b0))
             if ($signed(vl_curr_reg - elements_per_reg) >= 0)
@@ -293,7 +294,7 @@ module vectorUnit
             total_elements_processed <= 0;
         else if (next_state == V_IDLE)
             total_elements_processed <= 0;
-        else if (!hold && !(accumulate_instruction && cycle_count_vd == 0))
+        else if (!hold)
             total_elements_processed <= total_elements_processed + elements_per_reg;
 
     assign vector_process_done = (total_elements_processed >= vl && !whole_reg_load_store && instruction_operation_i == VECTOR);
@@ -303,10 +304,34 @@ module vectorUnit
 //////////////////////////////////////////////////////////////////////////////
 
     // ADDRESS CALCULATION
+    assign rs1_addr = cycle_count + rs1;
+    assign rs2_addr = cycle_count + rs2;
+    assign rd_addr  = cycle_count + rd;
+
     always_comb begin
-        vs1_addr = cycle_count + ((instruction_operation_i == VSTORE) ? rd : rs1);
-        vs2_addr = cycle_count + rs2;
-        vs3_addr = cycle_count + rd;
+        // VS1 Address
+        vs1_addr =  (instruction_operation_i == VSTORE)
+                    ? rd_addr
+                    : rs1_addr;
+
+        // VS2 Address
+        if (accumulate_instruction) begin
+            if (!hold_accumulation) begin
+                unique case (vector_operation_i)
+                    VMADD, VNMSUB: vs2_addr = rd_addr;
+                    default:       vs2_addr = rs2_addr;
+                endcase
+            end
+            else begin
+                unique case (vector_operation_i)
+                    VMADD, VNMSUB: vs2_addr = rs2_addr - 1;
+                    default:       vs2_addr = rd_addr  - 1;
+                endcase
+            end
+        end
+        else begin
+            vs2_addr = rs2_addr;
+        end
     end
 
     always_ff @(posedge clk) begin
@@ -370,14 +395,12 @@ module vectorUnit
         .reset_n  (reset_n),
         .vs1_addr (vs1_addr),
         .vs2_addr (vs2_addr),
-        .vs3_addr (vs3_addr),
         .enable   (write_enable),
         .vd_addr  (vd_addr_r),
         .result   (result),
         .v0_mask  (v0_mask),
         .vs1_data (vs1_data),
-        .vs2_data (vs2_data),
-        .vs3_data (vs3_data)
+        .vs2_data (vs2_data)
     );
 
 //////////////////////////////////////////////////////////////////////////////
@@ -416,14 +439,13 @@ module vectorUnit
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk) begin
-        if (!hold) begin
-            first_operand  <= (vector_operation_i inside {VMADD, VNMSUB})  ? vs3_data : vs2_data;
-            third_operand  <= (vector_operation_i inside {VMADD, VNMSUB})  ? vs2_data : vs3_data;
+        if (!hold || hold_accumulation) begin
+            first_operand  <= vs2_data;
         end
     end
 
     always_ff @(posedge clk) begin
-        if (!hold) begin
+        if (!hold || hold_accumulation) begin
             if (instruction_operation_i == VSTORE) begin
                 second_operand <= vs1_data;
             end
@@ -490,7 +512,6 @@ module vectorUnit
         .reset_n            (reset_n),
         .first_operand      (first_operand),
         .second_operand     (second_operand),
-        .third_operand      (third_operand),
         .vector_operation_i (vector_operation_i),
         .cycle_count        (cycle_count),
         .cycle_count_r      (cycle_count_r),
@@ -504,6 +525,7 @@ module vectorUnit
         .vsew               (vsew),
         .hold_o             (hold_alu),
         .hold_widening_o    (hold_widening),
+        .hold_accumulation_o(hold_accumulation),
         .result_mask_o      (result_alu_mask),
         .result_o           (result_alu)
     );
