@@ -82,7 +82,7 @@ module align
         if (!reset_n) begin
             pc_r <= '0;
         end
-        if (flush_align) begin
+        else if (flush_align) begin
             pc_r <= '0;
         end
         else if (enable_i && !hazard_i) begin
