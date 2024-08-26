@@ -1090,10 +1090,11 @@ module vectorALU
 
     assign ended_acc = (vector_operation_i inside {VMACC, VNMSAC, VMADD, VNMSUB})
                         &&  (
-                                (vlmul == LMUL_1  && cycle_count > 1)
-                            ||  (vlmul == LMUL_2  && cycle_count > 2)
-                            ||  (vlmul == LMUL_4  && cycle_count > 4)
-                            ||  (vlmul == LMUL_8  && cycle_count > 8)
+                                (vlmul == LMUL_1_2  && cycle_count > 1)
+                            ||  (vlmul == LMUL_1    && cycle_count > 1)
+                            ||  (vlmul == LMUL_2    && cycle_count > 2)
+                            ||  (vlmul == LMUL_4    && cycle_count > 4)
+                            ||  (vlmul == LMUL_8    && cycle_count > 8)
                             );
 
     assign mult_enable = (

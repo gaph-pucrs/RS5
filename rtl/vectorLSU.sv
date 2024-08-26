@@ -143,7 +143,7 @@ module vectorLSU
 
             VLSU_LAST_CYCLE:
                 if ((
-                    (vlmul == LMUL_1  && reg_count < 1)
+                    (vlmul inside {LMUL_1, LMUL_1_2, LMUL_1_4, LMUL_1_8}  && reg_count < 1)
                 ||  (vlmul == LMUL_2  && reg_count < 2)
                 ||  (vlmul == LMUL_4  && reg_count < 4)
                 ||  (vlmul == LMUL_8  && reg_count < 8)

@@ -160,7 +160,7 @@ module vectorUnit
 
             V_EXEC:
                 if ((
-                    (vlmul_effective == LMUL_1  && cycle_count_vd < 1)
+                    (vlmul_effective inside {LMUL_1, LMUL_1_2, LMUL_1_4, LMUL_1_8}  && cycle_count_vd < 1)
                 ||  (vlmul_effective == LMUL_2  && cycle_count_vd < 2)
                 ||  (vlmul_effective == LMUL_4  && cycle_count_vd < 4)
                 ||  (vlmul_effective == LMUL_8  && cycle_count_vd < 8)

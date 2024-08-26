@@ -75,7 +75,14 @@ module vectorCSRs
     assign elementsPerRegister = VLENB >> vsew_next;
 
     // Max VL value equals the max number of elements per register * LMUL.
-    assign vl_max = elementsPerRegister << vlmul_next;
+    always_comb begin
+        case (vlmul_next)
+            LMUL_1_8:   vl_max = VLENB/8;
+            LMUL_1_4:   vl_max = (vsew_next == EW8) ? VLENB/4 : VLENB/8;
+            LMUL_1_2:   vl_max = (vsew_next == EW8) ? VLENB/2 : (vsew_next == EW16) ? VLENB/4 : VLENB/8;
+            default:    vl_max   = elementsPerRegister << vlmul_next;
+        endcase
+    end
 
     always_comb begin
         if (vector_operation_i == VSETIVLI)
