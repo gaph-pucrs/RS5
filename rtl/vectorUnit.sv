@@ -61,6 +61,7 @@ module vectorUnit
     logic [4:0]       vs1_addr, vs2_addr;
     logic [VLEN-1:0]  vs1_data, vs2_data;
     logic [3:0]       cycle_count, cycle_count_r, cycle_count_vd;
+    logic             hazard_detected;
     logic             hold, hold_widening, hold_accumulation, hold_alu, hold_lsu;
 
     logic [VLEN-1:0]  first_operand, second_operand;
@@ -136,7 +137,9 @@ module vectorUnit
 // FSM
 //////////////////////////////////////////////////////////////////////////////
 
-    assign hold_o = (next_state inside {V_EXEC, V_END});
+    assign hazard_detected = (state == V_IDLE && |write_enable == 1'b1 && (vs1_addr == vd_addr_r || vs2_addr == vd_addr_r));
+
+    assign hold_o = (next_state == V_EXEC || hazard_detected == 1'b1);
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
@@ -150,10 +153,10 @@ module vectorUnit
     always_comb begin
         unique case (state)
             V_IDLE:
-                if (
+                if ((
                     (instruction_operation_i == VECTOR && !(vector_operation_i inside {VNOP, VSETVL, VSETVLI, VSETIVLI}))
                 ||  (instruction_operation_i inside {VLOAD, VSTORE})
-                )
+                ) && !hazard_detected)
                     next_state = V_EXEC;
                 else
                     next_state = V_IDLE;
@@ -168,11 +171,10 @@ module vectorUnit
                 && (!vector_process_done)
                 )
                     next_state = V_EXEC;
+                else if (!hold)
+                    next_state = V_IDLE;
                 else
-                    next_state = V_END;
-
-            V_END:
-                next_state = V_IDLE;
+                    next_state = V_EXEC;
 
             default:
                 next_state = V_IDLE;
@@ -475,6 +477,7 @@ module vectorUnit
         .indexed_offsets_i      (first_operand),
         .write_data_i           (second_operand),
         .current_state          (state),
+        .hazard_detected_i      (hazard_detected),
         .instruction_operation_i(instruction_operation_i),
         .whole_reg_load_store   (whole_reg_load_store),
         .vlmul                  (vlmul_effective),
@@ -530,10 +533,22 @@ module vectorUnit
         .result_o           (result_alu)
     );
 
+//////////////////////////////////////////////////////////////////////////////
+// Result Demux
+//////////////////////////////////////////////////////////////////////////////
+
+    iType_e instruction_operation_r;
+    logic   mask_instruction_r;
+
+    always_ff @(posedge clk) begin
+        instruction_operation_r <= instruction_operation_i;
+        mask_instruction_r      <= mask_instruction;
+    end
+
     always_comb begin
-        if (instruction_operation_i == VLOAD)
+        if (instruction_operation_r == VLOAD)
             result = result_lsu;
-        else if (mask_instruction)
+        else if (mask_instruction_r)
             result = result_alu_mask;
         else
             result = result_alu;
@@ -550,9 +565,9 @@ module vectorUnit
         end
         else if (vector_operation_i == VMVXS) begin
             unique case (vsew_effective)
-                EW8:     res_scalar_o = {'0, result[7:0]};
-                EW16:    res_scalar_o = {'0, result[15:0]};
-                default: res_scalar_o =      result[31:0];
+                EW8:     res_scalar_o = {'0, first_operand[7:0]};
+                EW16:    res_scalar_o = {'0, first_operand[15:0]};
+                default: res_scalar_o =      first_operand[31:0];
             endcase
             wr_en_scalar_o = 1'b1;
         end

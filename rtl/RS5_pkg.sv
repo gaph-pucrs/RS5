@@ -115,8 +115,8 @@ package RS5_pkg;
         D_IDLE, D_INIT, D_CALC, D_SIGN
     } div_states_e;
 
-    typedef enum logic [1:0] {
-        V_IDLE, V_EXEC, V_END
+    typedef enum logic {
+        V_IDLE, V_EXEC
     } vector_states_e;
 
     typedef enum logic [1:0] {

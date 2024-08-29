@@ -17,6 +17,7 @@ module vectorLSU
     input  logic [VLEN-1:0]           write_data_i,
 
     input  vector_states_e            current_state,
+    input  logic                      hazard_detected_i,
 
     input  iType_e                    instruction_operation_i,
     input  logic                      whole_reg_load_store,
@@ -122,7 +123,7 @@ module vectorLSU
     always_comb begin
         unique case (state)
             VLSU_IDLE:
-                if (instruction_operation_i inside {VLOAD, VSTORE} && current_state == V_IDLE)
+                if (instruction_operation_i inside {VLOAD, VSTORE} && current_state == V_IDLE && !hazard_detected_i)
                     next_state = VLSU_FIRST_CYCLE;
                 else
                     next_state = VLSU_IDLE;
@@ -260,7 +261,7 @@ module vectorLSU
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             reg_count <= '0;
-        else if (next_state == V_IDLE)
+        else if (next_state == VLSU_IDLE)
             reg_count <= '0;
         else if (next_state == VLSU_LAST_CYCLE)
             reg_count <= reg_count + 1;
