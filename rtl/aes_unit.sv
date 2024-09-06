@@ -16,6 +16,8 @@
 // IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 //
 
+`include "RS5_pkg.sv"
+
 module aes_unit 
     import RS5_pkg::*;
 #(

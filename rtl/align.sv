@@ -18,6 +18,7 @@ module align
     input  logic        enable_i,
     input  logic        hazard_i,
     input  logic        jumped_i,
+    input  logic        jump_i,
     input  logic  [2:0] tag_i,
     input  logic [31:0] pc_i,
     input  logic [31:0] instruction_i,
@@ -34,17 +35,27 @@ module align
 
     logic hazard_r;
     logic jumped_r;
+    logic enable_r;
+    logic jump_r;
+
+    logic flush_align;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             hazard_r <= 1'b0;
             jumped_r <= 1'b0;
+            enable_r <= 1'b0;
+            jump_r   <= 1'b0;
         end
         else if (enable_i) begin
             hazard_r <= hazard_i;
             jumped_r <= jumped_i;
+            enable_r <= enable_i;
+            jump_r   <= jump_i;
         end
     end
+
+    assign flush_align = jump_i || jump_r;
 
 //////////////////////////////////////////////////////////////////////////////
 // Compression control
@@ -69,6 +80,9 @@ module align
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
+            pc_r <= '0;
+        end
+        else if (flush_align) begin
             pc_r <= '0;
         end
         else if (enable_i && !hazard_i) begin
@@ -115,6 +129,8 @@ module align
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             prefetched_r <= 1'b0;
+        else if (flush_align)
+            prefetched_r <= 1'b0;
         else if (enable_i && !hazard_i)
             prefetched_r <= prefetched;
     end
@@ -132,6 +148,9 @@ module align
         if (!reset_n) begin
             instruction_r <= '0;
         end
+        else if (flush_align) begin
+            instruction_r <= '0;
+        end
         else if (enable_i && !hazard_i && !(prefetched_r && compressed)) begin
             instruction_r <= instruction_i;
         end
@@ -143,7 +162,12 @@ module align
             compressed_o  <= 1'b0;
             instruction_o <= '0;
         end
-        else if (enable_i && !hazard_i) begin
+        else if (flush_align) begin
+            pc_o          <= '0;
+            compressed_o  <= 1'b0;
+            instruction_o <= '0;
+        end
+        else if (enable_i && !hazard_i && enable_r) begin
             pc_o          <= pc;
             compressed_o  <= compressed;
             instruction_o <= instruction;

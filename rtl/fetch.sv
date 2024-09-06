@@ -81,7 +81,7 @@ module fetch  #(
                 pc <= start_address;
                 jump_misaligned <= 1'b0;
             end
-            else if (sys_reset) begin
+            else if (sys_reset)begin
                 pc <= start_address;
                 jump_misaligned <= 1'b0;
             end

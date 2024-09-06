@@ -138,6 +138,7 @@ package RS5_pkg;
         MHPMCOUNTER22 = 12'hB16, MHPMCOUNTER23 = 12'hB17, MHPMCOUNTER24 = 12'hB18, MHPMCOUNTER25 = 12'hB19, MHPMCOUNTER26 = 12'hB1A,
         MHPMCOUNTER27 = 12'hB1B, MHPMCOUNTER28 = 12'hB1C, MHPMCOUNTER29 = 12'hB1D, MHPMCOUNTER30 = 12'hB1E, MHPMCOUNTER31 = 12'hB1F,
         MCYCLEH = 12'hB80, MINSTRETH = 12'hB82,
+        MCOUNTINHIBIT = 12'h320,
         CYCLE = 12'hC00, TIME, INSTRET, CYCLEH=12'hC80, TIMEH, INSTRETH,
         VL = 12'hC20, VTYPE, VLENBYTES
     } CSRs;
@@ -150,7 +151,7 @@ package RS5_pkg;
     } exceptionCode_e;
 
     typedef enum  logic[4:0] {
-        S_SW_INT = 1, M_SW_INT = 3, S_TIM_INT = 5, M_TIM_INT = 7, S_EXT_INT = 9,
+        NO_INT = 0, S_SW_INT = 1, M_SW_INT = 3, S_TIM_INT = 5, M_TIM_INT = 7, S_EXT_INT = 9,
         M_EXT_INT = 11
     } interruptionCode_e;
 
