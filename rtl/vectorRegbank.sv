@@ -21,31 +21,27 @@ module vectorRegbank
 );
 
     //////////////////////////////////////////////////////////////////////////////
-    // V0 (Mask)
-    //////////////////////////////////////////////////////////////////////////////
-
-    logic [VLEN-1:0] v0;
-
-    always_ff @(posedge clk  or negedge reset_n) begin
-        if (!reset_n) begin
-            v0 <= '0;
-        end
-        else if (vd_addr == 0) begin
-            for (int i = 0; i < VLENB; i++) begin
-                if (enable[i]) begin
-                    v0[(8*i)+:8]  <= result[(8*i)+:8];
-                end
-            end
-        end
-    end
-
-    assign v0_mask = v0;
-
-    //////////////////////////////////////////////////////////////////////////////
     // RegBank
     //////////////////////////////////////////////////////////////////////////////
 
     if (Environment == FPGA) begin : gen_vector_regbank_fpga
+
+        logic [VLEN-1:0] v0;
+
+        always_ff @(posedge clk  or negedge reset_n) begin
+            if (!reset_n) begin
+                v0 <= '0;
+            end
+            else if (vd_addr == 0) begin
+                for (int i = 0; i < VLENB; i++) begin
+                    if (enable[i]) begin
+                        v0[(8*i)+:8]  <= result[(8*i)+:8];
+                    end
+                end
+            end
+        end
+
+        assign v0_mask = v0;
 
         DRAM_Vector_RegBank VectorRegBankA (
             .clk        (clk),
@@ -75,6 +71,7 @@ module vectorRegbank
 
         assign vs1_data = regfile[vs1_addr];
         assign vs2_data = regfile[vs2_addr];
+        assign v0_mask  = regfile[0];
 
         //////////////////////////////////////////////////////////////////////////////
         // Reset and Write control
