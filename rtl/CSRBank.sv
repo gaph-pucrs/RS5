@@ -589,8 +589,6 @@ module CSRBank
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     if (ZIHPMEnable == 1'b1) begin : gen_zihpm_csr_on
-        int fd;
-
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n) begin
                 instructions_killed_counter <= '0;
@@ -686,30 +684,30 @@ module CSRBank
         if (PROFILING) begin : gen_csr_dbg
             int fd;
 
-        initial begin
-            fd = $fopen ("./debug/Report.txt", "w");
-            if (fd == 0) begin
-                $display("Error opening profiling file");
-            end
-        end
-
-        final begin
-            $fwrite(fd,"Clock Cycles:            %0d\n", mcycle);
-            $fwrite(fd,"Instructions Retired:    %0d\n", minstret);
-            if (COMPRESSED == 1'b1) begin
-                $fwrite(fd,"Instructions Compressed: %0d\n", compressed_counter);
-            end
-            $fwrite(fd,"Instructions Killed:     %0d\n", instructions_killed_counter);
-            $fwrite(fd,"Context Switches:        %0d\n", context_switch_counter);
-            $fwrite(fd,"Exceptions Raised:       %0d\n", raise_exception_counter);
-            $fwrite(fd,"Interrupts Acked:        %0d\n", interrupt_ack_counter);
-            if (COMPRESSED == 1'b1) begin
-                $fwrite(fd,"Misaligned Jumps:        %0d\n", jump_misaligned_counter);
+            initial begin
+                fd = $fopen(PROFILING_FILE, "w");
+                if (fd == 0) begin
+                    $display("Error\ opening profiling file");
+                end
             end
 
-            $fwrite(fd,"\nCYCLES WITH::\n");
-            $fwrite(fd,"HAZARDS:                 %0d\n", hazard_counter);
-            $fwrite(fd,"STALL:                   %0d\n", stall_counter);
+            final begin
+                $fwrite(fd,"Clock Cycles:            %0d\n", mcycle);
+                $fwrite(fd,"Instructions Retired:    %0d\n", minstret);
+                if (COMPRESSED == 1'b1) begin
+                    $fwrite(fd,"Instructions Compressed: %0d\n", compressed_counter);
+                end
+                $fwrite(fd,"Instructions Killed:     %0d\n", instructions_killed_counter);
+                $fwrite(fd,"Context Switches:        %0d\n", context_switch_counter);
+                $fwrite(fd,"Exceptions Raised:       %0d\n", raise_exception_counter);
+                $fwrite(fd,"Interrupts Acked:        %0d\n", interrupt_ack_counter);
+                if (COMPRESSED == 1'b1) begin
+                    $fwrite(fd,"Misaligned Jumps:        %0d\n", jump_misaligned_counter);
+                end
+
+                $fwrite(fd,"\nCYCLES WITH::\n");
+                $fwrite(fd,"HAZARDS:                 %0d\n", hazard_counter);
+                $fwrite(fd,"STALL:                   %0d\n", stall_counter);
 
                 $fwrite(fd,"\nINSTRUCTION COUNTERS:\n");
                 $fwrite(fd,"NOP:                     %0d\n", nop_counter);
