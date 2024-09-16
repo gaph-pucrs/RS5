@@ -403,7 +403,26 @@ end
 // Atomic Extension
 //////////////////////////////////////////////////////////////////////////////
 
+    logic [31:0] atomic_result;
+    logic        hold_atomic;
 
+    if (AEnable != OFF) begin: atomic_gen_on
+
+        atomic atomic_unit (
+            .clk                (clk),
+            .reset_n            (reset_n),
+            .atomic_operation_i (atomic_operation_i),
+            .rs1_i              (first_operand_i),
+            .rs2_i              (second_operand_i),
+            .result_o           (atomic_result),
+            .hold_o             (hold_atomic)
+        );
+
+    end
+    else begin: atomic_gen_off
+        assign hold_atomic   = 1'b0;
+        assign atomic_result = '0;
+    end
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -496,7 +515,7 @@ end
 //////////////////////////////////////////////////////////////////////////////
 // Output Registers
 //////////////////////////////////////////////////////////////////////////////
-    assign hold_o = hold_div | hold_mul | hold_vector;
+    assign hold_o = hold_div | hold_mul | hold_vector | hold_atomic;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
