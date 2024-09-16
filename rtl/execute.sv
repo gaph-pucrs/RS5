@@ -33,6 +33,7 @@ module execute
     parameter environment_e Environment = ASIC,
     parameter rv32_e        RV32        = RV32I,
     parameter bit           ZKNEEnable  = 1'b0,
+    parameter atomic_ext_e  AEnable     = OFF,
     parameter bit           VEnable     = 1'b0,
     parameter int           VLEN        = 64
 )
@@ -56,6 +57,10 @@ module execute
     /* Not used if VEnable is 0 */
     /* verilator lint_off UNUSEDSIGNAL */
     input   iTypeVector_e       vector_operation_i,
+    /* verilator lint_on UNUSEDSIGNAL */
+    /* Not used if AEnable is OFF */
+    /* verilator lint_off UNUSEDSIGNAL */
+    input   iTypeAtomic_e       atomic_operation_i,
     /* verilator lint_on UNUSEDSIGNAL */
     input   logic  [2:0]        tag_i,
     input   privilegeLevel_e    privilege_i,
@@ -393,6 +398,13 @@ end
     else begin : zkne_gen_off
         assign aes_result = '0;
     end
+
+//////////////////////////////////////////////////////////////////////////////
+// Atomic Extension
+//////////////////////////////////////////////////////////////////////////////
+
+
+
 
 //////////////////////////////////////////////////////////////////////////////
 // Vector Extension
