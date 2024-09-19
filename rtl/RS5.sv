@@ -401,6 +401,7 @@ module RS5
         .instruction_compressed_i(instruction_compressed_execute),
         .vector_operation_i      (vector_operation_execute),
         .atomic_operation_i      (atomic_operation_execute),
+        .atomic_read_value_i     (regbank_data_writeback),
         .tag_i                   (tag_execute),
         .privilege_i             (privilege),
         .exc_ilegal_inst_i       (exc_ilegal_inst_execute),

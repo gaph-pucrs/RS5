@@ -61,6 +61,7 @@ module execute
     /* Not used if AEnable is OFF */
     /* verilator lint_off UNUSEDSIGNAL */
     input   iTypeAtomic_e       atomic_operation_i,
+    input   logic [31:0]        atomic_read_value_i,
     /* verilator lint_on UNUSEDSIGNAL */
     input   logic  [2:0]        tag_i,
     input   privilegeLevel_e    privilege_i,
@@ -117,6 +118,8 @@ module execute
     assign first_operand_signed  = first_operand_i;
     assign second_operand_signed = second_operand_i;
 
+    logic atomic_write;
+
 //////////////////////////////////////////////////////////////////////////////
 // ALU
 //////////////////////////////////////////////////////////////////////////////
@@ -132,12 +135,16 @@ module execute
     logic [31:0]    srl_result;
     logic [31:0]    sra_result;
 
+    logic [31:0]    first_operand;
+
     logic           equal;
     logic           less_than;
     logic           less_than_unsigned;
     logic           greater_equal;
     logic           greater_equal_unsigned;
     logic           jump;
+
+    assign first_operand = atomic_write ? atomic_read_value_i : first_operand_i;
 
     always_comb begin
         unique case (instruction_operation_i)
@@ -155,11 +162,11 @@ module execute
     end
 
     always_comb begin
-        sum_result              = first_operand_i + second_operand_i;
+        sum_result              = first_operand + second_operand_i;
         sum2_result             = sum2_opA + sum2_opB;
-        and_result              = first_operand_i & second_operand_i;
-        or_result               = first_operand_i | second_operand_i;
-        xor_result              = first_operand_i ^ second_operand_i;
+        and_result              = first_operand & second_operand_i;
+        or_result               = first_operand | second_operand_i;
+        xor_result              = first_operand ^ second_operand_i;
         sll_result              = first_operand_i << second_operand_i[4:0];
         srl_result              = first_operand_i >> second_operand_i[4:0];
         sra_result              = first_operand_signed >>> second_operand_i[4:0];
@@ -182,6 +189,7 @@ module execute
 
     logic        mem_read_enable;
     logic        mem_read_enable_vector;
+    logic        mem_read_enable_atomic;
 
     logic  [3:0] mem_write_enable;
     logic  [3:0] mem_write_enable_vector;
@@ -195,6 +203,20 @@ module execute
             mem_read_enable_o  = mem_read_enable_vector;
             mem_write_enable_o = mem_write_enable_vector;
             mem_write_data_o   = mem_write_data_vector;
+        end
+        else if (instruction_operation_i == ATOMIC_AMO) begin
+            mem_address_o      = {first_operand_i[31:2], 2'b00};
+            mem_read_enable_o  = mem_read_enable_atomic;
+            mem_write_enable_o = {4{atomic_write}};
+
+            unique case (atomic_operation_i)
+                AMOSWAP: mem_write_data_o = second_operand_i;
+                AMOADD:  mem_write_data_o = sum_result;
+                AMOXOR:  mem_write_data_o = xor_result;
+                AMOAND:  mem_write_data_o = and_result;
+                AMOOR:   mem_write_data_o = or_result;
+                default: mem_write_data_o   = '0;
+            endcase
         end
         else begin
             mem_address_o      = mem_address;
@@ -403,25 +425,25 @@ end
 // Atomic Extension
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [31:0] atomic_result;
+    // logic [31:0] atomic_result;
     logic        hold_atomic;
 
     if (AEnable != OFF) begin: atomic_gen_on
 
         atomic atomic_unit (
-            .clk                (clk),
-            .reset_n            (reset_n),
-            .atomic_operation_i (atomic_operation_i),
-            .rs1_i              (first_operand_i),
-            .rs2_i              (second_operand_i),
-            .result_o           (atomic_result),
-            .hold_o             (hold_atomic)
+            .clk                     (clk),
+            .reset_n                 (reset_n),
+            .instruction_operation_i (instruction_operation_i),
+            //.result_o                (atomic_result),
+            .atomic_read_o           (mem_read_enable_atomic),
+            .atomic_write_o          (atomic_write),
+            .hold_o                  (hold_atomic)
         );
 
     end
     else begin: atomic_gen_off
         assign hold_atomic   = 1'b0;
-        assign atomic_result = '0;
+        // assign atomic_result = '0;
     end
 
 
@@ -522,6 +544,11 @@ end
             write_enable_o          <= 1'b0;
             instruction_operation_o <= NOP;
             result_o                <= '0;
+        end
+        else if (instruction_operation_i == ATOMIC_AMO) begin
+            write_enable_o          <= write_enable;
+            instruction_operation_o <= mem_read_enable_atomic ? LW : instruction_operation_i;
+            result_o                <= atomic_write ? atomic_read_value_i : '0;
         end
         else if (stall == 1'b0 & hold_o == 1'b0) begin
             write_enable_o          <= write_enable;

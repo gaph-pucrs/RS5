@@ -122,6 +122,7 @@ module decode
     iType_e decode_op;
     iType_e decode_misc_mem;
     iType_e decode_system;
+    iType_e decode_atomic;
 
     logic [2:0] funct3;
     logic [6:0] funct7;
@@ -228,6 +229,8 @@ module decode
         endcase
     end
 
+    assign decode_atomic = funct7[3] == 1'b1 ? ATOMIC_LRSC : ATOMIC_AMO;
+
     always_comb begin
         unique case (opcode)
             7'b0110111: instruction_operation = LUI;
@@ -244,7 +247,7 @@ module decode
             7'b1010111: instruction_operation = VEnable ? VECTOR : INVALID; /* OP-V */
             7'b0000111: instruction_operation = VEnable ? VLOAD  : INVALID; /* LOAD-FP */
             7'b0100111: instruction_operation = VEnable ? VSTORE : INVALID; /* STORE-FP */
-            7'b0101111: instruction_operation = AEnable != OFF ? ATOMIC : INVALID;
+            7'b0101111: instruction_operation = AEnable != OFF ? decode_atomic : INVALID;
             default:    instruction_operation = INVALID;
         endcase
     end
@@ -256,10 +259,15 @@ module decode
     if (AEnable != OFF) begin : a_enable_decode_gen_on
 
         always_comb begin
-            if (instruction_operation == ATOMIC) begin
+            if (instruction_operation == ATOMIC_LRSC) begin
                 unique case (funct7[6:2]) inside
                     5'b00010: atomic_operation = LR;
                     5'b00011: atomic_operation = SC;
+                    default:  atomic_operation = ANOP;
+                endcase
+            end
+            else if (instruction_operation == ATOMIC_AMO) begin
+                unique case (funct7[6:2]) inside
                     5'b00001: atomic_operation = AMOSWAP;
                     5'b00000: atomic_operation = AMOADD;
                     5'b00100: atomic_operation = AMOXOR;
