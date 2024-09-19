@@ -115,7 +115,6 @@ module execute
     logic signed [31:0]  first_operand_signed;
     logic signed [31:0]  second_operand_signed;
 
-    assign first_operand_signed  = first_operand_i;
     assign second_operand_signed = second_operand_i;
 
     logic atomic_write;
@@ -135,7 +134,7 @@ module execute
     logic [31:0]    srl_result;
     logic [31:0]    sra_result;
 
-    logic [31:0]    first_operand;
+    logic        [31:0]    first_operand;
 
     logic           equal;
     logic           less_than;
@@ -144,7 +143,8 @@ module execute
     logic           greater_equal_unsigned;
     logic           jump;
 
-    assign first_operand = atomic_write ? atomic_read_value_i : first_operand_i;
+    assign first_operand        = atomic_write        ? atomic_read_value_i      : first_operand_i;
+    assign first_operand_signed = first_operand;
 
     always_comb begin
         unique case (instruction_operation_i)
@@ -173,9 +173,9 @@ module execute
 
         equal                   = first_operand_i == second_operand_i;
         less_than               = first_operand_signed < second_operand_signed;
-        less_than_unsigned      = first_operand_i < second_operand_i;
+        less_than_unsigned      = first_operand < second_operand_i;
         greater_equal           = first_operand_signed >= second_operand_signed;
-        greater_equal_unsigned  = first_operand_i >= second_operand_i;
+        greater_equal_unsigned  = first_operand >= second_operand_i;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -215,6 +215,11 @@ module execute
                 AMOXOR:  mem_write_data_o = xor_result;
                 AMOAND:  mem_write_data_o = and_result;
                 AMOOR:   mem_write_data_o = or_result;
+                AMOMIN:  mem_write_data_o = (less_than) ? first_operand : second_operand_i;
+                AMOMAX:  mem_write_data_o = (!less_than)? first_operand : second_operand_i;
+                AMOMINU: mem_write_data_o = (less_than_unsigned) ?  first_operand : second_operand_i;
+                AMOMAXU: mem_write_data_o = (!less_than_unsigned)?  first_operand : second_operand_i;
+
                 default: mem_write_data_o   = '0;
             endcase
         end
