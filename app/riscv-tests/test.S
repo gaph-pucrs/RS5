@@ -103,6 +103,18 @@ _entry:
 	/* RV32UC */
 	TEST(rvc)
 
+	/* RV32UA */
+	TEST(amoadd_w)
+	TEST(amoand_w)
+	TEST(amomax_w)
+	TEST(amomaxu_w)
+	TEST(amomin_w)
+	TEST(amominu_w)
+	TEST(amoor_w)
+	TEST(amoswap_w)
+	TEST(amoxor_w)
+	TEST(lrsc)
+
 	/* I don't know where this one came from */
 	TEST(j)
 
