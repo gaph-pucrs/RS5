@@ -130,10 +130,6 @@ module mul
                 next_state = ALBL;
                 hold_o     = 1'b0;
             end
-            default: begin
-                next_state = ALBL;
-                hold_o     = 1'b0;
-            end
         endcase
     end
 
