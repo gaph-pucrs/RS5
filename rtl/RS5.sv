@@ -25,10 +25,10 @@ module RS5
 #(
     parameter environment_e Environment    = ASIC,
     parameter rv32_e        RV32           = RV32M,
-    parameter bit           COMPRESSED     = 1'b0,
+    parameter bit           COMPRESSED     = 1'b1,
     parameter bit           VEnable        = 1'b0,
     parameter int           VLEN           = 64,
-    parameter bit           XOSVMEnable    = 1'b0,
+    parameter bit           XOSVMEnable    = 1'b1,
     parameter bit           ZIHPMEnable    = 1'b0,
     `ifdef DEBUG
     parameter bit           DEBUG          = 1'b0,

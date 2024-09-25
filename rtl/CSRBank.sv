@@ -30,22 +30,15 @@ module CSRBank
 #(
     parameter bit       XOSVMEnable    = 1'b1,
     parameter bit       ZIHPMEnable    = 1'b0,
-<<<<<<< HEAD
     parameter bit       COMPRESSED     = 1'b1,
+    parameter rv32_e    RV32           = RV32M,
     `ifdef DEBUG
     parameter bit       PROFILING      = 1'b0,
-    parameter string    PROFILING_FILE = "./debug/Report.txt",
-    `endif
-    parameter rv32_e    RV32           = RV32M
-
-=======
-    parameter bit       COMPRESSED     = 1'b0,
-    parameter rv32_e    RV32           = RV32I,
-    parameter bit       VEnable        = 1'b0,
-    parameter int       VLEN           = 128,
-    parameter bit       PROFILING      = 1'b0,
     parameter string    PROFILING_FILE = "./debug/Report.txt"
->>>>>>> origin/master
+    `endif
+    parameter bit       VEnable        = 1'b0,
+    parameter int       VLEN           = 128
+
 )
 (
     input   logic               clk,
