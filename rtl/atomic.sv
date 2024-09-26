@@ -14,7 +14,10 @@ module atomic
     output logic         atomic_read_o,
     output logic         atomic_write_o,
     output logic         hold_o,
-    output logic         result_o 
+
+    output logic         atomic_write_reg_o,
+
+    output logic         result_o
 );
 
     logic [31:0] reservation_set_address;
@@ -47,6 +50,7 @@ module atomic
         atomic_read_o  = 1'b0;
         atomic_write_o = 1'b0;
         hold_o         = 1'b0;
+        atomic_write_reg_o  = 1'b0;
 
         unique case (atomic_state)
             IDLE: begin
@@ -57,8 +61,10 @@ module atomic
             end
             WRITE_AMO: begin
                 atomic_write_o = 1'b1;
+                atomic_write_reg_o = 1'b1;
             end
             LRSC: begin
+                atomic_write_reg_o = 1'b1;
                 if (atomic_operation_i == SC) begin
                     if (reservation_set_address == lrsc_address && reservation_set_content == lrsc_data) begin
                         result_o = 0;
@@ -67,7 +73,7 @@ module atomic
                     else begin
                         result_o = 1;
                     end
-                end 
+                end
             end
         endcase
     end

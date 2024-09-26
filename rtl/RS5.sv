@@ -114,6 +114,7 @@ module RS5
     logic    [4:0]  rs1, rs2;
     logic   [31:0]  regbank_data1, regbank_data2;
     logic   [31:0]  rs1_data_read, rs2_data_read;
+    logic    [4:0]  rd_decode;
     logic    [4:0]  rd;
     logic   [31:0]  regbank_data_writeback;
     logic           regbank_write_enable_int, regbank_write_enable;
@@ -121,6 +122,9 @@ module RS5
 //////////////////////////////////////////////////////////////////////////////
 // Execute signals
 //////////////////////////////////////////////////////////////////////////////
+
+    logic [4:0] rd_atomic;
+    logic retire_atomic;
 
     iType_e         instruction_operation_execute;
     iTypeVector_e   vector_operation_execute;
@@ -177,15 +181,15 @@ module RS5
         assign mmu_en = 1'b0;
     end
 
-    assign regbank_write_enable =   (rd == '0)
+    assign regbank_write_enable =   (rd_decode == '0)
                                     ? 1'b0
                                     : regbank_write_enable_int;
 
-    assign rs1_data_read =  (rs1 == rd && regbank_write_enable)
+    assign rs1_data_read =  (rs1 == rd_decode && regbank_write_enable)
                             ? regbank_data_writeback
                             : regbank_data1;
 
-    assign rs2_data_read =  (rs2 == rd && regbank_write_enable)
+    assign rs2_data_read =  (rs2 == rd_decode && regbank_write_enable)
                             ? regbank_data_writeback
                             : regbank_data2;
 
@@ -315,7 +319,7 @@ module RS5
         .rs2_data_read_i            (rs2_data_read),
         .rs1_o                      (rs1),
         .rs2_o                      (rs2),
-        .rd_o                       (rd),
+        .rd_o                       (rd_decode),
         .first_operand_o            (first_operand_execute),
         .second_operand_o           (second_operand_execute),
         .third_operand_o            (third_operand_execute),
@@ -337,6 +341,8 @@ module RS5
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// REGISTER BANK ///////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    assign rd = retire_atomic ? rd_atomic : rd_decode;
 
     if (Environment == FPGA) begin :RegFileFPGA_blk
         DRAM_RegBank RegBankA (
@@ -428,6 +434,10 @@ module RS5
         .vlen_o                  (vlen),
         .jump_o                  (jump),
         .jump_target_o           (jump_target),
+
+        .atomic_write_reg_o (retire_atomic),
+        .rd_atomic_o        (rd_atomic),
+
         .interrupt_pending_i     (interrupt_pending),
         .interrupt_ack_o         (interrupt_ack_o),
         .machine_return_o        (MACHINE_RETURN),
