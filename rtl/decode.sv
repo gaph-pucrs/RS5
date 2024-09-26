@@ -286,6 +286,9 @@ module decode
         end
         
     end
+    else begin : a_enable_decode_gen_off
+        assign atomic_operation = ANOP;
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 //  Decode Vector Instruction

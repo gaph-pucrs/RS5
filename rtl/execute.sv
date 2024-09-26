@@ -462,9 +462,11 @@ end
 
     end
     else begin: atomic_gen_off
-        assign hold_atomic      = 1'b0;
-        assign atomic_result    = '0;
-        assign atomic_write_reg = '0;
+        assign hold_atomic            = 1'b0;
+        assign atomic_result          = '0;
+        assign atomic_write_reg       = '0;
+        assign atomic_write           = '0;
+        assign mem_read_enable_atomic = '0;
     end
 
 
