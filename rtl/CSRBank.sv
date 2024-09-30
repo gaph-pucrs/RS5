@@ -55,6 +55,11 @@ module CSRBank
     /* Signals enabled with ZIHPM */
     /* verilator lint_off UNUSEDSIGNAL */
     input   iType_e             instruction_operation_i,
+
+`ifndef SYNTH
+    input   iTypeVector_e       vector_operation_i,          
+`endif
+
     input   logic               hazard,
     input   logic               stall,
     input   logic               hold,
@@ -159,6 +164,10 @@ module CSRBank
     /* verilator lint_off UNUSEDSIGNAL */
     logic [31:0] mul_counter, div_counter;
     /* verilator lint_on UNUSEDSIGNAL */
+
+    /* vector extension profiling signals */
+    logic [31:0] vaddsub_counter, vmul_counter, vdiv_counter, vmac_counter, vred_counter, 
+                 vloadstore_counter, vothers_counter;
 
 //////////////////////////////////////////////////////////////////////////////
 // MCAUSE and MSTATUS CSRs
@@ -456,6 +465,14 @@ module CSRBank
                 MHPMCOUNTER22:  out = mul_counter;
                 MHPMCOUNTER23:  out = div_counter;
 
+                MHPMCOUNTER24:  out = vaddsub_counter;
+                MHPMCOUNTER25:  out = vmul_counter;
+                MHPMCOUNTER26:  out = vdiv_counter;
+                MHPMCOUNTER27:  out = vmac_counter;
+                MHPMCOUNTER28:  out = vred_counter;
+                MHPMCOUNTER29:  out = vloadstore_counter;
+                MHPMCOUNTER30:  out = vothers_counter;
+
                 CYCLEH:         out = mcycle[63:32];
                 TIMEH:          out = mtime_i[63:32];
                 INSTRETH:       out = minstret[63:32];
@@ -606,6 +623,14 @@ module CSRBank
                 mul_counter                 <= '0;
                 div_counter                 <= '0;
 
+                vaddsub_counter             <= '0;
+                vmul_counter                <= '0;
+                vdiv_counter                <= '0;
+                vmac_counter                <= '0;
+                vred_counter                <= '0;
+                vloadstore_counter          <= '0;
+                vothers_counter             <= '0;
+
                 if (COMPRESSED == 1'b1) begin
                     jump_misaligned_counter     <= '0;
                     compressed_counter          <= '0;
@@ -632,6 +657,14 @@ module CSRBank
                 csr_counter                 <= '0;
                 mul_counter                 <= '0;
                 div_counter                 <= '0;
+
+                vaddsub_counter             <= '0;
+                vmul_counter                <= '0;
+                vdiv_counter                <= '0;
+                vmac_counter                <= '0;
+                vred_counter                <= '0;
+                vloadstore_counter          <= '0;
+                vothers_counter             <= '0;
 
                 if (COMPRESSED == 1'b1) begin
                     jump_misaligned_counter     <= '0;
@@ -672,6 +705,33 @@ module CSRBank
                     csr_counter             <= (instruction_operation_i inside {CSRRW, CSRRWI, CSRRS, CSRRSI, CSRRC, CSRRCI}) && !mcountinhibit[18] ? csr_counter     + 1 : csr_counter;
                     mul_counter             <= (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU})                    && !mcountinhibit[22] ? mul_counter     + 1 : mul_counter;
                     div_counter             <= (instruction_operation_i inside {DIV, DIVU, REM, REMU})                        && !mcountinhibit[23] ? div_counter     + 1 : div_counter;
+                    
+
+
+                    // vector extension... 
+                    vloadstore_counter      <= (instruction_operation_i inside {VLOAD, VSTORE})                               && !mcountinhibit[29] ? vloadstore_counter    + 1 : vloadstore_counter;
+
+                    if(VEnable && instruction_operation_i == VECTOR) begin
+                        vaddsub_counter     <= (vector_operation_i      inside {VADD, VSUB, VRSUB})                           && !mcountinhibit[24] ? vaddsub_counter + 1 : vaddsub_counter;
+                        
+                        vmul_counter        <= (vector_operation_i      inside {
+                                                                                VMUL, VMULH, VMULHU, VMULHSU,                               // non-widening multiplication
+                                                                                VWMUL, VWMULU, VWMULSU                                      // widening multiplication
+                                                                               })   && !mcountinhibit[25] ?  vmul_counter    + 1 : vmul_counter;
+
+                        vdiv_counter        <= (vector_operation_i      inside {VDIV, VDIVU, VREM, VREMU})                    && !mcountinhibit[26] ? vdiv_counter    + 1 : vdiv_counter;
+                        vmac_counter        <= (vector_operation_i      inside {VMACC, VNMSAC, VMADD, VNMSUB})                && !mcountinhibit[27] ? vmac_counter    + 1 : vmac_counter;          
+                        vred_counter        <= (vector_operation_i      inside {VREDMIN, VREDMINU, VREDMAX, VREDMAXU})        && !mcountinhibit[28] ? vred_counter    + 1 : vred_counter;
+
+                        vothers_counter     <= (vector_operation_i     inside {
+                                                                                VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT,  // mask compares
+                                                                                VREDAND, VREDOR, VREDXOR,                                   // logic reduction
+                                                                                VMV, VMVR, VMVSX, VMVXS,                                    // register moves
+                                                                                VSLL, VSRL, VSRA,                                           // shifts
+                                                                                VAND, VOR, VXOR                                             // logic
+                                                                              })   && !mcountinhibit[30] ?  vothers_counter + 1 : vothers_counter;
+                    end
+                    //
 
                     if (COMPRESSED == 1'b1) begin
                         compressed_counter  <= compressed_counter + (instruction_compressed_i && !mcountinhibit[20] ? 1 : 0);
@@ -692,37 +752,48 @@ module CSRBank
             end
 
             final begin
-                $fwrite(fd,"Clock Cycles:            %0d\n", mcycle);
-                $fwrite(fd,"Instructions Retired:    %0d\n", minstret);
+                $fwrite(fd,"Clock Cycles:                       %0d\n", mcycle);
+                $fwrite(fd,"Instructions Retired:               %0d\n", minstret);
                 if (COMPRESSED == 1'b1) begin
-                    $fwrite(fd,"Instructions Compressed: %0d\n", compressed_counter);
+                    $fwrite(fd,"Instructions Compressed:        %0d\n", compressed_counter);
                 end
-                $fwrite(fd,"Instructions Killed:     %0d\n", instructions_killed_counter);
-                $fwrite(fd,"Context Switches:        %0d\n", context_switch_counter);
-                $fwrite(fd,"Exceptions Raised:       %0d\n", raise_exception_counter);
-                $fwrite(fd,"Interrupts Acked:        %0d\n", interrupt_ack_counter);
+                $fwrite(fd,"Instructions Killed:                %0d\n", instructions_killed_counter);
+                $fwrite(fd,"Context Switches:                   %0d\n", context_switch_counter);
+                $fwrite(fd,"Exceptions Raised:                  %0d\n", raise_exception_counter);
+                $fwrite(fd,"Interrupts Acked:                   %0d\n", interrupt_ack_counter);
                 if (COMPRESSED == 1'b1) begin
-                    $fwrite(fd,"Misaligned Jumps:        %0d\n", jump_misaligned_counter);
+                    $fwrite(fd,"Misaligned Jumps:               %0d\n", jump_misaligned_counter);
                 end
 
                 $fwrite(fd,"\nCYCLES WITH::\n");
-                $fwrite(fd,"HAZARDS:                 %0d\n", hazard_counter);
-                $fwrite(fd,"STALL:                   %0d\n", stall_counter);
+                $fwrite(fd,"HAZARDS:                            %0d\n", hazard_counter);
+                $fwrite(fd,"STALL:                              %0d\n", stall_counter);
 
                 $fwrite(fd,"\nINSTRUCTION COUNTERS:\n");
-                $fwrite(fd,"NOP:                     %0d\n", nop_counter);
-                $fwrite(fd,"LUI_SLT:                 %0d\n", lui_slt_counter);
-                $fwrite(fd,"LOGIC:                   %0d\n", logic_counter);
-                $fwrite(fd,"ADDSUB:                  %0d\n", addsub_counter);
-                $fwrite(fd,"SHIFT:                   %0d\n", shift_counter);
-                $fwrite(fd,"BRANCH:                  %0d\n", branch_counter);
-                $fwrite(fd,"JUMP:                    %0d\n", jump_counter);
-                $fwrite(fd,"LOAD:                    %0d\n", load_counter);
-                $fwrite(fd,"STORE:                   %0d\n", store_counter);
-                $fwrite(fd,"SYS:                     %0d\n", sys_counter);
-                $fwrite(fd,"CSR:                     %0d\n", csr_counter);
-                $fwrite(fd,"MUL:                     %0d\n", mul_counter);
-                $fwrite(fd,"DIV:                     %0d\n", div_counter);
+                $fwrite(fd,"NOP:                                %0d\n", nop_counter);
+                $fwrite(fd,"LUI_SLT:                            %0d\n", lui_slt_counter);
+                $fwrite(fd,"LOGIC:                              %0d\n", logic_counter);
+                $fwrite(fd,"ADDSUB:                             %0d\n", addsub_counter);
+                $fwrite(fd,"SHIFT:                              %0d\n", shift_counter);
+                $fwrite(fd,"BRANCH:                             %0d\n", branch_counter);
+                $fwrite(fd,"JUMP:                               %0d\n", jump_counter);
+                $fwrite(fd,"LOAD:                               %0d\n", load_counter);
+                $fwrite(fd,"STORE:                              %0d\n", store_counter);
+                $fwrite(fd,"SYS:                                %0d\n", sys_counter);
+                $fwrite(fd,"CSR:                                %0d\n", csr_counter);
+                $fwrite(fd,"MUL:                                %0d\n", mul_counter);
+                $fwrite(fd,"DIV:                                %0d\n", div_counter);
+                
+                if(VEnable) begin
+                    $fwrite(fd, "\nVECTOR EXTENSION:\n");
+                    $fwrite(fd, "VADDSUB:                            %0d\n", vaddsub_counter);
+                    $fwrite(fd, "VMUL:                               %0d\n", vmul_counter);
+                    $fwrite(fd, "VDIV:                               %0d\n", vdiv_counter);
+                    $fwrite(fd, "VMAC:                               %0d\n", vmac_counter);
+                    $fwrite(fd, "VRED:                               %0d\n", vred_counter);
+                    $fwrite(fd, "VLOAD/VSTORE:                       %0d\n", vloadstore_counter);
+                    $fwrite(fd, "VOTHERS:                            %0d\n", vothers_counter);
+                end
             end
         end
     `endif
@@ -749,6 +820,15 @@ module CSRBank
         assign context_switch_counter      = '0;
         assign compressed_counter          = '0;
         assign jump_misaligned_counter     = '0;
+        
+
+        assign vaddsub_counter             = '0; 
+        assign vmul_counter                = '0;
+        assign vdiv_counter                = '0;
+        assign vmac_counter                = '0;
+        assign vred_counter                = '0;
+        assign vloadstore_counter          = '0;
+        assign vothers_counter             = '0;
     end
 
 endmodule
