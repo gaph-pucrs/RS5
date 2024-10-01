@@ -18,6 +18,7 @@ module align
     input  logic        enable_i,
     input  logic        hazard_i,
     input  logic        jumped_i,
+    input  logic        jumped_r,
     input  logic        jump_i,
     input  logic  [2:0] tag_i,
     input  logic [31:0] pc_i,
@@ -34,7 +35,6 @@ module align
     logic [31:0] instruction;
 
     logic hazard_r;
-    logic jumped_r;
     logic enable_r;
     logic jump_r;
 
@@ -43,13 +43,11 @@ module align
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             hazard_r <= 1'b0;
-            jumped_r <= 1'b0;
             enable_r <= 1'b0;
             jump_r   <= 1'b0;
         end
         else if (enable_i) begin
             hazard_r <= hazard_i;
-            jumped_r <= jumped_i;
             enable_r <= enable_i;
             jump_r   <= jump_i;
         end

@@ -34,7 +34,7 @@ module RS5
     parameter bit           COMPRESSED     = 1'b0,
     parameter bit           VEnable        = 1'b1,
     parameter int           VLEN           = 256,
-    parameter atomic_ext_e  AEnable        = OFF,
+    parameter atomic_ext_e  AEnable        = ON,
     parameter bit           XOSVMEnable    = 1'b0,
     parameter bit           ZIHPMEnable    = 1'b0,
     parameter bit           ZKNEEnable     = 1'b0
@@ -270,6 +270,7 @@ module RS5
             .enable_i           (enable_prefetch),
             .hazard_i           (hazard),
             .jumped_i           (jumped),
+            .jumped_r           (jumped_r),
             .jump_i             (jump),
             .tag_i              (tag_prefetch),
             .pc_i               (pc_prefetch),
