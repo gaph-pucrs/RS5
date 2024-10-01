@@ -5,7 +5,7 @@ module atomic
 (
     input  logic         clk,
     input  logic         reset_n,
-    input  iType_e       instruction_operation_i,
+    //input  iType_e       instruction_operation_i,
     input  iTypeAtomic_e atomic_operation_i,
 
     input  logic [31:0]  lrsc_data,
@@ -23,26 +23,31 @@ module atomic
     logic [31:0] reservation_set_address;
     logic [31:0] reservation_set_content;
 
-    enum logic[2:0] {IDLE, WRITE_AMO, LRSC} atomic_state, atomic_next_state;
+    enum logic[2:0] {IDLE, WAIT_AMO, WAIT_LRSC, WRITE_AMO, LRSC} atomic_state, atomic_next_state;
 
     always_comb begin
         unique case (atomic_state)
             IDLE: begin
-                if (instruction_operation_i == ATOMIC_AMO) begin
-                    atomic_next_state = WRITE_AMO;
+                if (atomic_operation_i != ANOP && atomic_operation_i != LR && atomic_operation_i != SC) begin
+                    atomic_next_state = WAIT_AMO;
                 end
-                else if(instruction_operation_i == ATOMIC_LRSC) begin
-                    atomic_next_state = LRSC;
+                else if(atomic_operation_i != ANOP) begin
+                    atomic_next_state = WAIT_LRSC;
                 end 
                 else begin
                     atomic_next_state = IDLE;
                 end
             end
-            
-            WRITE_AMO:
+            WAIT_AMO:
+                atomic_next_state = WRITE_AMO;
+            WAIT_LRSC:
+                atomic_next_state = LRSC;
+            default: 
                 atomic_next_state = IDLE;
-            LRSC:
-                atomic_next_state = IDLE;
+            // WRITE_AMO:
+            //     atomic_next_state = IDLE;
+            // LRSC:
+            //     atomic_next_state = IDLE;
         endcase
     end
 
@@ -51,13 +56,22 @@ module atomic
         atomic_write_o = 1'b0;
         hold_o         = 1'b0;
         atomic_write_reg_o  = 1'b0;
+        result_o = '0;
 
         unique case (atomic_state)
             IDLE: begin
-                if (instruction_operation_i == ATOMIC_AMO || instruction_operation_i == ATOMIC_LRSC) begin
+                if (atomic_operation_i != ANOP) begin
                     atomic_read_o = 1'b1;
                     hold_o        = 1'b1;
                 end
+            end
+            WAIT_AMO: begin
+                hold_o        = 1'b1;
+                atomic_read_o = 1'b1;
+            end
+            WAIT_LRSC: begin
+                hold_o        = 1'b1;
+                atomic_read_o = 1'b1;
             end
             WRITE_AMO: begin
                 atomic_write_o = 1'b1;
@@ -75,6 +89,7 @@ module atomic
                     end
                 end
             end
+            default: ;
         endcase
     end
 

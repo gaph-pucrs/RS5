@@ -123,6 +123,16 @@ module execute
     assign second_operand_signed = second_operand_i;
 
     logic atomic_write;
+    logic atomic_write_reg;
+    logic [31:0] atomic_read_value;
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            atomic_read_value <= '0;
+        else
+            atomic_read_value <= atomic_read_value_i;
+
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 // ALU
@@ -148,7 +158,7 @@ module execute
     logic           greater_equal_unsigned;
     logic           jump;
 
-    assign first_operand        = atomic_write ? atomic_read_value_i : first_operand_i;
+    assign first_operand        = atomic_write_reg ? atomic_read_value : first_operand_i;
     assign first_operand_signed = first_operand;
 
     always_comb begin
@@ -442,17 +452,16 @@ end
 
     logic        atomic_result;
     logic        hold_atomic;
-    logic        atomic_write_reg;
 
     if (AEnable != OFF) begin: atomic_gen_on
 
         atomic atomic_unit (
             .clk                     (clk),
             .reset_n                 (reset_n),
-            .instruction_operation_i (instruction_operation_i),
+            //.instruction_operation_i (instruction_operation_i),
             .atomic_operation_i      (atomic_operation_i),
             .lrsc_address            (first_operand_i),
-            .lrsc_data               (atomic_read_value_i),
+            .lrsc_data               (atomic_read_value),
             .atomic_read_o           (mem_read_enable_atomic),
             .atomic_write_o          (atomic_write),
             .hold_o                  (hold_atomic),
@@ -575,14 +584,14 @@ end
         else if (instruction_operation_i == ATOMIC_AMO) begin
             write_enable_o          <= write_enable;
             instruction_operation_o <= mem_read_enable_atomic ? LW : instruction_operation_i;
-            result_o                <= atomic_write ? atomic_read_value_i : '0;
+            result_o                <= atomic_write ? atomic_read_value : '0;
             atomic_write_reg_o      <= 1'b0;
             rd_atomic_o             <= '0;
         end
         else if (instruction_operation_i == ATOMIC_LRSC) begin
             write_enable_o          <= write_enable;
             instruction_operation_o <= mem_read_enable_atomic ? LW : instruction_operation_i;
-            result_o                <= atomic_operation_i == SC ? {31'b0, atomic_result} :  atomic_read_value_i;
+            result_o                <= atomic_operation_i == SC ? {31'b0, atomic_result} :  atomic_read_value;
             atomic_write_reg_o      <= atomic_write_reg;
             rd_atomic_o             <= rd;
         end
