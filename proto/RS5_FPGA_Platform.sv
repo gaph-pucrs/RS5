@@ -11,6 +11,7 @@ module RS5_FPGA_Platform
     parameter bit           ZIHPMEnable = 1'b0,
     parameter bit           ZKNEEnable  = 1'b0,
     parameter bit           VEnable     = 1'b0,
+    parameter atomic_ext_e  AEnable     = ON,
     parameter int           VLEN        = 64,
     parameter int           CLKS_PER_BIT_UART = 868
 )
@@ -109,6 +110,7 @@ module RS5_FPGA_Platform
         .ZKNEEnable     (ZKNEEnable),
         .COMPRESSED     (COMPRESSED),
         .VEnable        (VEnable),
+        .AEnable        (AEnable),
         .VLEN           (VLEN)
     ) dut (
         .clk                    (clk),

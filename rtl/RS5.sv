@@ -34,7 +34,7 @@ module RS5
     parameter bit           COMPRESSED     = 1'b0,
     parameter bit           VEnable        = 1'b1,
     parameter int           VLEN           = 256,
-    parameter atomic_ext_e  AEnable        = ON,
+    parameter atomic_ext_e  AEnable        = OFF,
     parameter bit           XOSVMEnable    = 1'b0,
     parameter bit           ZIHPMEnable    = 1'b0,
     parameter bit           ZKNEEnable     = 1'b0
@@ -435,9 +435,8 @@ module RS5
         .vlen_o                  (vlen),
         .jump_o                  (jump),
         .jump_target_o           (jump_target),
-
-        .atomic_write_reg_o (retire_atomic),
-        .rd_atomic_o        (rd_atomic),
+        .atomic_write_reg_o      (retire_atomic),
+        .rd_atomic_o             (rd_atomic),
 
         .interrupt_pending_i     (interrupt_pending),
         .interrupt_ack_o         (interrupt_ack_o),
