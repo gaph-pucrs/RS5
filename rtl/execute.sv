@@ -458,7 +458,6 @@ end
         atomic atomic_unit (
             .clk                     (clk),
             .reset_n                 (reset_n),
-            //.instruction_operation_i (instruction_operation_i),
             .atomic_operation_i      (atomic_operation_i),
             .lrsc_address            (first_operand_i),
             .lrsc_data               (atomic_read_value),

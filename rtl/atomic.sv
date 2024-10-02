@@ -5,7 +5,6 @@ module atomic
 (
     input  logic         clk,
     input  logic         reset_n,
-    //input  iType_e       instruction_operation_i,
     input  iTypeAtomic_e atomic_operation_i,
 
     input  logic [31:0]  lrsc_data,
@@ -28,7 +27,7 @@ module atomic
     always_comb begin
         unique case (atomic_state)
             IDLE: begin
-                if (atomic_operation_i != ANOP && atomic_operation_i != LR && atomic_operation_i != SC) begin
+                if (!(atomic_operation_i inside {ANOP, LR, SC})) begin
                     atomic_next_state = WAIT_AMO;
                 end
                 else if(atomic_operation_i != ANOP) begin
@@ -44,19 +43,15 @@ module atomic
                 atomic_next_state = LRSC;
             default: 
                 atomic_next_state = IDLE;
-            // WRITE_AMO:
-            //     atomic_next_state = IDLE;
-            // LRSC:
-            //     atomic_next_state = IDLE;
         endcase
     end
 
     always_comb begin
-        atomic_read_o  = 1'b0;
-        atomic_write_o = 1'b0;
-        hold_o         = 1'b0;
+        atomic_read_o       = 1'b0;
+        atomic_write_o      = 1'b0;
+        hold_o              = 1'b0;
         atomic_write_reg_o  = 1'b0;
-        result_o = '0;
+        result_o            = 1'b0;
 
         unique case (atomic_state)
             IDLE: begin
@@ -81,11 +76,11 @@ module atomic
                 atomic_write_reg_o = 1'b1;
                 if (atomic_operation_i == SC) begin
                     if (reservation_set_address == lrsc_address && reservation_set_content == lrsc_data) begin
-                        result_o = 0;
+                        result_o = 1'b0;
                         atomic_write_o = 1'b1;
                     end 
                     else begin
-                        result_o = 1;
+                        result_o = 1'b1;
                     end
                 end
             end
@@ -121,8 +116,5 @@ module atomic
             atomic_state <= atomic_next_state;
         end
     end
-
-
-
 
 endmodule
