@@ -1335,6 +1335,34 @@ module vectorALU
 
     assign hold_o = hold | hold_widening_o | hold_accumulation_o;
 
+
+//////////////////////////////////////////////////////////////////////////////
+//  Merge
+//////////////////////////////////////////////////////////////////////////////
+
+    logic [(VLEN-1):0] result_merge;
+    
+    always_comb begin
+        unique case (vsew)
+            EW8: begin
+                for (int i = 0; i < VLENB; i++) begin
+                    result_merge[(8*i)+:8]    = (mask_sew8[cycle_count_r][i])  ? second_operand_8b[i]  : first_operand_8b[i];
+                end 
+            end
+            EW16: begin
+                for (int i = 0; i < (VLENB/2); i++) begin
+                    result_merge[(16*i)+:16]  = (mask_sew16[cycle_count_r][i]) ? second_operand_16b[i] : first_operand_16b[i];
+                end 
+            end
+            default: begin
+                for (int i = 0; i < (VLENB/4); i++) begin
+                    result_merge[(32*i)+:32]  = (mask_sew32[cycle_count_r][i]) ? second_operand_32b[i] : first_operand_32b[i];
+                end 
+            end
+        endcase
+    end
+
+
 //////////////////////////////////////////////////////////////////////////////
 // Result Demux
 //////////////////////////////////////////////////////////////////////////////
@@ -1367,6 +1395,7 @@ module vectorALU
             VREDMAXU:        result_o <= result_redmaxu;
             VMV, VMVSX:      result_o <= second_operand;
             VMVR:            result_o <= first_operand;
+            VMERGE:          result_o <= result_merge;
             default:         result_o <= result_add;
         endcase
     end
