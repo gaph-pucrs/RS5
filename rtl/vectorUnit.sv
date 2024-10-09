@@ -357,7 +357,7 @@ module vectorUnit
                     default: write_enable <= {'0, 4'b1111};
                 endcase
             end
-            else if (whole_reg_load_store || mask_instruction || vector_operation_i inside {VMERGE}) begin
+            else if (whole_reg_load_store || mask_instruction || (vector_operation_i == VMERGE)) begin
                 write_enable <= '1;
             end
             else begin

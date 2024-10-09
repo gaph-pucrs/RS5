@@ -55,10 +55,7 @@ module CSRBank
     /* Signals enabled with ZIHPM */
     /* verilator lint_off UNUSEDSIGNAL */
     input   iType_e             instruction_operation_i,
-
-`ifndef SYNTH
     input   iTypeVector_e       vector_operation_i,          
-`endif
 
     input   logic               hazard,
     input   logic               stall,
@@ -706,32 +703,33 @@ module CSRBank
                     csr_counter             <= (instruction_operation_i inside {CSRRW, CSRRWI, CSRRS, CSRRSI, CSRRC, CSRRCI}) && !mcountinhibit[18] ? csr_counter     + 1 : csr_counter;
                     mul_counter             <= (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU})                    && !mcountinhibit[22] ? mul_counter     + 1 : mul_counter;
                     div_counter             <= (instruction_operation_i inside {DIV, DIVU, REM, REMU})                        && !mcountinhibit[23] ? div_counter     + 1 : div_counter;
-                    
-
 
                     // vector extension... 
-                    vloadstore_counter      <= (instruction_operation_i inside {VLOAD, VSTORE})                               && !mcountinhibit[29] ? vloadstore_counter    + 1 : vloadstore_counter;
+                    if(VEnable) begin
+                        vloadstore_counter      <= (instruction_operation_i inside {VLOAD, VSTORE})                           && !mcountinhibit[29] ? vloadstore_counter + 1 : vloadstore_counter;
+        
+                        if(instruction_operation_i == VECTOR) begin
 
-                    if(VEnable && instruction_operation_i == VECTOR) begin
-                        vaddsub_counter     <= (vector_operation_i      inside {VADD, VSUB, VRSUB})                           && !mcountinhibit[24] ? vaddsub_counter + 1 : vaddsub_counter;
-                        
-                        vmul_counter        <= (vector_operation_i      inside {
-                                                                                VMUL, VMULH, VMULHU, VMULHSU,                               // non-widening multiplication
-                                                                                VWMUL, VWMULU, VWMULSU                                      // widening multiplication
-                                                                               })   && !mcountinhibit[25] ?  vmul_counter    + 1 : vmul_counter;
+                            vaddsub_counter     <= (vector_operation_i      inside {VADD, VSUB, VRSUB})                       && !mcountinhibit[24] ? vaddsub_counter    + 1 : vaddsub_counter;
+                            
+                            vmul_counter        <= (vector_operation_i      inside {
+                                                                                    VMUL, VMULH, VMULHU, VMULHSU,                               // non-widening multiplication
+                                                                                    VWMUL, VWMULU, VWMULSU                                      // widening multiplication
+                                                                                   })   && !mcountinhibit[25] ?  vmul_counter    + 1 : vmul_counter;
 
-                        vdiv_counter        <= (vector_operation_i      inside {VDIV, VDIVU, VREM, VREMU})                    && !mcountinhibit[26] ? vdiv_counter    + 1 : vdiv_counter;
-                        vmac_counter        <= (vector_operation_i      inside {VMACC, VNMSAC, VMADD, VNMSUB})                && !mcountinhibit[27] ? vmac_counter    + 1 : vmac_counter;          
-                        vred_counter        <= (vector_operation_i      inside {VREDMIN, VREDMINU, VREDMAX, VREDMAXU})        && !mcountinhibit[28] ? vred_counter    + 1 : vred_counter;
+                            vdiv_counter        <= (vector_operation_i      inside {VDIV, VDIVU, VREM, VREMU})                    && !mcountinhibit[26] ? vdiv_counter   + 1 : vdiv_counter;
+                            vmac_counter        <= (vector_operation_i      inside {VMACC, VNMSAC, VMADD, VNMSUB})                && !mcountinhibit[27] ? vmac_counter   + 1 : vmac_counter;          
+                            vred_counter        <= (vector_operation_i      inside {VREDMIN, VREDMINU, VREDMAX, VREDMAXU})        && !mcountinhibit[28] ? vred_counter   + 1 : vred_counter;
 
-                        vothers_counter     <= (vector_operation_i     inside {
-                                                                                VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT,  // mask compares
-                                                                                VREDAND, VREDOR, VREDXOR,                                   // logic reduction
-                                                                                VMV, VMVR, VMVSX, VMVXS,                                    // register moves
-                                                                                VSLL, VSRL, VSRA,                                           // shifts
-                                                                                VAND, VOR, VXOR,                                            // logic
-                                                                                VMERGE                                                      // merge
-                                                                              })   && !mcountinhibit[30] ?  vothers_counter + 1 : vothers_counter;
+                            vothers_counter     <= (vector_operation_i      inside {
+                                                                                    VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT,  // mask compares
+                                                                                    VREDAND, VREDOR, VREDXOR,                                   // logic reduction
+                                                                                    VMV, VMVR, VMVSX, VMVXS,                                    // register moves
+                                                                                    VSLL, VSRL, VSRA,                                           // shifts
+                                                                                    VAND, VOR, VXOR,                                            // logic
+                                                                                    VMERGE                                                      // merge
+                                                                                   })   && !mcountinhibit[30] ?  vothers_counter + 1 : vothers_counter;
+                        end
                     end
                     //
 
