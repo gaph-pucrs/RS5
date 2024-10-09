@@ -465,6 +465,7 @@ module CSRBank
                 MHPMCOUNTER22:  out = mul_counter;
                 MHPMCOUNTER23:  out = div_counter;
 
+                // Vector Extension counters
                 MHPMCOUNTER24:  out = vaddsub_counter;
                 MHPMCOUNTER25:  out = vmul_counter;
                 MHPMCOUNTER26:  out = vdiv_counter;
@@ -728,7 +729,8 @@ module CSRBank
                                                                                 VREDAND, VREDOR, VREDXOR,                                   // logic reduction
                                                                                 VMV, VMVR, VMVSX, VMVXS,                                    // register moves
                                                                                 VSLL, VSRL, VSRA,                                           // shifts
-                                                                                VAND, VOR, VXOR                                             // logic
+                                                                                VAND, VOR, VXOR,                                            // logic
+                                                                                VMERGE                                                      // merge
                                                                               })   && !mcountinhibit[30] ?  vothers_counter + 1 : vothers_counter;
                     end
                     //
