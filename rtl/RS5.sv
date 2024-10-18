@@ -187,20 +187,16 @@ module RS5
                             ? regbank_data_writeback
                             : regbank_data2;
 
-    if (COMPRESSED == 1'b1) begin : gen_en_fetch_c
-        assign enable_fetch = ~(stall || hold || instruction_prefetched);
-    end
-    else begin : gen_en_fetch_nc
-        assign enable_fetch = ~(stall || hold || hazard);
-    end
+    assign enable_fetch = ~(stall || hold || instruction_prefetched || hazard);
 
-    assign enable_decode = ~(stall | hold);
+    assign enable_decode = !(stall || hold);
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////// FETCH //////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+    logic [31:0] instruction_fetch;
 
     fetch #(
         .COMPRESSED(COMPRESSED)
@@ -221,6 +217,8 @@ module RS5
         .jumped_o               (jumped),
         .jumped_r_o             (jumped_r),
         .instruction_address_o  (instruction_address), 
+        .instruction_data_i     (instruction_i),
+        .instruction_o          (instruction_fetch),
         .pc_o                   (pc_prefetch), 
         .tag_o                  (tag_prefetch)
     );
@@ -264,10 +262,11 @@ module RS5
             .enable_i           (enable_prefetch),
             .hazard_i           (hazard),
             .jumped_i           (jumped),
+            .jumped_r_i         (jumped_r),
             .jump_i             (jump),
             .tag_i              (tag_prefetch),
             .pc_i               (pc_prefetch),
-            .instruction_i      (instruction_i),
+            .instruction_i      (instruction_fetch),
             .jump_misaligned_i  (jump_misaligned),
             .prefetched_o       (instruction_prefetched),
             .compressed_o       (instruction_compressed),
@@ -282,7 +281,7 @@ module RS5
         );
     end
     else begin : gen_compressed_off
-        assign instruction_decode = instruction_i;
+        assign instruction_decode = instruction_fetch;
         assign instruction_compressed = 1'b0;
         assign pc_decode = pc_prefetch;
         assign tag_decode = tag_prefetch;
