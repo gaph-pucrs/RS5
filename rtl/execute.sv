@@ -497,6 +497,11 @@ end
             instruction_operation_o <= instruction_operation_i;
             result_o                <= result;
         end
+        else begin
+            write_enable_o          <= 1'b0;
+            instruction_operation_o <= NOP;
+            result_o                <= '0;
+        end
     end
 
 //////////////////////////////////////////////////////////////////////////////
