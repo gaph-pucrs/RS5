@@ -261,6 +261,7 @@ module RS5
         align align (
             .clk                (clk),
             .reset_n            (reset_n),
+            .sys_reset          (sys_reset_i),
             .enable_i           (enable_prefetch),
             .hazard_i           (hazard),
             .jumped_i           (jumped),
