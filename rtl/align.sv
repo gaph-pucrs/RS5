@@ -14,6 +14,7 @@ module align
 (
     input  logic        clk,
     input  logic        reset_n,
+    input  logic        sys_reset,
 
     input  logic        enable_i,
     input  logic        hazard_i,
@@ -55,7 +56,7 @@ module align
         end
     end
 
-    assign flush_align = jump_i || jump_r;
+    assign flush_align = jump_i || jump_r || sys_reset;
 
 //////////////////////////////////////////////////////////////////////////////
 // Compression control
