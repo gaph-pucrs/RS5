@@ -35,7 +35,7 @@ module CSRBank
     parameter bit       XOSVMEnable    = 1'b0,
     parameter bit       ZIHPMEnable    = 1'b0,
     parameter bit       COMPRESSED     = 1'b0,
-    parameter rv32_e    RV32           = RV32I,
+    parameter mul_e     MULEXT         = MUL_M,
     parameter bit       VEnable        = 1'b0,
     parameter int       VLEN           = 64
 )
@@ -111,7 +111,7 @@ module CSRBank
         6'b0,
         XOSVMEnable,    // X - Non-standard extensions present
         1'b0,
-        VEnable,           // V - Vector extension
+        VEnable,        // V - Vector extension
         1'b1,           // U - User mode implemented
         1'b0,
         1'b0,           // S - Supervisor mode implemented
@@ -119,7 +119,7 @@ module CSRBank
         1'b0,           // P - Packed-SIMD extension
         1'b0,
         1'b0,           // N - User level interrupts supported
-        (RV32==RV32M),  // M - Integer Multiply/Divide extension
+        (MULEXT==MUL_M),// M - Integer Multiply/Divide extension
         3'b0,
         1'b1,           // I - RV32I/64I/128I base ISA
         1'b0,           // F - Hypervisor extension
@@ -127,7 +127,7 @@ module CSRBank
         1'b0,           // F - Single precision floating-point extension
         1'b0,           // E - RV32E base ISA
         1'b0,           // D - Double precision floating-point extension
-        1'b0,           // C - Compressed extension
+        (COMPRESSED),   // C - Compressed extension
         1'b0,           // B - Bit-Manipulation extension
         1'b0            // A - Atomic Extension
     };

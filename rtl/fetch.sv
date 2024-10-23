@@ -23,7 +23,8 @@
 
 module fetch  #(
     parameter     start_address = 32'b0,
-    parameter bit COMPRESSED    = 1'b0
+    parameter bit COMPRESSED    = 1'b0,
+    parameter bit BRANCHPRED    = 1'b1
 )
 (
     input   logic           clk,
@@ -33,22 +34,20 @@ module fetch  #(
 
 
     input   logic           jump_i,
+    input   logic           jump_rollback_i,
     input   logic [31:0]    jump_target_i,
+    input   logic           bp_take_i,
+    input   logic [31:0]    bp_target_i,
+    output  logic           jumping_o,
+    output  logic           bp_rollback_o,
 
     input   logic [31:0]    mtvec_i,
     input   logic [31:0]    mepc_i,
     input   logic           exception_raised_i,
     input   logic           machine_return_i,
     input   logic           interrupt_ack_i,
-    /* Used only with compressed */
-    /* verilator lint_off UNUSEDSIGNAL */
-    input   logic           hazard_i,
-    /* verilator lint_on UNUSEDSIGNAL */
 
     output  logic           jump_misaligned_o,
-    output  logic           jumped_o,
-    output  logic           jumped_r_o,
-
     output  logic [31:0]    instruction_address_o,
     input   logic [31:0]    instruction_data_i,
     output  logic [31:0]    instruction_o,
@@ -61,16 +60,17 @@ module fetch  #(
 //////////////////////////////////////////////////////////////////////////////
 
     logic [31:0] pc;
-    logic [31:0] pc_r;
+    logic [31:0] pc_next;
+    assign pc_next = pc + 4;
+
+    logic [31:0] pc_rollbacked;
 
     /* Not used without compressed */
     /* verilator lint_off UNUSEDSIGNAL */
     logic jump_misaligned;
     /* verilator lint_on UNUSEDSIGNAL */
 
-
     if (COMPRESSED) begin : gen_pc_c
-
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n) begin
                 pc <= start_address;
@@ -119,11 +119,19 @@ module fetch  #(
                     pc <= mtvec_i;
                 else if (jump_i)
                     pc <= jump_target_i;
+                else if (jump_rollback_i)
+                    pc <= pc_rollbacked;
+                else if (bp_take_i)
+                    pc <= bp_target_i;
                 else if (enable_i)
-                    pc <= pc + 4;
+                    pc <= pc_next;
             end
         end
     end
+
+    assign instruction_address_o = pc;
+
+    logic [31:0] pc_r;
 
     /* pc_r is the PC of the fetched instruction */
     always_ff @(posedge clk or negedge reset_n) begin
@@ -145,8 +153,6 @@ module fetch  #(
             pc_o <= pc_r;
         end
     end
-
-    assign instruction_address_o = pc;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Data control
@@ -187,44 +193,76 @@ module fetch  #(
     end
     
 ////////////////////////////////////////////////////////////////////////////////
+// Branch prediction
+////////////////////////////////////////////////////////////////////////////////
+
+    if (BRANCHPRED) begin : gen_bp_on
+        logic bp_rollback_r;
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                bp_rollback_r <= 1'b0;
+            else if (jump_rollback_i)
+                bp_rollback_r <= 1'b1;
+            else if (enable_i)
+                bp_rollback_r <= 1'b0;
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                bp_rollback_o <= 1'b0;
+            else if (enable_i)
+                bp_rollback_o <= bp_rollback_r;
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                pc_rollbacked <= '0;
+            else if (bp_take_i)
+                pc_rollbacked <= pc_next;
+        end
+    end
+    else begin : gen_bp_off
+        assign bp_rollback_o = 1'b0;
+        assign pc_rollbacked = '0;
+    end
+
+////////////////////////////////////////////////////////////////////////////////
 // Jump control
 ////////////////////////////////////////////////////////////////////////////////
 
     logic jumped;
-    assign jumped = machine_return_i || exception_raised_i || interrupt_ack_i || jump_i;
+    assign jumped = machine_return_i || exception_raised_i || interrupt_ack_i || jump_i || bp_take_i;
 
     logic jumped_r;
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             jumped_r <= 1'b1;
-        else
-            jumped_r <= jumped;
+        else if (jumped || jump_rollback_i)
+            jumped_r <= 1'b1;
+        else if (enable_i)
+            jumped_r <= 1'b0;
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
-            jumped_o <= 1'b1;
-        else
-            jumped_o <= jumped_r;
+            jumping_o <= 1'b0;
+        else if (jumped || jump_rollback_i || jumped_r)
+            jumping_o <= 1'b1;
+        else if (enable_i)
+            jumping_o <= 1'b0;
     end
 
     if (COMPRESSED) begin : gen_jmp_c
         always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n) begin
+            if (!reset_n)
                 jump_misaligned_o <= '0;
-            end
-            else begin
+            else if (enable_i)
                 jump_misaligned_o <= jump_misaligned;
-            end
         end
     end
     else begin : gen_jmp_nc
         assign jump_misaligned_o = 1'b0;
     end
-
-
-    /* Only for compressed, ignore for now */
-    assign jumped_r_o = jumped_r;
 
 //////////////////////////////////////////////////////////////////////////////
 // TAG control
@@ -232,32 +270,27 @@ module fetch  #(
 
     logic [2:0] tag;
     always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
+        if (!reset_n)
             tag <= '0;
-        end
-        else begin
-            if (jumped)
-                tag <= tag + 1'b1;
-        end
+        else if (jumped)
+            tag <= tag + 1'b1;
+        else if (jump_rollback_i)
+            tag <= tag - 1'b1;
     end
 
     logic [2:0] tag_r;
     always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
+        if (!reset_n)
             tag_r <= '1;
-        end
-        else if (enable_i) begin
+        else if (enable_i)
             tag_r <= tag;
-        end
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
+        if (!reset_n)
             tag_o <= '1;
-        end
-        else if (enable_i) begin
+        else if (enable_i)
             tag_o <= tag_r;
-        end
     end
 
 endmodule

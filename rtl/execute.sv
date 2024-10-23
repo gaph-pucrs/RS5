@@ -31,10 +31,11 @@ module execute
     import RS5_pkg::*;
 #(
     parameter environment_e Environment = ASIC,
-    parameter rv32_e        RV32        = RV32I,
+    parameter mul_e         MULEXT      = MUL_M,
     parameter bit           ZKNEEnable  = 1'b0,
     parameter bit           VEnable     = 1'b0,
-    parameter int           VLEN        = 64
+    parameter int           VLEN        = 64,
+    parameter bit           BRANCHPRED  = 1'b1
 )
 (
     input   logic               clk,
@@ -90,7 +91,12 @@ module execute
     output  logic [31:0]        vtype_o,
     output  logic [31:0]        vlen_o,
 
+    /* Not used if BP is off */
+    /* verilator lint_off UNUSEDSIGNAL */
+    input   logic               bp_taken_i,
+    /* verilator lint_on UNUSEDSIGNAL */
     output  logic               jump_o,
+    output  logic               jump_rollback_o,
     output  logic [31:0]        jump_target_o,
 
     input   logic               interrupt_pending_i,
@@ -132,7 +138,6 @@ module execute
     logic           less_than_unsigned;
     logic           greater_equal;
     logic           greater_equal_unsigned;
-    logic           jump;
 
     always_comb begin
         unique case (instruction_operation_i)
@@ -298,7 +303,7 @@ end
     logic        hold_mul;
     logic        hold_div;
 
-    if (RV32 == RV32M || RV32 == RV32ZMMUL) begin : gen_zmmul_on
+    if (MULEXT != MUL_OFF) begin : gen_zmmul_on
 
         logic [1:0] signed_mode_mul;
         logic       enable_mul;
@@ -340,7 +345,7 @@ end
     logic [31:0] div_result;
     logic [31:0] rem_result;
 
-    if (RV32 == RV32M) begin : gen_div_on
+    if (MULEXT == MUL_M) begin : gen_div_on
         logic enable_div;
         logic signed_div;
 
@@ -524,20 +529,28 @@ end
         endcase
     end
 
+    logic should_jump;
     always_comb begin
         unique case (instruction_operation_i)
-            BEQ:        jump = equal;
-            BNE:        jump = ~equal;
-            BLT:        jump = less_than;
-            BLTU:       jump = less_than_unsigned;
-            BGE:        jump = greater_equal;
-            BGEU:       jump = greater_equal_unsigned;
-            JAL, JALR:  jump = 1'b1;
-            default:    jump = 1'b0;
+            BEQ:        should_jump = equal;
+            BNE:        should_jump = !equal;
+            BLT:        should_jump = less_than;
+            BLTU:       should_jump = less_than_unsigned;
+            BGE:        should_jump = greater_equal;
+            BGEU:       should_jump = greater_equal_unsigned;
+            JAL, JALR:  should_jump = 1'b1;
+            default:    should_jump = 1'b0;
         endcase
     end
 
-    assign jump_o = (jump && !killed);
+    if (BRANCHPRED) begin : gen_bp_on
+        assign jump_o          = ( should_jump && !bp_taken_i && !killed);
+        assign jump_rollback_o = (!should_jump &&  bp_taken_i && !killed);
+    end
+    else begin : gen_bp_off
+        assign jump_o          = (should_jump && !killed);
+        assign jump_rollback_o = 1'b0;
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 // TAG control based on signals Jump and Killed
@@ -547,7 +560,7 @@ end
         if (!reset_n) begin
             curr_tag <= '0;
         end
-        else if ((jump_o || raise_exception_o || machine_return_o || interrupt_ack_o)) begin
+        else if (((should_jump && !killed) || raise_exception_o || machine_return_o || interrupt_ack_o)) begin
             curr_tag <= curr_tag + 1'b1;
         end
     end

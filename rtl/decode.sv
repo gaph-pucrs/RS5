@@ -26,9 +26,11 @@
 module decode
     import RS5_pkg::*;
 #(
+    parameter mul_e         MULEXT      = MUL_M,
+    parameter bit           COMPRESSED  = 1'b0,
     parameter bit           ZKNEEnable  = 1'b0,
     parameter bit           VEnable     = 1'b0,
-    parameter bit           COMPRESSED  = 1'b0
+    parameter bit           BRANCHPRED  = 1'b1
 )
 (
     input   logic           clk,
@@ -41,7 +43,7 @@ module decode
     input   logic [31:0]    rs1_data_read_i,
     input   logic [31:0]    rs2_data_read_i,
     input   logic           compressed_i,
-    input   logic           jumped_i,
+    input   logic           rollback_i,
 
     output  logic  [4:0]    rs1_o,
     output  logic  [4:0]    rs2_o,
@@ -57,27 +59,30 @@ module decode
     output  iTypeVector_e   vector_operation_o,
     output  logic           hazard_o,
 
+    /* Not used without BP */
+    /* verilator lint_off UNUSEDSIGNAL */
+    input   logic           jump_rollback_i,
+    /* verilator lint_on UNUSEDSIGNAL */
+    input   logic           jump_i,
+    input   logic           jumping_i,
+    output  logic           bp_take_o,
+    output  logic           bp_taken_o,
+    output  logic [31:0]    bp_target_o,
+
     input   logic           exc_inst_access_fault_i,
     output  logic           exc_inst_access_fault_o,
     output  logic           exc_ilegal_inst_o,
     output  logic           exc_misaligned_fetch_o
 );
 
-    logic [31:0]    first_operand, second_operand, third_operand, immediate;
-    logic [31:0]    instruction;
-    logic [31:0]    last_instruction;
+//////////////////////////////////////////////////////////////////////////////
+// Re-Decode instruction on hazard or stall
+//////////////////////////////////////////////////////////////////////////////
+
     logic           last_hazard;
     logic           last_stall;
-    logic           locked_memory;
-    logic  [4:0]    locked_register;
-
-    formatType_e    instruction_format;
-    iType_e         instruction_operation;
-
-
-//////////////////////////////////////////////////////////////////////////////
-// Re-Decode isntruction on hazard or stall
-//////////////////////////////////////////////////////////////////////////////
+    logic [31:0]    instruction;
+    logic [31:0]    last_instruction;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
@@ -113,22 +118,15 @@ module decode
 // Find out the type of the instruction
 //////////////////////////////////////////////////////////////////////////////
 
-    iType_e decode_branch;
-    iType_e decode_load;
-    iType_e decode_store;
-    iType_e decode_op_imm;
-    iType_e decode_op;
-    iType_e decode_misc_mem;
-    iType_e decode_system;
-
     logic [2:0] funct3;
     logic [6:0] funct7;
     logic [6:0] opcode;
-
-    assign opcode = instruction[6:0];
+    
     assign funct3 = instruction[14:12];
     assign funct7 = instruction[31:25];
+    assign opcode = instruction[6:0];
 
+    iType_e decode_branch;
     always_comb begin
         unique case (funct3)
             3'b000:     decode_branch = BEQ;
@@ -141,6 +139,7 @@ module decode
         endcase
     end
 
+    iType_e decode_load;
     always_comb begin
         unique case (funct3)
             3'b000:     decode_load = LB;
@@ -152,6 +151,7 @@ module decode
         endcase
     end
 
+    iType_e decode_store;
     always_comb begin
         unique case (funct3)
             3'b000:     decode_store = SB;
@@ -161,6 +161,7 @@ module decode
         endcase
     end
 
+    iType_e decode_op_imm;
     always_comb begin
         unique case ({funct7, funct3}) inside
             10'b???????000:     decode_op_imm = ADD;    /* ADDI */
@@ -176,6 +177,7 @@ module decode
         endcase
     end
 
+    iType_e decode_op;
     always_comb begin
         unique case ({funct7, funct3}) inside
             10'b0000000000:     decode_op = ADD;
@@ -188,20 +190,21 @@ module decode
             10'b0100000101:     decode_op = SRA;
             10'b0000000110:     decode_op = OR;
             10'b0000000111:     decode_op = AND;
-            10'b0000001000:     decode_op = MUL;
-            10'b0000001001:     decode_op = MULH;
-            10'b0000001010:     decode_op = MULHSU;
-            10'b0000001011:     decode_op = MULHU;
-            10'b0000001100:     decode_op = DIV;
-            10'b0000001101:     decode_op = DIVU;
-            10'b0000001110:     decode_op = REM;
-            10'b0000001111:     decode_op = REMU;
-            10'b??10001000:     decode_op = ZKNEEnable ? AES32ESI : INVALID;
+            10'b0000001000:     decode_op = (MULEXT != MUL_OFF) ? MUL    : INVALID;
+            10'b0000001001:     decode_op = (MULEXT != MUL_OFF) ? MULH   : INVALID;
+            10'b0000001010:     decode_op = (MULEXT != MUL_OFF) ? MULHSU : INVALID;
+            10'b0000001011:     decode_op = (MULEXT != MUL_OFF) ? MULHU  : INVALID;
+            10'b0000001100:     decode_op = (MULEXT == MUL_M  ) ? DIV    : INVALID;
+            10'b0000001101:     decode_op = (MULEXT == MUL_M  ) ? DIVU   : INVALID;
+            10'b0000001110:     decode_op = (MULEXT == MUL_M  ) ? REM    : INVALID;
+            10'b0000001111:     decode_op = (MULEXT == MUL_M  ) ? REMU   : INVALID;
+            10'b??10001000:     decode_op = ZKNEEnable ? AES32ESI  : INVALID;
             10'b??10011000:     decode_op = ZKNEEnable ? AES32ESMI : INVALID;
             default:            decode_op = INVALID;
         endcase
     end
 
+    iType_e decode_misc_mem;
     always_comb begin
         unique case (funct3)
             3'b000:     decode_misc_mem = NOP;  /* FENCE */
@@ -209,6 +212,7 @@ module decode
         endcase
     end
 
+    iType_e decode_system;
     always_comb begin
         unique case (instruction[31:7]) inside
             25'b0000000000000000000000000:  decode_system = ECALL;
@@ -226,6 +230,7 @@ module decode
         endcase
     end
 
+    iType_e instruction_operation;
     always_comb begin
         unique case (opcode)
             7'b0110111: instruction_operation = LUI;
@@ -358,6 +363,7 @@ module decode
 //  Decodes the instruction format
 //////////////////////////////////////////////////////////////////////////////
 
+    formatType_e instruction_format;
     always_comb begin
         unique case (opcode[6:2])
             5'b11001, 5'b00000, 5'b00100:   instruction_format = I_TYPE;        /* JALR, LOAD, OP-IMM */
@@ -372,6 +378,7 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 // Extract the immediate based on instruction format
 //////////////////////////////////////////////////////////////////////////////
+
     logic [31:0] imm_i;
     logic [31:0] imm_s;
     logic [31:0] imm_b;
@@ -384,6 +391,7 @@ module decode
     assign imm_u = {instruction[31:12], 12'b0};
     assign imm_j = {{12{instruction[31]}}, instruction[19:12], instruction[20], instruction[30:25], instruction[24:21], 1'b0};
 
+    logic [31:0] immediate;
     always_comb begin
         unique case (instruction_format)
             I_TYPE:     immediate = imm_i;
@@ -395,9 +403,54 @@ module decode
         endcase
     end
 
+////////////////////////////////////////////////////////////////////////////////
+// Branch Prediction
+////////////////////////////////////////////////////////////////////////////////
+
+    logic jump_confirmed;
+
+    if (BRANCHPRED) begin : gen_bp_on
+        logic bp_branch_taken;
+        logic bp_jump_taken;
+
+        assign bp_branch_taken = (opcode[6:2] == 5'b11000 && imm_b[31]);
+        assign bp_jump_taken   = (opcode[6:2] == 5'b11011);
+
+        assign bp_take_o  = (bp_jump_taken || bp_branch_taken) && !jumping_i && !hazard_o && !rollback_i;
+        assign bp_target_o = pc_i + immediate;
+
+        assign jump_confirmed = (jump_i || jumping_i) && !(jump_rollback_i || jump_rollback_r);
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                bp_taken_o <= 1'b0;
+            else
+                bp_taken_o <= bp_take_o;
+        end
+
+        logic jump_rollback_r;
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                jump_rollback_r <= 1'b0;
+            else if (jump_rollback_i)
+                jump_rollback_r <= 1'b1;
+            else if (enable)
+                jump_rollback_r <= 1'b0;
+        end
+    end
+    else begin : gen_bp_off
+        assign bp_take_o   = 1'b0;
+        assign bp_taken_o  = 1'b0;
+        assign bp_target_o = '0;
+        assign jump_confirmed = (jump_i || jumping_i);
+    end
+
 //////////////////////////////////////////////////////////////////////////////
 // Registe Lock Queue (RLQ)
 //////////////////////////////////////////////////////////////////////////////
+
+    logic           locked_memory;
+    logic  [4:0]    locked_register;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
@@ -475,7 +528,7 @@ module decode
     assign hazard_rs1 = locked_rs1      & use_rs1;
     assign hazard_rs2 = locked_rs2      & use_rs2;
 
-    assign hazard_o   = (hazard_mem || hazard_rs1 || hazard_rs2) && enable && !jumped_i;
+    assign hazard_o   = (hazard_mem || hazard_rs1 || hazard_rs2) && enable && !rollback_i && !jump_confirmed;
 
 //////////////////////////////////////////////////////////////////////////////
 // Exception Detection
@@ -494,8 +547,10 @@ module decode
     end
 
 //////////////////////////////////////////////////////////////////////////////
-// Control of the exits based on format
+// Control of the operands based on format
 //////////////////////////////////////////////////////////////////////////////
+
+    logic [31:0]    first_operand, second_operand, third_operand;
 
     always_comb begin
         unique case (instruction_format)
@@ -519,7 +574,7 @@ module decode
     end
 
 //////////////////////////////////////////////////////////////////////////////
-// Outputs
+// Outputs do execution unit
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk or negedge reset_n) begin
@@ -537,7 +592,7 @@ module decode
             exc_inst_access_fault_o <= 1'b0;
             vector_operation_o      <= VNOP;
         end
-        else if (hazard_o) begin
+        else if (hazard_o || rollback_i) begin
             first_operand_o         <= '0;
             second_operand_o        <= '0;
             third_operand_o         <= '0;
