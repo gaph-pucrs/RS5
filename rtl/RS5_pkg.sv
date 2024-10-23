@@ -29,10 +29,10 @@ package RS5_pkg;
     } environment_e;
 
     typedef enum integer {
-        RV32I       = 0,
-        RV32M       = 1,
-        RV32ZMMUL   = 2
-    } rv32_e;
+        MUL_OFF     = 0,
+        MUL_M       = 1,
+        MUL_ZMMUL   = 2
+    } mul_e;
 
     typedef enum logic[5:0] {
         R_TYPE = 6'b000001,
