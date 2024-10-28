@@ -31,7 +31,7 @@ module RS5
 `endif
     parameter environment_e Environment    = ASIC,
     parameter mul_e         MULEXT         = MUL_M,
-    parameter bit           COMPRESSED     = 1'b1,
+    parameter bit           COMPRESSED     = 1'b0,
     parameter bit           VEnable        = 1'b0,
     parameter int           VLEN           = 256,
     parameter bit           XOSVMEnable    = 1'b0,
