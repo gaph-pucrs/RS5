@@ -34,11 +34,15 @@ module fetch  #(
 
 
     input   logic           jump_i,
-    input   logic           jump_rollback_i,
     input   logic [31:0]    jump_target_i,
-    input   logic           bp_take_i,
-    input   logic [31:0]    bp_target_i,
     output  logic           jumping_o,
+    
+    /* Signals not used without BP */
+    /* verilator lint_off UNUSEDSIGNAL */
+    input   logic           bp_take_i,
+    input   logic           jump_rollback_i,
+    input   logic [31:0]    bp_target_i,
+    /* verilator lint_on UNUSEDSIGNAL */
     output  logic           bp_rollback_o,
 
     input   logic [31:0]    mtvec_i,
@@ -60,7 +64,12 @@ module fetch  #(
 //////////////////////////////////////////////////////////////////////////////
 
     logic        iaddr_continue;
-    logic [31:0] iaddr_rollbacked;
+    logic        should_jump;
+    logic [31:0] jump_target;
+    logic [31:0] iaddr_continue_next;
+
+    logic [31:0] iaddr_advance;
+    assign iaddr_advance = instruction_address_o + 32'd4;
 
     logic [31:0] iaddr_next;
     always_comb begin
@@ -68,14 +77,10 @@ module fetch  #(
             iaddr_next = mepc_i;
         else if ((exception_raised_i || interrupt_ack_i))
             iaddr_next = mtvec_i;
-        else if (jump_i)
-            iaddr_next = jump_target_i;
-        else if (jump_rollback_i)
-            iaddr_next = iaddr_rollbacked;
-        else if (bp_take_i)
-            iaddr_next = bp_target_i;
+        else if (should_jump)
+            iaddr_next = jump_target;
         else if (iaddr_continue)
-            iaddr_next = instruction_address_o + 32'd4;
+            iaddr_next = iaddr_continue_next;
         else
             iaddr_next = instruction_address_o;
     end
@@ -90,51 +95,17 @@ module fetch  #(
     end
 
 ////////////////////////////////////////////////////////////////////////////////
-// Branch prediction
-////////////////////////////////////////////////////////////////////////////////
-
-    if (BRANCHPRED) begin : gen_bp_on
-        logic bp_rollback_r;
-        always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n)
-                bp_rollback_r <= 1'b0;
-            else if (jump_rollback_i)
-                bp_rollback_r <= 1'b1;
-            else if (enable_i)
-                bp_rollback_r <= 1'b0;
-        end
-
-        always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n)
-                bp_rollback_o <= 1'b0;
-            else if (enable_i)
-                bp_rollback_o <= bp_rollback_r;
-        end
-
-        always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n)
-                iaddr_rollbacked <= '0;
-            else if (bp_take_i)
-                iaddr_rollbacked <= iaddr_next;   // @todo What to do with compressed? :(
-        end
-    end
-    else begin : gen_bp_off
-        assign bp_rollback_o = 1'b0;
-        assign iaddr_rollbacked = '0;
-    end
-
-////////////////////////////////////////////////////////////////////////////////
 // Jump control
 ////////////////////////////////////////////////////////////////////////////////
 
     logic jumped;
-    assign jumped = machine_return_i || exception_raised_i || interrupt_ack_i || jump_i || bp_take_i;
+    assign jumped = machine_return_i || exception_raised_i || interrupt_ack_i || should_jump;
 
     logic jumped_r;
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             jumped_r <= 1'b1;
-        else if (jumped || jump_rollback_i)
+        else if (jumped) // || jump_rollback_i
             jumped_r <= 1'b1;
         else if (enable_i)
             jumped_r <= 1'b0;
@@ -151,7 +122,7 @@ module fetch  #(
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             jumping_o <= 1'b1;
-        else if (jumped || jump_rollback_i || jumped_r)
+        else if (jumped || jumped_r) // || jump_rollback_i
             jumping_o <= 1'b1;
         else if (enable_i)
             jumping_o <= 1'b0;
@@ -171,7 +142,7 @@ module fetch  #(
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             pc <= start_address;
-        else if (jumped || jump_rollback_i)
+        else if (jumped) // || jump_rollback_i
             pc <= iaddr_next;
     end
 
@@ -188,13 +159,15 @@ module fetch  #(
     assign pc_next = pc_o + 32'(pc_add);
 
     logic [31:0] pc_update;
+    logic [31:0] pc_update_next;
+
     /* pc_o is the PC of the fetched instruction */
     /* at the moment the instruction arrives     */
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             pc_o <= '0;
-        else if (enable_i)
-            pc_o <= pc_update;
+        else if (enable_i) 
+            pc_o <= pc_update_next;
     end
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -233,14 +206,13 @@ module fetch  #(
 // TAG control
 //////////////////////////////////////////////////////////////////////////////
 
+    logic [2:0] tag_next;
     logic [2:0] tag;
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             tag <= '0;
-        else if (jumped)
-            tag <= tag + 1'b1;
-        else if (jump_rollback_i)
-            tag <= tag - 1'b1;
+        else
+            tag <= tag_next;
     end
 
     logic [2:0] tag_r;
@@ -256,6 +228,78 @@ module fetch  #(
             tag_o <= '1;
         else if (enable_i)
             tag_o <= tag_r;
+    end
+
+////////////////////////////////////////////////////////////////////////////////
+// Branch prediction
+////////////////////////////////////////////////////////////////////////////////
+
+    if (BRANCHPRED) begin : gen_bp_on
+        logic [31:0] iaddr_rollbacked;
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                iaddr_rollbacked <= '0;
+            else if (bp_take_i)
+                iaddr_rollbacked <= iaddr_advance;
+        end
+
+        logic jump_rollback_r;
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                jump_rollback_r <= 1'b0;
+            else if (jump_rollback_i)
+                jump_rollback_r <= 1'b1;
+            else if (enable_i || enable_r)
+                jump_rollback_r <= 1'b0;
+        end
+
+        logic should_rollback;
+        assign should_rollback = jump_rollback_i || (jump_rollback_r && !enable_r);
+
+        logic bp_rollback_r;
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                bp_rollback_r <= 1'b0;
+            else if (enable_i)
+                bp_rollback_r <= should_rollback;
+        end
+
+        logic [31:0] pc_rollbacked;
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                pc_rollbacked <= '0;
+            else if (bp_rollback_r)
+                pc_rollbacked <= pc_next;
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                bp_rollback_o <= 1'b0;
+            else if (enable_i)
+                bp_rollback_o <= bp_rollback_r;
+        end
+
+        always_comb begin
+            if (jumped)
+                tag_next = tag + 1'b1;
+            else if (jump_rollback_i)
+                tag_next = tag - 1'b1;
+            else
+                tag_next = tag;
+        end
+
+        assign should_jump = jump_i || bp_take_i;
+        assign jump_target = jump_i ? jump_target_i : bp_target_i;
+        assign pc_update_next = bp_rollback_o ? pc_rollbacked : pc_update;
+        assign iaddr_continue_next = should_rollback ? iaddr_rollbacked : iaddr_advance;
+    end
+    else begin : gen_bp_off
+        assign bp_rollback_o = 1'b0;
+        assign should_jump = jump_i;
+        assign jump_target = jump_target_i;
+        assign tag_next = jumped ? (tag + 1'b1) : tag;
+        assign pc_update_next = pc_update;
+        assign iaddr_continue_next = iaddr_advance;
     end
 
 ////////////////////////////////////////////////////////////////////////////////
