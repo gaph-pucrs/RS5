@@ -27,7 +27,7 @@ module decode
     import RS5_pkg::*;
 #(
     parameter mul_e         MULEXT      = MUL_M,
-    parameter bit           COMPRESSED  = 1'b0,
+    parameter bit           COMPRESSED  = 1'b1,
     parameter bit           ZKNEEnable  = 1'b0,
     parameter bit           VEnable     = 1'b0,
     parameter bit           BRANCHPRED  = 1'b1
@@ -42,7 +42,6 @@ module decode
     input   logic  [2:0]    tag_i,
     input   logic [31:0]    rs1_data_read_i,
     input   logic [31:0]    rs2_data_read_i,
-    input   logic           compressed_i,
     input   logic           rollback_i,
 
     output  logic  [4:0]    rs1_o,
@@ -81,14 +80,14 @@ module decode
 
     logic           last_hazard;
     logic           last_stall;
-    logic [31:0]    instruction;
+    logic [31:0]    instruction_to_decode;
     logic [31:0]    last_instruction;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             last_instruction <= 32'h00000013;
         else
-            last_instruction <= instruction;
+            last_instruction <= instruction_to_decode;
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
@@ -106,12 +105,10 @@ module decode
     end
 
     always_comb begin
-        if ((last_hazard || last_stall)) begin
-            instruction = last_instruction;
-        end
-        else begin
-            instruction = instruction_i;
-        end
+        if ((last_hazard || last_stall))
+            instruction_to_decode = last_instruction;
+        else
+            instruction_to_decode = instruction_i;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -121,6 +118,7 @@ module decode
     logic [2:0] funct3;
     logic [6:0] funct7;
     logic [6:0] opcode;
+    logic [31:0] instruction;
     
     assign funct3 = instruction[14:12];
     assign funct7 = instruction[31:25];
@@ -419,6 +417,7 @@ module decode
         assign bp_take_o  = (bp_jump_taken || bp_branch_taken) && !jumping_i && !hazard_o && !rollback_i;
         assign bp_target_o = pc_i + immediate;
 
+        logic jump_rollback_r;
         assign jump_confirmed = (jump_i || jumping_i) && !(jump_rollback_i || jump_rollback_r);
 
         always_ff @(posedge clk or negedge reset_n) begin
@@ -428,7 +427,6 @@ module decode
                 bp_taken_o <= bp_take_o;
         end
 
-        logic jump_rollback_r;
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
                 jump_rollback_r <= 1'b0;
@@ -536,14 +534,26 @@ module decode
 
     logic invalid_inst;
     logic misaligned_fetch;
+    logic compressed;
 
     assign invalid_inst     = instruction_operation == INVALID;
 
-    if (COMPRESSED) begin : gen_misaligned_check_c
+    if (COMPRESSED) begin : gen_compressed_on
         assign misaligned_fetch = pc_i[0] != 1'b0;
+
+        logic [31:0] instruction_decompressed;
+        decompresser decompresser (
+            .instruction_i (instruction_to_decode[15:0]),
+            .instruction_o (instruction_decompressed)
+        );
+
+        assign compressed = (instruction_to_decode[1:0] != '1);
+        assign instruction = compressed ? instruction_decompressed : instruction_to_decode;
     end
-    else begin : gen_misaligned_check_nc
+    else begin : gen_compressed_off
         assign misaligned_fetch = pc_i[1:0] != 2'b00;
+        assign instruction = instruction_to_decode;
+        assign compressed = 1'b0;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -612,7 +622,7 @@ module decode
             third_operand_o         <= third_operand;
             pc_o                    <= pc_i;
             instruction_o           <= instruction;
-            compressed_o            <= compressed_i;
+            compressed_o            <= compressed;
             instruction_operation_o <= instruction_operation;
             tag_o                   <= tag_i;
             exc_ilegal_inst_o       <= invalid_inst;
