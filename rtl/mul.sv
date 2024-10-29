@@ -55,7 +55,7 @@ module mul
 
     logic hold;
 
-    assign hold_o = start | hold;
+    assign hold_o = start || hold;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
@@ -64,7 +64,7 @@ module mul
         else begin
             unique case (mul_state)
                 ALBL:    hold <= start;
-                ALBH:    hold <= ~mul_low_i;
+                ALBH:    hold <= !mul_low_i;
                 default: hold <= 1'b0;
             endcase
         end
