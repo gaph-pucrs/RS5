@@ -32,8 +32,8 @@ module testbench
 //////////////////////////////////////////////////////////////////////////////
 
     localparam mul_e         MULEXT          = MUL_M;
-    localparam bit           COMPRESSED      = 1'b0;
-    localparam bit           USE_XOSVM       = 1'b1;
+    localparam bit           COMPRESSED      = 1'b1;
+    localparam bit           USE_XOSVM       = 1'b0;
     localparam bit           USE_ZIHPM       = 1'b1;
     localparam bit           USE_ZKNE        = 1'b1;
     localparam bit           VEnable         = 1'b1;
