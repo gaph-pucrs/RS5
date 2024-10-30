@@ -75,43 +75,6 @@ module decode
 );
 
 //////////////////////////////////////////////////////////////////////////////
-// Re-Decode instruction on hazard or stall
-//////////////////////////////////////////////////////////////////////////////
-
-    logic           last_hazard;
-    logic           last_stall;
-    logic [31:0]    instruction_to_decode;
-    logic [31:0]    last_instruction;
-
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            last_instruction <= 32'h00000013;
-        else
-            last_instruction <= instruction_to_decode;
-    end
-
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            last_hazard <= 1'b1;
-        else
-            last_hazard <= hazard_o;
-    end
-
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            last_stall <= 1'b1;
-        else
-            last_stall <= !enable;
-    end
-
-    always_comb begin
-        if ((last_hazard || last_stall))
-            instruction_to_decode = last_instruction;
-        else
-            instruction_to_decode = instruction_i;
-    end
-
-//////////////////////////////////////////////////////////////////////////////
 // Find out the type of the instruction
 //////////////////////////////////////////////////////////////////////////////
 
@@ -543,16 +506,16 @@ module decode
 
         logic [31:0] instruction_decompressed;
         decompresser decompresser (
-            .instruction_i (instruction_to_decode[15:0]),
+            .instruction_i (instruction_i[15:0]),
             .instruction_o (instruction_decompressed)
         );
 
-        assign compressed = (instruction_to_decode[1:0] != '1);
-        assign instruction = compressed ? instruction_decompressed : instruction_to_decode;
+        assign compressed = (instruction_i[1:0] != '1);
+        assign instruction = compressed ? instruction_decompressed : instruction_i;
     end
     else begin : gen_compressed_off
         assign misaligned_fetch = pc_i[1:0] != 2'b00;
-        assign instruction = instruction_to_decode;
+        assign instruction = instruction_i;
         assign compressed = 1'b0;
     end
 
