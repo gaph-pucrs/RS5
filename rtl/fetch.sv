@@ -59,14 +59,25 @@ module fetch  #(
     output  logic  [2:0]    tag_o
 );
 
+    logic iaddr_hold;
+    logic should_rollback;
+    /* verilator lint_off UNUSEDSIGNAL */
+    logic [31:0] instruction;
+    /* verilator lint_on UNUSEDSIGNAL */
+    logic [31:0] pc;
+    logic [31:0] pc_rollbacked;
+    logic [31:0] idata_rollbacked;
+    logic [31:0] iaddr_rollbacked;
+    assign instruction = bp_rollback_o ? idata_rollbacked : instruction_o;
+    assign pc          = bp_rollback_o ?    pc_rollbacked :          pc_o;
+
 //////////////////////////////////////////////////////////////////////////////
 // Instruction address control
 //////////////////////////////////////////////////////////////////////////////
 
-    logic        iaddr_continue;
+    // logic        iaddr_continue;
     logic        should_jump;
     logic [31:0] jump_target;
-    logic [31:0] iaddr_continue_next;
 
     logic [31:0] iaddr_advance;
     assign iaddr_advance = instruction_address_o + 32'd4;
@@ -79,8 +90,14 @@ module fetch  #(
             iaddr_next = mtvec_i;
         else if (should_jump)
             iaddr_next = jump_target;
-        else if (iaddr_continue)
-            iaddr_next = iaddr_continue_next;
+        else if (enable_i) begin
+            if (should_rollback)
+                iaddr_next = iaddr_rollbacked;
+            else if (!iaddr_hold)
+                iaddr_next = iaddr_advance;
+            else 
+                iaddr_next = instruction_address_o;
+        end
         else
             iaddr_next = instruction_address_o;
     end
@@ -138,28 +155,27 @@ module fetch  #(
      * 2. Allow 2-byte aligned 2/4-byte fetch in case of compressed
      */
 
-    logic [31:0] pc;
+    logic [31:0] iaddr_jumped;
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
-            pc <= start_address;
+            iaddr_jumped <= start_address;
         else if (jumped) // || jump_rollback_i
-            pc <= iaddr_next;
+            iaddr_jumped <= iaddr_next;
     end
 
-    logic [31:0] pc_r;
+    logic [31:0] iaddr_jumped_r;
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
-            pc_r <= '0;
+            iaddr_jumped_r <= '0;
         else if (jumped_r)
-            pc_r <= pc;
+            iaddr_jumped_r <= iaddr_jumped;
     end
 
     logic [ 2:0] pc_add;
     logic [31:0] pc_next;
-    assign pc_next = pc_o + 32'(pc_add);
+    assign pc_next = pc + 32'(pc_add);
 
     logic [31:0] pc_update;
-    logic [31:0] pc_update_next;
 
     /* pc_o is the PC of the fetched instruction */
     /* at the moment the instruction arrives     */
@@ -167,7 +183,7 @@ module fetch  #(
         if (!reset_n)
             pc_o <= '0;
         else if (enable_i) 
-            pc_o <= pc_update_next;
+            pc_o <= pc_update;
     end
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -234,16 +250,19 @@ module fetch  #(
 // Branch prediction
 ////////////////////////////////////////////////////////////////////////////////
 
+    logic unaligned;
+    logic iaddr_hold_r;
+    logic jump_rollback_r;
+    logic bp_rollback_r;
+
     if (BRANCHPRED) begin : gen_bp_on
-        logic [31:0] iaddr_rollbacked;
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
                 iaddr_rollbacked <= '0;
             else if (bp_take_i)
-                iaddr_rollbacked <= iaddr_advance;
+                iaddr_rollbacked <= iaddr_hold ? instruction_address_o : iaddr_advance;
         end
 
-        logic jump_rollback_r;
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
                 jump_rollback_r <= 1'b0;
@@ -253,10 +272,8 @@ module fetch  #(
                 jump_rollback_r <= 1'b0;
         end
 
-        logic should_rollback;
         assign should_rollback = jump_rollback_i || (jump_rollback_r && !enable_r);
 
-        logic bp_rollback_r;
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
                 bp_rollback_r <= 1'b0;
@@ -264,12 +281,18 @@ module fetch  #(
                 bp_rollback_r <= should_rollback;
         end
 
-        logic [31:0] pc_rollbacked;
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                idata_rollbacked <= 32'h00000013;
+            else if (bp_rollback_r)
+                idata_rollbacked <= instruction_o;
+        end
+
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
                 pc_rollbacked <= '0;
             else if (bp_rollback_r)
-                pc_rollbacked <= pc_next;
+                pc_rollbacked <= pc_o;
         end
 
         always_ff @(posedge clk or negedge reset_n) begin
@@ -290,16 +313,12 @@ module fetch  #(
 
         assign should_jump = jump_i || bp_take_i;
         assign jump_target = jump_i ? jump_target_i : bp_target_i;
-        assign pc_update_next = bp_rollback_o ? pc_rollbacked : pc_update;
-        assign iaddr_continue_next = should_rollback ? iaddr_rollbacked : iaddr_advance;
     end
     else begin : gen_bp_off
         assign bp_rollback_o = 1'b0;
         assign should_jump = jump_i;
         assign jump_target = jump_target_i;
         assign tag_next = jumped ? (tag + 1'b1) : tag;
-        assign pc_update_next = pc_update;
-        assign iaddr_continue_next = iaddr_advance;
     end
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -308,15 +327,12 @@ module fetch  #(
 
     if (COMPRESSED) begin : gen_compressed_on
         logic compressed;
-        assign compressed = (instruction_o[1:0] != '1);
+        assign compressed = (instruction[1:0] != '1);
 
-        logic unaligned;
-        assign unaligned = pc_o[1];
+        assign unaligned = pc[1];
 
-        logic iaddr_hold;
-        assign iaddr_hold = (!jumping_o && unaligned && compressed);
+        assign iaddr_hold = ((!(jumping_o && !should_rollback && !bp_rollback_r) && unaligned && compressed) || (iaddr_hold_r && bp_rollback_r)) && !(iaddr_hold_r && bp_rollback_o);
 
-        logic iaddr_hold_r;
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
                 iaddr_hold_r <= 1'b0;
@@ -327,7 +343,7 @@ module fetch  #(
         end
 
         logic unaligned_jump;
-        assign unaligned_jump = pc_r[1];
+        assign unaligned_jump = iaddr_jumped_r[1];
 
         logic unaligned_jump_r;
         always_ff @(posedge clk or negedge reset_n) begin
@@ -341,24 +357,24 @@ module fetch  #(
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
                 instruction_data_r <= 32'h00000013;
-            else if (enable_i && ((jumped_r2 && unaligned_jump) || unaligned_jump_r || (unaligned || (compressed && !iaddr_hold_r))))
+            else if (enable_i && ((jumped_r2 && unaligned_jump && !bp_rollback_r) || (unaligned_jump_r && !bp_rollback_o) || ((unaligned || (compressed && !iaddr_hold_r)) && !bp_rollback_r)))
                 instruction_data_r <= instruction_fetched;
         end
 
         logic [31:0] instruction_prefetched;
         assign instruction_prefetched = iaddr_hold_r ? instruction_data_r : instruction_fetched;
 
-        assign jump_misaligned_o = unaligned_jump_r;
-        assign iaddr_continue = enable_i && !iaddr_hold;
+        assign jump_misaligned_o = (unaligned_jump_r && !bp_rollback_o);
+        // assign iaddr_continue = enable_i && !iaddr_hold;
         assign pc_add = compressed ? 3'd2 : 3'd4;
        
         always_comb begin
             if (jumped_r2 && unaligned_jump)
                 // Bubble on unaligned jump
                 pc_update = '0;
-            else if ((jumped_r2 && !unaligned_jump) || unaligned_jump_r)
+            else if ((jumped_r2 && !unaligned_jump) || (unaligned_jump_r && !bp_rollback_o))
                 // Same as jumped instruction address on jump
-                pc_update = pc_r;
+                pc_update = iaddr_jumped_r;
             else
                 // Independent control otherwise
                 pc_update = pc_next;
@@ -371,12 +387,12 @@ module fetch  #(
             else if (jumped_r2 && !unaligned_jump)
                 // Disregard last instruction on jump
                 instruction_next = instruction_fetched;
-            else if (unaligned_jump_r || (unaligned && !compressed))
+            else if ((unaligned_jump_r && !bp_rollback_o) || (unaligned && !compressed))
                 // After bubble or unaligned 4-byte instruction we need the input of 2 fetches
                 instruction_next = {instruction_fetched[15:0], instruction_data_r[31:16]};
             else if (!unaligned &&  compressed)
                 // After aligned compressed the next instruction could be prefetched if the previous was compressed
-                instruction_next = {instruction_prefetched[15:0], instruction_o[31:16]};
+                instruction_next = {instruction_prefetched[15:0], instruction[31:16]};
             else if (!unaligned && !compressed)
                 // After aligned 4-byte instruction the next could be prefetched if the previous was compressed
                 instruction_next = instruction_prefetched;
@@ -387,9 +403,9 @@ module fetch  #(
     end
     else begin : gen_compressed_off
         assign jump_misaligned_o = 1'b0;
-        assign iaddr_continue = enable_i;
+        // assign iaddr_continue = enable_i;
         assign pc_add = 3'd4;
-        assign pc_update = jumped_r2 ? pc_r : pc_next;
+        assign pc_update = jumped_r2 ? iaddr_jumped_r : pc_next;
         assign instruction_next = instruction_fetched;
     end
 
