@@ -238,6 +238,7 @@ module RS5
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     logic bp_taken_exec;
+    logic jump_misaligned_exec;
 
     decode # (
         .MULEXT    (MULEXT    ),
@@ -271,6 +272,8 @@ module RS5
         .jumping_i                  (jumping),
         .jump_rollback_i            (jump_rollback),
         .rollback_i                 (bp_rollback),
+        .jump_misaligned_i          (jump_misaligned),
+        .jump_misaligned_o          (jump_misaligned_exec),
         .bp_take_o                  (bp_take_fetch),
         .bp_taken_o                 (bp_taken_exec),
         .bp_target_o                (bp_target),
@@ -371,6 +374,7 @@ module RS5
         .vtype_o                 (vtype),
         .vlen_o                  (vlen),
         .bp_taken_i              (bp_taken_exec),
+        .jump_misaligned_i       (jump_misaligned_exec),
         .jump_o                  (jump),
         .jump_rollback_o         (jump_rollback),
         .jump_target_o           (jump_target),

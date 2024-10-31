@@ -64,8 +64,13 @@ module decode
     /* verilator lint_on UNUSEDSIGNAL */
     input   logic           jump_i,
     input   logic           jumping_i,
+    /* Not used without C */
+    /* verilator lint_off UNUSEDSIGNAL */
+    input   logic           jump_misaligned_i,
+    /* verilator lint_off UNUSEDSIGNAL */
     output  logic           bp_take_o,
     output  logic           bp_taken_o,
+    output  logic           jump_misaligned_o,
     output  logic [31:0]    bp_target_o,
 
     input   logic           exc_inst_access_fault_i,
@@ -502,14 +507,20 @@ module decode
     assign invalid_inst     = instruction_operation == INVALID;
 
     if (COMPRESSED) begin : gen_compressed_on
-        assign misaligned_fetch = pc_i[0] != 1'b0;
-
         logic [31:0] instruction_decompressed;
         decompresser decompresser (
             .instruction_i (instruction_i[15:0]),
             .instruction_o (instruction_decompressed)
         );
 
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                jump_misaligned_o <= 1'b0;
+            else if (enable)
+                jump_misaligned_o <= jump_misaligned_i;
+        end
+
+        assign misaligned_fetch = pc_i[0] != 1'b0;
         assign compressed = (instruction_i[1:0] != '1);
         assign instruction = compressed ? instruction_decompressed : instruction_i;
     end
@@ -517,6 +528,7 @@ module decode
         assign misaligned_fetch = pc_i[1:0] != 2'b00;
         assign instruction = instruction_i;
         assign compressed = 1'b0;
+        assign jump_misaligned_o = 1'b0;
     end
 
 //////////////////////////////////////////////////////////////////////////////
