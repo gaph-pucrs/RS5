@@ -544,13 +544,25 @@ end
         endcase
     end
 
+    logic [2:0] next_tag;
     if (BRANCHPRED) begin : gen_bp_on
+        logic tag_add_bp;
+        assign tag_add_bp = (should_jump && bp_taken_i && !killed);
+
+        logic tag_add_jmp_exc_irq;
+        assign tag_add_jmp_exc_irq = (should_jump && !bp_taken_i && !killed) || raise_exception_o || machine_return_o || interrupt_ack_o;
+
         assign jump_o          = ( should_jump && !bp_taken_i && !killed);
         assign jump_rollback_o = (!should_jump &&  bp_taken_i && !killed);
+        assign next_tag = curr_tag + 3'(tag_add_bp) + 3'(tag_add_jmp_exc_irq);
     end
     else begin : gen_bp_off
+        logic tag_add_jmp_exc_irq;
+        assign tag_add_jmp_exc_irq = (should_jump && !killed) || raise_exception_o || machine_return_o || interrupt_ack_o;
+        
         assign jump_o          = (should_jump && !killed);
         assign jump_rollback_o = 1'b0;
+        assign next_tag        = curr_tag + 3'(tag_add_jmp_exc_irq);
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -558,12 +570,10 @@ end
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
+        if (!reset_n)
             curr_tag <= '0;
-        end
-        else if (((should_jump && !killed) || raise_exception_o || machine_return_o || interrupt_ack_o)) begin
-            curr_tag <= curr_tag + 1'b1;
-        end
+        else
+            curr_tag <= next_tag;
     end
 
 //////////////////////////////////////////////////////////////////////////////

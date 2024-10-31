@@ -286,9 +286,9 @@ module fetch  #(
         end
 
         always_comb begin
-            if (jumped)
+            if (jumped && !jump_rollback_i)
                 tag_next = tag + 1'b1;
-            else if (jump_rollback_i)
+            else if (jump_rollback_i && !jumped)
                 tag_next = tag - 1'b1;
             else
                 tag_next = tag;
