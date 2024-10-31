@@ -382,7 +382,7 @@ module decode
         assign bp_branch_taken = (opcode[6:2] == 5'b11000 && imm_b[31]);
         assign bp_jump_taken   = (opcode[6:2] == 5'b11011);
 
-        assign bp_take_o  = (bp_jump_taken || bp_branch_taken) && !jumping_i && !hazard_o && !rollback_i;
+        assign bp_take_o  = (bp_jump_taken || bp_branch_taken) && !jumping_i && !hazard_o && !rollback_i && enable;
         assign bp_target_o = pc_i + immediate;
 
         logic jump_rollback_r;
