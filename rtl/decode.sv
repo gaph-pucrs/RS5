@@ -70,7 +70,6 @@ module decode
     /* verilator lint_off UNUSEDSIGNAL */
     output  logic           bp_take_o,
     output  logic           bp_taken_o,
-    output  logic           jump_misaligned_o,
     output  logic [31:0]    bp_target_o,
 
     input   logic           exc_inst_access_fault_i,
@@ -382,18 +381,11 @@ module decode
         assign bp_branch_taken = (opcode[6:2] == 5'b11000 && imm_b[31]);
         assign bp_jump_taken   = (opcode[6:2] == 5'b11011);
 
-        assign bp_take_o  = (bp_jump_taken || bp_branch_taken) && !jumping_i && !hazard_o && !rollback_i && enable;
+        assign bp_take_o  = (bp_jump_taken || bp_branch_taken) && !jumping_i && !rollback_i;
         assign bp_target_o = pc_i + immediate;
 
         logic jump_rollback_r;
         assign jump_confirmed = (jump_i || jumping_i) && !(jump_rollback_i || jump_rollback_r);
-
-        always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n)
-                bp_taken_o <= 1'b0;
-            else
-                bp_taken_o <= bp_take_o;
-        end
 
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
@@ -513,13 +505,6 @@ module decode
             .instruction_o (instruction_decompressed)
         );
 
-        always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n)
-                jump_misaligned_o <= 1'b0;
-            else if (enable)
-                jump_misaligned_o <= jump_misaligned_i;
-        end
-
         assign misaligned_fetch = pc_i[0] != 1'b0;
         assign compressed = (instruction_i[1:0] != '1);
         assign instruction = compressed ? instruction_decompressed : instruction_i;
@@ -528,7 +513,6 @@ module decode
         assign misaligned_fetch = pc_i[1:0] != 2'b00;
         assign instruction = instruction_i;
         assign compressed = 1'b0;
-        assign jump_misaligned_o = 1'b0;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -576,8 +560,9 @@ module decode
             exc_misaligned_fetch_o  <= 1'b0;
             exc_inst_access_fault_o <= 1'b0;
             vector_operation_o      <= VNOP;
+            bp_taken_o              <= 1'b0;
         end
-        else if (hazard_o || rollback_i) begin
+        else if (hazard_o || rollback_i || jump_misaligned_i) begin
             first_operand_o         <= '0;
             second_operand_o        <= '0;
             third_operand_o         <= '0;
@@ -590,6 +575,7 @@ module decode
             exc_misaligned_fetch_o  <= 1'b0;
             exc_inst_access_fault_o <= 1'b0;
             vector_operation_o      <= VNOP;
+            bp_taken_o              <= 1'b0;
         end
         else if (enable) begin
             first_operand_o         <= first_operand;
@@ -604,6 +590,7 @@ module decode
             exc_misaligned_fetch_o  <= misaligned_fetch;
             exc_inst_access_fault_o <= exc_inst_access_fault_i;
             vector_operation_o      <= vector_operation;
+            bp_taken_o              <= bp_take_o;
         end
     end
 

@@ -295,7 +295,7 @@ module fetch  #(
         end
 
         assign pc = bp_rollback_o ? pc_rollbacked : pc_o;
-        assign should_jump = jump_i || bp_take_i;
+        assign should_jump = jump_i || (enable_i && bp_take_i);
         assign jump_target = jump_i ? jump_target_i : bp_target_i;
         assign iaddr_continue_next = should_rollback ? iaddr_rollbacked : iaddr_advance;
     end

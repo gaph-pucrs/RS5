@@ -95,7 +95,6 @@ module execute
     /* verilator lint_off UNUSEDSIGNAL */
     input   logic               bp_taken_i,
     /* verilator lint_on UNUSEDSIGNAL */
-    input   logic               jump_misaligned_i,
     output  logic               jump_o,
     output  logic               jump_rollback_o,
     output  logic [31:0]        jump_target_o,
@@ -633,7 +632,7 @@ end
                 exception_code_o  = NE;
                 // $write("[%0d] MRET: %8h %8h\n", $time, pc_i, instruction_i);
             end
-            else if (interrupt_pending_i && instruction_operation_i != NOP && !jump_misaligned_i && !hold_o) begin
+            else if (interrupt_pending_i && instruction_operation_i != NOP && !hold_o) begin
                 raise_exception_o = 1'b0;
                 machine_return_o  = 1'b0;
                 interrupt_ack_o   = 1'b1;
