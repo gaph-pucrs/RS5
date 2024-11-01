@@ -551,7 +551,7 @@ end
         logic tag_add_jmp_exc_irq;
         assign tag_add_jmp_exc_irq = (should_jump && !bp_taken_i && !killed) || raise_exception_o || machine_return_o || interrupt_ack_o;
 
-        assign jump_o          = ( should_jump && !bp_taken_i && !killed);
+        assign jump_o          = ( should_jump && (!bp_taken_i || interrupt_ack_o) && !killed);
         assign jump_rollback_o = (!should_jump &&  bp_taken_i && !killed);
         assign next_tag = curr_tag + 3'(tag_add_bp) + 3'(tag_add_jmp_exc_irq);
     end
