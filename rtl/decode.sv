@@ -398,7 +398,6 @@ module decode
     end
     else begin : gen_bp_off
         assign bp_take_o   = 1'b0;
-        assign bp_taken_o  = 1'b0;
         assign bp_target_o = '0;
         assign jump_confirmed = (jump_i || jumping_i);
     end
