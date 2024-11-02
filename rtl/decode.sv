@@ -414,13 +414,15 @@ module decode
             locked_register <= '0;
             locked_memory   <= '0;
         end
-        else if (hazard_o) begin
-            locked_register <= '0;
-            locked_memory   <= '0;
-        end
         else if (enable) begin
-            locked_register <= instruction[11:7];
-            locked_memory   <= (opcode[6:2] == 5'b01000);
+            if (hazard_o) begin
+                locked_register <= '0;
+                locked_memory   <= '0;
+            end
+            else begin
+                locked_register <= instruction[11:7];
+                locked_memory   <= (opcode[6:2] == 5'b01000);
+            end
         end
     end
 
@@ -485,7 +487,7 @@ module decode
     assign hazard_rs1 = locked_rs1      & use_rs1;
     assign hazard_rs2 = locked_rs2      & use_rs2;
 
-    assign hazard_o   = (hazard_mem || hazard_rs1 || hazard_rs2) && enable && !rollback_i && !jump_confirmed;
+    assign hazard_o   = (hazard_mem || hazard_rs1 || hazard_rs2) && !rollback_i && !jump_confirmed;
 
 //////////////////////////////////////////////////////////////////////////////
 // Exception Detection
@@ -561,35 +563,37 @@ module decode
             vector_operation_o      <= VNOP;
             bp_taken_o              <= 1'b0;
         end
-        else if (hazard_o || rollback_i || jump_misaligned_i) begin
-            first_operand_o         <= '0;
-            second_operand_o        <= '0;
-            third_operand_o         <= '0;
-            pc_o                    <= '0;
-            instruction_o           <= '0;
-            compressed_o            <= 1'b0;
-            instruction_operation_o <= NOP;
-            tag_o                   <= tag_i;
-            exc_ilegal_inst_o       <= 1'b0;
-            exc_misaligned_fetch_o  <= 1'b0;
-            exc_inst_access_fault_o <= 1'b0;
-            vector_operation_o      <= VNOP;
-            bp_taken_o              <= 1'b0;
-        end
         else if (enable) begin
-            first_operand_o         <= first_operand;
-            second_operand_o        <= second_operand;
-            third_operand_o         <= third_operand;
-            pc_o                    <= pc_i;
-            instruction_o           <= instruction;
-            compressed_o            <= compressed;
-            instruction_operation_o <= instruction_operation;
-            tag_o                   <= tag_i;
-            exc_ilegal_inst_o       <= invalid_inst;
-            exc_misaligned_fetch_o  <= misaligned_fetch;
-            exc_inst_access_fault_o <= exc_inst_access_fault_i;
-            vector_operation_o      <= vector_operation;
-            bp_taken_o              <= bp_take_o;
+            if (hazard_o || rollback_i || jump_misaligned_i) begin
+                first_operand_o         <= '0;
+                second_operand_o        <= '0;
+                third_operand_o         <= '0;
+                pc_o                    <= '0;
+                instruction_o           <= '0;
+                compressed_o            <= 1'b0;
+                instruction_operation_o <= NOP;
+                tag_o                   <= tag_i;
+                exc_ilegal_inst_o       <= 1'b0;
+                exc_misaligned_fetch_o  <= 1'b0;
+                exc_inst_access_fault_o <= 1'b0;
+                vector_operation_o      <= VNOP;
+                bp_taken_o              <= 1'b0;
+            end
+            else begin
+                first_operand_o         <= first_operand;
+                second_operand_o        <= second_operand;
+                third_operand_o         <= third_operand;
+                pc_o                    <= pc_i;
+                instruction_o           <= instruction;
+                compressed_o            <= compressed;
+                instruction_operation_o <= instruction_operation;
+                tag_o                   <= tag_i;
+                exc_ilegal_inst_o       <= invalid_inst;
+                exc_misaligned_fetch_o  <= misaligned_fetch;
+                exc_inst_access_fault_o <= exc_inst_access_fault_i;
+                vector_operation_o      <= vector_operation;
+                bp_taken_o              <= bp_take_o;
+            end
         end
     end
 
