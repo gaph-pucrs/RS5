@@ -88,7 +88,6 @@ module RS5
 //////////////////////////////////////////////////////////////////////////////
 
     logic   [31:0]  pc_decode;
-    logic    [2:0]  tag_decode;
     logic           enable_decode;
     logic           jump_misaligned;
 
@@ -112,7 +111,6 @@ module RS5
     logic   [31:0]  first_operand_execute, second_operand_execute, third_operand_execute;
     logic   [31:0]  instruction_execute;
     logic   [31:0]  pc_execute;
-    logic    [2:0]  tag_execute;
     logic           exc_ilegal_inst_execute;
     logic           exc_misaligned_fetch_execute;
     logic           exc_inst_access_fault_execute;
@@ -127,8 +125,6 @@ module RS5
     iType_e         instruction_operation_retire;
     logic   [31:0]  result_retire;
     logic           killed;
-
-
 
 //////////////////////////////////////////////////////////////////////////////
 // CSR Bank signals
@@ -184,9 +180,11 @@ module RS5
 
     logic        jump_rollback;
     logic        jumping;
+    logic        ctx_switch;
     logic        bp_take_fetch;
     logic        bp_rollback;
     logic [31:0] bp_target;
+    logic [31:0] ctx_switch_target;
     logic [31:0] instruction_fetch;
 
     fetch #(
@@ -197,24 +195,18 @@ module RS5
         .reset_n                (reset_n),
         .sys_reset              (sys_reset_i),
         .enable_i               (enable_fetch),
-        .jump_i                 (jump),
+        .ctx_switch_i           (ctx_switch),
         .jump_rollback_i        (jump_rollback),
-        .jump_target_i          (jump_target),
+        .ctx_switch_target_i    (ctx_switch_target),
         .bp_take_i              (bp_take_fetch),
         .bp_target_i            (bp_target),
         .jumping_o              (jumping),
         .bp_rollback_o          (bp_rollback),
-        .mtvec_i                (mtvec),
-        .mepc_i                 (mepc),
-        .exception_raised_i     (RAISE_EXCEPTION),
-        .machine_return_i       (MACHINE_RETURN),
-        .interrupt_ack_i        (interrupt_ack_o),
         .jump_misaligned_o      (jump_misaligned),
         .instruction_address_o  (instruction_address), 
         .instruction_data_i     (instruction_i),
         .instruction_o          (instruction_fetch),
-        .pc_o                   (pc_decode), 
-        .tag_o                  (tag_decode)
+        .pc_o                   (pc_decode)
     );
 
     if (XOSVMEnable == 1'b1) begin : gen_xosvm_i_mmu_on
@@ -251,7 +243,6 @@ module RS5
         .enable                     (enable_decode),
         .instruction_i              (instruction_fetch),
         .pc_i                       (pc_decode),
-        .tag_i                      (tag_decode),
         .rs1_data_read_i            (rs1_data_read),
         .rs2_data_read_i            (rs2_data_read),
         .rs1_o                      (rs1),
@@ -263,11 +254,11 @@ module RS5
         .pc_o                       (pc_execute),
         .instruction_o              (instruction_execute),
         .compressed_o               (instruction_compressed_execute),
-        .tag_o                      (tag_execute),
         .instruction_operation_o    (instruction_operation_execute),
         .vector_operation_o         (vector_operation_execute),
         .hazard_o                   (hazard),
-        .jump_i                     (jump),
+        .killed_o                   (killed),
+        .ctx_switch_i               (ctx_switch),
         .jumping_i                  (jumping),
         .jump_rollback_i            (jump_rollback),
         .rollback_i                 (bp_rollback),
@@ -337,7 +328,6 @@ module RS5
     ) execute1 (
         .clk                     (clk),
         .reset_n                 (reset_n),
-        .sys_reset               (sys_reset_i),
         .stall                   (stall),
         .instruction_i           (instruction_execute),
         .pc_i                    (pc_execute),
@@ -347,14 +337,12 @@ module RS5
         .instruction_operation_i (instruction_operation_execute),
         .instruction_compressed_i(instruction_compressed_execute),
         .vector_operation_i      (vector_operation_execute),
-        .tag_i                   (tag_execute),
         .privilege_i             (privilege),
         .exc_ilegal_inst_i       (exc_ilegal_inst_execute),
         .exc_misaligned_fetch_i  (exc_misaligned_fetch_execute),
         .exc_inst_access_fault_i (exc_inst_access_fault_execute),
         .exc_load_access_fault_i (mmu_data_fault),
         .hold_o                  (hold),
-        .killed_o                (killed),
         .write_enable_o          (regbank_write_enable_int),
         .instruction_operation_o (instruction_operation_retire),
         .result_o                (result_retire),
@@ -372,10 +360,14 @@ module RS5
         .vtype_o                 (vtype),
         .vlen_o                  (vlen),
         .bp_taken_i              (bp_taken_exec),
-        .jump_o                  (jump),
+        .ctx_switch_o            (ctx_switch),
         .jump_rollback_o         (jump_rollback),
+        .ctx_switch_target_o     (ctx_switch_target),
         .jump_target_o           (jump_target),
         .interrupt_pending_i     (interrupt_pending),
+        .mtvec_i                 (mtvec),
+        .mepc_i                  (mepc),
+        .jump_o                  (jump),
         .interrupt_ack_o         (interrupt_ack_o),
         .machine_return_o        (MACHINE_RETURN),
         .raise_exception_o       (RAISE_EXCEPTION),
@@ -470,12 +462,10 @@ module RS5
     end
 
     always_comb begin
-        if ((killed == 1'b0 && (mem_write_enable != '0 || mem_read_enable == 1'b1)) && mmu_data_fault == 1'b0) begin
+        if ((mem_write_enable != '0 || mem_read_enable) && !mmu_data_fault)
             mem_operation_enable_o = 1'b1;
-        end
-        else begin
+        else
             mem_operation_enable_o = 1'b0;
-        end
     end
 
     assign mem_write_enable_o = mem_write_enable;

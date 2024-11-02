@@ -39,7 +39,6 @@ module decode
 
     input   logic [31:0]    instruction_i,
     input   logic [31:0]    pc_i,
-    input   logic  [2:0]    tag_i,
     input   logic [31:0]    rs1_data_read_i,
     input   logic [31:0]    rs2_data_read_i,
     input   logic           rollback_i,
@@ -53,16 +52,16 @@ module decode
     output  logic [31:0]    pc_o,
     output  logic [31:0]    instruction_o,
     output  logic           compressed_o,
-    output  logic  [2:0]    tag_o,
     output  iType_e         instruction_operation_o,
     output  iTypeVector_e   vector_operation_o,
     output  logic           hazard_o,
+    output  logic           killed_o,
 
     /* Not used without BP */
     /* verilator lint_off UNUSEDSIGNAL */
     input   logic           jump_rollback_i,
     /* verilator lint_on UNUSEDSIGNAL */
-    input   logic           jump_i,
+    input   logic           ctx_switch_i,
     input   logic           jumping_i,
     /* Not used without C */
     /* verilator lint_off UNUSEDSIGNAL */
@@ -381,31 +380,23 @@ module decode
         assign bp_branch_taken = (opcode[6:2] == 5'b11000 && imm_b[31]);
         assign bp_jump_taken   = (opcode[6:2] == 5'b11011);
 
-        assign bp_take_o  = (bp_jump_taken || bp_branch_taken) && !jumping_i && !rollback_i;
+        // bp_take_o should use !jump_confirmed instead of !jumping_i but that is causing problems
+        assign bp_take_o   = (bp_jump_taken || bp_branch_taken) && !jumping_i && !rollback_i;
         assign bp_target_o = pc_i + immediate;
 
-        logic jump_rollback_r;
-        assign jump_confirmed = (jump_i || jumping_i) && !(jump_rollback_i || jump_rollback_r);
-
-        always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n)
-                jump_rollback_r <= 1'b0;
-            else if (jump_rollback_i)
-                jump_rollback_r <= 1'b1;
-            else if (enable)
-                jump_rollback_r <= 1'b0;
-        end
+        assign jump_confirmed = ctx_switch_i || (jumping_i && !jump_rollback_i);
     end
     else begin : gen_bp_off
         assign bp_take_o   = 1'b0;
         assign bp_target_o = '0;
-        assign jump_confirmed = (jump_i || jumping_i);
+        assign jump_confirmed = ctx_switch_i || jumping_i;
     end
 
 //////////////////////////////////////////////////////////////////////////////
 // Registe Lock Queue (RLQ)
 //////////////////////////////////////////////////////////////////////////////
 
+    logic           killed;
     logic           locked_memory;
     logic  [4:0]    locked_register;
 
@@ -415,7 +406,7 @@ module decode
             locked_memory   <= '0;
         end
         else if (enable) begin
-            if (hazard_o) begin
+            if (hazard_o || killed) begin
                 locked_register <= '0;
                 locked_memory   <= '0;
             end
@@ -480,14 +471,22 @@ module decode
         endcase
     end
 
-    assign locked_rs1 = (locked_register == rs1_o && rs1_o != '0) ? 1'b1 : 1'b0;
-    assign locked_rs2 = (locked_register == rs2_o && rs2_o != '0) ? 1'b1 : 1'b0;
+    assign locked_rs1 = (locked_register != '0 && locked_register == rs1_o);
+    assign locked_rs2 = (locked_register != '0 && locked_register == rs2_o);
 
-    assign hazard_mem = locked_memory   & use_mem;
-    assign hazard_rs1 = locked_rs1      & use_rs1;
-    assign hazard_rs2 = locked_rs2      & use_rs2;
+    assign hazard_mem = locked_memory   && use_mem;
+    assign hazard_rs1 = locked_rs1      && use_rs1;
+    assign hazard_rs2 = locked_rs2      && use_rs2;
 
-    assign hazard_o   = (hazard_mem || hazard_rs1 || hazard_rs2) && !rollback_i && !jump_confirmed;
+    assign killed   = jump_confirmed || jump_misaligned_i || rollback_i;
+    assign hazard_o = (hazard_mem || hazard_rs1 || hazard_rs2) && !killed;
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            killed_o <= 1'b0;
+        else if (enable)
+            killed_o <= 1'b1;
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 // Exception Detection
@@ -556,7 +555,6 @@ module decode
             instruction_o           <= '0;
             compressed_o            <= 1'b0;
             instruction_operation_o <= NOP;
-            tag_o                   <= '0;
             exc_ilegal_inst_o       <= 1'b0;
             exc_misaligned_fetch_o  <= 1'b0;
             exc_inst_access_fault_o <= 1'b0;
@@ -564,7 +562,7 @@ module decode
             bp_taken_o              <= 1'b0;
         end
         else if (enable) begin
-            if (hazard_o || rollback_i || jump_misaligned_i) begin
+            if (hazard_o || killed) begin
                 first_operand_o         <= '0;
                 second_operand_o        <= '0;
                 third_operand_o         <= '0;
@@ -572,7 +570,6 @@ module decode
                 instruction_o           <= '0;
                 compressed_o            <= 1'b0;
                 instruction_operation_o <= NOP;
-                tag_o                   <= tag_i;
                 exc_ilegal_inst_o       <= 1'b0;
                 exc_misaligned_fetch_o  <= 1'b0;
                 exc_inst_access_fault_o <= 1'b0;
@@ -587,7 +584,6 @@ module decode
                 instruction_o           <= instruction;
                 compressed_o            <= compressed;
                 instruction_operation_o <= instruction_operation;
-                tag_o                   <= tag_i;
                 exc_ilegal_inst_o       <= invalid_inst;
                 exc_misaligned_fetch_o  <= misaligned_fetch;
                 exc_inst_access_fault_o <= exc_inst_access_fault_i;

@@ -16,9 +16,6 @@
  * Fetch Unit is the first stage of the RS5 processor core. It has an
  * internal loop that contains the Program Counter(PC) that is increased by four 
  * on a new clock cycle or is replaced by a new address in case of a branch. 
- * It has a internal tag calculator that is increased in branches and mantained
- * in regular flows, the instruction fetched leaves arrives at next stage alongside
- * its associated tag.
  */
 
 module fetch  #(
@@ -32,9 +29,8 @@ module fetch  #(
     input   logic           sys_reset,
     input   logic           enable_i,
 
-
-    input   logic           jump_i,
-    input   logic [31:0]    jump_target_i,
+    input   logic           ctx_switch_i,
+    input   logic [31:0]    ctx_switch_target_i,
     output  logic           jumping_o,
     
     /* Signals not used without BP */
@@ -45,18 +41,11 @@ module fetch  #(
     /* verilator lint_on UNUSEDSIGNAL */
     output  logic           bp_rollback_o,
 
-    input   logic [31:0]    mtvec_i,
-    input   logic [31:0]    mepc_i,
-    input   logic           exception_raised_i,
-    input   logic           machine_return_i,
-    input   logic           interrupt_ack_i,
-
     output  logic           jump_misaligned_o,
     output  logic [31:0]    instruction_address_o,
     input   logic [31:0]    instruction_data_i,
     output  logic [31:0]    instruction_o,
-    output  logic [31:0]    pc_o,
-    output  logic  [2:0]    tag_o
+    output  logic [31:0]    pc_o
 );
 
 //////////////////////////////////////////////////////////////////////////////
@@ -66,7 +55,7 @@ module fetch  #(
     logic        iaddr_continue;
     logic [31:0] iaddr_continue_next;
 
-    logic        should_jump;
+    logic        jumped;
     logic [31:0] jump_target;
 
     logic [31:0] iaddr_advance;
@@ -74,11 +63,7 @@ module fetch  #(
 
     logic [31:0] iaddr_next;
     always_comb begin
-        if (machine_return_i)
-            iaddr_next = mepc_i;
-        else if ((exception_raised_i || interrupt_ack_i))
-            iaddr_next = mtvec_i;
-        else if (should_jump)
+        if (jumped)
             iaddr_next = jump_target;
         else if (iaddr_continue)
             iaddr_next = iaddr_continue_next;
@@ -99,14 +84,11 @@ module fetch  #(
 // Jump control
 ////////////////////////////////////////////////////////////////////////////////
 
-    logic jumped;
-    assign jumped = machine_return_i || exception_raised_i || interrupt_ack_i || should_jump;
-
     logic jumped_r;
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             jumped_r <= 1'b1;
-        else if (jumped) // || jump_rollback_i
+        else if (jumped)
             jumped_r <= 1'b1;
         else if (enable_i)
             jumped_r <= 1'b0;
@@ -120,12 +102,14 @@ module fetch  #(
             jumped_r2 <= jumped_r;
     end
 
+    logic should_rollback;
+    
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             jumping_o <= 1'b1;
-        else if (jumped || jumped_r) // || jump_rollback_i
+        else if (jumped || (jumped_r && !should_rollback))
             jumping_o <= 1'b1;
-        else if (enable_i)
+        else if (enable_i || should_rollback)
             jumping_o <= 1'b0;
     end
 
@@ -143,7 +127,7 @@ module fetch  #(
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             iaddr_jumped <= start_address;
-        else if (jumped) // || jump_rollback_i
+        else if (jumped)
             iaddr_jumped <= iaddr_next;
     end
 
@@ -203,34 +187,6 @@ module fetch  #(
             instruction_o <= instruction_next;
     end
 
-//////////////////////////////////////////////////////////////////////////////
-// TAG control
-//////////////////////////////////////////////////////////////////////////////
-
-    logic [2:0] tag_next;
-    logic [2:0] tag;
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            tag <= '0;
-        else
-            tag <= tag_next;
-    end
-
-    logic [2:0] tag_r;
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            tag_r <= '1;
-        else if (enable_i)
-            tag_r <= tag;
-    end
-
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            tag_o <= '1;
-        else if (enable_i)
-            tag_o <= tag_r;
-    end
-
 ////////////////////////////////////////////////////////////////////////////////
 // Branch prediction
 ////////////////////////////////////////////////////////////////////////////////
@@ -238,7 +194,6 @@ module fetch  #(
     /* Only used with BP, but needed for BP + C */
     /* verilator lint_off UNUSEDSIGNAL */
     logic bp_rollback_r;
-    logic should_rollback;
     logic [31:0] iaddr_not_jumped;
     /* verilator lint_on UNUSEDSIGNAL*/
 
@@ -247,7 +202,7 @@ module fetch  #(
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
                 iaddr_rollbacked <= '0;
-            else if (bp_take_i)
+            else if (enable_i && bp_take_i)
                 iaddr_rollbacked <= iaddr_not_jumped;
         end
 
@@ -285,28 +240,18 @@ module fetch  #(
                 bp_rollback_o <= bp_rollback_r;
         end
 
-        always_comb begin
-            if (jumped && !jump_rollback_i)
-                tag_next = tag + 1'b1;
-            else if (jump_rollback_i && !jumped)
-                tag_next = tag - 1'b1;
-            else
-                tag_next = tag;
-        end
-
         assign pc = bp_rollback_o ? pc_rollbacked : pc_o;
-        assign should_jump = jump_i || (enable_i && bp_take_i);
-        assign jump_target = jump_i ? jump_target_i : bp_target_i;
+        assign jumped = ctx_switch_i || (enable_i && bp_take_i);
+        assign jump_target = ctx_switch_i ? ctx_switch_target_i : bp_target_i;
         assign iaddr_continue_next = should_rollback ? iaddr_rollbacked : iaddr_advance;
     end
     else begin : gen_bp_off
-        assign pc = pc_o;
-        assign bp_rollback_r = 1'b0;
+        assign bp_rollback_r   = 1'b0;
         assign should_rollback = 1'b0;
-        assign bp_rollback_o = 1'b0;
-        assign should_jump = jump_i;
-        assign jump_target = jump_target_i;
-        assign tag_next = jumped ? (tag + 1'b1) : tag;
+        assign bp_rollback_o   = 1'b0;
+        assign pc                  = pc_o;
+        assign jumped              = ctx_switch_i;
+        assign jump_target         = ctx_switch_target_i;
         assign iaddr_continue_next = iaddr_advance;
     end
 
@@ -406,7 +351,7 @@ module fetch  #(
                     idata_rollbacked <= instruction_o;
             end
 
-            assign iaddr_hold = ((!(jumping_o && !should_rollback && !bp_rollback_r) && unaligned && compressed) || (iaddr_hold_r && bp_rollback_r)) && !(iaddr_hold_r && bp_rollback_o);
+            assign iaddr_hold = ((!(jumping_o && !should_rollback) && unaligned && compressed) || (iaddr_hold_r && bp_rollback_r)) && !(iaddr_hold_r && bp_rollback_o);
             assign iaddr_continue = enable_i && (should_rollback || !iaddr_hold);
             assign instruction = bp_rollback_o ? idata_rollbacked : instruction_o;
             assign iaddr_not_jumped = iaddr_hold ? instruction_address_o : iaddr_advance;
