@@ -25,18 +25,20 @@ module testbench
     import RS5_pkg::*;
 (
 );
+    timeunit 1ns; timeprecision 1ns;
 
 //////////////////////////////////////////////////////////////////////////////
 // PARAMETERS FOR CORE INSTANTIATION
 //////////////////////////////////////////////////////////////////////////////
 
-    localparam rv32_e        INSTRUCTION_SET = RV32M;
+    localparam mul_e         MULEXT          = MUL_M;
     localparam bit           COMPRESSED      = 1'b1;
-    localparam bit           USE_XOSVM       = 1'b1;
+    localparam bit           USE_XOSVM       = 1'b0;
     localparam bit           USE_ZIHPM       = 1'b1;
     localparam bit           USE_ZKNE        = 1'b1;
     localparam bit           VEnable         = 1'b1;
     localparam int           VLEN            = 256;
+    localparam bit           BRANCHPRED      = 1'b1;
 
 `ifndef SYNTH
     localparam bit           PROFILING       = 1'b1;
@@ -168,13 +170,14 @@ module testbench
 	    .PROFILING  (PROFILING      ),
     `endif
         .Environment(ASIC           ),
-        .RV32       (INSTRUCTION_SET),
+        .MULEXT     (MULEXT         ),
         .COMPRESSED (COMPRESSED     ),
         .VEnable    (VEnable        ),
         .VLEN       (VLEN           ),
         .XOSVMEnable(USE_XOSVM      ),
         .ZIHPMEnable(USE_ZIHPM      ),
-        .ZKNEEnable (USE_ZKNE       )
+        .ZKNEEnable (USE_ZKNE       ),
+        .BRANCHPRED (BRANCHPRED     )
     ) dut (
         .clk                    (clk),
         .reset_n                (reset_n),

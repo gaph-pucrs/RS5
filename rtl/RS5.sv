@@ -30,13 +30,14 @@ module RS5
     parameter string        PROFILING_FILE = "./debug/Report.txt",
 `endif
     parameter environment_e Environment    = ASIC,
-    parameter rv32_e        RV32           = RV32M,
+    parameter mul_e         MULEXT         = MUL_M,
     parameter bit           COMPRESSED     = 1'b0,
-    parameter bit           VEnable        = 1'b1,
+    parameter bit           VEnable        = 1'b0,
     parameter int           VLEN           = 256,
     parameter bit           XOSVMEnable    = 1'b0,
     parameter bit           ZIHPMEnable    = 1'b0,
-    parameter bit           ZKNEEnable     = 1'b0
+    parameter bit           ZKNEEnable     = 1'b0,
+    parameter bit           BRANCHPRED     = 1'b1
 )
 (
     input  logic                    clk,
@@ -82,29 +83,13 @@ module RS5
 
     logic           enable_fetch;
 
-    /* Unused without compressed */
-    /* verilator lint_off UNUSEDSIGNAL */
-    logic           instruction_prefetched;
-    /* verilator lint_on UNUSEDSIGNAL */
-
-//////////////////////////////////////////////////////////////////////////////
-// Prefetch signals
-//////////////////////////////////////////////////////////////////////////////
-
-    logic   [31:0]  pc_prefetch;
-    logic    [2:0]  tag_prefetch;
-    logic           jumped, jumped_r;
-
 //////////////////////////////////////////////////////////////////////////////
 // Decoder signals
 //////////////////////////////////////////////////////////////////////////////
 
     logic   [31:0]  pc_decode;
-    logic    [2:0]  tag_decode;
     logic           enable_decode;
     logic           jump_misaligned;
-    logic           instruction_compressed;
-    logic           is_jumping;
 
 //////////////////////////////////////////////////////////////////////////////
 // RegBank signals
@@ -126,7 +111,6 @@ module RS5
     logic   [31:0]  first_operand_execute, second_operand_execute, third_operand_execute;
     logic   [31:0]  instruction_execute;
     logic   [31:0]  pc_execute;
-    logic    [2:0]  tag_execute;
     logic           exc_ilegal_inst_execute;
     logic           exc_misaligned_fetch_execute;
     logic           exc_inst_access_fault_execute;
@@ -141,8 +125,6 @@ module RS5
     iType_e         instruction_operation_retire;
     logic   [31:0]  result_retire;
     logic           killed;
-
-
 
 //////////////////////////////////////////////////////////////////////////////
 // CSR Bank signals
@@ -187,42 +169,44 @@ module RS5
                             ? regbank_data_writeback
                             : regbank_data2;
 
-    if (COMPRESSED == 1'b1) begin : gen_en_fetch_c
-        assign enable_fetch = ~(stall || hold || instruction_prefetched);
-    end
-    else begin : gen_en_fetch_nc
-        assign enable_fetch = ~(stall || hold || hazard);
-    end
+    assign enable_fetch = !(stall || hold || hazard);
 
-    assign enable_decode = ~(stall | hold);
+    assign enable_decode = !(stall || hold);
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////// FETCH //////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+    logic        jump_rollback;
+    logic        jumping;
+    logic        ctx_switch;
+    logic        bp_take_fetch;
+    logic        bp_rollback;
+    logic [31:0] bp_target;
+    logic [31:0] ctx_switch_target;
+    logic [31:0] instruction_decode;
 
     fetch #(
-        .COMPRESSED(COMPRESSED)
+        .COMPRESSED(COMPRESSED),
+        .BRANCHPRED(BRANCHPRED)
     ) fetch1 (
         .clk                    (clk),
         .reset_n                (reset_n),
         .sys_reset              (sys_reset_i),
         .enable_i               (enable_fetch),
-        .jump_i                 (jump),
-        .jump_target_i          (jump_target),
-        .mtvec_i                (mtvec),
-        .mepc_i                 (mepc),
-        .exception_raised_i     (RAISE_EXCEPTION),
-        .machine_return_i       (MACHINE_RETURN),
-        .interrupt_ack_i        (interrupt_ack_o),
-        .hazard_i               (hazard),
+        .ctx_switch_i           (ctx_switch),
+        .jump_rollback_i        (jump_rollback),
+        .ctx_switch_target_i    (ctx_switch_target),
+        .bp_take_i              (bp_take_fetch),
+        .bp_target_i            (bp_target),
+        .jumping_o              (jumping),
+        .bp_rollback_o          (bp_rollback),
         .jump_misaligned_o      (jump_misaligned),
-        .jumped_o               (jumped),
-        .jumped_r_o             (jumped_r),
         .instruction_address_o  (instruction_address), 
-        .pc_o                   (pc_prefetch), 
-        .tag_o                  (tag_prefetch)
+        .instruction_data_i     (instruction_i),
+        .instruction_o          (instruction_decode),
+        .pc_o                   (pc_decode)
     );
 
     if (XOSVMEnable == 1'b1) begin : gen_xosvm_i_mmu_on
@@ -242,73 +226,23 @@ module RS5
     end
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////// C EXTENSION PREFETCH //////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    
-
-    logic [31:0] instruction_decode;
-
-    if (COMPRESSED == 1'b1) begin : gen_compressed_on
-
-        logic enable_prefetch;
-
-        logic [31:0] instruction_fetched;
-        logic [31:0] instruction_decompressed;
-
-        assign enable_prefetch = !(stall || hold);
-        assign instruction_decode = instruction_compressed ? instruction_decompressed : instruction_fetched;
-
-        align align (
-            .clk                (clk),
-            .reset_n            (reset_n),
-            .sys_reset          (sys_reset_i),
-            .enable_i           (enable_prefetch),
-            .hazard_i           (hazard),
-            .jumped_i           (jumped),
-            .jump_i             (jump),
-            .tag_i              (tag_prefetch),
-            .pc_i               (pc_prefetch),
-            .instruction_i      (instruction_i),
-            .jump_misaligned_i  (jump_misaligned),
-            .prefetched_o       (instruction_prefetched),
-            .compressed_o       (instruction_compressed),
-            .tag_o              (tag_decode),
-            .pc_o               (pc_decode),
-            .instruction_o      (instruction_fetched)
-        );
-
-        decompresser decompresser (
-            .instruction_i (instruction_fetched[15:0]),
-            .instruction_o (instruction_decompressed)
-        );
-    end
-    else begin : gen_compressed_off
-        assign instruction_decode = instruction_i;
-        assign instruction_compressed = 1'b0;
-        assign pc_decode = pc_prefetch;
-        assign tag_decode = tag_prefetch;
-        assign instruction_prefetched = 1'b0;
-    end
-
-
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// DECODER /////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    assign is_jumping = jumped || jumped_r || jump;
+    logic bp_taken_exec;
 
     decode # (
-        .ZKNEEnable(ZKNEEnable),
+        .MULEXT    (MULEXT    ),
         .COMPRESSED(COMPRESSED),
-        .VEnable   (VEnable)
+        .ZKNEEnable(ZKNEEnable),
+        .VEnable   (VEnable   ),
+        .BRANCHPRED(BRANCHPRED)
     ) decoder1 (
         .clk                        (clk),
         .reset_n                    (reset_n),
         .enable                     (enable_decode),
         .instruction_i              (instruction_decode),
         .pc_i                       (pc_decode),
-        .tag_i                      (tag_decode),
-        .jumped_i                   (is_jumping),
         .rs1_data_read_i            (rs1_data_read),
         .rs2_data_read_i            (rs2_data_read),
         .rs1_o                      (rs1),
@@ -319,12 +253,19 @@ module RS5
         .third_operand_o            (third_operand_execute),
         .pc_o                       (pc_execute),
         .instruction_o              (instruction_execute),
-        .compressed_i               (instruction_compressed),
         .compressed_o               (instruction_compressed_execute),
-        .tag_o                      (tag_execute),
         .instruction_operation_o    (instruction_operation_execute),
         .vector_operation_o         (vector_operation_execute),
         .hazard_o                   (hazard),
+        .killed_o                   (killed),
+        .ctx_switch_i               (ctx_switch),
+        .jumping_i                  (jumping),
+        .jump_rollback_i            (jump_rollback),
+        .rollback_i                 (bp_rollback),
+        .jump_misaligned_i          (jump_misaligned),
+        .bp_take_o                  (bp_take_fetch),
+        .bp_taken_o                 (bp_taken_exec),
+        .bp_target_o                (bp_target),
         .exc_inst_access_fault_i    (mmu_inst_fault),
         .exc_inst_access_fault_o    (exc_inst_access_fault_execute),
         .exc_ilegal_inst_o          (exc_ilegal_inst_execute),
@@ -379,14 +320,14 @@ module RS5
 
     execute #(
         .Environment (Environment),
-        .RV32        (RV32),
+        .MULEXT      (MULEXT),
         .ZKNEEnable  (ZKNEEnable),
         .VEnable     (VEnable),
-        .VLEN        (VLEN)
+        .VLEN        (VLEN),
+        .BRANCHPRED  (BRANCHPRED)
     ) execute1 (
         .clk                     (clk),
         .reset_n                 (reset_n),
-        .sys_reset               (sys_reset_i),
         .stall                   (stall),
         .instruction_i           (instruction_execute),
         .pc_i                    (pc_execute),
@@ -396,14 +337,12 @@ module RS5
         .instruction_operation_i (instruction_operation_execute),
         .instruction_compressed_i(instruction_compressed_execute),
         .vector_operation_i      (vector_operation_execute),
-        .tag_i                   (tag_execute),
         .privilege_i             (privilege),
         .exc_ilegal_inst_i       (exc_ilegal_inst_execute),
         .exc_misaligned_fetch_i  (exc_misaligned_fetch_execute),
         .exc_inst_access_fault_i (exc_inst_access_fault_execute),
         .exc_load_access_fault_i (mmu_data_fault),
         .hold_o                  (hold),
-        .killed_o                (killed),
         .write_enable_o          (regbank_write_enable_int),
         .instruction_operation_o (instruction_operation_retire),
         .result_o                (result_retire),
@@ -420,9 +359,15 @@ module RS5
         .csr_data_o              (csr_data_to_write),
         .vtype_o                 (vtype),
         .vlen_o                  (vlen),
-        .jump_o                  (jump),
+        .bp_taken_i              (bp_taken_exec),
+        .ctx_switch_o            (ctx_switch),
+        .jump_rollback_o         (jump_rollback),
+        .ctx_switch_target_o     (ctx_switch_target),
         .jump_target_o           (jump_target),
         .interrupt_pending_i     (interrupt_pending),
+        .mtvec_i                 (mtvec),
+        .mepc_i                  (mepc),
+        .jump_o                  (jump),
         .interrupt_ack_o         (interrupt_ack_o),
         .machine_return_o        (MACHINE_RETURN),
         .raise_exception_o       (RAISE_EXCEPTION),
@@ -450,7 +395,7 @@ module RS5
         .XOSVMEnable   (XOSVMEnable   ),
         .ZIHPMEnable   (ZIHPMEnable   ),
         .COMPRESSED    (COMPRESSED    ),
-        .RV32          (RV32          ),
+        .MULEXT        (MULEXT        ),
         .VEnable       (VEnable       ),
         .VLEN          (VLEN          )
     ) CSRBank1 (
@@ -474,6 +419,7 @@ module RS5
         .machine_return_i           (MACHINE_RETURN),
         .exception_code_i           (Exception_Code),
         .pc_i                       (pc_execute),
+        .next_pc_i                  (pc_decode),
         .instruction_i              (instruction_execute),
         .instruction_compressed_i   (instruction_compressed_execute),
         .jump_misaligned_i          (jump_misaligned),
@@ -517,12 +463,10 @@ module RS5
     end
 
     always_comb begin
-        if ((killed == 1'b0 && (mem_write_enable != '0 || mem_read_enable == 1'b1)) && mmu_data_fault == 1'b0) begin
+        if ((mem_write_enable != '0 || mem_read_enable) && !mmu_data_fault)
             mem_operation_enable_o = 1'b1;
-        end
-        else begin
+        else
             mem_operation_enable_o = 1'b0;
-        end
     end
 
     assign mem_write_enable_o = mem_write_enable;
