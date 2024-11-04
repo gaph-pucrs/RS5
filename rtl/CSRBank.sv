@@ -67,6 +67,7 @@ module CSRBank
     input   logic               machine_return_i,
     input   exceptionCode_e     exception_code_i,
     input   logic [31:0]        pc_i,
+    input   logic [31:0]        next_pc_i,
     input   logic [31:0]        instruction_i,
     input   logic               instruction_compressed_i,
 
@@ -352,7 +353,7 @@ module CSRBank
                 if (jump_i)
                     mepc_r      <= jump_target_i;
                 else
-                    mepc_r      <= pc_i + (instruction_compressed_i ? 32'd2 : 32'd4);
+                    mepc_r      <= next_pc_i;
             end
         //////////////////////////////////////////////////////////////////////////////
         // CSR Write

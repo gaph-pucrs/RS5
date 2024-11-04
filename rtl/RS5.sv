@@ -419,6 +419,7 @@ module RS5
         .machine_return_i           (MACHINE_RETURN),
         .exception_code_i           (Exception_Code),
         .pc_i                       (pc_execute),
+        .next_pc_i                  (pc_decode),
         .instruction_i              (instruction_execute),
         .instruction_compressed_i   (instruction_compressed_execute),
         .jump_misaligned_i          (jump_misaligned),
