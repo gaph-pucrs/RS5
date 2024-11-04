@@ -485,7 +485,7 @@ module decode
         if (!reset_n)
             killed_o <= 1'b0;
         else if (enable)
-            killed_o <= 1'b1;
+            killed_o <= killed;
     end
 
 //////////////////////////////////////////////////////////////////////////////
