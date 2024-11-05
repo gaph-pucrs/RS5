@@ -69,13 +69,13 @@ module CSRBank
     input   logic [31:0]        pc_i,
     input   logic [31:0]        next_pc_i,
     input   logic [31:0]        instruction_i,
-    input   logic               instruction_compressed_i,
 
     input   logic               jump_i,
     input   logic [31:0]        jump_target_i,
 
     /* Not used without compressed */
     /* verilator lint_off UNUSEDSIGNAL */
+    input   logic               instruction_compressed_i,
     input   logic               jump_misaligned_i,
     /* verilator lint_on UNUSEDSIGNAL */
 
