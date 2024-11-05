@@ -53,6 +53,7 @@ module CSRBank
 
     /* Signals enabled with ZIHPM */
     /* verilator lint_off UNUSEDSIGNAL */
+    input   logic               instruction_compressed_i,
     input   iType_e             instruction_operation_i,
     input   logic               hazard,
     input   logic               stall,
@@ -69,7 +70,6 @@ module CSRBank
     input   logic [31:0]        pc_i,
     input   logic [31:0]        next_pc_i,
     input   logic [31:0]        instruction_i,
-    input   logic               instruction_compressed_i,
 
     input   logic               jump_i,
     input   logic [31:0]        jump_target_i,
