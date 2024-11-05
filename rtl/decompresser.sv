@@ -135,7 +135,6 @@ module decompresser
             7'b1001110: expansion_C1 = {7'b0000000, CS_rs2, CS_rs1, 3'b110, CS_rs1, 7'b0110011}; /* C.OR */
             7'b1001101: expansion_C1 = {7'b0000000, CS_rs2, CS_rs1, 3'b100, CS_rs1, 7'b0110011}; /* C.XOR */
             7'b1001100: expansion_C1 = {7'b0100000, CS_rs2, CS_rs1, 3'b000, CS_rs1, 7'b0110011}; /* C.SUB */
-            default:    expansion_C1 = '0;
         endcase
     end
 

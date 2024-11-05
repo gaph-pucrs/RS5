@@ -26,10 +26,12 @@
 module decode
     import RS5_pkg::*;
 #(
+    parameter mul_e         MULEXT      = MUL_M,
+    parameter bit           COMPRESSED  = 1'b1,
     parameter bit           ZKNEEnable  = 1'b0,
     parameter bit           VEnable     = 1'b0,
-    parameter atomic_ext_e  AMOEXT      = AMO_OFF,
-    parameter bit           COMPRESSED  = 1'b0
+    parameter atomic_ext_e  AMOEXT      = AMO_A,
+    parameter bit           BRANCHPRED  = 1'b1
 )
 (
     input   logic           clk,
@@ -38,11 +40,9 @@ module decode
 
     input   logic [31:0]    instruction_i,
     input   logic [31:0]    pc_i,
-    input   logic  [2:0]    tag_i,
     input   logic [31:0]    rs1_data_read_i,
     input   logic [31:0]    rs2_data_read_i,
-    input   logic           compressed_i,
-    input   logic           jumped_i,
+    input   logic           rollback_i,
 
     output  logic  [4:0]    rs1_o,
     output  logic  [4:0]    rs2_o,
@@ -53,10 +53,24 @@ module decode
     output  logic [31:0]    pc_o,
     output  logic [31:0]    instruction_o,
     output  logic           compressed_o,
-    output  logic  [2:0]    tag_o,
     output  iType_e         instruction_operation_o,
     output  iTypeVector_e   vector_operation_o,
     output  logic           hazard_o,
+    output  logic           killed_o,
+
+    /* Not used without BP */
+    /* verilator lint_off UNUSEDSIGNAL */
+    input   logic           jump_rollback_i,
+    /* verilator lint_on UNUSEDSIGNAL */
+    input   logic           ctx_switch_i,
+    input   logic           jumping_i,
+    /* Not used without C */
+    /* verilator lint_off UNUSEDSIGNAL */
+    input   logic           jump_misaligned_i,
+    /* verilator lint_off UNUSEDSIGNAL */
+    output  logic           bp_take_o,
+    output  logic           bp_taken_o,
+    output  logic [31:0]    bp_target_o,
 
     input   logic           exc_inst_access_fault_i,
     output  logic           exc_inst_access_fault_o,
@@ -64,73 +78,20 @@ module decode
     output  logic           exc_misaligned_fetch_o
 );
 
-    logic [31:0]    first_operand, second_operand, third_operand, immediate;
-    logic [31:0]    instruction;
-    logic [31:0]    last_instruction;
-    logic           last_hazard;
-    logic           last_stall;
-    logic           locked_memory;
-    logic  [4:0]    locked_register;
-
-    formatType_e    instruction_format;
-    iType_e         instruction_operation;
-
-
-//////////////////////////////////////////////////////////////////////////////
-// Re-Decode isntruction on hazard or stall
-//////////////////////////////////////////////////////////////////////////////
-
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            last_instruction <= 32'h00000013;
-        else
-            last_instruction <= instruction;
-    end
-
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            last_hazard <= 1'b1;
-        else
-            last_hazard <= hazard_o;
-    end
-
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            last_stall <= 1'b1;
-        else
-            last_stall <= !enable;
-    end
-
-    always_comb begin
-        if ((last_hazard || last_stall)) begin
-            instruction = last_instruction;
-        end
-        else begin
-            instruction = instruction_i;
-        end
-    end
-
 //////////////////////////////////////////////////////////////////////////////
 // Find out the type of the instruction
 //////////////////////////////////////////////////////////////////////////////
 
-    iType_e decode_branch;
-    iType_e decode_load;
-    iType_e decode_store;
-    iType_e decode_op_imm;
-    iType_e decode_op;
-    iType_e decode_misc_mem;
-    iType_e decode_system;
-    iType_e decode_atomic;
-
     logic [2:0] funct3;
     logic [6:0] funct7;
     logic [6:0] opcode;
-
-    assign opcode = instruction[6:0];
+    logic [31:0] instruction;
+    
     assign funct3 = instruction[14:12];
     assign funct7 = instruction[31:25];
+    assign opcode = instruction[6:0];
 
+    iType_e decode_branch;
     always_comb begin
         unique case (funct3)
             3'b000:     decode_branch = BEQ;
@@ -143,6 +104,7 @@ module decode
         endcase
     end
 
+    iType_e decode_load;
     always_comb begin
         unique case (funct3)
             3'b000:     decode_load = LB;
@@ -154,6 +116,7 @@ module decode
         endcase
     end
 
+    iType_e decode_store;
     always_comb begin
         unique case (funct3)
             3'b000:     decode_store = SB;
@@ -163,6 +126,7 @@ module decode
         endcase
     end
 
+    iType_e decode_op_imm;
     always_comb begin
         unique case ({funct7, funct3}) inside
             10'b???????000:     decode_op_imm = ADD;    /* ADDI */
@@ -178,6 +142,7 @@ module decode
         endcase
     end
 
+    iType_e decode_op;
     always_comb begin
         unique case ({funct7, funct3}) inside
             10'b0000000000:     decode_op = ADD;
@@ -190,20 +155,21 @@ module decode
             10'b0100000101:     decode_op = SRA;
             10'b0000000110:     decode_op = OR;
             10'b0000000111:     decode_op = AND;
-            10'b0000001000:     decode_op = MUL;
-            10'b0000001001:     decode_op = MULH;
-            10'b0000001010:     decode_op = MULHSU;
-            10'b0000001011:     decode_op = MULHU;
-            10'b0000001100:     decode_op = DIV;
-            10'b0000001101:     decode_op = DIVU;
-            10'b0000001110:     decode_op = REM;
-            10'b0000001111:     decode_op = REMU;
-            10'b??10001000:     decode_op = ZKNEEnable ? AES32ESI : INVALID;
+            10'b0000001000:     decode_op = (MULEXT != MUL_OFF) ? MUL    : INVALID;
+            10'b0000001001:     decode_op = (MULEXT != MUL_OFF) ? MULH   : INVALID;
+            10'b0000001010:     decode_op = (MULEXT != MUL_OFF) ? MULHSU : INVALID;
+            10'b0000001011:     decode_op = (MULEXT != MUL_OFF) ? MULHU  : INVALID;
+            10'b0000001100:     decode_op = (MULEXT == MUL_M  ) ? DIV    : INVALID;
+            10'b0000001101:     decode_op = (MULEXT == MUL_M  ) ? DIVU   : INVALID;
+            10'b0000001110:     decode_op = (MULEXT == MUL_M  ) ? REM    : INVALID;
+            10'b0000001111:     decode_op = (MULEXT == MUL_M  ) ? REMU   : INVALID;
+            10'b??10001000:     decode_op = ZKNEEnable ? AES32ESI  : INVALID;
             10'b??10011000:     decode_op = ZKNEEnable ? AES32ESMI : INVALID;
             default:            decode_op = INVALID;
         endcase
     end
 
+    iType_e decode_misc_mem;
     always_comb begin
         unique case (funct3)
             3'b000:     decode_misc_mem = NOP;  /* FENCE */
@@ -211,6 +177,7 @@ module decode
         endcase
     end
 
+    iType_e decode_system;
     always_comb begin
         unique case (instruction[31:7]) inside
             25'b0000000000000000000000000:  decode_system = ECALL;
@@ -228,6 +195,7 @@ module decode
         endcase
     end
 
+    iType_e decode_atomic;
     if (AMOEXT != AMO_OFF) begin : a_enable_decode_gen_on
         always_comb begin
             unique case (funct7[6:2]) inside
@@ -250,6 +218,7 @@ module decode
         assign decode_atomic = INVALID;
     end
 
+    iType_e instruction_operation;
     always_comb begin
         unique case (opcode)
             7'b0110111: instruction_operation = LUI;
@@ -383,6 +352,7 @@ module decode
 //  Decodes the instruction format
 //////////////////////////////////////////////////////////////////////////////
 
+    formatType_e instruction_format;
     always_comb begin
         unique case (opcode[6:2])
             5'b11001, 5'b00000, 5'b00100:   instruction_format = I_TYPE;        /* JALR, LOAD, OP-IMM */
@@ -397,6 +367,7 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 // Extract the immediate based on instruction format
 //////////////////////////////////////////////////////////////////////////////
+
     logic [31:0] imm_i;
     logic [31:0] imm_s;
     logic [31:0] imm_b;
@@ -409,6 +380,7 @@ module decode
     assign imm_u = {instruction[31:12], 12'b0};
     assign imm_j = {{12{instruction[31]}}, instruction[19:12], instruction[20], instruction[30:25], instruction[24:21], 1'b0};
 
+    logic [31:0] immediate;
     always_comb begin
         unique case (instruction_format)
             I_TYPE:     immediate = imm_i;
@@ -420,22 +392,53 @@ module decode
         endcase
     end
 
+////////////////////////////////////////////////////////////////////////////////
+// Branch Prediction
+////////////////////////////////////////////////////////////////////////////////
+
+    logic jump_confirmed;
+
+    if (BRANCHPRED) begin : gen_bp_on
+        logic bp_branch_taken;
+        logic bp_jump_taken;
+
+        assign bp_branch_taken = (opcode[6:2] == 5'b11000 && imm_b[31]);
+        assign bp_jump_taken   = (opcode[6:2] == 5'b11011);
+
+        // bp_take_o should use !jump_confirmed instead of !jumping_i but that is causing problems
+        assign bp_take_o   = (bp_jump_taken || bp_branch_taken) && !jumping_i && !rollback_i;
+        assign bp_target_o = pc_i + immediate;
+
+        assign jump_confirmed = ctx_switch_i || (jumping_i && !jump_rollback_i);
+    end
+    else begin : gen_bp_off
+        assign bp_take_o   = 1'b0;
+        assign bp_target_o = '0;
+        assign jump_confirmed = ctx_switch_i || jumping_i;
+    end
+
 //////////////////////////////////////////////////////////////////////////////
 // Registe Lock Queue (RLQ)
 //////////////////////////////////////////////////////////////////////////////
+
+    logic           killed;
+    logic           locked_memory;
+    logic  [4:0]    locked_register;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             locked_register <= '0;
             locked_memory   <= '0;
         end
-        else if (hazard_o) begin
-            locked_register <= '0;
-            locked_memory   <= '0;
-        end
         else if (enable) begin
-            locked_register <= instruction[11:7];
-            locked_memory   <= (opcode[6:2] == 5'b01000);
+            if (hazard_o || killed) begin
+                locked_register <= '0;
+                locked_memory   <= '0;
+            end
+            else begin
+                locked_register <= instruction[11:7];
+                locked_memory   <= (opcode[6:2] == 5'b01000);
+            end
         end
     end
 
@@ -493,14 +496,22 @@ module decode
         endcase
     end
 
-    assign locked_rs1 = (locked_register == rs1_o && rs1_o != '0) ? 1'b1 : 1'b0;
-    assign locked_rs2 = (locked_register == rs2_o && rs2_o != '0) ? 1'b1 : 1'b0;
+    assign locked_rs1 = (locked_register != '0 && locked_register == rs1_o);
+    assign locked_rs2 = (locked_register != '0 && locked_register == rs2_o);
 
-    assign hazard_mem = locked_memory   & use_mem;
-    assign hazard_rs1 = locked_rs1      & use_rs1;
-    assign hazard_rs2 = locked_rs2      & use_rs2;
+    assign hazard_mem = locked_memory   && use_mem;
+    assign hazard_rs1 = locked_rs1      && use_rs1;
+    assign hazard_rs2 = locked_rs2      && use_rs2;
 
-    assign hazard_o   = (hazard_mem || hazard_rs1 || hazard_rs2) && enable && !jumped_i;
+    assign killed   = jump_confirmed || jump_misaligned_i || rollback_i;
+    assign hazard_o = (hazard_mem || hazard_rs1 || hazard_rs2) && !killed;
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            killed_o <= 1'b0;
+        else if (enable)
+            killed_o <= killed;
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 // Exception Detection
@@ -508,19 +519,32 @@ module decode
 
     logic invalid_inst;
     logic misaligned_fetch;
+    logic compressed;
 
     assign invalid_inst     = instruction_operation == INVALID;
 
-    if (COMPRESSED) begin : gen_misaligned_check_c
+    if (COMPRESSED) begin : gen_compressed_on
+        logic [31:0] instruction_decompressed;
+        decompresser decompresser (
+            .instruction_i (instruction_i[15:0]),
+            .instruction_o (instruction_decompressed)
+        );
+
         assign misaligned_fetch = pc_i[0] != 1'b0;
+        assign compressed = (instruction_i[1:0] != '1);
+        assign instruction = compressed ? instruction_decompressed : instruction_i;
     end
-    else begin : gen_misaligned_check_nc
+    else begin : gen_compressed_off
         assign misaligned_fetch = pc_i[1:0] != 2'b00;
+        assign instruction = instruction_i;
+        assign compressed = 1'b0;
     end
 
 //////////////////////////////////////////////////////////////////////////////
-// Control of the exits based on format
+// Control of the operands based on format
 //////////////////////////////////////////////////////////////////////////////
+
+    logic [31:0]    first_operand, second_operand, third_operand;
 
     always_comb begin
         unique case (instruction_format)
@@ -544,7 +568,7 @@ module decode
     end
 
 //////////////////////////////////////////////////////////////////////////////
-// Outputs
+// Outputs do execution unit
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk or negedge reset_n) begin
@@ -556,39 +580,41 @@ module decode
             instruction_o           <= '0;
             compressed_o            <= 1'b0;
             instruction_operation_o <= NOP;
-            tag_o                   <= '0;
             exc_ilegal_inst_o       <= 1'b0;
             exc_misaligned_fetch_o  <= 1'b0;
             exc_inst_access_fault_o <= 1'b0;
             vector_operation_o      <= VNOP;
-        end
-        else if (hazard_o) begin
-            first_operand_o         <= '0;
-            second_operand_o        <= '0;
-            third_operand_o         <= '0;
-            pc_o                    <= '0;
-            instruction_o           <= '0;
-            compressed_o            <= 1'b0;
-            instruction_operation_o <= NOP;
-            tag_o                   <= tag_i;
-            exc_ilegal_inst_o       <= 1'b0;
-            exc_misaligned_fetch_o  <= 1'b0;
-            exc_inst_access_fault_o <= 1'b0;
-            vector_operation_o      <= VNOP;
+            bp_taken_o              <= 1'b0;
         end
         else if (enable) begin
-            first_operand_o         <= first_operand;
-            second_operand_o        <= second_operand;
-            third_operand_o         <= third_operand;
-            pc_o                    <= pc_i;
-            instruction_o           <= instruction;
-            compressed_o            <= compressed_i;
-            instruction_operation_o <= instruction_operation;
-            tag_o                   <= tag_i;
-            exc_ilegal_inst_o       <= invalid_inst;
-            exc_misaligned_fetch_o  <= misaligned_fetch;
-            exc_inst_access_fault_o <= exc_inst_access_fault_i;
-            vector_operation_o      <= vector_operation;
+            if (hazard_o || killed) begin
+                first_operand_o         <= '0;
+                second_operand_o        <= '0;
+                third_operand_o         <= '0;
+                pc_o                    <= '0;
+                instruction_o           <= '0;
+                compressed_o            <= 1'b0;
+                instruction_operation_o <= NOP;
+                exc_ilegal_inst_o       <= 1'b0;
+                exc_misaligned_fetch_o  <= 1'b0;
+                exc_inst_access_fault_o <= 1'b0;
+                vector_operation_o      <= VNOP;
+                bp_taken_o              <= 1'b0;
+            end
+            else begin
+                first_operand_o         <= first_operand;
+                second_operand_o        <= second_operand;
+                third_operand_o         <= third_operand;
+                pc_o                    <= pc_i;
+                instruction_o           <= instruction;
+                compressed_o            <= compressed;
+                instruction_operation_o <= instruction_operation;
+                exc_ilegal_inst_o       <= invalid_inst;
+                exc_misaligned_fetch_o  <= misaligned_fetch;
+                exc_inst_access_fault_o <= exc_inst_access_fault_i;
+                vector_operation_o      <= vector_operation;
+                bp_taken_o              <= bp_take_o;
+            end
         end
     end
 

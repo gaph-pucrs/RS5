@@ -53,6 +53,23 @@ module mul
         end
     end
 
+    logic hold;
+
+    assign hold_o = start || hold;
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            hold <= 1'b0;
+        end
+        else begin
+            unique case (mul_state)
+                ALBL:    hold <= start;
+                ALBH:    hold <= !mul_low_i;
+                default: hold <= 1'b0;
+            endcase
+        end
+    end
+
     always_comb begin
         op_a           = first_operand_i[15:0];
         op_b           = second_operand_i[15:0];
@@ -71,10 +88,8 @@ module mul
                 mac_result_partial = mac_result;
                 if (start == 1'b1) begin
                     next_state = ALBH;
-                    hold_o     = 1'b1;
                 end else begin
                     next_state = ALBL;
-                    hold_o     = 1'b0;
                 end
             end
             ALBH: begin
@@ -93,7 +108,6 @@ module mul
                 end
 
                 next_state = AHBL;
-                hold_o     = 1'b1;
             end
             AHBL: begin
                 op_a   = first_operand_i[31:16];
@@ -105,13 +119,11 @@ module mul
                     accum               = {19'b0, mac_result_reg[31:16]};
                     mac_result_partial  = {3'b0, mac_result[15:0], mac_result_reg[15:0]};
 
-                    hold_o     = 1'b0;
                     next_state = ALBL;
                 end
                 else begin
                     mac_result_partial = mac_result;
                     accum      = mac_result_reg;
-                    hold_o     = 1'b1;
                     next_state = AHBH;
                 end
             end
@@ -128,11 +140,6 @@ module mul
                 mac_result_partial = mac_result;
 
                 next_state = ALBL;
-                hold_o     = 1'b0;
-            end
-            default: begin
-                next_state = ALBL;
-                hold_o     = 1'b0;
             end
         endcase
     end

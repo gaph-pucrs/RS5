@@ -18,11 +18,6 @@
  * a Branch Unit that makes the decision of branching based on instruction
  * operation and operands. Also implements the Memory Load and Store mechanism.
  * Lastly it implements the CSR access logic.
- * The operations are performed based on Tag comparisons between this unit's tag
- * and the instruction tag, if they mismatch the instruction is killed and its
- * operation is not performed. A performed branch causes the internal tag to be
- * increased, causing the tag mismatch on the following instructions until an
- * instruction fetched from the new flow arrives with the updated tag.
  */
 
 `include "RS5_pkg.sv"
@@ -31,16 +26,16 @@ module execute
     import RS5_pkg::*;
 #(
     parameter environment_e Environment = ASIC,
-    parameter rv32_e        RV32        = RV32I,
+    parameter mul_e         MULEXT      = MUL_M,
     parameter bit           ZKNEEnable  = 1'b0,
     parameter atomic_ext_e  AMOEXT      = AMO_OFF,
     parameter bit           VEnable     = 1'b0,
-    parameter int           VLEN        = 64
+    parameter int           VLEN        = 64,
+    parameter bit           BRANCHPRED  = 1'b1
 )
 (
     input   logic               clk,
     input   logic               reset_n,
-    input   logic               sys_reset,
     input   logic               stall,
 
     /* Bits 14:12 and 6:0 are not used in this module */
@@ -62,7 +57,6 @@ module execute
     /* verilator lint_off UNUSEDSIGNAL */
     input   logic [31:0]        atomic_read_value_i,
     /* verilator lint_on UNUSEDSIGNAL */
-    input   logic  [2:0]        tag_i,
     input   privilegeLevel_e    privilege_i,
 
     input   logic               exc_ilegal_inst_i,
@@ -71,7 +65,6 @@ module execute
     input   logic               exc_load_access_fault_i,
 
     output  logic               hold_o,
-    output  logic               killed_o,
     output  logic               write_enable_o,
     output  iType_e             instruction_operation_o,
     output  logic [31:0]        result_o,
@@ -95,10 +88,18 @@ module execute
     output  logic [31:0]        vtype_o,
     output  logic [31:0]        vlen_o,
 
-    output  logic               jump_o,
-    output  logic [31:0]        jump_target_o,
+    /* Not used if BP is off */
+    /* verilator lint_off UNUSEDSIGNAL */
+    input   logic               bp_taken_i,
+    /* verilator lint_on UNUSEDSIGNAL */
+    output  logic               jump_rollback_o,
+    output  logic               ctx_switch_o,
+    output  logic [31:0]        ctx_switch_target_o,
 
     input   logic               interrupt_pending_i,
+    input   logic [31:0]        mtvec_i,
+    input   logic [31:0]        mepc_i,
+    output  logic               jump_o,
     output  logic               interrupt_ack_o,
     output  logic               machine_return_o,
     output  logic               raise_exception_o,
@@ -107,13 +108,12 @@ module execute
     output logic [4:0]          rd_atomic_o,
     output logic                atomic_write_reg_o,
 
+    output  logic [31:0]        jump_target_o,
     output  exceptionCode_e     exception_code_o
 );
 
-    logic  [2:0]    curr_tag;
     logic [31:0]    result;
     logic [31:0]    atomic_read_value;
-    logic           killed;
     logic           write_enable;
     logic           exc_ilegal_csr_inst;
     logic           atomic_write;
@@ -146,7 +146,6 @@ module execute
     logic           less_than_unsigned;
     logic           greater_equal;
     logic           greater_equal_unsigned;
-    logic           jump;
 
     assign first_operand        = atomic_write_reg ? atomic_read_value : first_operand_i;
     assign first_operand_signed = first_operand;
@@ -353,7 +352,7 @@ end
     logic        hold_mul;
     logic        hold_div;
 
-    if (RV32 == RV32M || RV32 == RV32ZMMUL) begin : gen_zmmul_on
+    if (MULEXT != MUL_OFF) begin : gen_zmmul_on
 
         logic [1:0] signed_mode_mul;
         logic       enable_mul;
@@ -367,8 +366,8 @@ end
             endcase
         end
 
-        assign enable_mul = (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU}) && !killed;
-        assign mul_low    = (instruction_operation_i == MUL) && !killed;
+        assign enable_mul = (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU});
+        assign mul_low    = (instruction_operation_i == MUL);
 
         mul mul1 (
             .clk              (clk),
@@ -395,12 +394,12 @@ end
     logic [31:0] div_result;
     logic [31:0] rem_result;
 
-    if (RV32 == RV32M) begin : gen_div_on
+    if (MULEXT == MUL_M) begin : gen_div_on
         logic enable_div;
         logic signed_div;
 
-        assign enable_div = (instruction_operation_i inside {DIV, DIVU, REM, REMU}) && !killed;
-        assign signed_div = (instruction_operation_i inside {DIV, REM}) && !killed;
+        assign enable_div = (instruction_operation_i inside {DIV, DIVU, REM, REMU});
+        assign signed_div = (instruction_operation_i inside {DIV, REM});
 
         div div1 (
             .clk              (clk),
@@ -472,7 +471,7 @@ end
         logic amo_hold;
 
         if (AMOEXT != AMO_ZALRSC) begin : gen_zaamo_on
-            assign amo_enable = !killed && instruction_operation_i inside {AMOSWAP, AMOADD, AMOXOR, AMOAND, AMOOR, AMOMIN, AMOMAX, AMOMINU, AMOMAXU};
+            assign amo_enable = instruction_operation_i inside {AMOSWAP, AMOADD, AMOXOR, AMOAND, AMOOR, AMOMIN, AMOMAX, AMOMINU, AMOMAXU};
 
             logic amo_enable_stall;
             assign amo_enable_stall = !stall && amo_enable;
@@ -501,7 +500,7 @@ end
         logic lrsc_hold;
 
         if (AMOEXT != AMO_ZAAMO) begin : gen_zalrsc_on
-            assign lrsc_enable = !killed && instruction_operation_i inside {LR, SC};
+            assign lrsc_enable = instruction_operation_i inside {LR, SC};
 
             logic lrsc_enable_stall;     
             assign lrsc_enable_stall = !stall && lrsc_enable;
@@ -554,9 +553,6 @@ end
     logic        hold_vector;
 
     if (VEnable) begin : v_gen_on
-        iType_e vector_inst;
-
-        assign vector_inst = (killed) ? NOP : instruction_operation_i;
         vectorUnit #(
             .Environment (Environment),
             .VLEN        (VLEN)
@@ -564,7 +560,7 @@ end
             .clk                    (clk),
             .reset_n                (reset_n),
             .instruction_i          (instruction_i),
-            .instruction_operation_i(vector_inst),
+            .instruction_operation_i(instruction_operation_i),
             .vector_operation_i     (vector_operation_i),
             .op1_scalar_i           (first_operand_i),
             .op2_scalar_i           (second_operand_i),
@@ -625,13 +621,13 @@ end
             SB,SH,SW,
             BEQ,BNE,
             BLT,BLTU,
-            BGE,BGEU:    write_enable = 1'b0;
+            BGE,BGEU: write_enable = 1'b0;
             VECTOR,
             VLOAD,
-            VSTORE:      write_enable = vector_wr_en;
+            VSTORE:   write_enable = vector_wr_en;
             LR,
-            SC:          write_enable = atomic_write_reg;
-            default:     write_enable = ~(killed | raise_exception_o);
+            SC:       write_enable = atomic_write_reg;
+            default:  write_enable = !raise_exception_o;
         endcase
     end
 
@@ -672,15 +668,12 @@ end
                 rd_atomic_o             <= '0;
             end
         end
+        else begin
+            write_enable_o          <= 1'b0;
+            instruction_operation_o <= NOP;
+            result_o                <= '0;
+        end
     end
-
-//////////////////////////////////////////////////////////////////////////////
-// Killed signal generation
-//////////////////////////////////////////////////////////////////////////////
-
-    assign killed   = (curr_tag != tag_i) | sys_reset;
-
-    assign killed_o = killed;
 
 //////////////////////////////////////////////////////////////////////////////
 // BRANCH CONTROL
@@ -694,32 +687,38 @@ end
         endcase
     end
 
+    logic should_jump;
     always_comb begin
         unique case (instruction_operation_i)
-            BEQ:        jump = equal;
-            BNE:        jump = ~equal;
-            BLT:        jump = less_than;
-            BLTU:       jump = less_than_unsigned;
-            BGE:        jump = greater_equal;
-            BGEU:       jump = greater_equal_unsigned;
-            JAL, JALR:  jump = 1'b1;
-            default:    jump = 1'b0;
+            BEQ:        should_jump = equal;
+            BNE:        should_jump = !equal;
+            BLT:        should_jump = less_than;
+            BLTU:       should_jump = less_than_unsigned;
+            BGE:        should_jump = greater_equal;
+            BGEU:       should_jump = greater_equal_unsigned;
+            JAL, JALR:  should_jump = 1'b1;
+            default:    should_jump = 1'b0;
         endcase
     end
 
-    assign jump_o = (jump && !killed);
+    always_comb begin
+        if (machine_return_o)
+            ctx_switch_target_o = mepc_i;
+        else if (raise_exception_o || interrupt_ack_o)
+            ctx_switch_target_o = mtvec_i;
+        else
+            ctx_switch_target_o = jump_target_o;
+    end
 
-//////////////////////////////////////////////////////////////////////////////
-// TAG control based on signals Jump and Killed
-//////////////////////////////////////////////////////////////////////////////
+    assign ctx_switch_o = machine_return_o || raise_exception_o || interrupt_ack_o || jump_o;
 
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            curr_tag <= '0;
-        end
-        else if ((jump_o || raise_exception_o || machine_return_o || interrupt_ack_o)) begin
-            curr_tag <= curr_tag + 1'b1;
-        end
+    if (BRANCHPRED) begin : gen_bp_on
+        assign jump_o          = ( should_jump && (!bp_taken_i || interrupt_ack_o));
+        assign jump_rollback_o = (!should_jump &&  bp_taken_i);
+    end
+    else begin : gen_bp_off
+        assign jump_o          = should_jump;
+        assign jump_rollback_o = 1'b0;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -727,71 +726,63 @@ end
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        if ((killed) == 1'b0) begin
-            if (exc_inst_access_fault_i) begin
-                raise_exception_o = 1'b1;
-                machine_return_o  = 1'b0;
-                interrupt_ack_o   = 1'b0;
-                //exception_code_o  = ILLEGAL_INSTRUCTION;
-                exception_code_o  = INSTRUCTION_ACCESS_FAULT;
-                // $write("[%0d] EXCEPTION - INSTRUCTION ACCESS FAULT: %8h %8h\n", $time, pc_i, instruction_i);
-            end
-            else
-            if ((exc_ilegal_inst_i || exc_ilegal_csr_inst)) begin
-                raise_exception_o = 1'b1;
-                machine_return_o  = 1'b0;
-                interrupt_ack_o   = 1'b0;
-                exception_code_o  = ILLEGAL_INSTRUCTION;
-                // $write("[%0d] EXCEPTION - ILLEGAL INSTRUCTION: %8h %8h\n", $time, pc_i, instruction_i);
-            end
-            else if (exc_misaligned_fetch_i) begin
-                raise_exception_o = 1'b1;
-                machine_return_o  = 1'b0;
-                interrupt_ack_o   = 1'b0;
-                exception_code_o  = INSTRUCTION_ADDRESS_MISALIGNED;
-                // $write("[%0d] EXCEPTION - INSTRUCTION ADDRESS MISALIGNED: %8h %8h\n", $time, pc_i, instruction_i);
-            end
-            else if (instruction_operation_i == ECALL) begin
-                raise_exception_o = 1'b1;
-                machine_return_o  = 1'b0;
-                interrupt_ack_o   = 1'b0;
-                exception_code_o  = (privilege_i == USER) ? ECALL_FROM_UMODE : ECALL_FROM_MMODE;
-                // $write("[%0d] EXCEPTION - ECALL_FROM_MMODE: %8h %8h\n", $time, pc_i, instruction_i);
-            end
-            else if (instruction_operation_i == EBREAK) begin
-                raise_exception_o = 1'b1;
-                machine_return_o  = 1'b0;
-                interrupt_ack_o   = 1'b0;
-                exception_code_o  = BREAKPOINT;
-                // $write("[%0d] EXCEPTION - EBREAK: %8h %8h\n", $time, pc_i, instruction_i);
-            end
-            else if (exc_load_access_fault_i == 1'b1 && (mem_write_enable_o != '0 || mem_read_enable_o == 1'b1)) begin
-                raise_exception_o = 1'b1;
-                machine_return_o  = 1'b0;
-                interrupt_ack_o   = 1'b0;
-                exception_code_o  = LOAD_ACCESS_FAULT;
-                // $write("[%0d] EXCEPTION - LOAD ACCESS FAULT: %8h %8h %8h\n", $time, pc_i, instruction_i, mem_address_o);
-            end
-            else if (instruction_operation_i == MRET) begin
-                raise_exception_o = 1'b0;
-                machine_return_o  = 1'b1;
-                interrupt_ack_o   = 1'b0;
-                exception_code_o  = NE;
-                // $write("[%0d] MRET: %8h %8h\n", $time, pc_i, instruction_i);
-            end
-            else if (interrupt_pending_i == 1'b1 && instruction_operation_i != NOP && !hold_o) begin
-                raise_exception_o = 1'b0;
-                machine_return_o  = 1'b0;
-                interrupt_ack_o   = 1'b1;
-                exception_code_o  = NE;
-                // $write("[%0d] Interrupt Acked\n", $time);
-            end
-            else begin
-                raise_exception_o = 1'b0;
-                machine_return_o  = 1'b0;
-                interrupt_ack_o   = 1'b0;
-                exception_code_o  = NE;
-            end
+        if (exc_inst_access_fault_i) begin
+            raise_exception_o = 1'b1;
+            machine_return_o  = 1'b0;
+            interrupt_ack_o   = 1'b0;
+            //exception_code_o  = ILLEGAL_INSTRUCTION;
+            exception_code_o  = INSTRUCTION_ACCESS_FAULT;
+            // $write("[%0d] EXCEPTION - INSTRUCTION ACCESS FAULT: %8h %8h\n", $time, pc_i, instruction_i);
+        end
+        else
+        if ((exc_ilegal_inst_i || exc_ilegal_csr_inst)) begin
+            raise_exception_o = 1'b1;
+            machine_return_o  = 1'b0;
+            interrupt_ack_o   = 1'b0;
+            exception_code_o  = ILLEGAL_INSTRUCTION;
+            // $write("[%0d] EXCEPTION - ILLEGAL INSTRUCTION: %8h %8h\n", $time, pc_i, instruction_i);
+        end
+        else if (exc_misaligned_fetch_i) begin
+            raise_exception_o = 1'b1;
+            machine_return_o  = 1'b0;
+            interrupt_ack_o   = 1'b0;
+            exception_code_o  = INSTRUCTION_ADDRESS_MISALIGNED;
+            // $write("[%0d] EXCEPTION - INSTRUCTION ADDRESS MISALIGNED: %8h %8h\n", $time, pc_i, instruction_i);
+        end
+        else if (instruction_operation_i == ECALL) begin
+            raise_exception_o = 1'b1;
+            machine_return_o  = 1'b0;
+            interrupt_ack_o   = 1'b0;
+            exception_code_o  = (privilege_i == USER) ? ECALL_FROM_UMODE : ECALL_FROM_MMODE;
+            // $write("[%0d] EXCEPTION - ECALL_FROM_MMODE: %8h %8h\n", $time, pc_i, instruction_i);
+        end
+        else if (instruction_operation_i == EBREAK) begin
+            raise_exception_o = 1'b1;
+            machine_return_o  = 1'b0;
+            interrupt_ack_o   = 1'b0;
+            exception_code_o  = BREAKPOINT;
+            // $write("[%0d] EXCEPTION - EBREAK: %8h %8h\n", $time, pc_i, instruction_i);
+        end
+        else if (exc_load_access_fault_i == 1'b1 && (mem_write_enable_o != '0 || mem_read_enable_o == 1'b1)) begin
+            raise_exception_o = 1'b1;
+            machine_return_o  = 1'b0;
+            interrupt_ack_o   = 1'b0;
+            exception_code_o  = LOAD_ACCESS_FAULT;
+            // $write("[%0d] EXCEPTION - LOAD ACCESS FAULT: %8h %8h %8h\n", $time, pc_i, instruction_i, mem_address_o);
+        end
+        else if (instruction_operation_i == MRET) begin
+            raise_exception_o = 1'b0;
+            machine_return_o  = 1'b1;
+            interrupt_ack_o   = 1'b0;
+            exception_code_o  = NE;
+            // $write("[%0d] MRET: %8h %8h\n", $time, pc_i, instruction_i);
+        end
+        else if (interrupt_pending_i && instruction_operation_i != NOP && !hold_o) begin
+            raise_exception_o = 1'b0;
+            machine_return_o  = 1'b0;
+            interrupt_ack_o   = 1'b1;
+            exception_code_o  = NE;
+            // $write("[%0d] Interrupt Acked\n", $time);
         end
         else begin
             raise_exception_o = 1'b0;

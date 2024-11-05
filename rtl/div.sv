@@ -138,7 +138,6 @@ module div
                         div_result  <= '0;
                 end
 
-                default: state <= state;
             endcase
         end
     end
