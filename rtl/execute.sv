@@ -46,6 +46,7 @@ module execute
     input   logic [31:0]        first_operand_i,
     input   logic [31:0]        second_operand_i,
     input   logic [31:0]        third_operand_i,
+    input   logic  [4:0]        rd_i,
     input   iType_e             instruction_operation_i,
     input   logic               instruction_compressed_i,
     /* Not used if VEnable is 0 */
@@ -63,6 +64,7 @@ module execute
     output  logic               write_enable_o,
     output  iType_e             instruction_operation_o,
     output  logic [31:0]        result_o,
+    output  logic  [4:0]        rd_o,
 
     output  logic [31:0]        mem_address_o,
     output  logic               mem_read_enable_o,
@@ -230,10 +232,9 @@ end
 // CSR access signals
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [4:0] rd, rs1;
+    logic [4:0] rs1;
     logic       csr_read_enable, csr_write_enable;
 
-    assign rd  = instruction_i[11:7];
     assign rs1 = instruction_i[19:15];
 
     assign csr_address_o = instruction_i[31:20];
@@ -244,7 +245,7 @@ end
     always_comb begin
         unique case (instruction_operation_i)
             CSRRW, CSRRWI: begin
-                csr_read_enable  = (rd == '0) ? 1'b0 : 1'b1;
+                csr_read_enable  = (rd_i == '0) ? 1'b0 : 1'b1;
                 csr_write_enable = 1'b1;
             end
             CSRRS, CSRRC, CSRRSI, CSRRCI: begin
@@ -480,23 +481,26 @@ end
 //////////////////////////////////////////////////////////////////////////////
 // Output Registers
 //////////////////////////////////////////////////////////////////////////////
-    assign hold_o = hold_div | hold_mul | hold_vector;
+    assign hold_o = hold_div || hold_mul || hold_vector;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             write_enable_o          <= 1'b0;
             instruction_operation_o <= NOP;
             result_o                <= '0;
+            rd_o                    <= '0;
         end
-        else if (stall == 1'b0 & hold_o == 1'b0) begin
+        else if (!stall && !hold_o) begin
             write_enable_o          <= write_enable;
             instruction_operation_o <= instruction_operation_i;
             result_o                <= result;
+            rd_o                    <= rd_i;
         end
         else begin
             write_enable_o          <= 1'b0;
             instruction_operation_o <= NOP;
             result_o                <= '0;
+            rd_o                    <= '0;
         end
     end
 

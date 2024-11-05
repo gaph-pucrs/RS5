@@ -399,6 +399,9 @@ module decode
     logic           killed;
     logic           locked_memory;
     logic  [4:0]    locked_register;
+    logic  [4:0]    rd;
+
+    assign rd = instruction[11:7];
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
@@ -411,7 +414,7 @@ module decode
                 locked_memory   <= '0;
             end
             else begin
-                locked_register <= instruction[11:7];
+                locked_register <= rd;
                 locked_memory   <= (opcode[6:2] == 5'b01000);
             end
         end
@@ -423,13 +426,6 @@ module decode
 
     assign rs1_o = instruction[19:15];
     assign rs2_o = instruction[24:20];
-
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            rd_o <= '0;
-        else if (enable)
-            rd_o <= locked_register;
-    end
 
 //////////////////////////////////////////////////////////////////////////////
 // Hazard signal generation
@@ -560,6 +556,7 @@ module decode
             exc_inst_access_fault_o <= 1'b0;
             vector_operation_o      <= VNOP;
             bp_taken_o              <= 1'b0;
+            rd_o                    <= '0;
         end
         else if (enable) begin
             if (hazard_o || killed) begin
@@ -575,6 +572,7 @@ module decode
                 exc_inst_access_fault_o <= 1'b0;
                 vector_operation_o      <= VNOP;
                 bp_taken_o              <= 1'b0;
+                rd_o                    <= '0;
             end
             else begin
                 first_operand_o         <= first_operand;
@@ -589,6 +587,7 @@ module decode
                 exc_inst_access_fault_o <= exc_inst_access_fault_i;
                 vector_operation_o      <= vector_operation;
                 bp_taken_o              <= bp_take_o;
+                rd_o                    <= rd;
             end
         end
     end

@@ -98,7 +98,7 @@ module RS5
     logic    [4:0]  rs1, rs2;
     logic   [31:0]  regbank_data1, regbank_data2;
     logic   [31:0]  rs1_data_read, rs2_data_read;
-    logic    [4:0]  rd;
+    logic    [4:0]  rd_retire;
     logic   [31:0]  regbank_data_writeback;
     logic           regbank_write_enable_int, regbank_write_enable;
 
@@ -111,6 +111,7 @@ module RS5
     logic   [31:0]  first_operand_execute, second_operand_execute, third_operand_execute;
     logic   [31:0]  instruction_execute;
     logic   [31:0]  pc_execute;
+    logic    [4:0]  rd_execute;
     logic           exc_ilegal_inst_execute;
     logic           exc_misaligned_fetch_execute;
     logic           exc_inst_access_fault_execute;
@@ -157,15 +158,15 @@ module RS5
         assign mmu_en = 1'b0;
     end
 
-    assign regbank_write_enable =   (rd == '0)
+    assign regbank_write_enable =   (rd_retire == '0)
                                     ? 1'b0
                                     : regbank_write_enable_int;
 
-    assign rs1_data_read =  (rs1 == rd && regbank_write_enable)
+    assign rs1_data_read =  (rs1 == rd_retire && regbank_write_enable)
                             ? regbank_data_writeback
                             : regbank_data1;
 
-    assign rs2_data_read =  (rs2 == rd && regbank_write_enable)
+    assign rs2_data_read =  (rs2 == rd_retire && regbank_write_enable)
                             ? regbank_data_writeback
                             : regbank_data2;
 
@@ -247,7 +248,7 @@ module RS5
         .rs2_data_read_i            (rs2_data_read),
         .rs1_o                      (rs1),
         .rs2_o                      (rs2),
-        .rd_o                       (rd),
+        .rd_o                       (rd_execute),
         .first_operand_o            (first_operand_execute),
         .second_operand_o           (second_operand_execute),
         .third_operand_o            (third_operand_execute),
@@ -280,7 +281,7 @@ module RS5
         DRAM_RegBank RegBankA (
             .clk        (clk),
             .we         (regbank_write_enable),
-            .a          (rd),
+            .a          (rd_retire),
             .d          (regbank_data_writeback),
             .dpra       (rs1),
             .dpo        (regbank_data1)
@@ -289,7 +290,7 @@ module RS5
         DRAM_RegBank RegBankB (
             .clk        (clk),
             .we         (regbank_write_enable),
-            .a          (rd),
+            .a          (rd_retire),
             .d          (regbank_data_writeback),
             .dpra       (rs2),
             .dpo        (regbank_data2)
@@ -306,7 +307,7 @@ module RS5
             .reset_n    (reset_n),
             .rs1        (rs1),
             .rs2        (rs2),
-            .rd         (rd),
+            .rd         (rd_retire),
             .enable     (regbank_write_enable),
             .data_i     (regbank_data_writeback),
             .data1_o    (regbank_data1),
@@ -334,6 +335,7 @@ module RS5
         .first_operand_i         (first_operand_execute),
         .second_operand_i        (second_operand_execute),
         .third_operand_i         (third_operand_execute),
+        .rd_i                    (rd_execute),
         .instruction_operation_i (instruction_operation_execute),
         .instruction_compressed_i(instruction_compressed_execute),
         .vector_operation_i      (vector_operation_execute),
@@ -346,6 +348,7 @@ module RS5
         .write_enable_o          (regbank_write_enable_int),
         .instruction_operation_o (instruction_operation_retire),
         .result_o                (result_retire),
+        .rd_o                    (rd_retire),
         .mem_address_o           (mem_address),
         .mem_read_enable_o       (mem_read_enable),
         .mem_write_enable_o      (mem_write_enable),
