@@ -635,7 +635,7 @@ end
 // Output Registers
 //////////////////////////////////////////////////////////////////////////////
     
-    assign hold_o = hold_div | hold_mul | hold_vector | hold_atomic;
+    assign hold_o = hold_div || hold_mul || hold_vector || hold_atomic;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
