@@ -75,7 +75,10 @@ module execute
     input   logic [31:0]        mem_read_data_i,
     /* verilator lint_on UNUSEDSIGNAL */
 
-    output  logic [11:0]        csr_address_o,
+    /* We only use some bits of this signal here */
+    /* verilator lint_off UNUSEDSIGNAL */
+    input   logic [11:0]        csr_address_i,
+    /* verilator lint_on UNUSEDSIGNAL */
     output  logic               csr_read_enable_o,
     input   logic [31:0]        csr_data_read_i,
     output  logic               csr_write_enable_o,
@@ -237,8 +240,6 @@ end
 
     assign rs1 = instruction_i[19:15];
 
-    assign csr_address_o = instruction_i[31:20];
-
     assign csr_read_enable_o = csr_read_enable & !exc_ilegal_csr_inst;
     assign csr_write_enable_o = csr_write_enable & !exc_ilegal_csr_inst;
 
@@ -277,11 +278,11 @@ end
 
     always_comb begin
         // Raise exeption if CSR is read only and write enable is true
-        if (csr_address_o[11:10] == 2'b11 && csr_write_enable == 1'b1) begin
+        if (csr_address_i[11:10] == 2'b11 && csr_write_enable == 1'b1) begin
             exc_ilegal_csr_inst = 1;
         end
         // Check Level privileges
-        else if (csr_address_o[9:8] > privilege_i && ((csr_read_enable | csr_write_enable) == 1'b1)) begin
+        else if (csr_address_i[9:8] > privilege_i && ((csr_read_enable | csr_write_enable) == 1'b1)) begin
             exc_ilegal_csr_inst = 1;
         end
         // No exception is raised
