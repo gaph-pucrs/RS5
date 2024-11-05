@@ -28,7 +28,7 @@ module decode
 #(
     parameter bit           ZKNEEnable  = 1'b0,
     parameter bit           VEnable     = 1'b0,
-    parameter atomic_ext_e  AEnable     = OFF,
+    parameter atomic_ext_e  AMOEXT      = AMO_OFF,
     parameter bit           COMPRESSED  = 1'b0
 )
 (
@@ -56,7 +56,6 @@ module decode
     output  logic  [2:0]    tag_o,
     output  iType_e         instruction_operation_o,
     output  iTypeVector_e   vector_operation_o,
-    output  iTypeAtomic_e   atomic_operation_o,
     output  logic           hazard_o,
 
     input   logic           exc_inst_access_fault_i,
@@ -229,7 +228,27 @@ module decode
         endcase
     end
 
-    assign decode_atomic = funct7[3] == 1'b1 ? ATOMIC_LRSC : ATOMIC_AMO;
+    if (AMOEXT != AMO_OFF) begin : a_enable_decode_gen_on
+        always_comb begin
+            unique case (funct7[6:2]) inside
+                5'b00010: decode_atomic = (AMOEXT != AMO_ZAAMO)  ? LR      : INVALID;
+                5'b00011: decode_atomic = (AMOEXT != AMO_ZAAMO)  ? SC      : INVALID;
+                5'b00001: decode_atomic = (AMOEXT != AMO_ZALRSC) ? AMOSWAP : INVALID;
+                5'b00000: decode_atomic = (AMOEXT != AMO_ZALRSC) ? AMOADD  : INVALID;
+                5'b00100: decode_atomic = (AMOEXT != AMO_ZALRSC) ? AMOXOR  : INVALID;
+                5'b01100: decode_atomic = (AMOEXT != AMO_ZALRSC) ? AMOAND  : INVALID;
+                5'b01000: decode_atomic = (AMOEXT != AMO_ZALRSC) ? AMOOR   : INVALID;
+                5'b10000: decode_atomic = (AMOEXT != AMO_ZALRSC) ? AMOMIN  : INVALID;
+                5'b10100: decode_atomic = (AMOEXT != AMO_ZALRSC) ? AMOMAX  : INVALID;
+                5'b11000: decode_atomic = (AMOEXT != AMO_ZALRSC) ? AMOMINU : INVALID;
+                5'b11100: decode_atomic = (AMOEXT != AMO_ZALRSC) ? AMOMAXU : INVALID;
+                default:  decode_atomic = INVALID;
+            endcase
+        end
+    end
+    else begin : a_enable_decode_gen_off
+        assign decode_atomic = INVALID;
+    end
 
     always_comb begin
         unique case (opcode)
@@ -247,47 +266,9 @@ module decode
             7'b1010111: instruction_operation = VEnable ? VECTOR : INVALID; /* OP-V */
             7'b0000111: instruction_operation = VEnable ? VLOAD  : INVALID; /* LOAD-FP */
             7'b0100111: instruction_operation = VEnable ? VSTORE : INVALID; /* STORE-FP */
-            7'b0101111: instruction_operation = AEnable != OFF ? decode_atomic : INVALID;
+            7'b0101111: instruction_operation = (AMOEXT != AMO_OFF) ? decode_atomic : INVALID;
             default:    instruction_operation = INVALID;
         endcase
-    end
-
-//////////////////////////////////////////////////////////////////////////////
-//  Decode Atomic Instruction
-//////////////////////////////////////////////////////////////////////////////
-    iTypeAtomic_e atomic_operation;
-    if (AEnable != OFF) begin : a_enable_decode_gen_on
-
-        always_comb begin
-            if (instruction_operation == ATOMIC_LRSC) begin
-                unique case (funct7[6:2]) inside
-                    5'b00010: atomic_operation = LR;
-                    5'b00011: atomic_operation = SC;
-                    default:  atomic_operation = ANOP;
-                endcase
-            end
-            else if (instruction_operation == ATOMIC_AMO) begin
-                unique case (funct7[6:2]) inside
-                    5'b00001: atomic_operation = AMOSWAP;
-                    5'b00000: atomic_operation = AMOADD;
-                    5'b00100: atomic_operation = AMOXOR;
-                    5'b01100: atomic_operation = AMOAND;
-                    5'b01000: atomic_operation = AMOOR;
-                    5'b10000: atomic_operation = AMOMIN;
-                    5'b10100: atomic_operation = AMOMAX;
-                    5'b11000: atomic_operation = AMOMINU;
-                    5'b11100: atomic_operation = AMOMAXU;
-                    default:  atomic_operation = ANOP;
-                endcase
-            end
-            else begin
-                atomic_operation = ANOP;
-            end
-        end
-        
-    end
-    else begin : a_enable_decode_gen_off
-        assign atomic_operation = ANOP;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -580,7 +561,6 @@ module decode
             exc_misaligned_fetch_o  <= 1'b0;
             exc_inst_access_fault_o <= 1'b0;
             vector_operation_o      <= VNOP;
-            atomic_operation_o      <= ANOP;
         end
         else if (hazard_o) begin
             first_operand_o         <= '0;
@@ -595,7 +575,6 @@ module decode
             exc_misaligned_fetch_o  <= 1'b0;
             exc_inst_access_fault_o <= 1'b0;
             vector_operation_o      <= VNOP;
-            atomic_operation_o      <= ANOP;
         end
         else if (enable) begin
             first_operand_o         <= first_operand;
@@ -610,7 +589,6 @@ module decode
             exc_misaligned_fetch_o  <= misaligned_fetch;
             exc_inst_access_fault_o <= exc_inst_access_fault_i;
             vector_operation_o      <= vector_operation;
-            atomic_operation_o      <= atomic_operation;
         end
     end
 

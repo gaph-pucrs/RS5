@@ -35,7 +35,7 @@ module testbench
     localparam bit           USE_XOSVM       = 1'b1;
     localparam bit           USE_ZIHPM       = 1'b1;
     localparam bit           USE_ZKNE        = 1'b1;
-    localparam atomic_ext_e  AEnable         = ON;
+    localparam atomic_ext_e  AMOEXT          = AMO_A;
     localparam bit           VEnable         = 1'b1;
     localparam int           VLEN            = 256;
 
@@ -173,7 +173,7 @@ module testbench
         .RV32       (INSTRUCTION_SET),
         .COMPRESSED (COMPRESSED     ),
         .VEnable    (VEnable        ),
-        .AEnable    (AEnable       ),
+        .AMOEXT     (AMOEXT         ),
         .VLEN       (VLEN           ),
         .XOSVMEnable(USE_XOSVM      ),
         .ZIHPMEnable(USE_ZIHPM      ),

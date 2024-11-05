@@ -31,10 +31,10 @@ module RS5
 `endif
     parameter environment_e Environment    = ASIC,
     parameter rv32_e        RV32           = RV32M,
+    parameter atomic_ext_e  AMOEXT         = AMO_A,
     parameter bit           COMPRESSED     = 1'b0,
     parameter bit           VEnable        = 1'b1,
     parameter int           VLEN           = 256,
-    parameter atomic_ext_e  AEnable        = OFF,
     parameter bit           XOSVMEnable    = 1'b0,
     parameter bit           ZIHPMEnable    = 1'b0,
     parameter bit           ZKNEEnable     = 1'b0
@@ -128,7 +128,6 @@ module RS5
 
     iType_e         instruction_operation_execute;
     iTypeVector_e   vector_operation_execute;
-    iTypeAtomic_e   atomic_operation_execute;
     logic   [31:0]  first_operand_execute, second_operand_execute, third_operand_execute;
     logic   [31:0]  instruction_execute;
     logic   [31:0]  pc_execute;
@@ -306,7 +305,7 @@ module RS5
     decode # (
         .ZKNEEnable(ZKNEEnable),
         .COMPRESSED(COMPRESSED),
-        .AEnable   (AEnable),
+        .AMOEXT    (AMOEXT),
         .VEnable   (VEnable)
     ) decoder1 (
         .clk                        (clk),
@@ -331,7 +330,6 @@ module RS5
         .tag_o                      (tag_execute),
         .instruction_operation_o    (instruction_operation_execute),
         .vector_operation_o         (vector_operation_execute),
-        .atomic_operation_o         (atomic_operation_execute),
         .hazard_o                   (hazard),
         .exc_inst_access_fault_i    (mmu_inst_fault),
         .exc_inst_access_fault_o    (exc_inst_access_fault_execute),
@@ -391,7 +389,7 @@ module RS5
         .Environment (Environment),
         .RV32        (RV32),
         .ZKNEEnable  (ZKNEEnable),
-        .AEnable     (AEnable),
+        .AMOEXT      (AMOEXT),
         .VEnable     (VEnable),
         .VLEN        (VLEN)
     ) execute1 (
@@ -407,7 +405,6 @@ module RS5
         .instruction_operation_i (instruction_operation_execute),
         .instruction_compressed_i(instruction_compressed_execute),
         .vector_operation_i      (vector_operation_execute),
-        .atomic_operation_i      (atomic_operation_execute),
         .atomic_read_value_i     (regbank_data_writeback),
         .tag_i                   (tag_execute),
         .privilege_i             (privilege),
@@ -437,7 +434,6 @@ module RS5
         .jump_target_o           (jump_target),
         .atomic_write_reg_o      (retire_atomic),
         .rd_atomic_o             (rd_atomic),
-
         .interrupt_pending_i     (interrupt_pending),
         .interrupt_ack_o         (interrupt_ack_o),
         .machine_return_o        (MACHINE_RETURN),
