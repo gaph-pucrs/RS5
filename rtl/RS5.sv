@@ -112,6 +112,7 @@ module RS5
     logic   [31:0]  instruction_execute;
     logic   [31:0]  pc_execute;
     logic    [4:0]  rd_execute;
+    logic    [4:0]  rs1_execute;
     logic           exc_ilegal_inst_execute;
     logic           exc_misaligned_fetch_execute;
     logic           exc_inst_access_fault_execute;
@@ -249,6 +250,7 @@ module RS5
         .rs1_o                      (rs1),
         .rs2_o                      (rs2),
         .rd_o                       (rd_execute),
+        .instr_rs1_o                (rs1_execute),
         .csr_address_o              (csr_addr),
         .first_operand_o            (first_operand_execute),
         .second_operand_o           (second_operand_execute),
@@ -337,6 +339,7 @@ module RS5
         .second_operand_i        (second_operand_execute),
         .third_operand_i         (third_operand_execute),
         .rd_i                    (rd_execute),
+        .rs1_i                   (rs1_execute),
         .instruction_operation_i (instruction_operation_execute),
         .instruction_compressed_i(instruction_compressed_execute),
         .vector_operation_i      (vector_operation_execute),

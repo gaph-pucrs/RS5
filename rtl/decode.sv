@@ -46,6 +46,7 @@ module decode
     output  logic  [4:0]    rs1_o,
     output  logic  [4:0]    rs2_o,
     output  logic  [4:0]    rd_o,
+    output  logic  [4:0]    instr_rs1_o,
     output  logic [11:0]    csr_address_o,
     output  logic [31:0]    first_operand_o,
     output  logic [31:0]    second_operand_o,
@@ -562,6 +563,7 @@ module decode
             bp_taken_o              <= 1'b0;
             rd_o                    <= '0;
             csr_address_o           <= '0;
+            instr_rs1_o             <= '0;
         end
         else if (enable) begin
             if (hazard_o || killed) begin
@@ -579,6 +581,7 @@ module decode
                 bp_taken_o              <= 1'b0;
                 rd_o                    <= '0;
                 csr_address_o           <= '0;
+                instr_rs1_o             <= '0;
             end
             else begin
                 first_operand_o         <= first_operand;
@@ -595,6 +598,7 @@ module decode
                 bp_taken_o              <= bp_take_o;
                 rd_o                    <= rd;
                 csr_address_o           <= csr_address;
+                instr_rs1_o             <= rs1_o;
             end
         end
     end

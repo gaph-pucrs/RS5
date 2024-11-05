@@ -47,6 +47,7 @@ module execute
     input   logic [31:0]        second_operand_i,
     input   logic [31:0]        third_operand_i,
     input   logic  [4:0]        rd_i,
+    input   logic  [4:0]        rs1_i,
     input   iType_e             instruction_operation_i,
     input   logic               instruction_compressed_i,
     /* Not used if VEnable is 0 */
@@ -235,10 +236,7 @@ end
 // CSR access signals
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [4:0] rs1;
     logic       csr_read_enable, csr_write_enable;
-
-    assign rs1 = instruction_i[19:15];
 
     assign csr_read_enable_o = csr_read_enable & !exc_ilegal_csr_inst;
     assign csr_write_enable_o = csr_write_enable & !exc_ilegal_csr_inst;
@@ -246,12 +244,12 @@ end
     always_comb begin
         unique case (instruction_operation_i)
             CSRRW, CSRRWI: begin
-                csr_read_enable  = (rd_i == '0) ? 1'b0 : 1'b1;
+                csr_read_enable  = (rd_i != '0);
                 csr_write_enable = 1'b1;
             end
             CSRRS, CSRRC, CSRRSI, CSRRCI: begin
                 csr_read_enable  = 1'b1;
-                csr_write_enable = (rs1 == '0) ? 1'b0 : 1'b1;
+                csr_write_enable = (rs1_i != '0);
             end
             default: begin
                 csr_read_enable  = 1'b0;
@@ -263,7 +261,7 @@ end
     always_comb begin
         unique case (instruction_operation_i)
             CSRRW, CSRRS, CSRRC:    csr_data_o = first_operand_i;
-            default:                csr_data_o = {27'b0, rs1};
+            default:                csr_data_o = {27'b0, rs1_i};
         endcase
     end
 
