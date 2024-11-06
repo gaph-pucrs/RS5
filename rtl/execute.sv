@@ -473,7 +473,7 @@ end
             VECTOR,
             VLOAD,
             VSTORE:     write_enable = vector_wr_en;
-            default:    write_enable = !raise_exception_o;
+            default:    write_enable = (rd_i != '0 && !raise_exception_o);
         endcase
     end
 

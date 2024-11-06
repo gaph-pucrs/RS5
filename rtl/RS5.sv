@@ -97,10 +97,9 @@ module RS5
 
     logic    [4:0]  rs1, rs2;
     logic   [31:0]  regbank_data1, regbank_data2;
-    logic   [31:0]  rs1_data_read, rs2_data_read;
     logic    [4:0]  rd_retire;
     logic   [31:0]  regbank_data_writeback;
-    logic           regbank_write_enable_int, regbank_write_enable;
+    logic           regbank_write_enable;
 
 //////////////////////////////////////////////////////////////////////////////
 // Execute signals
@@ -159,22 +158,8 @@ module RS5
         assign mmu_en = 1'b0;
     end
 
-    assign regbank_write_enable =   (rd_retire == '0)
-                                    ? 1'b0
-                                    : regbank_write_enable_int;
-
-    assign rs1_data_read =  (rs1 == rd_retire && regbank_write_enable)
-                            ? regbank_data_writeback
-                            : regbank_data1;
-
-    assign rs2_data_read =  (rs2 == rd_retire && regbank_write_enable)
-                            ? regbank_data_writeback
-                            : regbank_data2;
-
-    assign enable_fetch = !(stall || hold || hazard);
-
+    assign enable_fetch  = !(stall || hold || hazard);
     assign enable_decode = !(stall || hold);
-
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////// FETCH //////////////////////////////////////////////////////////////////////////////////
@@ -245,8 +230,11 @@ module RS5
         .enable                     (enable_decode),
         .instruction_i              (instruction_decode),
         .pc_i                       (pc_decode),
-        .rs1_data_read_i            (rs1_data_read),
-        .rs2_data_read_i            (rs2_data_read),
+        .rs1_data_read_i            (regbank_data1),
+        .rs2_data_read_i            (regbank_data2),
+        .rd_retire_i                (rd_retire),
+        .writeback_i                (regbank_data_writeback),
+        .regbank_we_i               (regbank_write_enable),
         .rs1_o                      (rs1),
         .rs2_o                      (rs2),
         .rd_o                       (rd_execute),
@@ -349,7 +337,7 @@ module RS5
         .exc_inst_access_fault_i (exc_inst_access_fault_execute),
         .exc_load_access_fault_i (mmu_data_fault),
         .hold_o                  (hold),
-        .write_enable_o          (regbank_write_enable_int),
+        .write_enable_o          (regbank_write_enable),
         .instruction_operation_o (instruction_operation_retire),
         .result_o                (result_retire),
         .rd_o                    (rd_retire),

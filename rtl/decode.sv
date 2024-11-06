@@ -41,6 +41,9 @@ module decode
     input   logic [31:0]    pc_i,
     input   logic [31:0]    rs1_data_read_i,
     input   logic [31:0]    rs2_data_read_i,
+    input   logic [31:0]    writeback_i,
+    input   logic [ 4:0]    rd_retire_i,
+    input   logic           regbank_we_i,
     input   logic           rollback_i,
 
     output  logic  [4:0]    rs1_o,
@@ -522,23 +525,34 @@ module decode
 
     logic [31:0]    first_operand, second_operand, third_operand;
 
+    logic [31:0] rs1_data;
+    logic [31:0] rs2_data;
+
+    assign rs1_data = (rs1_o == rd_retire_i && regbank_we_i)
+                            ? writeback_i
+                            : rs1_data_read_i;
+
+    assign rs2_data = (rs2_o == rd_retire_i && regbank_we_i)
+                            ? writeback_i
+                            : rs2_data_read_i;
+
     always_comb begin
         unique case (instruction_format)
             U_TYPE, J_TYPE:     first_operand   = pc_i;
-            default:            first_operand   = rs1_data_read_i;
+            default:            first_operand   = rs1_data;
         endcase
     end
 
     always_comb begin
         unique case (instruction_format)
-            R_TYPE, B_TYPE:     second_operand   = rs2_data_read_i;
+            R_TYPE, B_TYPE:     second_operand   = rs2_data;
             default:            second_operand   = immediate;
         endcase
     end
 
     always_comb begin
         unique case (instruction_format)
-            S_TYPE:             third_operand   = rs2_data_read_i;
+            S_TYPE:             third_operand   = rs2_data;
             default:            third_operand   = immediate;
         endcase
     end
