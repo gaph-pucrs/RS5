@@ -319,13 +319,14 @@ end
         mul mul1 (
             .clk              (clk),
             .reset_n          (reset_n),
+            .stall            (stall),
             .first_operand_i  (first_operand_i),
             .second_operand_i (second_operand_i),
             .signed_mode_i    (signed_mode_mul),
             .enable_i         (enable_mul),
             .mul_low_i        (mul_low),
-            .single_cycle_i   (1'b0),
             .hold_o           (hold_mul),
+            .single_cycle_i   (1'b0),
             .result_o         (mul_result)
         );
     end
