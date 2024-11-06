@@ -455,7 +455,7 @@ module decode
     logic hazard_rs1;
     logic hazard_rs2;
 
-    assign use_mem = ({opcode[6], opcode[4:2]} == '0);
+    assign use_mem = (opcode[6:2] == '0); // LOAD
 
     always_comb begin
         unique case (instruction_format)
