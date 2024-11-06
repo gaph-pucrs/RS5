@@ -63,9 +63,11 @@ module execute
 
     output  logic               hold_o,
     output  logic               write_enable_o,
+    output  logic               write_enable_fwd_o,
     output  iType_e             instruction_operation_o,
-    output  logic [31:0]        result_o,
-    output  logic  [4:0]        rd_o,
+    output  logic   [31:0]      result_o,
+    output  logic   [31:0]      result_fwd_o,
+    output  logic   [ 4:0]      rd_o,
 
     output  logic [31:0]        mem_address_o,
     output  logic               mem_read_enable_o,
@@ -477,6 +479,8 @@ end
         endcase
     end
 
+    assign write_enable_fwd_o = write_enable;
+
 //////////////////////////////////////////////////////////////////////////////
 // Output Registers
 //////////////////////////////////////////////////////////////////////////////
@@ -502,6 +506,8 @@ end
             rd_o                    <= '0;
         end
     end
+
+    assign result_fwd_o = result;
 
 //////////////////////////////////////////////////////////////////////////////
 // BRANCH CONTROL

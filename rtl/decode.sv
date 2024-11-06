@@ -42,8 +42,10 @@ module decode
     input   logic [31:0]    rs1_data_read_i,
     input   logic [31:0]    rs2_data_read_i,
     input   logic [31:0]    writeback_i,
+    input   logic [31:0]    result_i, 
     input   logic [ 4:0]    rd_retire_i,
     input   logic           regbank_we_i,
+    input   logic           execute_we_i,
     input   logic           rollback_i,
 
     output  logic  [4:0]    rs1_o,
@@ -419,7 +421,10 @@ module decode
                 locked_memory   <= '0;
             end
             else begin
-                locked_register <= rd;
+                // Read-after-write on LOAD
+                locked_register <= (opcode[6:2] == 5'b00000) ? rd : '0;
+
+                // Read-after-write on STORE
                 locked_memory   <= (opcode[6:2] == 5'b01000);
             end
         end
@@ -450,7 +455,7 @@ module decode
     logic hazard_rs1;
     logic hazard_rs2;
 
-    assign use_mem = ({opcode[6], opcode[4:2]} == '0) ? 1'b1 : 1'b0;
+    assign use_mem = ({opcode[6], opcode[4:2]} == '0);
 
     always_comb begin
         unique case (instruction_format)
@@ -528,13 +533,23 @@ module decode
     logic [31:0] rs1_data;
     logic [31:0] rs2_data;
 
-    assign rs1_data = (rs1_o == rd_retire_i && regbank_we_i)
-                            ? writeback_i
-                            : rs1_data_read_i;
+    always_comb begin
+        if (rs1_o == rd_o && execute_we_i)  // Forwarding from execute
+            rs1_data = result_i;
+        else if (rs1_o == rd_retire_i && regbank_we_i)  // Forwarding from retire on LOAD
+            rs1_data = writeback_i;
+        else
+            rs1_data = rs1_data_read_i;
+    end
 
-    assign rs2_data = (rs2_o == rd_retire_i && regbank_we_i)
-                            ? writeback_i
-                            : rs2_data_read_i;
+    always_comb begin
+        if (rs2_o == rd_o && execute_we_i)  // Forwarding from execute
+            rs2_data = result_i;
+        else if (rs2_o == rd_retire_i && regbank_we_i)  // Forwarding from retire on LOAD
+            rs2_data = writeback_i;
+        else
+            rs2_data = rs2_data_read_i;
+    end
 
     always_comb begin
         unique case (instruction_format)
