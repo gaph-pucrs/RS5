@@ -42,6 +42,7 @@ module fetch  #(
     output  logic           bp_rollback_o,
 
     output  logic           jump_misaligned_o,
+    output  logic           compressed_o,
     output  logic [31:0]    instruction_address_o,
     input   logic [31:0]    instruction_data_i,
     output  logic [31:0]    instruction_o,
@@ -264,6 +265,8 @@ module fetch  #(
         /* verilator lint_off UNUSEDSIGNAL */
         logic [31:0] instruction;
         /* verilator lint_on UNUSEDSIGNAL */
+        logic [31:0] instruction_word;
+        logic [31:0] instruction_built;
         logic iaddr_hold;
         logic realign_jump;
         logic update_inst_r;
@@ -324,22 +327,46 @@ module fetch  #(
         always_comb begin
             if (jumped_r2 && unaligned_jump)
                 // Bubble on unaligned jump
-                instruction_next = 32'h00000013;
+                instruction_built = 32'h00000013;
             else if (jumped_r2 && !unaligned_jump)
                 // Disregard last instruction on jump
-                instruction_next = instruction_fetched;
+                instruction_built = instruction_fetched;
             else if (realign_jump || (unaligned && !compressed))
                 // After bubble or unaligned 4-byte instruction we need the input of 2 fetches
-                instruction_next = {instruction_fetched[15:0], instruction_data_r[31:16]};
+                instruction_built = {instruction_fetched[15:0], instruction_data_r[31:16]};
             else if (!unaligned &&  compressed)
                 // After aligned compressed the next instruction could be prefetched if the previous was compressed
-                instruction_next = {instruction_prefetched[15:0], instruction[31:16]};
+                instruction_built = {instruction_prefetched[15:0], instruction[31:16]};
             else if (!unaligned && !compressed)
                 // After aligned 4-byte instruction the next could be prefetched if the previous was compressed
-                instruction_next = instruction_prefetched;
+                instruction_built = instruction_prefetched;
             else   // unaligned &&  compressed
                 // After unaligned compressed, next instruction is surely prefetched
-                instruction_next = instruction_data_r;
+                instruction_built = instruction_data_r;
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                instruction_word <= 32'h00000013;
+            else if (enable_i)
+                instruction_word <= instruction_built;
+        end
+
+        logic [31:0] instruction_decompressed;
+        decompresser decompresser (
+            .instruction_i (instruction_built[15:0]),
+            .instruction_o (instruction_decompressed)
+        );
+
+        logic next_compressed;
+        assign next_compressed = (instruction_built[1:0] != '1);
+        assign instruction_next = next_compressed ? instruction_decompressed : instruction_built;
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                compressed_o <= 1'b0;
+            else if (enable_i)
+                compressed_o <= next_compressed;
         end
 
         if (BRANCHPRED) begin : gen_compressed_bp
@@ -348,12 +375,12 @@ module fetch  #(
                 if (!reset_n)
                     idata_rollbacked <= 32'h00000013;
                 else if (bp_rollback_r)
-                    idata_rollbacked <= instruction_o;
+                    idata_rollbacked <= instruction_word;
             end
 
             assign iaddr_hold = ((!(jumping_o && !should_rollback) && unaligned && compressed) || (iaddr_hold_r && bp_rollback_r)) && !(iaddr_hold_r && bp_rollback_o);
             assign iaddr_continue = enable_i && (should_rollback || !iaddr_hold);
-            assign instruction = bp_rollback_o ? idata_rollbacked : instruction_o;
+            assign instruction = bp_rollback_o ? idata_rollbacked : instruction_word;
             assign iaddr_not_jumped = iaddr_hold ? instruction_address_o : iaddr_advance;
             assign realign_jump = unaligned_jump_r && !bp_rollback_o;
             assign update_inst_r = realign_jump || (jumped_r2 && unaligned_jump && !bp_rollback_r) || ((unaligned || (compressed && !iaddr_hold_r)) && !bp_rollback_r);
@@ -361,13 +388,14 @@ module fetch  #(
         else begin : gen_compressed_wo_bp
             assign iaddr_hold = !jumping_o && unaligned && compressed;
             assign iaddr_continue = enable_i && !iaddr_hold;
-            assign instruction = instruction_o;
+            assign instruction = instruction_word;
             assign iaddr_not_jumped = '0;
             assign realign_jump = unaligned_jump_r;
             assign update_inst_r = realign_jump || (jumped_r2 && unaligned_jump) || (unaligned || (compressed && !iaddr_hold_r));
         end
     end
     else begin : gen_compressed_off
+        assign compressed_o = 1'b0;
         assign jump_misaligned_o = 1'b0;
         assign iaddr_continue = enable_i;
         assign pc_add = 3'd4;

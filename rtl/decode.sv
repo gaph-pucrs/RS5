@@ -47,6 +47,7 @@ module decode
     input   logic           regbank_we_i,
     input   logic           execute_we_i,
     input   logic           rollback_i,
+    input   logic           compressed_i,
 
     output  logic  [4:0]    rs1_o,
     output  logic  [4:0]    rs2_o,
@@ -91,11 +92,10 @@ module decode
     logic [2:0] funct3;
     logic [6:0] funct7;
     logic [6:0] opcode;
-    logic [31:0] instruction;
     
-    assign funct3 = instruction[14:12];
-    assign funct7 = instruction[31:25];
-    assign opcode = instruction[6:0];
+    assign funct3 = instruction_i[14:12];
+    assign funct7 = instruction_i[31:25];
+    assign opcode = instruction_i[6:0];
 
     iType_e decode_branch;
     always_comb begin
@@ -185,7 +185,7 @@ module decode
 
     iType_e decode_system;
     always_comb begin
-        unique case (instruction[31:7]) inside
+        unique case (instruction_i[31:7]) inside
             25'b0000000000000000000000000:  decode_system = ECALL;
             25'b0000000000010000000000000:  decode_system = EBREAK;
             25'b0001000000100000000000000:  decode_system = SRET;
@@ -238,7 +238,7 @@ module decode
         assign opCat = opCat_e'(funct3);
 
         always_comb begin
-            unique case (instruction[31:30]) inside
+            unique case (instruction_i[31:30]) inside
                 2'b0?:      decode_vector_opcfg = VSETVLI;
                 2'b11:      decode_vector_opcfg = VSETIVLI;
                 2'b10:      decode_vector_opcfg = VSETVL;
@@ -356,11 +356,11 @@ module decode
     logic [31:0] imm_u;
     logic [31:0] imm_j;
 
-    assign imm_i = {{21{instruction[31]}}, instruction[30:20]};
-    assign imm_s = {{21{instruction[31]}}, instruction[30:25], instruction[11:7]};
-    assign imm_b = {{20{instruction[31]}}, instruction[7], instruction[30:25], instruction[11:8], 1'b0};
-    assign imm_u = {instruction[31:12], 12'b0};
-    assign imm_j = {{12{instruction[31]}}, instruction[19:12], instruction[20], instruction[30:25], instruction[24:21], 1'b0};
+    assign imm_i = {{21{instruction_i[31]}}, instruction_i[30:20]};
+    assign imm_s = {{21{instruction_i[31]}}, instruction_i[30:25], instruction_i[11:7]};
+    assign imm_b = {{20{instruction_i[31]}}, instruction_i[7], instruction_i[30:25], instruction_i[11:8], 1'b0};
+    assign imm_u = {instruction_i[31:12], 12'b0};
+    assign imm_j = {{12{instruction_i[31]}}, instruction_i[19:12], instruction_i[20], instruction_i[30:25], instruction_i[24:21], 1'b0};
 
     logic [31:0] immediate;
     always_comb begin
@@ -408,7 +408,7 @@ module decode
     logic  [4:0]    locked_register;
     logic  [4:0]    rd;
 
-    assign rd = instruction[11:7];
+    assign rd = instruction_i[11:7];
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
@@ -434,8 +434,8 @@ module decode
 // Addresses to RegBank
 //////////////////////////////////////////////////////////////////////////////
 
-    assign rs1_o = instruction[19:15];
-    assign rs2_o = instruction[24:20];
+    assign rs1_o = instruction_i[19:15];
+    assign rs2_o = instruction_i[24:20];
 
     logic [11:0] csr_address;
     assign csr_address = instruction_i[31:20];
@@ -503,25 +503,14 @@ module decode
 
     logic invalid_inst;
     logic misaligned_fetch;
-    logic compressed;
 
     assign invalid_inst     = instruction_operation == INVALID;
 
     if (COMPRESSED) begin : gen_compressed_on
-        logic [31:0] instruction_decompressed;
-        decompresser decompresser (
-            .instruction_i (instruction_i[15:0]),
-            .instruction_o (instruction_decompressed)
-        );
-
         assign misaligned_fetch = pc_i[0] != 1'b0;
-        assign compressed = (instruction_i[1:0] != '1);
-        assign instruction = compressed ? instruction_decompressed : instruction_i;
     end
     else begin : gen_compressed_off
         assign misaligned_fetch = pc_i[1:0] != 2'b00;
-        assign instruction = instruction_i;
-        assign compressed = 1'b0;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -617,8 +606,8 @@ module decode
                 second_operand_o        <= second_operand;
                 third_operand_o         <= third_operand;
                 pc_o                    <= pc_i;
-                instruction_o           <= instruction;
-                compressed_o            <= compressed;
+                instruction_o           <= instruction_i;
+                compressed_o            <= compressed_i;
                 instruction_operation_o <= instruction_operation;
                 exc_ilegal_inst_o       <= invalid_inst;
                 exc_misaligned_fetch_o  <= misaligned_fetch;

@@ -170,6 +170,7 @@ module RS5
     logic        ctx_switch;
     logic        bp_take_fetch;
     logic        bp_rollback;
+    logic        compressed_decode;
     logic [31:0] bp_target;
     logic [31:0] ctx_switch_target;
     logic [31:0] instruction_decode;
@@ -190,6 +191,7 @@ module RS5
         .jumping_o              (jumping),
         .bp_rollback_o          (bp_rollback),
         .jump_misaligned_o      (jump_misaligned),
+        .compressed_o           (compressed_decode),
         .instruction_address_o  (instruction_address), 
         .instruction_data_i     (instruction_i),
         .instruction_o          (instruction_decode),
@@ -258,6 +260,7 @@ module RS5
         .jumping_i                  (jumping),
         .jump_rollback_i            (jump_rollback),
         .rollback_i                 (bp_rollback),
+        .compressed_i               (compressed_decode),
         .jump_misaligned_i          (jump_misaligned),
         .bp_take_o                  (bp_take_fetch),
         .bp_taken_o                 (bp_taken_exec),
