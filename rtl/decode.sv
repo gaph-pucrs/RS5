@@ -403,6 +403,12 @@ module decode
 // Registe Lock Queue (RLQ)
 //////////////////////////////////////////////////////////////////////////////
 
+    logic is_load;
+    logic is_store;
+
+    assign is_load  = (opcode[6:2] == 5'b00000);
+    assign is_store = (opcode[6:2] == 5'b01000);
+    
     logic           killed;
     logic           locked_memory;
     logic  [4:0]    locked_register;
@@ -422,10 +428,10 @@ module decode
             end
             else begin
                 // Read-after-write on LOAD
-                locked_register <= (opcode[6:2] == 5'b00000) ? rd : '0;
+                locked_register <= is_load ? rd : '0;
 
                 // Read-after-write on STORE
-                locked_memory   <= (opcode[6:2] == 5'b01000);
+                locked_memory   <= is_store;
             end
         end
     end
@@ -444,7 +450,6 @@ module decode
 // Hazard signal generation
 //////////////////////////////////////////////////////////////////////////////
 
-    logic use_mem;
     logic use_rs1;
     logic use_rs2;
 
@@ -454,8 +459,6 @@ module decode
     logic hazard_mem;
     logic hazard_rs1;
     logic hazard_rs2;
-
-    assign use_mem = (opcode[6:2] == '0); // LOAD
 
     always_comb begin
         unique case (instruction_format)
@@ -483,7 +486,11 @@ module decode
     assign locked_rs1 = (locked_register != '0 && locked_register == rs1_o);
     assign locked_rs2 = (locked_register != '0 && locked_register == rs2_o);
 
-    assign hazard_mem = locked_memory   && use_mem;
+    /* I don't know why we should have this hazard                  */
+    /* But removing this breaks the processor                       */
+    /* It also breaks if we limit the hazard to same address access */
+    assign hazard_mem = locked_memory   && is_load;
+
     assign hazard_rs1 = locked_rs1      && use_rs1;
     assign hazard_rs2 = locked_rs2      && use_rs2;
 
