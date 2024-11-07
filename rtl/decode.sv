@@ -226,6 +226,7 @@ module decode
 //  Decode Vector Instruction
 //////////////////////////////////////////////////////////////////////////////
 
+    logic         killed;
     iTypeVector_e vector_operation;
 
     if (VEnable) begin : v_enable_decode_gen_on
@@ -433,7 +434,6 @@ module decode
     assign is_load  = (opcode == 5'b00000);
     assign is_store = (opcode == 5'b01000);
     
-    logic           killed;
     logic           locked_memory;
     logic  [4:0]    locked_register;
     logic  [4:0]    rd;
