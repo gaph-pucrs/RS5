@@ -263,7 +263,7 @@ module vectorUnit
             cycle_count_vd <= 0;
         else if (next_state == V_IDLE)
             cycle_count_vd <= 0;
-        else if (next_state == V_EXEC && (!hold || hold_widening))
+        else if (next_state == V_EXEC && (!hold || hold_widening || hold_accumulation))
             cycle_count_vd <= cycle_count_vd + 1;
 
     always_ff @(posedge clk or negedge reset_n)
@@ -287,11 +287,19 @@ module vectorUnit
             vl_curr_reg <= '1;
         else if (state == V_IDLE && next_state == V_EXEC)
             vl_curr_reg <= vl;
-        else if (next_state == V_EXEC && (hold == 1'b0))
+        else if (next_state == V_EXEC && (hold == 1'b0 || hold_accumulation))
             if ($signed(vl_curr_reg - elements_per_reg) >= 0)
                 vl_curr_reg <= vl_curr_reg - elements_per_reg;
             else
                 vl_curr_reg <= 0;
+            
+    logic hold_accumulation_r;
+    always_ff @(posedge clk or negedge reset_n)
+        if (!reset_n)
+            hold_accumulation_r <= '0;
+        else 
+            hold_accumulation_r <= hold_accumulation;
+        
 
     always_ff @(posedge clk or negedge reset_n)
         if (!reset_n)
@@ -339,7 +347,7 @@ module vectorUnit
     end
 
     always_ff @(posedge clk) begin
-        if (!hold || hold_widening) begin
+        if (!hold || hold_widening || hold_accumulation) begin
             vd_addr   <= (reduction_instruction || mask_instruction)
                         ? rd
                         : rd + cycle_count_vd;
@@ -349,7 +357,7 @@ module vectorUnit
 
     // WRITE ENABLE GENERATION
     always_ff @(posedge clk) begin
-        if ((state == V_EXEC) && (!hold || hold_widening) && instruction_operation_i != VSTORE && vector_operation_i != VMVXS) begin
+        if ((state == V_EXEC) && (!hold || hold_widening || hold_accumulation_r) && instruction_operation_i != VSTORE && vector_operation_i != VMVXS) begin
             if (reduction_instruction || vector_operation_i == VMVSX) begin
                 unique case (vsew_effective)
                     EW8:     write_enable <= {'0, 1'b1};
@@ -443,7 +451,7 @@ module vectorUnit
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk) begin
-        if (!hold || hold_accumulation) begin
+        if (!hold || hold_accumulation || hold_accumulation_r) begin
             first_operand  <= vs2_data;
         end
     end
