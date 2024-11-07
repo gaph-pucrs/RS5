@@ -406,15 +406,10 @@ module decode
         assign jump_confirmed = ctx_switch_i || (jumping_i && !jump_rollback_i);
         
         always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n) begin
+            if (!reset_n)
                 bp_taken_o <= 1'b0;
-            end
-            else if (enable) begin
-                if (hazard_o || killed) 
-                    bp_taken_o <= 1'b0;
-                else
-                    bp_taken_o <= bp_take_o;
-            end
+            else if (enable && !hazard_o)
+                bp_taken_o <= bp_take_o;
         end
     end
     else begin : gen_bp_off
@@ -443,20 +438,24 @@ module decode
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             locked_register <= '0;
-            locked_memory   <= '0;
         end
         else if (enable) begin
-            if (hazard_o || killed) begin
+            if (hazard_o || killed)
                 locked_register <= '0;
-                locked_memory   <= '0;
-            end
-            else begin
-                // Read-after-write on LOAD
+            else    // Read-after-write on LOAD
                 locked_register <= is_load ? rd : '0;
+        end
+    end
 
-                // Read-after-write on STORE
-                locked_memory   <= is_store;
-            end
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            locked_memory <= '0;
+        end
+        else if (enable) begin
+            if (hazard_o || killed) 
+                locked_memory <= '0;
+            else    // Read-after-write on STORE
+                locked_memory <= is_store;
         end
     end
 
