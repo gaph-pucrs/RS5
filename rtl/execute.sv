@@ -63,9 +63,11 @@ module execute
 
     output  logic               hold_o,
     output  logic               write_enable_o,
+    output  logic               write_enable_fwd_o,
     output  iType_e             instruction_operation_o,
-    output  logic [31:0]        result_o,
-    output  logic  [4:0]        rd_o,
+    output  logic   [31:0]      result_o,
+    output  logic   [31:0]      result_fwd_o,
+    output  logic   [ 4:0]      rd_o,
 
     output  logic [31:0]        mem_address_o,
     output  logic               mem_read_enable_o,
@@ -317,13 +319,14 @@ end
         mul mul1 (
             .clk              (clk),
             .reset_n          (reset_n),
+            .stall            (stall),
             .first_operand_i  (first_operand_i),
             .second_operand_i (second_operand_i),
             .signed_mode_i    (signed_mode_mul),
             .enable_i         (enable_mul),
             .mul_low_i        (mul_low),
-            .single_cycle_i   (1'b0),
             .hold_o           (hold_mul),
+            .single_cycle_i   (1'b0),
             .result_o         (mul_result)
         );
     end
@@ -477,6 +480,8 @@ end
         endcase
     end
 
+    assign write_enable_fwd_o = write_enable;
+
 //////////////////////////////////////////////////////////////////////////////
 // Output Registers
 //////////////////////////////////////////////////////////////////////////////
@@ -502,6 +507,8 @@ end
             rd_o                    <= '0;
         end
     end
+
+    assign result_fwd_o = result;
 
 //////////////////////////////////////////////////////////////////////////////
 // BRANCH CONTROL

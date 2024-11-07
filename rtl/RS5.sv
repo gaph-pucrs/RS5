@@ -170,6 +170,7 @@ module RS5
     logic        ctx_switch;
     logic        bp_take_fetch;
     logic        bp_rollback;
+    logic        compressed_decode;
     logic [31:0] bp_target;
     logic [31:0] ctx_switch_target;
     logic [31:0] instruction_decode;
@@ -190,6 +191,7 @@ module RS5
         .jumping_o              (jumping),
         .bp_rollback_o          (bp_rollback),
         .jump_misaligned_o      (jump_misaligned),
+        .compressed_o           (compressed_decode),
         .instruction_address_o  (instruction_address), 
         .instruction_data_i     (instruction_i),
         .instruction_o          (instruction_decode),
@@ -216,7 +218,9 @@ module RS5
 /////////////////////////////////////////////////////////// DECODER /////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    logic bp_taken_exec;
+    logic        bp_taken_exec;
+    logic        write_enable_exec;
+    logic [31:0] result_exec;
 
     decode # (
         .MULEXT    (MULEXT    ),
@@ -234,7 +238,9 @@ module RS5
         .rs2_data_read_i            (regbank_data2),
         .rd_retire_i                (rd_retire),
         .writeback_i                (regbank_data_writeback),
+        .result_i                   (result_exec),
         .regbank_we_i               (regbank_write_enable),
+        .execute_we_i               (write_enable_exec),
         .rs1_o                      (rs1),
         .rs2_o                      (rs2),
         .rd_o                       (rd_execute),
@@ -254,6 +260,7 @@ module RS5
         .jumping_i                  (jumping),
         .jump_rollback_i            (jump_rollback),
         .rollback_i                 (bp_rollback),
+        .compressed_i               (compressed_decode),
         .jump_misaligned_i          (jump_misaligned),
         .bp_take_o                  (bp_take_fetch),
         .bp_taken_o                 (bp_taken_exec),
@@ -338,8 +345,10 @@ module RS5
         .exc_load_access_fault_i (mmu_data_fault),
         .hold_o                  (hold),
         .write_enable_o          (regbank_write_enable),
+        .write_enable_fwd_o      (write_enable_exec),
         .instruction_operation_o (instruction_operation_retire),
         .result_o                (result_retire),
+        .result_fwd_o            (result_exec),
         .rd_o                    (rd_retire),
         .mem_address_o           (mem_address),
         .mem_read_enable_o       (mem_read_enable),
