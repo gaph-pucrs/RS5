@@ -325,9 +325,21 @@ module decode
             if (instruction_operation == VECTOR && vector_operation == VNOP)
                 $display("INVALID VECTOR INST!!!");
 
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n) begin
+                vector_operation_o <= VNOP;
+            end
+            else if (enable) begin
+                if (hazard_o || killed)
+                    vector_operation_o <= VNOP;
+                else
+                    vector_operation_o <= vector_operation;
+            end
+        end
     end
     else begin : v_enable_decode_gen_on
         assign vector_operation = VNOP;
+        assign vector_operation_o = VNOP;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -391,9 +403,22 @@ module decode
         assign bp_target_o = pc_i + immediate;
 
         assign jump_confirmed = ctx_switch_i || (jumping_i && !jump_rollback_i);
+        
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n) begin
+                bp_taken_o <= 1'b0;
+            end
+            else if (enable) begin
+                if (hazard_o || killed) 
+                    bp_taken_o <= 1'b0;
+                else
+                    bp_taken_o <= bp_take_o;
+            end
+        end
     end
     else begin : gen_bp_off
         assign bp_take_o   = 1'b0;
+        assign bp_taken_o  = 1'b0;
         assign bp_target_o = '0;
         assign jump_confirmed = ctx_switch_i || jumping_i;
     end
@@ -435,6 +460,13 @@ module decode
         end
     end
 
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            rd_o <= '0;
+        else if (enable)
+            rd_o <= rd;
+    end
+
 //////////////////////////////////////////////////////////////////////////////
 // Addresses to RegBank
 //////////////////////////////////////////////////////////////////////////////
@@ -445,9 +477,25 @@ module decode
     logic [11:0] csr_address;
     assign csr_address = instruction_i[31:20];
 
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            csr_address_o <= '0;
+        else if (enable)
+            csr_address_o <= csr_address;
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            instr_rs1_o <= '0;
+        else if (enable)
+            instr_rs1_o <= rs1_o;
+    end
+
 //////////////////////////////////////////////////////////////////////////////
 // Hazard signal generation
 //////////////////////////////////////////////////////////////////////////////
+    
+    logic exception;
 
     logic use_rs1;
     logic use_rs2;
@@ -494,7 +542,7 @@ module decode
     assign hazard_rs2 = locked_rs2      && use_rs2;
 
     assign killed   = jump_confirmed || jump_misaligned_i || rollback_i;
-    assign hazard_o = (hazard_mem || hazard_rs1 || hazard_rs2) && !killed;
+    assign hazard_o = (hazard_mem || hazard_rs1 || hazard_rs2) && !killed && !exception;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
@@ -509,21 +557,47 @@ module decode
 
     logic invalid_inst;
     logic misaligned_fetch;
+    logic exc_inst_access_fault;
 
-    assign invalid_inst = (instruction_i[1:0] != '1) || instruction_operation == INVALID;
+    assign invalid_inst = ((instruction_i[1:0] != '1) || instruction_operation == INVALID) && !killed;
 
     if (COMPRESSED) begin : gen_compressed_on
-        assign misaligned_fetch = pc_i[0] != 1'b0;
+        assign misaligned_fetch = (pc_i[0] != 1'b0) && !killed;
     end
     else begin : gen_compressed_off
-        assign misaligned_fetch = pc_i[1:0] != 2'b00;
+        assign misaligned_fetch = (pc_i[1:0] != 2'b00) && !killed;
+    end
+
+    assign exc_inst_access_fault = exc_inst_access_fault_i && !killed;
+
+    assign exception = exc_inst_access_fault || invalid_inst || misaligned_fetch;
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            exc_ilegal_inst_o <= 1'b0;
+        else if (enable)
+            exc_ilegal_inst_o <= invalid_inst;
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            exc_misaligned_fetch_o <= 1'b0;
+        else if (enable)
+            exc_misaligned_fetch_o <= misaligned_fetch;
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            exc_inst_access_fault_o <= 1'b0;
+        else if (enable)
+            exc_inst_access_fault_o <= exc_inst_access_fault;
     end
 
 //////////////////////////////////////////////////////////////////////////////
 // Control of the operands based on format
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [31:0]    first_operand, second_operand, third_operand;
+    logic [31:0] first_operand, second_operand, third_operand;
 
     logic [31:0] rs1_data;
     logic [31:0] rs2_data;
@@ -567,63 +641,61 @@ module decode
         endcase
     end
 
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            first_operand_o <= '0;
+        else if (enable)
+            first_operand_o <= first_operand;
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            second_operand_o <= '0;
+        else if (enable)
+            second_operand_o <= second_operand;
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            third_operand_o <= '0;
+        else if (enable)
+            third_operand_o <= third_operand;
+    end
+
 //////////////////////////////////////////////////////////////////////////////
 // Outputs do execution unit
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            pc_o <= '0;
+        else if (enable)
+            pc_o <= pc_i;
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            instruction_o <= '0;
+        else if (enable)
+            instruction_o <= instruction_i;
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            compressed_o <= 1'b0;
+        else if (enable)
+            compressed_o <= compressed_i;
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
-            first_operand_o         <= '0;
-            second_operand_o        <= '0;
-            third_operand_o         <= '0;
-            pc_o                    <= '0;
-            instruction_o           <= '0;
-            compressed_o            <= 1'b0;
             instruction_operation_o <= NOP;
-            exc_ilegal_inst_o       <= 1'b0;
-            exc_misaligned_fetch_o  <= 1'b0;
-            exc_inst_access_fault_o <= 1'b0;
-            vector_operation_o      <= VNOP;
-            bp_taken_o              <= 1'b0;
-            rd_o                    <= '0;
-            csr_address_o           <= '0;
-            instr_rs1_o             <= '0;
         end
         else if (enable) begin
-            if (hazard_o || killed) begin
-                first_operand_o         <= '0;
-                second_operand_o        <= '0;
-                third_operand_o         <= '0;
-                pc_o                    <= '0;
-                instruction_o           <= '0;
-                compressed_o            <= 1'b0;
+            if (hazard_o || killed)
                 instruction_operation_o <= NOP;
-                exc_ilegal_inst_o       <= 1'b0;
-                exc_misaligned_fetch_o  <= 1'b0;
-                exc_inst_access_fault_o <= 1'b0;
-                vector_operation_o      <= VNOP;
-                bp_taken_o              <= 1'b0;
-                rd_o                    <= '0;
-                csr_address_o           <= '0;
-                instr_rs1_o             <= '0;
-            end
-            else begin
-                first_operand_o         <= first_operand;
-                second_operand_o        <= second_operand;
-                third_operand_o         <= third_operand;
-                pc_o                    <= pc_i;
-                instruction_o           <= instruction_i;
-                compressed_o            <= compressed_i;
+            else
                 instruction_operation_o <= instruction_operation;
-                exc_ilegal_inst_o       <= invalid_inst;
-                exc_misaligned_fetch_o  <= misaligned_fetch;
-                exc_inst_access_fault_o <= exc_inst_access_fault_i;
-                vector_operation_o      <= vector_operation;
-                bp_taken_o              <= bp_take_o;
-                rd_o                    <= rd;
-                csr_address_o           <= csr_address;
-                instr_rs1_o             <= rs1_o;
-            end
         end
     end
 
