@@ -91,11 +91,11 @@ module decode
 
     logic [2:0] funct3;
     logic [6:0] funct7;
-    logic [6:0] opcode;
+    logic [4:0] opcode;
     
     assign funct3 = instruction_i[14:12];
     assign funct7 = instruction_i[31:25];
-    assign opcode = instruction_i[6:0];
+    assign opcode = instruction_i[6:2];
 
     iType_e decode_branch;
     always_comb begin
@@ -204,20 +204,20 @@ module decode
     iType_e instruction_operation;
     always_comb begin
         unique case (opcode)
-            7'b0110111: instruction_operation = LUI;
-            7'b0010111: instruction_operation = ADD;                        /* AUIPC */
-            7'b1101111: instruction_operation = JAL;
-            7'b1100111: instruction_operation = JALR;
-            7'b1100011: instruction_operation = decode_branch;              /* BRANCH */
-            7'b0000011: instruction_operation = decode_load;                /* LOAD */
-            7'b0100011: instruction_operation = decode_store;               /* STORE */
-            7'b0010011: instruction_operation = decode_op_imm;              /* OP-IMM */
-            7'b0110011: instruction_operation = decode_op;                  /* OP */
-            7'b0001111: instruction_operation = decode_misc_mem;            /* MISC-MEM */
-            7'b1110011: instruction_operation = decode_system;              /* SYSTEM */
-            7'b1010111: instruction_operation = VEnable ? VECTOR : INVALID; /* OP-V */
-            7'b0000111: instruction_operation = VEnable ? VLOAD  : INVALID; /* LOAD-FP */
-            7'b0100111: instruction_operation = VEnable ? VSTORE : INVALID; /* STORE-FP */
+            5'b01101: instruction_operation = LUI;
+            5'b00101: instruction_operation = ADD;                        /* AUIPC */
+            5'b11011: instruction_operation = JAL;
+            5'b11001: instruction_operation = JALR;
+            5'b11000: instruction_operation = decode_branch;              /* BRANCH */
+            5'b00000: instruction_operation = decode_load;                /* LOAD */
+            5'b01000: instruction_operation = decode_store;               /* STORE */
+            5'b00100: instruction_operation = decode_op_imm;              /* OP-IMM */
+            5'b01100: instruction_operation = decode_op;                  /* OP */
+            5'b00011: instruction_operation = decode_misc_mem;            /* MISC-MEM */
+            5'b11100: instruction_operation = decode_system;              /* SYSTEM */
+            5'b10101: instruction_operation = VEnable ? VECTOR : INVALID; /* OP-V */
+            5'b00001: instruction_operation = VEnable ? VLOAD  : INVALID; /* LOAD-FP */
+            5'b01001: instruction_operation = VEnable ? VSTORE : INVALID; /* STORE-FP */
             default:    instruction_operation = INVALID;
         endcase
     end
@@ -336,7 +336,7 @@ module decode
 
     formatType_e instruction_format;
     always_comb begin
-        unique case (opcode[6:2])
+        unique case (opcode)
             5'b11001, 5'b00000, 5'b00100:   instruction_format = I_TYPE;        /* JALR, LOAD, OP-IMM */
             5'b01000:                       instruction_format = S_TYPE;        /* STORE */
             5'b11000:                       instruction_format = B_TYPE;        /* BRANCH */
@@ -384,11 +384,10 @@ module decode
         logic bp_branch_taken;
         logic bp_jump_taken;
 
-        assign bp_branch_taken = (opcode[6:2] == 5'b11000 && imm_b[31]);
-        assign bp_jump_taken   = (opcode[6:2] == 5'b11011);
+        assign bp_branch_taken = (opcode == 5'b11000 && imm_b[31]);
+        assign bp_jump_taken   = (opcode == 5'b11011);
 
-        // bp_take_o should use !jump_confirmed instead of !jumping_i but that is causing problems
-        assign bp_take_o   = (bp_jump_taken || bp_branch_taken) && !jumping_i && !rollback_i;
+        assign bp_take_o   = (bp_jump_taken || bp_branch_taken) && !jumping_i && !killed;
         assign bp_target_o = pc_i + immediate;
 
         assign jump_confirmed = ctx_switch_i || (jumping_i && !jump_rollback_i);
@@ -406,8 +405,8 @@ module decode
     logic is_load;
     logic is_store;
 
-    assign is_load  = (opcode[6:2] == 5'b00000);
-    assign is_store = (opcode[6:2] == 5'b01000);
+    assign is_load  = (opcode == 5'b00000);
+    assign is_store = (opcode == 5'b01000);
     
     logic           killed;
     logic           locked_memory;
@@ -511,7 +510,7 @@ module decode
     logic invalid_inst;
     logic misaligned_fetch;
 
-    assign invalid_inst     = instruction_operation == INVALID;
+    assign invalid_inst = (instruction_i[1:0] != '1) || instruction_operation == INVALID;
 
     if (COMPRESSED) begin : gen_compressed_on
         assign misaligned_fetch = pc_i[0] != 1'b0;
