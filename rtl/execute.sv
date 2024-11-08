@@ -560,71 +560,38 @@ end
 // Privileged Architecture Control
 //////////////////////////////////////////////////////////////////////////////
 
+    assign raise_exception_o = (
+           exc_inst_access_fault_i 
+        || exc_ilegal_inst_i 
+        || exc_ilegal_csr_inst 
+        || exc_misaligned_fetch_i
+        || (instruction_operation_i inside {ECALL, EBREAK})
+        || (exc_load_access_fault_i && (mem_read_enable_o || (mem_write_enable_o != '0)))
+    );
+
+    assign machine_return_o = !raise_exception_o && (instruction_operation_i == MRET);
+
+    assign interrupt_ack_o = (
+           !machine_return_o 
+        && !raise_exception_o 
+        && (interrupt_pending_i && instruction_operation_i != NOP && !hold_o)
+    );
+
     always_comb begin
-        if (exc_inst_access_fault_i) begin
-            raise_exception_o = 1'b1;
-            machine_return_o  = 1'b0;
-            interrupt_ack_o   = 1'b0;
-            //exception_code_o  = ILLEGAL_INSTRUCTION;
+        if (exc_inst_access_fault_i)
             exception_code_o  = INSTRUCTION_ACCESS_FAULT;
-            // $write("[%0d] EXCEPTION - INSTRUCTION ACCESS FAULT: %8h %8h\n", $time, pc_i, instruction_i);
-        end
-        else
-        if ((exc_ilegal_inst_i || exc_ilegal_csr_inst)) begin
-            raise_exception_o = 1'b1;
-            machine_return_o  = 1'b0;
-            interrupt_ack_o   = 1'b0;
+        else if ((exc_ilegal_inst_i || exc_ilegal_csr_inst)) 
             exception_code_o  = ILLEGAL_INSTRUCTION;
-            // $write("[%0d] EXCEPTION - ILLEGAL INSTRUCTION: %8h %8h\n", $time, pc_i, instruction_i);
-        end
-        else if (exc_misaligned_fetch_i) begin
-            raise_exception_o = 1'b1;
-            machine_return_o  = 1'b0;
-            interrupt_ack_o   = 1'b0;
+        else if (exc_misaligned_fetch_i)
             exception_code_o  = INSTRUCTION_ADDRESS_MISALIGNED;
-            // $write("[%0d] EXCEPTION - INSTRUCTION ADDRESS MISALIGNED: %8h %8h\n", $time, pc_i, instruction_i);
-        end
-        else if (instruction_operation_i == ECALL) begin
-            raise_exception_o = 1'b1;
-            machine_return_o  = 1'b0;
-            interrupt_ack_o   = 1'b0;
+        else if (instruction_operation_i == ECALL)
             exception_code_o  = (privilege_i == USER) ? ECALL_FROM_UMODE : ECALL_FROM_MMODE;
-            // $write("[%0d] EXCEPTION - ECALL_FROM_MMODE: %8h %8h\n", $time, pc_i, instruction_i);
-        end
-        else if (instruction_operation_i == EBREAK) begin
-            raise_exception_o = 1'b1;
-            machine_return_o  = 1'b0;
-            interrupt_ack_o   = 1'b0;
+        else if (instruction_operation_i == EBREAK)
             exception_code_o  = BREAKPOINT;
-            // $write("[%0d] EXCEPTION - EBREAK: %8h %8h\n", $time, pc_i, instruction_i);
-        end
-        else if (exc_load_access_fault_i == 1'b1 && (mem_write_enable_o != '0 || mem_read_enable_o == 1'b1)) begin
-            raise_exception_o = 1'b1;
-            machine_return_o  = 1'b0;
-            interrupt_ack_o   = 1'b0;
+        else if (exc_load_access_fault_i)
             exception_code_o  = LOAD_ACCESS_FAULT;
-            // $write("[%0d] EXCEPTION - LOAD ACCESS FAULT: %8h %8h %8h\n", $time, pc_i, instruction_i, mem_address_o);
-        end
-        else if (instruction_operation_i == MRET) begin
-            raise_exception_o = 1'b0;
-            machine_return_o  = 1'b1;
-            interrupt_ack_o   = 1'b0;
+        else
             exception_code_o  = NE;
-            // $write("[%0d] MRET: %8h %8h\n", $time, pc_i, instruction_i);
-        end
-        else if (interrupt_pending_i && instruction_operation_i != NOP && !hold_o) begin
-            raise_exception_o = 1'b0;
-            machine_return_o  = 1'b0;
-            interrupt_ack_o   = 1'b1;
-            exception_code_o  = NE;
-            // $write("[%0d] Interrupt Acked\n", $time);
-        end
-        else begin
-            raise_exception_o = 1'b0;
-            machine_return_o  = 1'b0;
-            interrupt_ack_o   = 1'b0;
-            exception_code_o  = NE;
-        end
     end
 
 endmodule
