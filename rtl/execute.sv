@@ -43,9 +43,9 @@ module execute
     /* verilator lint_on UNUSEDSIGNAL */
 
     input   logic [31:0]        pc_i,
-    input   logic [31:0]        first_operand_i,
+    input   logic [31:0]        rs1_data_i,
+    input   logic [31:0]        rs2_data_i,
     input   logic [31:0]        second_operand_i,
-    input   logic [31:0]        third_operand_i,
     input   logic  [4:0]        rd_i,
     input   logic  [4:0]        rs1_i,
     input   iType_e             instruction_operation_i,
@@ -102,6 +102,7 @@ module execute
     input   logic               interrupt_pending_i,
     input   logic [31:0]        mtvec_i,
     input   logic [31:0]        mepc_i,
+    input   logic [31:0]        jump_imm_target_i,
     output  logic               jump_o,
     output  logic               interrupt_ack_o,
     output  logic               machine_return_o,
@@ -114,18 +115,10 @@ module execute
     logic           write_enable;
     logic           exc_ilegal_csr_inst;
 
-    logic signed [31:0]  first_operand_signed;
-    logic signed [31:0]  second_operand_signed;
-
-    assign first_operand_signed  = first_operand_i;
-    assign second_operand_signed = second_operand_i;
-
 //////////////////////////////////////////////////////////////////////////////
 // ALU
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [31:0]    sum2_opA;
-    logic [31:0]    sum2_opB;
     logic [31:0]    sum_result;
     logic [31:0]    sum2_result;
     logic [31:0]    and_result;
@@ -141,36 +134,41 @@ module execute
     logic           greater_equal;
     logic           greater_equal_unsigned;
 
+    logic [31:0] sum2_opA;
     always_comb begin
         unique case (instruction_operation_i)
-            SUB:      sum2_opA = first_operand_i;
-            default:  sum2_opA = pc_i;
+            // To link register. Maybe we can remove this by using the PC in decode stage
+            JAL, JALR: sum2_opA = pc_i;
+            default:   sum2_opA = rs1_data_i;    // SUB
+        endcase
+    end
+
+    logic [31:0] sum2_opB;
+    always_comb begin
+        unique case (instruction_operation_i)
+            // To link register. Maybe we can remove this by using the PC in decode stage
+            JAL, JALR: sum2_opB = instruction_compressed_i ? 32'd2 : 32'd4;
+            default:   sum2_opB = -second_operand_i;    // SUB
         endcase
     end
 
     always_comb begin
-        unique case (instruction_operation_i)
-            JAL, JALR:  sum2_opB = instruction_compressed_i ? 2 : 4;
-            SUB:        sum2_opB = -second_operand_i;
-            default:    sum2_opB = third_operand_i;
-        endcase
-    end
+        sum_result              = rs1_data_i + second_operand_i;
+        and_result              = rs1_data_i & second_operand_i;
+        or_result               = rs1_data_i | second_operand_i;
+        xor_result              = rs1_data_i ^ second_operand_i;
+        sll_result              = rs1_data_i << second_operand_i[4:0];
+        srl_result              = rs1_data_i >> second_operand_i[4:0];
+        sra_result              = $signed(rs1_data_i) >>> second_operand_i[4:0];
 
-    always_comb begin
-        sum_result              = first_operand_i + second_operand_i;
+        equal                   = rs1_data_i == second_operand_i;
+        less_than               = $signed(rs1_data_i) < $signed(second_operand_i);
+        less_than_unsigned      = rs1_data_i < second_operand_i;
+        greater_equal           = $signed(rs1_data_i) >= $signed(second_operand_i);
+        greater_equal_unsigned  = rs1_data_i >= second_operand_i;
+
+        /* We need a second adder to avoid operand multiplexing in memory address */
         sum2_result             = sum2_opA + sum2_opB;
-        and_result              = first_operand_i & second_operand_i;
-        or_result               = first_operand_i | second_operand_i;
-        xor_result              = first_operand_i ^ second_operand_i;
-        sll_result              = first_operand_i << second_operand_i[4:0];
-        srl_result              = first_operand_i >> second_operand_i[4:0];
-        sra_result              = first_operand_signed >>> second_operand_i[4:0];
-
-        equal                   = first_operand_i == second_operand_i;
-        less_than               = first_operand_signed < second_operand_signed;
-        less_than_unsigned      = first_operand_i < second_operand_i;
-        greater_equal           = first_operand_signed >= second_operand_signed;
-        greater_equal_unsigned  = first_operand_i >= second_operand_i;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -212,9 +210,9 @@ module execute
 
     always_comb begin
         unique case (instruction_operation_i)
-            SB:         mem_write_data = {4{third_operand_i[7:0]}};
-            SH:         mem_write_data = {2{third_operand_i[15:0]}};
-            default:    mem_write_data = third_operand_i;
+            SB:         mem_write_data = {4{rs2_data_i[7:0]}};
+            SH:         mem_write_data = {2{rs2_data_i[15:0]}};
+            default:    mem_write_data = rs2_data_i;
         endcase
     end
 
@@ -262,7 +260,7 @@ end
 
     always_comb begin
         unique case (instruction_operation_i)
-            CSRRW, CSRRS, CSRRC:    csr_data_o = first_operand_i;
+            CSRRW, CSRRS, CSRRC:    csr_data_o = rs1_data_i;
             default:                csr_data_o = {27'b0, rs1_i};
         endcase
     end
@@ -320,8 +318,8 @@ end
             .clk              (clk),
             .reset_n          (reset_n),
             .stall            (stall),
-            .first_operand_i  (first_operand_i),
-            .second_operand_i (second_operand_i),
+            .first_operand_i  (rs1_data_i),
+            .second_operand_i (rs2_data_i),
             .signed_mode_i    (signed_mode_mul),
             .enable_i         (enable_mul),
             .mul_low_i        (mul_low),
@@ -352,8 +350,8 @@ end
         div div1 (
             .clk              (clk),
             .reset_n          (reset_n),
-            .first_operand_i  (first_operand_i),
-            .second_operand_i (second_operand_i),
+            .first_operand_i  (rs1_data_i),
+            .second_operand_i (rs2_data_i),
             .enable_i         (enable_div),
             .signed_i         (signed_div),
             .hold_o           (hold_div),
@@ -384,8 +382,8 @@ end
             .Environment (Environment),
             .LOGIC_GATING(1'b1)  // Gate sub-module inputs to save toggling
         ) u_aes_unit (
-            .rs1_in   (first_operand_i),      // Source register 1
-            .rs2_in   (second_operand_i),     // Source register 2
+            .rs1_in   (rs1_data_i),           // Source register 1
+            .rs2_in   (rs2_data_i),           // Source register 2
             .bs_in    (instruction_i[31:30]), // Byte select immediate
             .mix_in   (aes_mix),              // SubBytes + MixColumn or just SubBytes
             .valid_in (aes_valid),            // Are the inputs valid?
@@ -413,8 +411,8 @@ end
             .instruction_i          (instruction_i),
             .instruction_operation_i(instruction_operation_i),
             .vector_operation_i     (vector_operation_i),
-            .op1_scalar_i           (first_operand_i),
-            .op2_scalar_i           (second_operand_i),
+            .op1_scalar_i           (rs1_data_i),
+            .op2_scalar_i           (rs2_data_i),
             .hold_o                 (hold_vector),
             .vtype_o                (vtype_o),
             .vlen_o                 (vlen_o),
@@ -457,6 +455,7 @@ end
             SRL:                    result = srl_result;
             SRA:                    result = sra_result;
             LUI:                    result = second_operand_i;
+            AUIPC:                  result = jump_imm_target_i;
             DIV,DIVU:               result = div_result;
             REM,REMU:               result = rem_result;
             MUL,MULH,MULHU,MULHSU:  result = mul_result;
@@ -517,8 +516,7 @@ end
     always_comb begin
         unique case (instruction_operation_i)
             JALR:       jump_target_o = {sum_result[31:1], 1'b0};
-            JAL:        jump_target_o = sum_result;
-            default:    jump_target_o = sum2_result;
+            default:    jump_target_o = jump_imm_target_i;
         endcase
     end
 

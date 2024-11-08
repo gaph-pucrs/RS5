@@ -54,11 +54,12 @@ module decode
     output  logic  [4:0]    rd_o,
     output  logic  [4:0]    instr_rs1_o,
     output  logic [11:0]    csr_address_o,
-    output  logic [31:0]    first_operand_o,
+    output  logic [31:0]    rs1_data_o,
+    output  logic [31:0]    rs2_data_o,
     output  logic [31:0]    second_operand_o,
-    output  logic [31:0]    third_operand_o,
     output  logic [31:0]    pc_o,
     output  logic [31:0]    instruction_o,
+    output  logic [31:0]    jump_imm_target_o,
     output  logic           compressed_o,
     output  iType_e         instruction_operation_o,
     output  iTypeVector_e   vector_operation_o,
@@ -205,7 +206,7 @@ module decode
     always_comb begin
         unique case (opcode)
             5'b01101: instruction_operation = LUI;
-            5'b00101: instruction_operation = ADD;                        /* AUIPC */
+            5'b00101: instruction_operation = AUIPC;
             5'b11011: instruction_operation = JAL;
             5'b11001: instruction_operation = JALR;
             5'b11000: instruction_operation = decode_branch;              /* BRANCH */
@@ -218,7 +219,7 @@ module decode
             5'b10101: instruction_operation = VEnable ? VECTOR : INVALID; /* OP-V */
             5'b00001: instruction_operation = VEnable ? VLOAD  : INVALID; /* LOAD-FP */
             5'b01001: instruction_operation = VEnable ? VSTORE : INVALID; /* STORE-FP */
-            default:    instruction_operation = INVALID;
+            default:  instruction_operation = INVALID;
         endcase
     end
 
@@ -392,16 +393,26 @@ module decode
 ////////////////////////////////////////////////////////////////////////////////
 
     logic jump_confirmed;
+    
+    /* We add this adder here regardless of using BP or not */
+    /* Because if we don't add here, we have to add in exec */
+    assign bp_target_o = pc_i + immediate;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            jump_imm_target_o <= '0;
+        else if (enable)
+            jump_imm_target_o <= bp_target_o;
+    end
 
     if (BRANCHPRED) begin : gen_bp_on
         logic bp_branch_taken;
         logic bp_jump_taken;
 
+        /* We really can't add jalr here */
         assign bp_branch_taken = (opcode == 5'b11000 && imm_b[31]);
         assign bp_jump_taken   = (opcode == 5'b11011);
 
         assign bp_take_o   = (bp_jump_taken || bp_branch_taken) && !jumping_i && !killed;
-        assign bp_target_o = pc_i + immediate;
 
         assign jump_confirmed = ctx_switch_i || (jumping_i && !jump_rollback_i);
         
@@ -415,7 +426,6 @@ module decode
     else begin : gen_bp_off
         assign bp_take_o   = 1'b0;
         assign bp_taken_o  = 1'b0;
-        assign bp_target_o = '0;
         assign jump_confirmed = ctx_switch_i || jumping_i;
     end
 
@@ -596,8 +606,6 @@ module decode
 // Control of the operands based on format
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [31:0] first_operand, second_operand, third_operand;
-
     logic [31:0] rs1_data;
     logic [31:0] rs2_data;
 
@@ -619,32 +627,28 @@ module decode
             rs2_data = rs2_data_read_i;
     end
 
-    always_comb begin
-        unique case (instruction_format)
-            U_TYPE, J_TYPE:     first_operand   = pc_i;
-            default:            first_operand   = rs1_data;
-        endcase
-    end
-
-    always_comb begin
-        unique case (instruction_format)
-            R_TYPE, B_TYPE:     second_operand   = rs2_data;
-            default:            second_operand   = immediate;
-        endcase
-    end
-
-    always_comb begin
-        unique case (instruction_format)
-            S_TYPE:             third_operand   = rs2_data;
-            default:            third_operand   = immediate;
-        endcase
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            rs1_data_o <= '0;
+        else if (enable)
+            rs1_data_o <= rs1_data;
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
-            first_operand_o <= '0;
+            rs2_data_o <= '0;
         else if (enable)
-            first_operand_o <= first_operand;
+            rs2_data_o <= rs2_data;
+    end
+
+    logic [31:0] second_operand;
+    always_comb begin
+        unique case (instruction_format)
+            I_TYPE,
+            S_TYPE,
+            U_TYPE:  second_operand = immediate;
+            default: second_operand =  rs2_data;
+        endcase
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
@@ -652,13 +656,6 @@ module decode
             second_operand_o <= '0;
         else if (enable)
             second_operand_o <= second_operand;
-    end
-
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            third_operand_o <= '0;
-        else if (enable)
-            third_operand_o <= third_operand;
     end
 
 //////////////////////////////////////////////////////////////////////////////

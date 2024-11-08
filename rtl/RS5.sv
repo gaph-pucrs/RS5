@@ -107,7 +107,7 @@ module RS5
 
     iType_e         instruction_operation_execute;
     iTypeVector_e   vector_operation_execute;
-    logic   [31:0]  first_operand_execute, second_operand_execute, third_operand_execute;
+    logic   [31:0]  rs1_data_execute, rs2_data_execute, second_operand_execute;
     logic   [31:0]  instruction_execute;
     logic   [31:0]  pc_execute;
     logic    [4:0]  rd_execute;
@@ -221,6 +221,7 @@ module RS5
     logic        bp_taken_exec;
     logic        write_enable_exec;
     logic [31:0] result_exec;
+    logic [31:0] jump_imm_target_exec;
 
     decode # (
         .MULEXT    (MULEXT    ),
@@ -246,11 +247,12 @@ module RS5
         .rd_o                       (rd_execute),
         .instr_rs1_o                (rs1_execute),
         .csr_address_o              (csr_addr),
-        .first_operand_o            (first_operand_execute),
+        .rs1_data_o                 (rs1_data_execute),
+        .rs2_data_o                 (rs2_data_execute),
         .second_operand_o           (second_operand_execute),
-        .third_operand_o            (third_operand_execute),
         .pc_o                       (pc_execute),
         .instruction_o              (instruction_execute),
+        .jump_imm_target_o          (jump_imm_target_exec),
         .compressed_o               (instruction_compressed_execute),
         .instruction_operation_o    (instruction_operation_execute),
         .vector_operation_o         (vector_operation_execute),
@@ -330,9 +332,9 @@ module RS5
         .stall                   (stall),
         .instruction_i           (instruction_execute),
         .pc_i                    (pc_execute),
-        .first_operand_i         (first_operand_execute),
+        .rs1_data_i              (rs1_data_execute),
+        .rs2_data_i              (rs2_data_execute),
         .second_operand_i        (second_operand_execute),
-        .third_operand_i         (third_operand_execute),
         .rd_i                    (rd_execute),
         .rs1_i                   (rs1_execute),
         .instruction_operation_i (instruction_operation_execute),
@@ -367,6 +369,7 @@ module RS5
         .ctx_switch_o            (ctx_switch),
         .jump_rollback_o         (jump_rollback),
         .ctx_switch_target_o     (ctx_switch_target),
+        .jump_imm_target_i       (jump_imm_target_exec),
         .jump_target_o           (jump_target),
         .interrupt_pending_i     (interrupt_pending),
         .mtvec_i                 (mtvec),
