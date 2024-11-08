@@ -6,12 +6,12 @@ module RS5_FPGA_Platform
     parameter int           i_cnt       = 2,
     parameter environment_e Environment = FPGA,
     parameter mul_e         MULEXT      = MUL_M,
-    parameter bit           COMPRESSED  = 1'b0,
+    parameter bit           COMPRESSED  = 1'b1,
     parameter bit           XOSVMEnable = 1'b0,
     parameter bit           ZIHPMEnable = 1'b0,
     parameter bit           ZKNEEnable  = 1'b0,
     parameter bit           VEnable     = 1'b0,
-    parameter bit           BRANCHPRED  = 1'b0,
+    parameter bit           BRANCHPRED  = 1'b1,
     parameter int           VLEN        = 64,
     parameter int           CLKS_PER_BIT_UART = 868
 )
