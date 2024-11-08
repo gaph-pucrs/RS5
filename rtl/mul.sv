@@ -23,11 +23,12 @@ module mul
     output  logic [31:0] result_o
 );
 
-    typedef enum logic [3:0] {
-        ALBL = 4'b0001, 
-        ALBH = 4'b0010, 
-        AHBL = 4'b0100, 
-        AHBH = 4'b1000
+    typedef enum logic [4:0] {
+        IDLE = 5'b00001,
+        ALBL = 5'b00010, 
+        ALBH = 5'b00100, 
+        AHBL = 5'b01000, 
+        AHBH = 5'b10000
     } mul_states_e;
 
     mul_states_e mul_state;
@@ -35,21 +36,14 @@ module mul
 
     always_comb begin
         unique case (mul_state)
-            ALBL:    next_state = enable_i ? ALBH : ALBL;
+            IDLE:    next_state = enable_i       ? ALBL : IDLE;
+            ALBL:    next_state = single_cycle_i ? IDLE : ALBH;
             ALBH:    next_state = AHBL;
-            AHBL:    next_state = mul_low_i ? ALBL : AHBH;
-            AHBH:    next_state = ALBL;
-            default: next_state = ALBL;
+            AHBL:    next_state = mul_low_i      ? IDLE : AHBH;
+            AHBH:    next_state = IDLE;
+            default: next_state = IDLE;
         endcase
     end
-
-    logic last_cycle;
-    assign last_cycle = (mul_state == AHBH) || (mul_state == AHBL && mul_low_i) || (mul_state == ALBH && single_cycle_i);
-    
-    assign hold_o = enable_i && !last_cycle;
-    
-    logic should_stall;
-    assign should_stall = stall && last_cycle;
 
     always_ff@(posedge clk or negedge reset_n) begin
         if (!reset_n)
@@ -58,36 +52,75 @@ module mul
             mul_state <= next_state;
     end
 
+    logic last_cycle;
+    assign last_cycle = (mul_state == AHBH) || (mul_state == AHBL && mul_low_i) || (mul_state == ALBL && single_cycle_i);
+    
+    assign hold_o = enable_i && !last_cycle;
+    
+    logic should_stall;
+    assign should_stall = stall && last_cycle;    
+
     logic [16:0] op_al;
     logic [16:0] op_ah;
-    logic [16:0] op_a;
     assign op_al = {single_cycle_i && signed_mode_i[0] && first_operand_i[15], first_operand_i[15: 0]};
     assign op_ah = {                  signed_mode_i[0] && first_operand_i[31], first_operand_i[31:16]};
-    assign op_a  = (mul_state inside {ALBL, ALBH}) ? op_al : op_ah;
+
+    logic [16:0] op_a;
+    always_ff@(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            op_a <= '0;
+        end
+        else begin
+            unique case (mul_state)
+                IDLE: op_a <= op_al;
+                ALBH: op_a <= op_ah;
+                default: ;
+            endcase
+        end
+    end
 
     logic [16:0] op_bl;
     logic [16:0] op_bh;
-    logic [16:0] op_b;
     assign op_bl = {single_cycle_i && signed_mode_i[1] && second_operand_i[15], second_operand_i[15: 0]};
     assign op_bh = {                  signed_mode_i[1] && second_operand_i[31], second_operand_i[31:16]};
-    assign op_b  = (mul_state inside {ALBL, AHBL}) ? op_bl : op_bh;
 
-    logic [34:0] mac_result_r;
+    logic [16:0] op_b;
+    always_ff@(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            op_b <= '0;
+        end
+        else begin
+            unique case (mul_state)
+                IDLE,
+                ALBH: op_b <= op_bl;
+                ALBL,
+                AHBL: op_b <= !should_stall ? op_bh : op_b;
+                default: ;
+            endcase
+        end
+    end
+
+    logic [15:0] mac_result_r;
 
     logic signed_mult;
     assign signed_mult = (signed_mode_i != '0);
 
     logic [34:0] accum;
-    always_comb begin
-        unique case (mul_state)
-            ALBL:    accum = '0;
-            ALBH:    accum = {19'b0, mac_result_r[31:16]};
-            AHBL:    accum = mul_low_i ? {19'b0, mac_result_r[31:16]} : mac_result_r;
-            AHBH:    accum = {{17{signed_mult && mac_result_r[33]}}, mac_result_r[33:16]}; 
-            default: accum = '0;
-        endcase
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            accum <= '0;
+        end
+        else if (!should_stall) begin
+            unique case (mul_state)
+                IDLE:    accum <= '0;
+                ALBL:    accum <= {19'b0, mac_result_partial[31:16]};
+                ALBH:    accum <= mul_low_i ? {19'b0, mac_result_partial[31:16]} : mac_result_partial;
+                AHBL:    accum <= {{17{signed_mult && mac_result_partial[33]}}, mac_result_partial[33:16]};
+                default: ;
+            endcase
+        end
     end
-
+    
     logic [34:0] mac_result;
     assign mac_result = $signed(op_a) * $signed(op_b) + $signed(accum);
     
@@ -97,7 +130,7 @@ module mul
             ALBL, 
             AHBH:    mac_result_partial = mac_result;
             ALBH,
-            AHBL:    mac_result_partial = mul_low_i ? {3'b0, mac_result[15:0], mac_result_r[15:0]} : mac_result;
+            AHBL:    mac_result_partial = mul_low_i ? {3'b0, mac_result[15:0], mac_result_r} : mac_result;
             default: mac_result_partial = '0;
         endcase
     end
@@ -106,7 +139,7 @@ module mul
         if (!reset_n)
             mac_result_r <= 0;
         else if (!should_stall)
-            mac_result_r <= mac_result_partial;
+            mac_result_r <= mac_result_partial[15:0];
     end
 
     assign result_o     = mac_result_partial[31:0];
