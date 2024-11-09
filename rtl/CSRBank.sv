@@ -35,7 +35,7 @@ module CSRBank
     parameter bit       XOSVMEnable    = 1'b0,
     parameter bit       ZIHPMEnable    = 1'b0,
     parameter bit       COMPRESSED     = 1'b0,
-    parameter rv32_e    RV32           = RV32I,
+    parameter mul_e     MULEXT         = MUL_M,
     parameter bit       VEnable        = 1'b0,
     parameter int       VLEN           = 64
 )
@@ -49,15 +49,16 @@ module CSRBank
     input   csrOperation_e      operation_i,
     input   logic [11:0]        address_i,
     input   logic [31:0]        data_i,
-    input   logic               killed,
     output  logic [31:0]        out,
 
     /* Signals enabled with ZIHPM */
     /* verilator lint_off UNUSEDSIGNAL */
+    input   logic               instruction_compressed_i,
     input   iType_e             instruction_operation_i,
     input   logic               hazard,
     input   logic               stall,
     input   logic               hold,
+    input   logic               killed,
 
     input   logic [31:0]        vtype_i,
     input   logic [31:0]        vlen_i,
@@ -67,8 +68,8 @@ module CSRBank
     input   logic               machine_return_i,
     input   exceptionCode_e     exception_code_i,
     input   logic [31:0]        pc_i,
+    input   logic [31:0]        next_pc_i,
     input   logic [31:0]        instruction_i,
-    input   logic               instruction_compressed_i,
 
     input   logic               jump_i,
     input   logic [31:0]        jump_target_i,
@@ -111,7 +112,7 @@ module CSRBank
         6'b0,
         XOSVMEnable,    // X - Non-standard extensions present
         1'b0,
-        VEnable,           // V - Vector extension
+        VEnable,        // V - Vector extension
         1'b1,           // U - User mode implemented
         1'b0,
         1'b0,           // S - Supervisor mode implemented
@@ -119,7 +120,7 @@ module CSRBank
         1'b0,           // P - Packed-SIMD extension
         1'b0,
         1'b0,           // N - User level interrupts supported
-        (RV32==RV32M),  // M - Integer Multiply/Divide extension
+        (MULEXT==MUL_M),// M - Integer Multiply/Divide extension
         3'b0,
         1'b1,           // I - RV32I/64I/128I base ISA
         1'b0,           // F - Hypervisor extension
@@ -127,7 +128,7 @@ module CSRBank
         1'b0,           // F - Single precision floating-point extension
         1'b0,           // E - RV32E base ISA
         1'b0,           // D - Double precision floating-point extension
-        1'b0,           // C - Compressed extension
+        (COMPRESSED),   // C - Compressed extension
         1'b0,           // B - Bit-Manipulation extension
         1'b0            // A - Atomic Extension
     };
@@ -142,8 +143,6 @@ module CSRBank
     /* verilator lint_on UNUSEDSIGNAL */
 
     logic [31:0] wr_data, wmask, current_val;
-
-    logic read_allowed, write_allowed;
 
     logic [31:0] instructions_killed_counter, hazard_counter, stall_counter, nop_counter;
     logic [31:0] interrupt_ack_counter, raise_exception_counter, context_switch_counter;
@@ -206,10 +205,6 @@ module CSRBank
     assign mepc        = mepc_r;
 
     assign CSR = CSRs'(address_i);
-
-    assign write_allowed = (write_enable_i == 1'b1 & killed == 1'b0);
-
-    assign read_allowed = (read_enable_i == 1'b1 & killed == 1'b0);
 
 //////////////////////////////////////////////////////////////////////////////
 // Masks and Current Value
@@ -315,7 +310,7 @@ module CSRBank
         //////////////////////////////////////////////////////////////////////////////
         else begin
             mcycle      <= mcycle + 1;
-            minstret    <= (killed | hold)
+            minstret    <= (hold || instruction_operation_i == NOP)
                             ? minstret
                             : minstret + 1;
         //////////////////////////////////////////////////////////////////////////////
@@ -355,15 +350,15 @@ module CSRBank
                  * because this one will be retired completely before taking
                  * the trap
                  */
-                if(jump_i)
+                if (jump_i)
                     mepc_r      <= jump_target_i;
                 else
-                    mepc_r      <= pc_i + (instruction_compressed_i ? 32'd2 : 32'd4);
+                    mepc_r      <= next_pc_i;
             end
         //////////////////////////////////////////////////////////////////////////////
         // CSR Write
         //////////////////////////////////////////////////////////////////////////////
-            else if (write_allowed == 1'b1) begin
+            else if (write_enable_i) begin
                 case(CSR)
                     MISA:           misa                <= wr_data;
                     // MEDELEG:     medeleg             <= wr_data;
@@ -401,7 +396,7 @@ module CSRBank
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        if (read_allowed == 1'b1) begin
+        if (read_enable_i) begin
             case(CSR)
                 //RO
                 MVENDORID:      out = '0;
@@ -508,7 +503,7 @@ module CSRBank
                 mvmis       <= '0;
                 mvmim       <= '0;
             end
-            else if (write_allowed == 1'b1) begin
+            else if (write_enable_i) begin
                 case (CSR)
                     MVMCTL:     mvmctl  <= wr_data[0];
                     MVMDO:      mvmdo   <= wr_data;
@@ -653,13 +648,13 @@ module CSRBank
                 interrupt_ack_counter       <= (interrupt_ack_i                                                      && !mcountinhibit[ 6]) ? interrupt_ack_counter   + 1 : interrupt_ack_counter;
                 raise_exception_counter     <= (raise_exception_i                                                    && !mcountinhibit[ 5]) ? raise_exception_counter + 1 : raise_exception_counter;
                 context_switch_counter      <= ((jump_i || raise_exception_i || machine_return_i || interrupt_ack_i) && !mcountinhibit[ 4]) ? context_switch_counter  + 1 : context_switch_counter;
-                nop_counter                 <= (instruction_operation_i == NOP && !hold && !killed                   && !mcountinhibit[ 9]) ? nop_counter             + 1 : nop_counter;
+                nop_counter                 <= (instruction_operation_i == NOP && !hold                              && !mcountinhibit[ 9]) ? nop_counter             + 1 : nop_counter;
 
                 if (COMPRESSED == 1'b1) begin
                     jump_misaligned_counter <= jump_misaligned_counter + ((jump_misaligned_i && !hold && !mcountinhibit[21]) ? 1 : 0);
                 end
 
-                if (!killed && !hold) begin
+                if (!hold) begin
                     logic_counter           <= (instruction_operation_i inside {XOR, OR, AND})                                && !mcountinhibit[10] ? logic_counter   + 1 : logic_counter;
                     addsub_counter          <= (instruction_operation_i inside {ADD, SUB})                                    && !mcountinhibit[11] ? addsub_counter  + 1 : addsub_counter;
                     lui_slt_counter         <= (instruction_operation_i inside {SLTU, SLT, LUI})                              && !mcountinhibit[19] ? lui_slt_counter + 1 : lui_slt_counter;
@@ -708,9 +703,9 @@ module CSRBank
                 $fwrite(fd,"\nCYCLES WITH::\n");
                 $fwrite(fd,"HAZARDS:                 %0d\n", hazard_counter);
                 $fwrite(fd,"STALL:                   %0d\n", stall_counter);
+                $fwrite(fd,"BUBBLES (INC. HAZARDS):  %0d\n", nop_counter);
 
                 $fwrite(fd,"\nINSTRUCTION COUNTERS:\n");
-                $fwrite(fd,"NOP:                     %0d\n", nop_counter);
                 $fwrite(fd,"LUI_SLT:                 %0d\n", lui_slt_counter);
                 $fwrite(fd,"LOGIC:                   %0d\n", logic_counter);
                 $fwrite(fd,"ADDSUB:                  %0d\n", addsub_counter);

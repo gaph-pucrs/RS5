@@ -1113,6 +1113,7 @@ module vectorALU
             mul mul32b (
                 .clk             (clk),
                 .reset_n         (reset_n),
+                .stall           (1'b0),
                 .first_operand_i (mult_op_a_32b[i_mul32b]),
                 .second_operand_i(mult_op_b_32b[i_mul32b]),
                 .signed_mode_i   (mult_signed_mode),
