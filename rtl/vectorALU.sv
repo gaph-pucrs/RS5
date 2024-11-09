@@ -102,23 +102,20 @@ module vectorALU
 // Accumulation Control
 //////////////////////////////////////////////////////////////////////////////
     logic accumulate_instruction;
-    logic accumulate_counter;
+    logic hold_accumulation_r;
 
     assign accumulate_instruction = (vector_operation_i inside {VMACC, VNMSAC, VMADD, VNMSUB});
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
-            accumulate_counter <= 1'b0;
-        end
-        else if (accumulate_instruction && !hold && current_state == V_EXEC) begin
-            accumulate_counter <= accumulate_counter + 1'b1;
+            hold_accumulation_r <= 1'b0;
         end
         else begin
-            accumulate_counter <= 1'b0;
+            hold_accumulation_r <= hold_accumulation_o;
         end
     end
 
-    assign hold_accumulation_o = accumulate_instruction && !hold && current_state == V_EXEC && !accumulate_counter;
+    assign hold_accumulation_o = accumulate_instruction && !hold && current_state == V_EXEC && !hold_accumulation_r;
 
 //////////////////////////////////////////////////////////////////////////////
 // Logical
@@ -1104,6 +1101,7 @@ module vectorALU
                         &&  (current_state == V_EXEC)
                         &&  (vsew == EW32)
                         &&  (!ended_acc)
+                        &&  (!hold_accumulation_r)
                         );
     assign mult_low    = (vector_operation_i inside {VMUL, VMACC, VNMSAC, VMADD, VNMSUB});
     assign hold_mult   = |hold_mult_int;

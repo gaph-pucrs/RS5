@@ -255,7 +255,7 @@ module vectorUnit
             cycle_count <= 0;
         else if (next_state == V_IDLE)
             cycle_count <= 0;
-        else if ((next_state == V_EXEC && hold == 1'b0) || hold_accumulation)
+        else if (next_state == V_EXEC && !hold)
             cycle_count <= cycle_count + 1;
 
     always_ff @(posedge clk or negedge reset_n)
@@ -287,7 +287,7 @@ module vectorUnit
             vl_curr_reg <= '1;
         else if (state == V_IDLE && next_state == V_EXEC)
             vl_curr_reg <= vl;
-        else if (next_state == V_EXEC && (hold == 1'b0))
+        else if (next_state == V_EXEC && !hold)
             if ($signed(vl_curr_reg - elements_per_reg) >= 0)
                 vl_curr_reg <= vl_curr_reg - elements_per_reg;
             else
@@ -329,7 +329,7 @@ module vectorUnit
             else begin
                 unique case (vector_operation_i)
                     VMADD, VNMSUB: vs2_addr = rs2_addr - 1;
-                    default:       vs2_addr = rd_addr  - 1;
+                    default:       vs2_addr = vd_addr;
                 endcase
             end
         end
