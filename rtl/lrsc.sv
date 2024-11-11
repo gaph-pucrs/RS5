@@ -35,13 +35,13 @@ module lrsc
             LOAD:     next_state = enable_i    ? CMP_ADDR : LOAD;
             CMP_ADDR: next_state = eq_result_i ? CMP_DATA : STORE;
             CMP_DATA: next_state = STORE;
-            default:  next_state = CMP_ADDR;
+            default:  next_state = LOAD; /* STORE */
         endcase
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
-            current_state <= CMP_ADDR;
+            current_state <= LOAD;
         else if (!stall)
             current_state <= next_state;
     end
