@@ -27,6 +27,7 @@ module execute
 #(
     parameter environment_e Environment = ASIC,
     parameter mul_e         MULEXT      = MUL_M,
+    parameter atomic_e      AMOEXT      = AMO_A,
     parameter bit           ZKNEEnable  = 1'b0,
     parameter bit           VEnable     = 1'b0,
     parameter int           VLEN        = 64,
@@ -103,6 +104,7 @@ module execute
     input   logic [31:0]        mtvec_i,
     input   logic [31:0]        mepc_i,
     input   logic [31:0]        jump_imm_target_i,
+    input   logic [31:0]        reservation_data_i,
     output  logic               jump_o,
     output  logic               interrupt_ack_o,
     output  logic               machine_return_o,
@@ -206,7 +208,7 @@ module execute
 
     assign mem_address[31:2]  = sum_result[31:2];
     assign mem_address [1:0]  = '0;
-    assign mem_read_enable    = instruction_operation_i inside {LB, LBU, LH, LHU, LW};
+    assign mem_read_enable    = instruction_operation_i inside {LB, LBU, LH, LHU, LW, LR_W};
 
     always_comb begin
         unique case (instruction_operation_i)
@@ -435,6 +437,27 @@ end
         assign mem_write_data_vector    = '0;
         assign vtype_o = '0;
         assign vlen_o  = '0;
+    end
+
+//////////////////////////////////////////////////////////////////////////////
+// Vector Extension
+//////////////////////////////////////////////////////////////////////////////
+
+    if (AMOEXT inside {AMO_A, AMO_ZALRSC}) begin : gen_zalrsc_on
+        logic [31:0] reservation_addr;
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n) begin
+                reservation_addr <= '0;
+            end
+            else begin
+                if (instruction_operation_i == LR_W)
+                    reservation_addr <= mem_address_o;
+            end
+        end
+    end
+    else begin : gen_zalrsc_off
+
     end
 
 //////////////////////////////////////////////////////////////////////////////

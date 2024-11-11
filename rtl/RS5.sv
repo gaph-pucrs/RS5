@@ -319,6 +319,8 @@ module RS5
 /////////////////////////////////////////////////////////// EXECUTE /////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+    logic [31:0] reservation_data;
+
     execute #(
         .Environment (Environment),
         .MULEXT      (MULEXT),
@@ -370,6 +372,7 @@ module RS5
         .jump_rollback_o         (jump_rollback),
         .ctx_switch_target_o     (ctx_switch_target),
         .jump_imm_target_i       (jump_imm_target_exec),
+        .reservation_data_i      (reservation_data),
         .jump_target_o           (jump_target),
         .interrupt_pending_i     (interrupt_pending),
         .mtvec_i                 (mtvec),
@@ -385,9 +388,12 @@ module RS5
 /////////////////////////////////////////////////////////// RETIRE //////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     retire retire1 (
+        .clk                    (clk),
+        .reset_n                (reset_n),
         .instruction_operation_i(instruction_operation_retire),
         .result_i               (result_retire),
         .mem_data_i             (mem_data_i),
+        .reservation_data_o     (reservation_data),
         .regbank_data_o         (regbank_data_writeback)
     );
 

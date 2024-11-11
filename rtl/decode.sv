@@ -27,6 +27,7 @@ module decode
     import RS5_pkg::*;
 #(
     parameter mul_e         MULEXT      = MUL_M,
+    parameter atomic_e      AMOEXT      = AMO_A,
     parameter bit           COMPRESSED  = 1'b1,
     parameter bit           ZKNEEnable  = 1'b0,
     parameter bit           VEnable     = 1'b0,
@@ -202,6 +203,29 @@ module decode
         endcase
     end
 
+    iType_e decode_atomic;
+    if (AMOEXT != AMO_OFF) begin : a_enable_decode_gen_on
+        always_comb begin
+            unique case (funct7[6:2]) inside
+                5'b00010: decode_atomic = (AMOEXT != AMO_ZAAMO)  ? LR_W       : INVALID;
+                // 5'b00011: decode_atomic = (AMOEXT != AMO_ZAAMO)  ? UCODE_LRSC : INVALID;
+                // 5'b00000,
+                // 5'b00001, /* Most atomic instructions will be a sequence of  */
+                // 5'b00100, /* other already-available instructions, therefore */
+                // 5'b01000, /* we opt to implement as a microcode              */
+                // 5'b01100,
+                // 5'b10000,
+                // 5'b10100,
+                // 5'b11000,
+                // 5'b11100: decode_atomic = (AMOEXT != AMO_ZALRSC) ? UCODE_AMO  : INVALID;
+                default:  decode_atomic = INVALID;
+            endcase
+        end
+    end
+    else begin : a_enable_decode_gen_off
+        assign decode_atomic = INVALID;
+    end
+
     iType_e instruction_operation;
     always_comb begin
         unique case (opcode)
@@ -219,6 +243,7 @@ module decode
             5'b10101: instruction_operation = VEnable ? VECTOR : INVALID; /* OP-V */
             5'b00001: instruction_operation = VEnable ? VLOAD  : INVALID; /* LOAD-FP */
             5'b01001: instruction_operation = VEnable ? VSTORE : INVALID; /* STORE-FP */
+            5'b01011: instruction_operation = decode_atomic;
             default:  instruction_operation = INVALID;
         endcase
     end
