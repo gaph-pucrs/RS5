@@ -207,8 +207,8 @@ module decode
     if (AMOEXT != AMO_OFF) begin : a_enable_decode_gen_on
         always_comb begin
             unique case (funct7[6:2]) inside
-                5'b00010: decode_atomic = (AMOEXT != AMO_ZAAMO)  ? LR_W       : INVALID;
-                // 5'b00011: decode_atomic = (AMOEXT != AMO_ZAAMO)  ? UCODE_LRSC : INVALID;
+                5'b00010: decode_atomic = (AMOEXT != AMO_ZAAMO) ? LR_W : INVALID;
+                5'b00011: decode_atomic = (AMOEXT != AMO_ZAAMO) ? SC_W : INVALID;
                 // 5'b00000,
                 // 5'b00001, /* Most atomic instructions will be a sequence of  */
                 // 5'b00100, /* other already-available instructions, therefore */

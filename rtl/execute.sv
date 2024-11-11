@@ -154,6 +154,22 @@ module execute
         endcase
     end
 
+    logic [31:0] eq_opA;
+    always_comb begin
+        unique case (instruction_operation_i)
+            SC_W:    eq_opA = lrsc_cmp_opA;
+            default: eq_opA = rs1_data_i;
+        endcase
+    end
+
+    logic [31:0] eq_opB;
+    always_comb begin
+        unique case (instruction_operation_i)
+            SC_W:    eq_opB = lrsc_cmp_opB;
+            default: eq_opB = second_operand_i;
+        endcase
+    end
+
     always_comb begin
         sum_result              = rs1_data_i + second_operand_i;
         and_result              = rs1_data_i & second_operand_i;
@@ -163,7 +179,7 @@ module execute
         srl_result              = rs1_data_i >> second_operand_i[4:0];
         sra_result              = $signed(rs1_data_i) >>> second_operand_i[4:0];
 
-        equal                   = rs1_data_i == second_operand_i;
+        equal                   = eq_opA == eq_opB;
         less_than               = $signed(rs1_data_i) < $signed(second_operand_i);
         less_than_unsigned      = rs1_data_i < second_operand_i;
         greater_equal           = $signed(rs1_data_i) >= $signed(second_operand_i);
@@ -200,8 +216,8 @@ module execute
         end
         else begin
             mem_address_o      = mem_address;
-            mem_read_enable_o  = mem_read_enable;
-            mem_write_enable_o = mem_write_enable;
+            mem_read_enable_o  = mem_read_enable  || lrsc_mem_read_enable;
+            mem_write_enable_o = mem_write_enable | {4{lrsc_mem_write_enable}};
             mem_write_data_o   = mem_write_data;
         end
     end
@@ -443,20 +459,58 @@ end
 // Vector Extension
 //////////////////////////////////////////////////////////////////////////////
 
-    if (AMOEXT inside {AMO_A, AMO_ZALRSC}) begin : gen_zalrsc_on
-        logic [31:0] reservation_addr;
+    logic        lrsc_hold;
+    logic        lrsc_mem_read_enable;
+    logic        lrsc_mem_write_enable;
+    logic        lrsc_result;
+    logic [31:0] lrsc_cmp_opA;
+    logic [31:0] lrsc_cmp_opB;
 
-        always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n) begin
-                reservation_addr <= '0;
+    if (AMOEXT != AMO_OFF) begin : gen_atomic_on
+
+        if (AMOEXT != AMO_ZAAMO) begin : gen_zalrsc_on
+            logic [31:0] reservation_addr;
+
+            always_ff @(posedge clk or negedge reset_n) begin
+                if (!reset_n) begin
+                    reservation_addr <= '0;
+                end
+                else begin
+                    unique case (instruction_operation_i)
+                        LR_W: reservation_addr <= mem_address_o;
+                        SC_W: reservation_addr <= hold_o ? reservation_addr : '0;
+                        default: ;
+                    endcase
+                end
             end
-            else begin
-                if (instruction_operation_i == LR_W)
-                    reservation_addr <= mem_address_o;
-            end
+
+            logic lrsc_enable;
+            assign lrsc_enable = (instruction_operation_i == SC_W);
+
+            lrsc lrsc_m (
+                .clk               (clk                  ),
+                .reset_n           (reset_n              ),
+                .stall             (stall                ),
+                .enable_i          (lrsc_enable          ),
+                .eq_result_i       (equal                ),
+                .rs1_data_i        (rs1_data_i           ),
+                .data_i            (mem_read_data_i      ),
+                .reservation_addr_i(reservation_addr     ),
+                .reservation_data_i(reservation_data_i   ),
+                .hold_o            (lrsc_hold            ),
+                .mem_read_enable_o (lrsc_mem_read_enable ),
+                .mem_write_enable_o(lrsc_mem_write_enable),
+                .result_o          (lrsc_result          ),
+                .cmp_opA_o         (lrsc_cmp_opA         ),
+                .cmp_opB_o         (lrsc_cmp_opB         )
+            );
         end
+        else begin : gen_zalrsc_off
+
+        end
+
     end
-    else begin : gen_zalrsc_off
+    else begin : gen_atomic_off
 
     end
 
@@ -484,6 +538,7 @@ end
             MUL,MULH,MULHU,MULHSU:  result = mul_result;
             AES32ESI, AES32ESMI:    result = aes_result;
             VECTOR, VLOAD, VSTORE:  result = vector_scalar_result;
+            SC_W:                   result = {31'b0, lrsc_result};
             default:                result = sum_result;
         endcase
     end
@@ -507,27 +562,42 @@ end
 //////////////////////////////////////////////////////////////////////////////
 // Output Registers
 //////////////////////////////////////////////////////////////////////////////
-    assign hold_o = hold_div || hold_mul || hold_vector;
+    assign hold_o = hold_div || hold_mul || hold_vector || lrsc_hold;
 
     always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            write_enable_o          <= 1'b0;
+        if (!reset_n)
+            write_enable_o <= 1'b0;
+        else if (!stall && !hold_o)
+            write_enable_o <= write_enable;
+        else
+            write_enable_o <= 1'b0;
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
             instruction_operation_o <= NOP;
-            result_o                <= '0;
-            rd_o                    <= '0;
-        end
-        else if (!stall && !hold_o) begin
-            write_enable_o          <= write_enable;
+        else if (!stall && !hold_o)
             instruction_operation_o <= instruction_operation_i;
-            result_o                <= result;
-            rd_o                    <= rd_i;
-        end
-        else begin
-            write_enable_o          <= 1'b0;
+        else
             instruction_operation_o <= NOP;
-            result_o                <= '0;
-            rd_o                    <= '0;
-        end
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            result_o <= '0;
+        else if (!stall && !hold_o)
+            result_o <= result;
+        else
+            result_o <= '0;
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            rd_o <= '0;
+        else if (!stall && !hold_o)
+            rd_o <= rd_i;
+        else
+            rd_o <= '0;
     end
 
     assign result_fwd_o = result;

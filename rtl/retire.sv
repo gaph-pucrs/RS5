@@ -125,8 +125,11 @@ module retire
                 reservation_data_o <= '0;
             end
             else begin
-                if (instruction_operation_i == LR_W)
-                    reservation_data_o <= mem_data_i;
+                unique case (instruction_operation_i)
+                    LR_W:    reservation_data_o <= mem_data_i;
+                    SC_W:    reservation_data_o <= '0;
+                    default: ;
+                endcase
             end
         end
     end
