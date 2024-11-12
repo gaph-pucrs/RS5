@@ -511,9 +511,9 @@ end
                 if (!reset_n) begin
                     reservation_addr <= '0;
                 end
-                else begin
+                else if (!stall) begin
                     unique case (instruction_operation_i)
-                        LR_W: reservation_addr <= mem_address_o;
+                        LR_W: reservation_addr <= rs1_data_i;
                         SC_W: reservation_addr <= hold_o ? reservation_addr : '0;
                         default: ;
                     endcase
@@ -643,7 +643,7 @@ end
     always_comb begin
         unique case (instruction_operation_i)
             NOP,
-            SB,SH,SW,SC_W,
+            SB,SH,SW, 
             BEQ,BNE,
             BLT,BLTU,
             BGE,BGEU:   write_enable = 1'b0;
@@ -677,7 +677,7 @@ end
         else if (!stall) begin
             unique case (instruction_operation_i)
                 SC_W,    
-                AMO_W:   instruction_operation_o <= atomic_mem_read_enable ? LW : instruction_operation_i;
+                AMO_W:   instruction_operation_o <= hold_o ? LW : instruction_operation_i;
                 default: instruction_operation_o <= instruction_operation_i;
             endcase
         end

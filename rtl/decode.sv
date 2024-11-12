@@ -238,15 +238,10 @@ module decode
             assign amo_invalid = (instruction_operation == AMO_W) && (decode_amo == AMONOP);
 
             always_ff @(posedge clk or negedge reset_n) begin
-                if (!reset_n) begin
+                if (!reset_n)
                     atomic_operation_o <= AMONOP;
-                end
-                else if (enable) begin
-                    if (hazard_o || killed)
-                        atomic_operation_o <= AMONOP;
-                    else
-                        atomic_operation_o <= decode_amo;
-                end
+                else if (enable)
+                    atomic_operation_o <= decode_amo;
             end
         end
         else begin : gen_zaamo_off
@@ -493,7 +488,7 @@ module decode
     logic is_load;
     logic is_store;
 
-    assign is_load  = (opcode == 5'b00000);
+    assign is_load  = (opcode == 5'b00000) || (instruction_operation == LR_W);
     assign is_store = (opcode == 5'b01000);
     
     logic           locked_memory;
