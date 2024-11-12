@@ -51,6 +51,7 @@ module execute
     input   logic  [4:0]        rs1_i,
     input   iType_e             instruction_operation_i,
     input   logic               instruction_compressed_i,
+    input   iTypeAtomic_e       atomic_operation_i,
     /* Not used if VEnable is 0 */
     /* verilator lint_off UNUSEDSIGNAL */
     input   iTypeVector_e       vector_operation_i,
@@ -114,6 +115,7 @@ module execute
 );
 
     logic [31:0]    result;
+    logic [31:0]    amo_operand;
     logic           write_enable;
     logic           exc_ilegal_csr_inst;
 
@@ -129,6 +131,8 @@ module execute
     logic [31:0]    sll_result;
     logic [31:0]    srl_result;
     logic [31:0]    sra_result;
+    logic [31:0]    lrsc_cmp_opA;
+    logic [31:0]    lrsc_cmp_opB;
 
     logic           equal;
     logic           less_than;
@@ -136,12 +140,15 @@ module execute
     logic           greater_equal;
     logic           greater_equal_unsigned;
 
+    logic [31:0] first_operand;
+
     logic [31:0] sum2_opA;
     always_comb begin
         unique case (instruction_operation_i)
             // To link register. Maybe we can remove this by using the PC in decode stage
             JAL, JALR: sum2_opA = pc_i;
-            default:   sum2_opA = rs1_data_i;    // SUB
+            AMO_W:     sum2_opA = amo_operand;
+            default:   sum2_opA = rs1_data_i;
         endcase
     end
 
@@ -150,7 +157,8 @@ module execute
         unique case (instruction_operation_i)
             // To link register. Maybe we can remove this by using the PC in decode stage
             JAL, JALR: sum2_opB = instruction_compressed_i ? 32'd2 : 32'd4;
-            default:   sum2_opB = -second_operand_i;    // SUB
+            SUB:       sum2_opB = -second_operand_i;
+            default:   sum2_opB = second_operand_i; // AMO_W
         endcase
     end
 
@@ -172,16 +180,16 @@ module execute
 
     always_comb begin
         sum_result              = rs1_data_i + second_operand_i;
-        and_result              = rs1_data_i & second_operand_i;
-        or_result               = rs1_data_i | second_operand_i;
-        xor_result              = rs1_data_i ^ second_operand_i;
+        and_result              = first_operand & second_operand_i;
+        or_result               = first_operand | second_operand_i;
+        xor_result              = first_operand ^ second_operand_i;
         sll_result              = rs1_data_i << second_operand_i[4:0];
         srl_result              = rs1_data_i >> second_operand_i[4:0];
         sra_result              = $signed(rs1_data_i) >>> second_operand_i[4:0];
 
         equal                   = eq_opA == eq_opB;
-        less_than               = $signed(rs1_data_i) < $signed(second_operand_i);
-        less_than_unsigned      = rs1_data_i < second_operand_i;
+        less_than               = $signed(first_operand) < $signed(second_operand_i);
+        less_than_unsigned      = first_operand < second_operand_i;
         greater_equal           = $signed(rs1_data_i) >= $signed(second_operand_i);
         greater_equal_unsigned  = rs1_data_i >= second_operand_i;
 
@@ -207,6 +215,9 @@ module execute
     logic [31:0] mem_write_data;
     logic [31:0] mem_write_data_vector;
 
+    logic        atomic_mem_read_enable;
+    logic        atomic_mem_write_enable;
+
     always_comb begin
         if (instruction_operation_i inside {VLOAD, VSTORE}) begin
             mem_address_o      = {mem_address_vector[31:2], 2'b00};
@@ -214,17 +225,22 @@ module execute
             mem_write_enable_o = mem_write_enable_vector;
             mem_write_data_o   = mem_write_data_vector;
         end
+        else if (instruction_operation_i == AMO_W) begin
+            mem_address_o      = rs1_data_i;
+            mem_read_enable_o  = atomic_mem_read_enable;
+            mem_write_enable_o = {4{atomic_mem_write_enable}};
+            mem_write_data_o   = result_o;
+        end
         else begin
             mem_address_o      = mem_address;
-            mem_read_enable_o  = mem_read_enable  || lrsc_mem_read_enable;
-            mem_write_enable_o = mem_write_enable | {4{lrsc_mem_write_enable}};
+            mem_read_enable_o  = mem_read_enable;
+            mem_write_enable_o = mem_write_enable;
             mem_write_data_o   = mem_write_data;
         end
     end
 
-    assign mem_address[31:2]  = sum_result[31:2];
-    assign mem_address [1:0]  = '0;
-    assign mem_read_enable    = instruction_operation_i inside {LB, LBU, LH, LHU, LW, LR_W};
+    assign mem_address     = {sum_result[31:2], 2'b00};
+    assign mem_read_enable = instruction_operation_i inside {LB, LBU, LH, LHU, LW, LR_W};
 
     always_comb begin
         unique case (instruction_operation_i)
@@ -455,22 +471,23 @@ end
         assign vlen_o  = '0;
     end
 
-//////////////////////////////////////////////////////////////////////////////
-// Vector Extension
-//////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+// Atomic Extension
+////////////////////////////////////////////////////////////////////////////////
 
-    logic        lrsc_hold;
-    logic        lrsc_mem_read_enable;
-    logic        lrsc_mem_write_enable;
+    logic        atomic_hold;
+
     logic        lrsc_result;
-    logic [31:0] lrsc_cmp_opA;
-    logic [31:0] lrsc_cmp_opB;
+    logic        amo_write_enable;
+    logic [31:0] amo_result;
 
     if (AMOEXT != AMO_OFF) begin : gen_atomic_on
+        logic lrsc_hold;
+        logic lrsc_mem_read_enable;
+        logic lrsc_mem_write_enable;
 
         if (AMOEXT != AMO_ZAAMO) begin : gen_zalrsc_on
             logic [31:0] reservation_addr;
-
             always_ff @(posedge clk or negedge reset_n) begin
                 if (!reset_n) begin
                     reservation_addr <= '0;
@@ -506,12 +523,72 @@ end
             );
         end
         else begin : gen_zalrsc_off
-
+            assign lrsc_result           = 1'b0;
+            assign lrsc_cmp_opA          = '0;
+            assign lrsc_cmp_opB          = '0;
+            assign lrsc_hold             = 1'b0;
+            assign lrsc_mem_read_enable  = 1'b0;
+            assign lrsc_mem_write_enable = 1'b0;
         end
 
+        logic amo_hold;
+        logic amo_mem_read_enable;
+        logic amo_mem_write_enable;
+
+        if (AMOEXT != AMO_ZALRSC) begin : gen_zaamo_on
+            logic amo_enable;
+            assign amo_enable = (instruction_operation_i == AMO_W);
+
+            always_comb begin
+                unique case (atomic_operation_i)
+                    AMOADD:  amo_result = sum2_result;
+                    AMOAND:  amo_result = and_result;
+                    AMOXOR:  amo_result = xor_result;
+                    AMOOR:   amo_result = or_result;
+                    AMOMAX:  amo_result = less_than          ? rs2_data_i  : amo_operand;
+                    AMOMIN:  amo_result = less_than          ? amo_operand : rs2_data_i;
+                    AMOMAXU: amo_result = less_than_unsigned ? rs2_data_i  : amo_operand;
+                    AMOMINU: amo_result = less_than_unsigned ? amo_operand : rs2_data_i;
+                    AMOSWAP: amo_result = rs2_data_i;
+                    default: amo_result = '0;
+                endcase
+            end
+
+            amo amo_m (
+                .clk               (clk                 ),
+                .reset_n           (reset_n             ),
+                .stall             (stall               ),
+                .enable_i          (amo_enable          ),
+                .data_i            (mem_read_data_i     ),
+                .hold_o            (amo_hold            ),
+                .write_enable_o    (amo_write_enable    ),
+                .mem_read_enable_o (amo_mem_read_enable ),
+                .mem_write_enable_o(amo_mem_write_enable),
+                .opA_o             (amo_operand         )
+            );
+
+            assign first_operand = amo_enable ? amo_operand : rs1_data_i;
+        end
+        else begin : gen_zaamo_off
+            assign first_operand    = rs1_data_i;
+            assign amo_operand      = '0;
+            assign amo_write_enable = 1'b0;
+        end
+
+        assign atomic_hold             = lrsc_hold             || amo_hold;
+        assign atomic_mem_read_enable  = lrsc_mem_read_enable  || amo_mem_read_enable;
+        assign atomic_mem_write_enable = lrsc_mem_write_enable || amo_mem_write_enable;
     end
     else begin : gen_atomic_off
-
+        assign first_operand           = rs1_data_i;
+        assign amo_operand             = '0;
+        assign atomic_hold             = 1'b0;
+        assign atomic_mem_read_enable  = 1'b0;
+        assign atomic_mem_write_enable = 1'b0;
+        assign lrsc_result             = 1'b0;
+        assign lrsc_cmp_opA            = '0;
+        assign lrsc_cmp_opB            = '0;
+        assign amo_write_enable        = 1'b0;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -539,6 +616,7 @@ end
             AES32ESI, AES32ESMI:    result = aes_result;
             VECTOR, VLOAD, VSTORE:  result = vector_scalar_result;
             SC_W:                   result = {31'b0, lrsc_result};
+            AMO_W:                  result = amo_result;
             default:                result = sum_result;
         endcase
     end
@@ -553,51 +631,51 @@ end
             VECTOR,
             VLOAD,
             VSTORE:     write_enable = vector_wr_en;
-            default:    write_enable = (rd_i != '0 && !raise_exception_o);
+            AMO_W:      write_enable = (rd_i != '0 && amo_write_enable);
+            default:    write_enable = (rd_i != '0 && !hold_o && !raise_exception_o);
         endcase
     end
 
     assign write_enable_fwd_o = write_enable;
 
-//////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 // Output Registers
-//////////////////////////////////////////////////////////////////////////////
-    assign hold_o = hold_div || hold_mul || hold_vector || lrsc_hold;
+////////////////////////////////////////////////////////////////////////////////
+    
+    assign hold_o = hold_div || hold_mul || hold_vector || atomic_hold;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             write_enable_o <= 1'b0;
-        else if (!stall && !hold_o)
+        else if (!stall)
             write_enable_o <= write_enable;
-        else
-            write_enable_o <= 1'b0;
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
+        if (!reset_n) begin
             instruction_operation_o <= NOP;
-        else if (!stall && !hold_o)
-            instruction_operation_o <= instruction_operation_i;
-        else
-            instruction_operation_o <= NOP;
+        end
+        else if (!stall) begin
+            unique case (instruction_operation_i)
+                SC_W,    
+                AMO_W:   instruction_operation_o <= atomic_mem_read_enable ? LW : instruction_operation_i;
+                default: instruction_operation_o <= instruction_operation_i;
+            endcase
+        end
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             result_o <= '0;
-        else if (!stall && !hold_o)
+        else if (!stall)
             result_o <= result;
-        else
-            result_o <= '0;
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             rd_o <= '0;
-        else if (!stall && !hold_o)
+        else if (!stall)
             rd_o <= rd_i;
-        else
-            rd_o <= '0;
     end
 
     assign result_fwd_o = result;

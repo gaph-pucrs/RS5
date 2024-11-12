@@ -106,6 +106,7 @@ module RS5
 //////////////////////////////////////////////////////////////////////////////
 
     iType_e         instruction_operation_execute;
+    iTypeAtomic_e   atomic_operation_execute;
     iTypeVector_e   vector_operation_execute;
     logic   [31:0]  rs1_data_execute, rs2_data_execute, second_operand_execute;
     logic   [31:0]  instruction_execute;
@@ -255,6 +256,7 @@ module RS5
         .jump_imm_target_o          (jump_imm_target_exec),
         .compressed_o               (instruction_compressed_execute),
         .instruction_operation_o    (instruction_operation_execute),
+        .atomic_operation_o         (atomic_operation_execute),
         .vector_operation_o         (vector_operation_execute),
         .hazard_o                   (hazard),
         .killed_o                   (killed),
@@ -341,6 +343,7 @@ module RS5
         .rs1_i                   (rs1_execute),
         .instruction_operation_i (instruction_operation_execute),
         .instruction_compressed_i(instruction_compressed_execute),
+        .atomic_operation_i      (atomic_operation_execute),
         .vector_operation_i      (vector_operation_execute),
         .privilege_i             (privilege),
         .exc_ilegal_inst_i       (exc_ilegal_inst_execute),

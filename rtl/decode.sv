@@ -63,6 +63,7 @@ module decode
     output  logic [31:0]    jump_imm_target_o,
     output  logic           compressed_o,
     output  iType_e         instruction_operation_o,
+    output  iTypeAtomic_e   atomic_operation_o,
     output  iTypeVector_e   vector_operation_o,
     output  logic           hazard_o,
     output  logic           killed_o,
@@ -90,6 +91,9 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 // Find out the type of the instruction
 //////////////////////////////////////////////////////////////////////////////
+
+    logic   killed;
+    iType_e instruction_operation;
 
     logic [2:0] funct3;
     logic [6:0] funct7;
@@ -203,30 +207,59 @@ module decode
         endcase
     end
 
-    iType_e decode_atomic;
-    if (AMOEXT != AMO_OFF) begin : a_enable_decode_gen_on
+    logic         amo_invalid;
+    iType_e       decode_atomic;
+    if (AMOEXT != AMO_OFF) begin : gen_amo_on
         always_comb begin
-            unique case (funct7[6:2]) inside
-                5'b00010: decode_atomic = (AMOEXT != AMO_ZAAMO) ? LR_W : INVALID;
-                5'b00011: decode_atomic = (AMOEXT != AMO_ZAAMO) ? SC_W : INVALID;
-                // 5'b00000,
-                // 5'b00001, /* Most atomic instructions will be a sequence of  */
-                // 5'b00100, /* other already-available instructions, therefore */
-                // 5'b01000, /* we opt to implement as a microcode              */
-                // 5'b01100,
-                // 5'b10000,
-                // 5'b10100,
-                // 5'b11000,
-                // 5'b11100: decode_atomic = (AMOEXT != AMO_ZALRSC) ? UCODE_AMO  : INVALID;
-                default:  decode_atomic = INVALID;
+            unique case (funct7[6:2])
+                5'b00010: decode_atomic = (AMOEXT != AMO_ZAAMO)  ? LR_W  : INVALID;
+                5'b00011: decode_atomic = (AMOEXT != AMO_ZAAMO)  ? SC_W  : INVALID;
+                default:  decode_atomic = (AMOEXT != AMO_ZALRSC) ? AMO_W : INVALID;
             endcase
         end
+
+        if (AMOEXT != AMO_ZALRSC) begin : gen_zaamo_on
+            iTypeAtomic_e decode_amo;
+            always_comb begin
+                unique case (funct7[6:2])
+                    5'b00000: decode_amo = AMOADD;
+                    5'b00001: decode_amo = AMOSWAP;
+                    5'b00100: decode_amo = AMOXOR;
+                    5'b01000: decode_amo = AMOOR;
+                    5'b01100: decode_amo = AMOAND;
+                    5'b10000: decode_amo = AMOMIN;
+                    5'b10100: decode_amo = AMOMAX;
+                    5'b11000: decode_amo = AMOMINU;
+                    5'b11100: decode_amo = AMOMAXU;
+                    default:  decode_amo = AMONOP;
+                endcase
+            end
+
+            assign amo_invalid = (instruction_operation == AMO_W) && (decode_amo == AMONOP);
+
+            always_ff @(posedge clk or negedge reset_n) begin
+                if (!reset_n) begin
+                    atomic_operation_o <= AMONOP;
+                end
+                else if (enable) begin
+                    if (hazard_o || killed)
+                        atomic_operation_o <= AMONOP;
+                    else
+                        atomic_operation_o <= decode_amo;
+                end
+            end
+        end
+        else begin : gen_zaamo_off
+            assign amo_invalid        = 1'b0;
+            assign atomic_operation_o = AMONOP;
+        end
     end
-    else begin : a_enable_decode_gen_off
-        assign decode_atomic = INVALID;
+    else begin : gen_amo_off
+        assign decode_atomic      = INVALID;
+        assign amo_invalid        = 1'b0;
+        assign atomic_operation_o = AMONOP;
     end
 
-    iType_e instruction_operation;
     always_comb begin
         unique case (opcode)
             5'b01101: instruction_operation = LUI;
@@ -252,7 +285,6 @@ module decode
 //  Decode Vector Instruction
 //////////////////////////////////////////////////////////////////////////////
 
-    logic         killed;
     iTypeVector_e vector_operation;
 
     if (VEnable) begin : v_enable_decode_gen_on
@@ -593,7 +625,7 @@ module decode
     logic misaligned_fetch;
     logic exc_inst_access_fault;
 
-    assign invalid_inst = ((instruction_i[1:0] != '1) || instruction_operation == INVALID) && !killed;
+    assign invalid_inst = ((instruction_i[1:0] != '1) || instruction_operation == INVALID || amo_invalid) && !killed;
 
     if (COMPRESSED) begin : gen_compressed_on
         assign misaligned_fetch = (pc_i[0] != 1'b0) && !killed;
