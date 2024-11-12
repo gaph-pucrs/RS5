@@ -219,24 +219,43 @@ module execute
     logic        atomic_mem_write_enable;
 
     always_comb begin
-        if (instruction_operation_i inside {VLOAD, VSTORE}) begin
-            mem_address_o      = {mem_address_vector[31:2], 2'b00};
-            mem_read_enable_o  = mem_read_enable_vector;
-            mem_write_enable_o = mem_write_enable_vector;
-            mem_write_data_o   = mem_write_data_vector;
-        end
-        else if (instruction_operation_i == AMO_W) begin
-            mem_address_o      = rs1_data_i;
-            mem_read_enable_o  = atomic_mem_read_enable;
-            mem_write_enable_o = {4{atomic_mem_write_enable}};
-            mem_write_data_o   = result_o;
-        end
-        else begin
-            mem_address_o      = mem_address;
-            mem_read_enable_o  = mem_read_enable;
-            mem_write_enable_o = mem_write_enable;
-            mem_write_data_o   = mem_write_data;
-        end
+        unique case (instruction_operation_i)
+            VLOAD,
+            VSTORE:  mem_address_o = {mem_address_vector[31:2], 2'b00};
+            AMO_W,
+            LR_W,
+            SC_W:    mem_address_o = rs1_data_i;
+            default: mem_address_o = mem_address;
+        endcase
+    end
+
+    always_comb begin
+        unique case (instruction_operation_i)
+            VLOAD,
+            VSTORE:  mem_read_enable_o = mem_read_enable_vector;
+            AMO_W,
+            SC_W:    mem_read_enable_o = atomic_mem_read_enable;
+            default: mem_read_enable_o = mem_read_enable;
+        endcase
+    end
+
+    always_comb begin
+        unique case (instruction_operation_i)
+            VLOAD,
+            VSTORE:  mem_write_enable_o = mem_write_enable_vector;
+            AMO_W,
+            SC_W:    mem_write_enable_o = {4{atomic_mem_write_enable}};
+            default: mem_write_enable_o = mem_write_enable;
+        endcase
+    end
+
+    always_comb begin
+        unique case (instruction_operation_i)
+            VLOAD,
+            VSTORE:  mem_write_data_o = mem_write_data_vector;
+            AMO_W:   mem_write_data_o = result_o;
+            default: mem_write_data_o = mem_write_data;
+        endcase
     end
 
     assign mem_address     = {sum_result[31:2], 2'b00};
@@ -624,14 +643,14 @@ end
     always_comb begin
         unique case (instruction_operation_i)
             NOP,
-            SB,SH,SW,
+            SB,SH,SW,SC_W,
             BEQ,BNE,
             BLT,BLTU,
             BGE,BGEU:   write_enable = 1'b0;
             VECTOR,
             VLOAD,
             VSTORE:     write_enable = vector_wr_en;
-            AMO_W:      write_enable = (rd_i != '0 && amo_write_enable);
+            AMO_W:      write_enable = (rd_i != '0 && amo_write_enable && !raise_exception_o);
             default:    write_enable = (rd_i != '0 && !hold_o && !raise_exception_o);
         endcase
     end
