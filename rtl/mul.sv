@@ -45,6 +45,12 @@ module mul
         endcase
     end
 
+    logic last_cycle;
+    assign last_cycle = (mul_state == AHBH) || (mul_state == AHBL && mul_low_i) || (mul_state == ALBL && single_cycle_i);
+    
+    logic should_stall;
+    assign should_stall = stall && last_cycle;  
+
     always_ff@(posedge clk or negedge reset_n) begin
         if (!reset_n)
             mul_state <= ALBL;
@@ -52,13 +58,7 @@ module mul
             mul_state <= next_state;
     end
 
-    logic last_cycle;
-    assign last_cycle = (mul_state == AHBH) || (mul_state == AHBL && mul_low_i) || (mul_state == ALBL && single_cycle_i);
-    
-    assign hold_o = enable_i && !last_cycle;
-    
-    logic should_stall;
-    assign should_stall = stall && last_cycle;    
+    assign hold_o = enable_i && !last_cycle;  
 
     logic [16:0] op_al;
     logic [16:0] op_ah;
@@ -105,6 +105,7 @@ module mul
     logic signed_mult;
     assign signed_mult = (signed_mode_i != '0);
 
+    logic [34:0] mac_result_partial;
     logic [34:0] accum;
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
@@ -124,7 +125,6 @@ module mul
     logic [34:0] mac_result;
     assign mac_result = $signed(op_a) * $signed(op_b) + $signed(accum);
     
-    logic [34:0] mac_result_partial;
     always_comb begin
         unique case (mul_state)
             ALBL, 
