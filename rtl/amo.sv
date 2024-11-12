@@ -6,6 +6,7 @@ module amo
 
     input  logic        enable_i,
     input  logic [31:0] data_i,
+    input  logic [31:0] amo_result_i,
 
     output logic        hold_o,
     output logic        write_enable_o,
@@ -41,10 +42,16 @@ module amo
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
+        if (!reset_n) begin
             opA_o <= '0;
-        else if (!stall && (current_state == WAIT))
-            opA_o <= data_i;
+        end
+        else if (!stall) begin
+            unique case (current_state)
+                WAIT:    opA_o <= data_i;
+                MODIFY:  opA_o <= amo_result_i;
+                default: ;
+            endcase
+        end
     end
 
     assign hold_o             = (current_state !=  STORE) && enable_i;

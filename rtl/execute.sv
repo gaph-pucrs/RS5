@@ -125,7 +125,6 @@ module execute
 );
 
     logic [31:0]    result;
-    logic [31:0]    amo_operand;
     logic           write_enable;
     logic           exc_ilegal_csr_inst;
 
@@ -141,8 +140,6 @@ module execute
     logic [31:0]    sll_result;
     logic [31:0]    srl_result;
     logic [31:0]    sra_result;
-    logic [31:0]    lrsc_cmp_opA;
-    logic [31:0]    lrsc_cmp_opB;
 
     logic           equal;
     logic           less_than;
@@ -157,8 +154,7 @@ module execute
         unique case (instruction_operation_i)
             // To link register. Maybe we can remove this by using the PC in decode stage
             JAL, JALR: sum2_opA = pc_i;
-            AMO_W:     sum2_opA = amo_operand;
-            default:   sum2_opA = rs1_data_i;
+            default:   sum2_opA = first_operand;
         endcase
     end
 
@@ -172,22 +168,6 @@ module execute
         endcase
     end
 
-    logic [31:0] eq_opA;
-    always_comb begin
-        unique case (instruction_operation_i)
-            SC_W:    eq_opA = lrsc_cmp_opA;
-            default: eq_opA = rs1_data_i;
-        endcase
-    end
-
-    logic [31:0] eq_opB;
-    always_comb begin
-        unique case (instruction_operation_i)
-            SC_W:    eq_opB = lrsc_cmp_opB;
-            default: eq_opB = second_operand_i;
-        endcase
-    end
-
     always_comb begin
         sum_result              = rs1_data_i + second_operand_i;
         and_result              = first_operand & second_operand_i;
@@ -197,7 +177,7 @@ module execute
         srl_result              = rs1_data_i >> second_operand_i[4:0];
         sra_result              = $signed(rs1_data_i) >>> second_operand_i[4:0];
 
-        equal                   = eq_opA == eq_opB;
+        equal                   = rs1_data_i == second_operand_i;
         less_than               = $signed(first_operand) < $signed(second_operand_i);
         less_than_unsigned      = first_operand < second_operand_i;
         greater_equal           = $signed(rs1_data_i) >= $signed(second_operand_i);
@@ -210,6 +190,8 @@ module execute
 //////////////////////////////////////////////////////////////////////////////
 // Load/Store signals
 //////////////////////////////////////////////////////////////////////////////
+
+    logic [31:0] amo_operand;
 
     /* verilator lint_off UNUSEDSIGNAL */
     logic [31:0] mem_address_vector;
@@ -243,9 +225,10 @@ module execute
         unique case (instruction_operation_i)
             VLOAD,
             VSTORE:  mem_read_enable_o = mem_read_enable_vector;
-            AMO_W,
-            SC_W:    mem_read_enable_o = atomic_mem_read_enable;
-            default: mem_read_enable_o = mem_read_enable;
+            // AMO_W,
+            // SC_W:    mem_read_enable_o = atomic_mem_read_enable;
+            // default: mem_read_enable_o = mem_read_enable;
+            default: mem_read_enable_o = mem_read_enable || atomic_mem_read_enable;
         endcase
     end
 
@@ -253,9 +236,10 @@ module execute
         unique case (instruction_operation_i)
             VLOAD,
             VSTORE:  mem_write_enable_o = mem_write_enable_vector;
-            AMO_W,
-            SC_W:    mem_write_enable_o = {4{atomic_mem_write_enable}};
-            default: mem_write_enable_o = mem_write_enable;
+            // AMO_W,
+            // SC_W:    mem_write_enable_o = {4{atomic_mem_write_enable}};
+            // default: mem_write_enable_o = mem_write_enable;
+            default: mem_write_enable_o = mem_write_enable | {4{atomic_mem_write_enable}};
         endcase
     end
 
@@ -263,7 +247,7 @@ module execute
         unique case (instruction_operation_i)
             VLOAD,
             VSTORE:  mem_write_data_o = mem_write_data_vector;
-            AMO_W:   mem_write_data_o = result_o;
+            AMO_W:   mem_write_data_o = amo_operand;
             default: mem_write_data_o = mem_write_data;
         endcase
     end
@@ -505,14 +489,11 @@ end
 ////////////////////////////////////////////////////////////////////////////////
 
     logic        atomic_hold;
-
-    
+    logic        atomic_write_enable;
     logic        lrsc_result;
-    logic        amo_write_enable;
-    logic [31:0] amo_result;
-    
 
     if (AMOEXT != AMO_OFF) begin : gen_atomic_on
+        logic lrsc_write_enable;
         logic lrsc_hold;
         logic lrsc_mem_read_enable;
         logic lrsc_mem_write_enable;
@@ -526,7 +507,7 @@ end
                 else if (!stall) begin
                     unique case (instruction_operation_i)
                         LR_W: reservation_addr <= rs1_data_i;
-                        SC_W: reservation_addr <= hold_o ? reservation_addr : '0;
+                        SC_W: reservation_addr <= lrsc_hold ? reservation_addr : '0;
                         default: ;
                     endcase
                 end
@@ -540,28 +521,26 @@ end
                 .reset_n           (reset_n              ),
                 .stall             (stall                ),
                 .enable_i          (lrsc_enable          ),
-                .eq_result_i       (equal                ),
                 .rs1_data_i        (rs1_data_i           ),
                 .data_i            (mem_read_data_i      ),
                 .reservation_addr_i(reservation_addr     ),
                 .reservation_data_i(reservation_data_i   ),
                 .hold_o            (lrsc_hold            ),
+                .write_enable_o    (lrsc_write_enable    ),
                 .mem_read_enable_o (lrsc_mem_read_enable ),
                 .mem_write_enable_o(lrsc_mem_write_enable),
-                .result_o          (lrsc_result          ),
-                .cmp_opA_o         (lrsc_cmp_opA         ),
-                .cmp_opB_o         (lrsc_cmp_opB         )
+                .result_o          (lrsc_result          )
             );
         end
         else begin : gen_zalrsc_off
             assign lrsc_result           = 1'b0;
-            assign lrsc_cmp_opA          = '0;
-            assign lrsc_cmp_opB          = '0;
             assign lrsc_hold             = 1'b0;
             assign lrsc_mem_read_enable  = 1'b0;
             assign lrsc_mem_write_enable = 1'b0;
+            assign lrsc_write_enable     = 1'b0;
         end
 
+        logic amo_write_enable;
         logic amo_hold;
         logic amo_mem_read_enable;
         logic amo_mem_write_enable;
@@ -570,6 +549,7 @@ end
             logic amo_enable;
             assign amo_enable = (instruction_operation_i == AMO_W);
 
+            logic [31:0] amo_result;
             always_comb begin
                 unique case (atomic_operation_i)
                     AMOADD:  amo_result = sum2_result;
@@ -591,6 +571,7 @@ end
                 .stall             (stall               ),
                 .enable_i          (amo_enable          ),
                 .data_i            (mem_read_data_i     ),
+                .amo_result_i      (amo_result          ),
                 .hold_o            (amo_hold            ),
                 .write_enable_o    (amo_write_enable    ),
                 .mem_read_enable_o (amo_mem_read_enable ),
@@ -605,31 +586,28 @@ end
             assign amo_mem_read_enable  = 1'b0;
             assign amo_mem_write_enable = 1'b0;
             assign first_operand        = rs1_data_i;
-            assign amo_result           = '0;
             assign amo_operand          = '0;
             assign amo_write_enable     = 1'b0;
         end
 
         assign atomic_hold             = lrsc_hold             || amo_hold;
+        assign atomic_write_enable     = lrsc_write_enable     || amo_write_enable;
         assign atomic_mem_read_enable  = lrsc_mem_read_enable  || amo_mem_read_enable;
         assign atomic_mem_write_enable = lrsc_mem_write_enable || amo_mem_write_enable;
     end
     else begin : gen_atomic_off
         assign first_operand           = rs1_data_i;
-        assign amo_result              = '0;
         assign amo_operand             = '0;
         assign atomic_hold             = 1'b0;
         assign atomic_mem_read_enable  = 1'b0;
         assign atomic_mem_write_enable = 1'b0;
         assign lrsc_result             = 1'b0;
-        assign lrsc_cmp_opA            = '0;
-        assign lrsc_cmp_opB            = '0;
-        assign amo_write_enable        = 1'b0;
+        assign atomic_write_enable     = 1'b0;
     end
 
 //////////////////////////////////////////////////////////////////////////////
 // Demux
-//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////lrsc_result////////////////////////
 
     always_comb begin
         unique case (instruction_operation_i)
@@ -651,8 +629,6 @@ end
             MUL,MULH,MULHU,MULHSU:  result = mul_result;
             AES32ESI, AES32ESMI:    result = aes_result;
             VECTOR, VLOAD, VSTORE:  result = vector_scalar_result;
-            SC_W:                   result = {31'b0, lrsc_result};
-            AMO_W:                  result = amo_result;
             default:                result = sum_result;
         endcase
     end
@@ -660,14 +636,14 @@ end
     always_comb begin
         unique case (instruction_operation_i)
             NOP,
-            SB,SH,SW, 
+            SB,SH,SW,SC_W, 
             BEQ,BNE,
             BLT,BLTU,
             BGE,BGEU:   write_enable = 1'b0;
             VECTOR,
             VLOAD,
             VSTORE:     write_enable = vector_wr_en;
-            AMO_W:      write_enable = (rd_i != '0 && amo_write_enable && !raise_exception_o);
+            AMO_W:      write_enable = (rd_i != '0 && atomic_write_enable && !raise_exception_o);
             default:    write_enable = (rd_i != '0 && !hold_o && !raise_exception_o);
         endcase
     end
@@ -681,10 +657,16 @@ end
     assign hold_o = hold_div || hold_mul || hold_vector || atomic_hold;
 
     always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
+        if (!reset_n) begin
             write_enable_o <= 1'b0;
-        else if (!stall)
-            write_enable_o <= write_enable;
+        end
+        else if (!stall) begin
+            /* Non-default cases have no forwarding */
+            unique case (instruction_operation_i)
+                SC_W:    write_enable_o <= (rd_i != '0 && atomic_write_enable);
+                default: write_enable_o <= write_enable;
+            endcase
+        end
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
@@ -693,7 +675,7 @@ end
         end
         else if (!stall) begin
             unique case (instruction_operation_i)
-                SC_W,    
+                SC_W:    instruction_operation_o <= atomic_write_enable ? instruction_operation_i : LW;
                 AMO_W:   instruction_operation_o <= hold_o ? LW : instruction_operation_i;
                 default: instruction_operation_o <= instruction_operation_i;
             endcase
@@ -701,10 +683,16 @@ end
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
+        if (!reset_n) begin
             result_o <= '0;
-        else if (!stall)
-            result_o <= result;
+        end
+        else if (!stall) begin
+            /* Non-default cases have no forwarding */
+            unique case (instruction_operation_i)
+                SC_W:    result_o <= {31'h0, lrsc_result};
+                default: result_o <= result;
+            endcase
+        end
     end
 
     always_ff @(posedge clk or negedge reset_n) begin

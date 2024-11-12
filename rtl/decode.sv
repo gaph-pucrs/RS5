@@ -489,7 +489,7 @@ module decode
     logic is_store;
 
     assign is_load  = (opcode == 5'b00000) || (instruction_operation == LR_W);
-    assign is_store = (opcode == 5'b01000);
+    assign is_store = (opcode == 5'b01000) || (instruction_operation inside {SC_W, AMO_W});
     
     logic           locked_memory;
     logic  [4:0]    locked_register;
