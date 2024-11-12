@@ -113,6 +113,7 @@ void TEST_CASE3(void) {
 
 void TEST_CASE4(void) {
   VSET(16, e16, m1);
+  VCLEAR(v3);
   VLOAD_16(v3, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
   VLOAD_8(v0, 0x00, 0x00);
   asm volatile("vle16.v v3, (%0), v0.t" ::"r"(&ALIGNED_I16[0]));

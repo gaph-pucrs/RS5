@@ -50,18 +50,43 @@ _entry:
 
 	jal main
 
-	li a0,0x80001000
-	addi a1,zero,'D'
-	addi a2,zero,'O'
-	addi a3,zero,'N'
-	addi a4,zero,'E'
-	addi a5,zero,'\n'
-	sw a1,0(a0)
-	sw a2,0(a0)
-	sw a3,0(a0)
-	sw a4,0(a0)
-	sw a5,0(a0)
+#    li  	a0,0x56f
+#    addi	a3,a3,-1768 # 56faa0 <INTconv0_featureMap.5>
+#    #la a0, INTconv0_featureMap 
+#    li a1, 580 
+#
+#print_words:
+#    beqz a1, .end         # If a1 is 0, exit loop
+#    lw a2, 0(a0)          # Load the word at address in a0
+#    mv a0, a2             # Move the word to a0 for printing
+#    li a7, 1              # syscall number for print integer
+#    ecall                 # Make the system call
+#
+#    # Print newline
+#    la a0, newline
+#    li a7, 4              # syscall number for print string
+#    ecall
+#
+#    addi a0, a0, 4        # Move to the next word (4 bytes)
+#    addi a1, a1, -1       # Decrement the counter
+#    j print_words         # Repeat the loop
+#
+#	li a0,0x80001000
+#	addi a1,zero,'D'
+#	addi a2,zero,'O'
+#	addi a3,zero,'N'
+#	addi a4,zero,'E'
+#	addi a5,zero,'\n'
+#	sw a1,0(a0)
+#	sw a2,0(a0)
+#	sw a3,0(a0)
+#	sw a4,0(a0)
+#	sw a5,0(a0)
 .end:
 	li	s10, 0x80000000		# this will interrupt the simulation (assertion)
 	sw	zero, 0(s10)
 	jal zero, .end
+
+.section .data
+buffer: .asciz "Value: %d\n"   # Format string for printing
+newline: .asciz "\n"           # Newline string

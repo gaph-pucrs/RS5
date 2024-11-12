@@ -1,0 +1,518 @@
+# SimVision Command Script (Thu Nov 07 16:19:45 -03 2024)
+#
+# Version 23.03.s003
+#
+# You can restore this configuration with:
+#
+#      xrun -f sim.xrun -access +rwc -input vmacc.tcl
+#
+
+
+#
+# Preferences
+#
+preferences set plugin-enable-svdatabrowser-new 1
+preferences set cursorctl-dont-show-sync-warning 1
+preferences set toolbar-txe_waveform_toggle-WaveWindow {
+  usual
+  position -pos 1
+}
+preferences set plugin-enable-groupscope 0
+preferences set plugin-enable-interleaveandcompare 0
+preferences set plugin-enable-waveformfrequencyplot 0
+preferences set toolbar-Windows-WaveWindow {
+  usual
+  position -pos 2
+}
+
+#
+# Simulator
+#
+database require simulator -hints {
+	simulator "xrun -f sim.xrun -gui -access +rwc -input vmacc.tcl -input vmacc.tcl"
+}
+
+#
+# Markers
+#
+set time 1390ns
+if {[catch {marker new -name  {res in regbank} -time $time}] != ""} {
+    marker set -using {res in regbank} -time $time -locked 0 
+}
+set time 1340ns
+if {[catch {marker new -name  {vmacc start} -time $time}] != ""} {
+    marker set -using {vmacc start} -time $time -locked 0 
+}
+set time 1360ns
+if {[catch {marker new -name  {res ready} -time $time}] != ""} {
+    marker set -using {res ready} -time $time -locked 0 
+}
+
+#
+# Mnemonic Maps
+#
+mmap new  -reuse -name {Boolean as Logic} -radix %b -contents {{%c=FALSE -edgepriority 1 -shape low}
+{%c=TRUE -edgepriority 1 -shape high}}
+mmap new  -reuse -name {Example Map} -radix %x -contents {{%b=11???? -bgcolor orange -label REG:%x -linecolor yellow -shape bus}
+{%x=1F -bgcolor red -label ERROR -linecolor white -shape EVENT}
+{%x=2C -bgcolor red -label ERROR -linecolor white -shape EVENT}
+{%x=* -label %x -linecolor gray -shape bus}}
+
+#
+# Design Browser windows
+#
+if {[catch {window new WatchList -name "Design Browser 1" -geometry 2560x1403+-1+-1}] != ""} {
+    window geometry "Design Browser 1" 2560x1403+-1+-1
+}
+window target "Design Browser 1" on
+browser using {Design Browser 1}
+browser set -scope [subst  {simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1}]} ]
+browser set \
+    -signalsort name
+browser yview see [subst  {simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1}]} ]
+browser timecontrol set -lock 0
+
+#
+# Waveform windows
+#
+if {[catch {window new WaveWindow -name "Waveform 1" -geometry 2560x1403+-1+-1}] != ""} {
+    window geometry "Waveform 1" 2560x1403+-1+-1
+}
+window target "Waveform 1" on
+waveform using {Waveform 1}
+waveform sidebar visibility partial
+waveform set \
+    -primarycursor TimeA \
+    -signalnames name \
+    -signalwidth 175 \
+    -units ns \
+    -valuewidth 75
+waveform baseline set -time 335ns
+
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.TREE_LEVELS_8b}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.TREE_LEVELS_16b}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.TREE_LEVELS_32b}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.VLEN}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.VLENB}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.V_DIV_ON}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.V_LOGIC_ON}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.V_MERGE_ON}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.V_MINMAX_ON}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.V_REDLOGIC_ON}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.V_REDMINMAX_ON}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.V_REDSUM_ON}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.accumulate_counter}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.accumulate_instruction}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.adder_carry[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.clk}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.current_state}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.cycle_count[3:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.cycle_count_r[3:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.div_enable}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.div_enable_8b}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.div_enable_16b}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.div_enable_32b}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.div_result_8b[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.div_result_16b[15:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.div_result_32b[7:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.div_signed}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.ended_acc}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.equal_8b[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorRegbank1.v0_mask[255:0]}]}
+	} ]]
+waveform format $id -color #9900ff
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vl_curr_reg[31:0]}]}
+	} ]]
+waveform format $id -radix %d -color #ffff00
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorRegbank1.enable[31:0]}]}
+	} ]]
+waveform format $id -color #9900ff
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorRegbank1.result[255:0]}]}
+	} ]]
+waveform format $id -color #ff0000
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.equal_16b[15:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.equal_32b[7:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.vector_operation_i[7:0]}]}
+	} ]]
+waveform format $id -color #0000ff
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.first_operand[255:0]}]}
+	} ]]
+waveform format $id -color #ff0099
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.second_operand[255:0]}]}
+	} ]]
+waveform format $id -color #ff0099
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.first_operand_8b[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.first_operand_16b[15:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.first_operand_32b[7:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.mult_result_32b[7:0]}]}
+	} ]]
+waveform format $id -color #ff9900
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.result_o[255:0]}]}
+	} ]]
+waveform format $id -color #0000ff
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.greater_than_8b[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.greater_than_16b[15:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.greater_than_32b[7:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.greater_than_signed_8b[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.greater_than_signed_16b[15:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.greater_than_signed_32b[7:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.hold}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.hold_accumulation_o}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.hold_div}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.hold_div_8b[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.hold_div_16b[15:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.hold_div_32b[7:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.hold_mult}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.hold_mult_int[7:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.hold_o}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.hold_widening_o}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.mask_instruction}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.mask_sew8[7:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.mask_sew16[7:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.mask_sew32[7:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.mult_enable}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.mult_low}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.mult_op_a_16b[15:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.mult_op_a_32b[7:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.mult_op_b_16b[15:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.mult_op_b_32b[7:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.mult_result_8b[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.mult_result_16b[15:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.mult_signed_mode[1:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.rem_result_8b[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.rem_result_16b[15:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.rem_result_32b[7:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.reset_n}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.result_add[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.result_add_bytes[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.result_and[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.result_comparison_8b[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.result_comparison_16b[15:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.result_comparison_32b[7:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.result_div[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.result_mask_o[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.result_max[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.result_maxu[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.result_merge[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.result_min[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.result_minu[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.result_mult[511:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.result_mult_r[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.result_or[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.result_redand[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.result_redmax[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.result_redmaxu[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.result_redmin[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.result_redminu[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.result_redor[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.result_redsum[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.result_redxor[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.result_rem[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.result_sll[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.result_sra[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.result_srl[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.result_xor[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.second_operand_8b[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.second_operand_16b[15:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.second_operand_32b[7:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.second_operand_reductions_8b[7:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.second_operand_reductions_16b[15:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.second_operand_reductions_32b[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.subtraend[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.subtraend_8b[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.subtraend_16b[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.subtraend_32b[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.subtraend_neg[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.summand_1[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.summand_2[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.summand_2_int[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.vl[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.vlmul[2:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.vm}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.vsew[2:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.widening_counter}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorALU1.widening_instruction}]}
+	} ]]
+set id [waveform add -cdivider divider]
+set id [waveform add -cdivider divider]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorRegbank1.Environment}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorRegbank1.VLEN}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorRegbank1.VLENB}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorRegbank1.clk}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorRegbank1.reset_n}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorRegbank1.vd_addr[4:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorRegbank1.vs1_addr[4:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorRegbank1.vs1_data[255:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorRegbank1.vs2_addr[4:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.v_gen_on.vector.vectorRegbank1.vs2_data[255:0]}]}
+	} ]]
+
+waveform xview limits 1376ns 1416ns
+
+#
+# Waveform Window Links
+#
+
+#
+# Layout selection
+#
+

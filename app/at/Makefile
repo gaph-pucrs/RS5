@@ -10,7 +10,7 @@ LDFLAGS = -nostdlib -march=rv32i -mabi=ilp32 -Triscv.ld
 OBJCOPY = $(TRIPLET)-objcopy
 OBJDUMP = $(TRIPLET)-objdump
 
-PROGNAME = vectorlsu  
+PROGNAME = vaddtest    
 
 BIN_FILES = $(addsuffix .bin, $(PROGNAME))
 LST_FILES = $(addsuffix .lst, $(PROGNAME))

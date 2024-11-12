@@ -1,0 +1,71 @@
+*** Message Type: info ***
+When: Mon Sep 23 14:07:18 -03 2024
+SimVision started.
+Version: TOOL:  simvision(64)   23.03-s003
+User: antonio.santos
+Host: gaphs05.portoalegre.pucrsnet.br
+Platform: Linux/x86_64/4.18.0-553.16.1.el8_10.x86_64
+Started: Mon Sep 23 14:07:18 -03 2024
+Command: /soft64/cadence/ferramentas/XCELIUM2303/tools.lnx86/simvision/bin/64bit/simvision.exe -connect dc:gaphs05.portoalegre.pucrsnet.br:60789 -64BIT -nocopyright
+Work Directory: /home/antonio.santos/rs5/sim
+ 
+*** Message Type: info ***
+When: Mon Sep 23 14:07:19 -03 2024
+Create browser window: "Design Browser 1"
+ 
+*** Message Type: info ***
+When: Mon Sep 23 14:07:20 -03 2024
+Create console window: "Console"
+ 
+*** Message Type: info ***
+When: Mon Sep 23 14:07:21 -03 2024
+Connect to Simulator
+      Design: worklib.testbench:sv
+   Languages: verilog
+   Simulator: XM-Sim
+     Version: TOOL:       xmsim(64)       23.03-s003
+        User: antonio.santos
+        Host: gaphs05.portoalegre.pucrsnet.br
+Time Started: Mon Sep 23 14:07:18 -03 2024
+  Process ID: 10571
+   Directory: /home/antonio.santos/rs5/sim
+     Command: xrun -f sim.xrun -gui -access +rwc
+
+ 
+*** Message Type: info ***
+When: Mon Sep 23 14:07:22 -03 2024
+Create utility window: "Properties"
+ 
+*** Message Type: info ***
+When: Mon Sep 23 14:07:50 -03 2024
+Create waveform window: "Waveform 1"
+ 
+*** Message Type: info ***
+When: Mon Sep 23 14:15:23 -03 2024
+Delete waveform window: "Waveform 1"
+ 
+*** Message Type: error ***
+When: Mon Sep 23 14:15:23 -03 2024
+invalid command name ".waveWindow0.bottom.statusbar.indicator-autosave.autosave"
+    while executing
+".waveWindow0.bottom.statusbar.indicator-autosave.autosave configure -image image284"
+    ("after" script)
+ 
+*** Message Type: error ***
+When: Mon Sep 23 14:15:23 -03 2024
+invalid command name ".waveWindow0.bottom.statusbar.indicator-autosave.autosave"
+    while executing
+".waveWindow0.bottom.statusbar.indicator-autosave.autosave configure -image image284"
+    ("after" script)
+ 
+*** Message Type: error ***
+When: Mon Sep 23 14:15:23 -03 2024
+invalid command name ".waveWindow0.bottom.statusbar.indicator-autosave.autosave"
+    while executing
+".waveWindow0.bottom.statusbar.indicator-autosave.autosave configure -image image284"
+    ("after" script)
+ 
+*** Message Type: info ***
+When: Mon Sep 23 14:15:25 -03 2024
+SimVision Exit.
+ 

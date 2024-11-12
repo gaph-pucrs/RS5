@@ -66,8 +66,15 @@
     la t4, storeSec
     addi t4, t4, 24
     vsuxei8.v v4, (t4), v1
-    j .end
     
+    addi a0, x0, 0
+    addi a7, x0, 93
+    ecall
+
+
+
+
+
 clear_vreg_bank:
     # CLEARS VREG BANK
     vsetvli t0, x0, e32, m8, ta, ma          # SEW= 32, LMUL=8, VL=VLMAX
@@ -77,10 +84,6 @@ clear_vreg_bank:
     vand.vi v24, v24, 0
     jr ra
 
-.end:
-    li  s10,    0x80000000
-    sw  zero, 0(s10)
-    jal zero, .end
 
 .section .rodata		# Constants
 .align 4

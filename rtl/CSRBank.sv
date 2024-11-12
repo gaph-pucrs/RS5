@@ -113,7 +113,7 @@ module CSRBank
         6'b0,
         XOSVMEnable,    // X - Non-standard extensions present
         1'b0,
-        VEnable,           // V - Vector extension
+        VEnable,        // V - Vector extension
         1'b1,           // U - User mode implemented
         1'b0,
         1'b0,           // S - Supervisor mode implemented
@@ -821,7 +821,6 @@ module CSRBank
         assign compressed_counter          = '0;
         assign jump_misaligned_counter     = '0;
         
-
         assign vaddsub_counter             = '0; 
         assign vmul_counter                = '0;
         assign vdiv_counter                = '0;
