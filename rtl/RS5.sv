@@ -31,6 +31,7 @@ module RS5
 `endif
     parameter environment_e Environment    = ASIC,
     parameter mul_e         MULEXT         = MUL_M,
+    parameter atomic_e      AMOEXT         = AMO_A,
     parameter bit           COMPRESSED     = 1'b0,
     parameter bit           VEnable        = 1'b0,
     parameter int           VLEN           = 256,
@@ -226,6 +227,7 @@ module RS5
 
     decode # (
         .MULEXT    (MULEXT    ),
+        .AMOEXT    (AMOEXT    ),
         .COMPRESSED(COMPRESSED),
         .ZKNEEnable(ZKNEEnable),
         .VEnable   (VEnable   ),
@@ -326,6 +328,7 @@ module RS5
     execute #(
         .Environment (Environment),
         .MULEXT      (MULEXT),
+        .AMOEXT      (AMOEXT),
         .ZKNEEnable  (ZKNEEnable),
         .VEnable     (VEnable),
         .VLEN        (VLEN),
@@ -390,7 +393,9 @@ module RS5
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// RETIRE //////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    retire retire1 (
+    retire #(
+        .AMOEXT      (AMOEXT)
+    ) retire1 (
         .clk                    (clk),
         .reset_n                (reset_n),
         .instruction_operation_i(instruction_operation_retire),

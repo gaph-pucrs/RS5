@@ -6,6 +6,7 @@ module RS5_FPGA_Platform
     parameter int           i_cnt       = 2,
     parameter environment_e Environment = FPGA,
     parameter mul_e         MULEXT      = MUL_M,
+    parameter atomic_e      AMOEXT      = AMO_OFF,
     parameter bit           COMPRESSED  = 1'b1,
     parameter bit           XOSVMEnable = 1'b0,
     parameter bit           ZIHPMEnable = 1'b0,
@@ -105,6 +106,7 @@ module RS5_FPGA_Platform
     RS5 #(
         .Environment    (Environment),
         .MULEXT         (MULEXT),
+        .AMOEXT         (AMOEXT),
         .XOSVMEnable    (XOSVMEnable),
         .ZIHPMEnable    (ZIHPMEnable),
         .ZKNEEnable     (ZKNEEnable),

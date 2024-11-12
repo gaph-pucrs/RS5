@@ -28,8 +28,11 @@ module retire
     parameter atomic_e AMOEXT = AMO_A
 )
 (
+    /* Not used without zalrsc */
+    /* verilator lint_off UNUSEDSIGNAL */
     input   logic           clk,
     input   logic           reset_n,
+    /* verilator lint_on UNUSEDSIGNAL */
 
     input   iType_e         instruction_operation_i,
     input   logic [31:0]    result_i,

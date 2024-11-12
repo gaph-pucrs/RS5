@@ -51,13 +51,18 @@ module execute
     input   logic  [4:0]        rs1_i,
     input   iType_e             instruction_operation_i,
     input   logic               instruction_compressed_i,
+    
+    /* Not used without zaamo */
+    /* verilator lint_off UNUSEDSIGNAL */
     input   iTypeAtomic_e       atomic_operation_i,
+    /* verilator lint_on UNUSEDSIGNAL */
+
     /* Not used if VEnable is 0 */
     /* verilator lint_off UNUSEDSIGNAL */
     input   iTypeVector_e       vector_operation_i,
     /* verilator lint_on UNUSEDSIGNAL */
-    input   privilegeLevel_e    privilege_i,
 
+    input   privilegeLevel_e    privilege_i,
     input   logic               exc_ilegal_inst_i,
     input   logic               exc_misaligned_fetch_i,
     input   logic               exc_inst_access_fault_i,
@@ -105,7 +110,12 @@ module execute
     input   logic [31:0]        mtvec_i,
     input   logic [31:0]        mepc_i,
     input   logic [31:0]        jump_imm_target_i,
+
+    /* Not used without zalrsc */
+    /* verilator lint_off UNUSEDSIGNAL */
     input   logic [31:0]        reservation_data_i,
+    /* verilator lint_on UNUSEDSIGNAL */
+
     output  logic               jump_o,
     output  logic               interrupt_ack_o,
     output  logic               machine_return_o,
@@ -496,9 +506,11 @@ end
 
     logic        atomic_hold;
 
+    
     logic        lrsc_result;
     logic        amo_write_enable;
     logic [31:0] amo_result;
+    
 
     if (AMOEXT != AMO_OFF) begin : gen_atomic_on
         logic lrsc_hold;
@@ -589,9 +601,13 @@ end
             assign first_operand = amo_enable ? amo_operand : rs1_data_i;
         end
         else begin : gen_zaamo_off
-            assign first_operand    = rs1_data_i;
-            assign amo_operand      = '0;
-            assign amo_write_enable = 1'b0;
+            assign amo_hold             = 1'b0;
+            assign amo_mem_read_enable  = 1'b0;
+            assign amo_mem_write_enable = 1'b0;
+            assign first_operand        = rs1_data_i;
+            assign amo_result           = '0;
+            assign amo_operand          = '0;
+            assign amo_write_enable     = 1'b0;
         end
 
         assign atomic_hold             = lrsc_hold             || amo_hold;
@@ -600,6 +616,7 @@ end
     end
     else begin : gen_atomic_off
         assign first_operand           = rs1_data_i;
+        assign amo_result              = '0;
         assign amo_operand             = '0;
         assign atomic_hold             = 1'b0;
         assign atomic_mem_read_enable  = 1'b0;
