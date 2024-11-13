@@ -169,22 +169,23 @@ module execute
     end
 
     always_comb begin
-        sum_result              = rs1_data_i + second_operand_i;
-        and_result              = first_operand & second_operand_i;
-        or_result               = first_operand | second_operand_i;
-        xor_result              = first_operand ^ second_operand_i;
+        /* "Unmuxable" operators */
+        sum_result              = rs1_data_i +  second_operand_i;
+        equal                   = rs1_data_i == second_operand_i;
+        less_than_unsigned      = rs1_data_i <  second_operand_i;
+        greater_equal_unsigned  = rs1_data_i >= second_operand_i;
+        less_than               = $signed(rs1_data_i) <  $signed(second_operand_i);
+        greater_equal           = $signed(rs1_data_i) >= $signed(second_operand_i);
+
         sll_result              = rs1_data_i << second_operand_i[4:0];
         srl_result              = rs1_data_i >> second_operand_i[4:0];
         sra_result              = $signed(rs1_data_i) >>> second_operand_i[4:0];
 
-        equal                   = rs1_data_i == second_operand_i;
-        less_than               = $signed(first_operand) < $signed(second_operand_i);
-        less_than_unsigned      = first_operand < second_operand_i;
-        greater_equal           = $signed(rs1_data_i) >= $signed(second_operand_i);
-        greater_equal_unsigned  = rs1_data_i >= second_operand_i;
-
-        /* We need a second adder to avoid operand multiplexing in memory address */
-        sum2_result             = sum2_opA + sum2_opB;
+        /* "Muxable" operators */
+        sum2_result             = sum2_opA      + sum2_opB;
+        and_result              = first_operand & second_operand_i;
+        or_result               = first_operand | second_operand_i;
+        xor_result              = first_operand ^ second_operand_i;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -225,9 +226,6 @@ module execute
         unique case (instruction_operation_i)
             VLOAD,
             VSTORE:  mem_read_enable_o = mem_read_enable_vector;
-            // AMO_W,
-            // SC_W:    mem_read_enable_o = atomic_mem_read_enable;
-            // default: mem_read_enable_o = mem_read_enable;
             default: mem_read_enable_o = mem_read_enable || atomic_mem_read_enable;
         endcase
     end
@@ -236,9 +234,6 @@ module execute
         unique case (instruction_operation_i)
             VLOAD,
             VSTORE:  mem_write_enable_o = mem_write_enable_vector;
-            // AMO_W,
-            // SC_W:    mem_write_enable_o = {4{atomic_mem_write_enable}};
-            // default: mem_write_enable_o = mem_write_enable;
             default: mem_write_enable_o = mem_write_enable | {4{atomic_mem_write_enable}};
         endcase
     end
@@ -549,6 +544,12 @@ end
             logic amo_enable;
             assign amo_enable = (instruction_operation_i == AMO_W);
 
+            logic amo_lt;
+            assign amo_lt = $signed(amo_operand) < $signed(rs2_data_i);
+            
+            logic amo_ltu;
+            assign amo_ltu = amo_operand < rs2_data_i;
+
             logic [31:0] amo_result;
             always_comb begin
                 unique case (atomic_operation_i)
@@ -556,10 +557,10 @@ end
                     AMOAND:  amo_result = and_result;
                     AMOXOR:  amo_result = xor_result;
                     AMOOR:   amo_result = or_result;
-                    AMOMAX:  amo_result = less_than          ? rs2_data_i  : amo_operand;
-                    AMOMIN:  amo_result = less_than          ? amo_operand : rs2_data_i;
-                    AMOMAXU: amo_result = less_than_unsigned ? rs2_data_i  : amo_operand;
-                    AMOMINU: amo_result = less_than_unsigned ? amo_operand : rs2_data_i;
+                    AMOMAX:  amo_result = amo_lt  ? rs2_data_i  : amo_operand;
+                    AMOMIN:  amo_result = amo_lt  ? amo_operand : rs2_data_i;
+                    AMOMAXU: amo_result = amo_ltu ? rs2_data_i  : amo_operand;
+                    AMOMINU: amo_result = amo_ltu ? amo_operand : rs2_data_i;
                     AMOSWAP: amo_result = rs2_data_i;
                     default: amo_result = '0;
                 endcase
@@ -636,14 +637,14 @@ end
     always_comb begin
         unique case (instruction_operation_i)
             NOP,
-            SB,SH,SW,SC_W, 
+            SC_W,AMO_W,
+            SB,SH,SW, 
             BEQ,BNE,
             BLT,BLTU,
             BGE,BGEU:   write_enable = 1'b0;
             VECTOR,
             VLOAD,
             VSTORE:     write_enable = vector_wr_en;
-            AMO_W:      write_enable = (rd_i != '0 && atomic_write_enable && !raise_exception_o);
             default:    write_enable = (rd_i != '0 && !hold_o && !raise_exception_o);
         endcase
     end
@@ -663,7 +664,8 @@ end
         else if (!stall) begin
             /* Non-default cases have no forwarding */
             unique case (instruction_operation_i)
-                SC_W:    write_enable_o <= (rd_i != '0 && atomic_write_enable);
+                SC_W,
+                AMO_W:   write_enable_o <= (rd_i != '0 && atomic_write_enable && !raise_exception_o);
                 default: write_enable_o <= write_enable;
             endcase
         end
@@ -675,8 +677,8 @@ end
         end
         else if (!stall) begin
             unique case (instruction_operation_i)
-                SC_W:    instruction_operation_o <= atomic_write_enable ? instruction_operation_i : LW;
-                AMO_W:   instruction_operation_o <= hold_o ? LW : instruction_operation_i;
+                SC_W:    instruction_operation_o <=  atomic_write_enable ? instruction_operation_i : LW;
+                AMO_W:   instruction_operation_o <= !atomic_write_enable ? instruction_operation_i : LW;
                 default: instruction_operation_o <= instruction_operation_i;
             endcase
         end
@@ -690,6 +692,7 @@ end
             /* Non-default cases have no forwarding */
             unique case (instruction_operation_i)
                 SC_W:    result_o <= {31'h0, lrsc_result};
+                // AMO_W has no result
                 default: result_o <= result;
             endcase
         end
@@ -754,12 +757,15 @@ end
 //////////////////////////////////////////////////////////////////////////////
 
     assign raise_exception_o = (
-           exc_inst_access_fault_i 
-        || exc_ilegal_inst_i 
-        || exc_ilegal_csr_inst 
-        || exc_misaligned_fetch_i
-        || (instruction_operation_i inside {ECALL, EBREAK})
-        || (exc_load_access_fault_i && (mem_read_enable_o || (mem_write_enable_o != '0)))
+        (
+            exc_inst_access_fault_i 
+            || exc_ilegal_inst_i 
+            || exc_ilegal_csr_inst 
+            || exc_misaligned_fetch_i
+            || (instruction_operation_i inside {ECALL, EBREAK})
+            || (exc_load_access_fault_i && (mem_read_enable_o || (mem_write_enable_o != '0)))
+        )
+        && (instruction_operation_i != NOP)
     );
 
     assign machine_return_o = !raise_exception_o && (instruction_operation_i == MRET);

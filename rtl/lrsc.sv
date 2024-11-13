@@ -18,12 +18,11 @@ module lrsc
     output logic        result_o
 );
 
-    typedef enum logic [4:0] {
-        LOAD     = 5'b00001,
-        CMP_ADDR = 5'b00010,
-        CMP_DATA = 5'b00100,
-        RESULT   = 5'b01000,
-        COMMIT   = 5'b10000
+    typedef enum logic [3:0] {
+        LOAD     = 4'b0001,
+        CMP_ADDR = 4'b0010,
+        CMP_DATA = 4'b0100,
+        STORE    = 4'b1000
     } state_t;
 
     state_t current_state;
@@ -34,10 +33,9 @@ module lrsc
     always_comb begin
         unique case (current_state)
             LOAD:     next_state = enable_i ? CMP_ADDR : LOAD;
-            CMP_ADDR: next_state = equal    ? CMP_DATA : RESULT;
-            CMP_DATA: next_state = RESULT;
-            RESULT:   next_state = !result_o ? COMMIT : LOAD;
-            default:  next_state = LOAD; /* COMMIT */
+            CMP_ADDR: next_state = equal    ? CMP_DATA : STORE;
+            CMP_DATA: next_state = STORE;
+            default:  next_state = LOAD;    /* STORE */
         endcase
     end
 
@@ -81,13 +79,13 @@ module lrsc
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             result_o <= '0;
-        else if (!stall && (current_state inside {CMP_ADDR, CMP_DATA}))
+        else if (!stall)
             result_o <= !equal;
     end
 
-    assign hold_o             =  enable_i && !(current_state == COMMIT || (result_o && current_state == RESULT));
-    assign write_enable_o     = (current_state == RESULT);
+    assign hold_o             =  enable_i && (current_state != STORE);
+    assign write_enable_o     = (current_state == STORE);
     assign mem_read_enable_o  =  enable_i && (current_state ==  LOAD);
-    assign mem_write_enable_o = (current_state == COMMIT);
+    assign mem_write_enable_o = !result_o && (current_state == STORE);
 
 endmodule
