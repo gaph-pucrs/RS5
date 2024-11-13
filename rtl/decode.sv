@@ -487,9 +487,11 @@ module decode
 
     logic is_load;
     logic is_store;
+    logic forwardingless;
 
     assign is_load  = (opcode == 5'b00000) || (instruction_operation == LR_W);
     assign is_store = (opcode == 5'b01000) || (instruction_operation inside {SC_W, AMO_W});
+    assign forwardingless = (instruction_operation inside {SC_W});
     
     logic           locked_memory;
     logic  [4:0]    locked_register;
@@ -505,7 +507,7 @@ module decode
             if (hazard_o || killed)
                 locked_register <= '0;
             else    // Read-after-write on LOAD
-                locked_register <= is_load ? rd : '0;
+                locked_register <= (is_load || forwardingless) ? rd : '0;
         end
     end
 
@@ -620,16 +622,16 @@ module decode
     logic misaligned_fetch;
     logic exc_inst_access_fault;
 
-    assign invalid_inst = ((instruction_i[1:0] != '1) || instruction_operation == INVALID || amo_invalid) && !killed;
+    assign invalid_inst = ((instruction_i[1:0] != '1) || instruction_operation == INVALID || amo_invalid);
 
     if (COMPRESSED) begin : gen_compressed_on
-        assign misaligned_fetch = (pc_i[0] != 1'b0) && !killed;
+        assign misaligned_fetch = (pc_i[0] != 1'b0);
     end
     else begin : gen_compressed_off
-        assign misaligned_fetch = (pc_i[1:0] != 2'b00) && !killed;
+        assign misaligned_fetch = (pc_i[1:0] != 2'b00);
     end
 
-    assign exc_inst_access_fault = exc_inst_access_fault_i && !killed;
+    assign exc_inst_access_fault = exc_inst_access_fault_i;
 
     assign exception = exc_inst_access_fault || invalid_inst || misaligned_fetch;
 
