@@ -54,7 +54,7 @@ module fetch  #(
 //////////////////////////////////////////////////////////////////////////////
 
     logic        iaddr_continue;
-    logic [31:0] iaddr_continue_next;
+    logic [31:0] iaddr_next;
 
     logic        jumped;
     logic [31:0] jump_target;
@@ -62,23 +62,15 @@ module fetch  #(
     logic [31:0] iaddr_advance;
     assign iaddr_advance = instruction_address_o + 32'd4;
 
-    logic [31:0] iaddr_next;
-    always_comb begin
-        if (jumped)
-            iaddr_next = jump_target;
-        else if (iaddr_continue)
-            iaddr_next = iaddr_continue_next;
-        else
-            iaddr_next = instruction_address_o;
-    end
-
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             instruction_address_o <= start_address;
         else if (sys_reset)
             instruction_address_o <= start_address;
-        else
-            instruction_address_o <= {iaddr_next[31:2], 2'b00};
+        else if (jumped)
+            instruction_address_o <= {jump_target[31:2], 2'b00};
+        else if (iaddr_continue)
+            instruction_address_o <= iaddr_next;
     end
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -124,20 +116,20 @@ module fetch  #(
      * 2. Allow 2-byte aligned 2/4-byte fetch in case of compressed
      */
 
-    logic [31:0] iaddr_jumped;
+    logic [31:0] pc_jumped;
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
-            iaddr_jumped <= start_address;
+            pc_jumped <= start_address;
         else if (jumped)
-            iaddr_jumped <= iaddr_next;
+            pc_jumped <= jump_target;
     end
 
-    logic [31:0] iaddr_jumped_r;
+    logic [31:0] pc_jumped_r;
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
-            iaddr_jumped_r <= '0;
+            pc_jumped_r <= '0;
         else if (jumped_r)
-            iaddr_jumped_r <= iaddr_jumped;
+            pc_jumped_r <= pc_jumped;
     end
 
     logic [ 2:0] pc_add;
@@ -244,7 +236,7 @@ module fetch  #(
         assign pc = bp_rollback_o ? pc_rollbacked : pc_o;
         assign jumped = ctx_switch_i || (enable_i && bp_take_i);
         assign jump_target = ctx_switch_i ? ctx_switch_target_i : bp_target_i;
-        assign iaddr_continue_next = should_rollback ? iaddr_rollbacked : iaddr_advance;
+        assign iaddr_next = should_rollback ? iaddr_rollbacked : iaddr_advance;
     end
     else begin : gen_bp_off
         assign bp_rollback_r   = 1'b0;
@@ -253,7 +245,7 @@ module fetch  #(
         assign pc                  = pc_o;
         assign jumped              = ctx_switch_i;
         assign jump_target         = ctx_switch_target_i;
-        assign iaddr_continue_next = iaddr_advance;
+        assign iaddr_next = iaddr_advance;
     end
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -288,7 +280,7 @@ module fetch  #(
         end
 
         logic unaligned_jump;
-        assign unaligned_jump = jumped_r2 && iaddr_jumped_r[1];
+        assign unaligned_jump = jumped_r2 && pc_jumped_r[1];
 
         logic unaligned_jump_r;
         always_ff @(posedge clk or negedge reset_n) begin
@@ -311,7 +303,7 @@ module fetch  #(
         assign instruction_prefetched = iaddr_hold_r ? instruction_data_r : instruction_fetched;
 
         assign pc_add = compressed ? 3'd2 : 3'd4;
-        assign pc_update = (jumped_r2 || realign_jump) ? iaddr_jumped_r : pc_next;
+        assign pc_update = (jumped_r2 || realign_jump) ? pc_jumped_r : pc_next;
        
         always_comb begin
             if (jumped_r2)
@@ -385,7 +377,7 @@ module fetch  #(
         assign jump_misaligned_o = 1'b0;
         assign iaddr_continue = enable_i;
         assign pc_add = 3'd4;
-        assign pc_update = jumped_r2 ? iaddr_jumped_r : pc_next;
+        assign pc_update = jumped_r2 ? pc_jumped_r : pc_next;
         assign instruction_next = instruction_fetched;
         assign iaddr_not_jumped = iaddr_advance;
     end
