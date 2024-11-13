@@ -242,10 +242,10 @@ module fetch  #(
         assign bp_rollback_r   = 1'b0;
         assign should_rollback = 1'b0;
         assign bp_rollback_o   = 1'b0;
-        assign pc                  = pc_o;
-        assign jumped              = ctx_switch_i;
-        assign jump_target         = ctx_switch_target_i;
-        assign iaddr_next = iaddr_advance;
+        assign pc              = pc_o;
+        assign jumped          = ctx_switch_i;
+        assign jump_target     = ctx_switch_target_i;
+        assign iaddr_next      = iaddr_advance;
     end
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -364,7 +364,7 @@ module fetch  #(
             assign update_inst_r = realign_jump || (unaligned_jump && !bp_rollback_r) || ((unaligned || (compressed && !iaddr_hold_r)) && !bp_rollback_r);
         end
         else begin : gen_compressed_wo_bp
-            assign iaddr_hold = !jumping_o && unaligned && compressed;
+            assign iaddr_hold = !jumping_o && unaligned && (compressed && !realign_jump);
             assign iaddr_continue = enable_i && !iaddr_hold;
             assign instruction = instruction_word;
             assign iaddr_not_jumped = '0;
