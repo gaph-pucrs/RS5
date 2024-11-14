@@ -83,7 +83,7 @@ module fetch  #(
             jumped_r <= 1'b1;
         else if (jumped)
             jumped_r <= 1'b1;
-        else if (enable_i)
+        else if (enable_i || jump_rollback_i)
             jumped_r <= 1'b0;
     end
 
@@ -92,17 +92,15 @@ module fetch  #(
         if (!reset_n)
             jumped_r2 <= 1'b1;
         else if (enable_i)
-            jumped_r2 <= jumped_r;
+            jumped_r2 <= jumped_r && !jump_rollback_i;
     end
-
-    logic should_rollback;
     
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             jumping_o <= 1'b1;
-        else if (jumped || (jumped_r && !should_rollback))
+        else if (jumped || (jumped_r && !jump_rollback_i))
             jumping_o <= 1'b1;
-        else if (enable_i || should_rollback)
+        else if (enable_i || jump_rollback_i)
             jumping_o <= 1'b0;
     end
 
@@ -186,7 +184,7 @@ module fetch  #(
 
     /* Only used with BP, but needed for BP + C */
     /* verilator lint_off UNUSEDSIGNAL */
-    logic bp_rollback_r;
+    logic jump_rollback_r;
     logic [31:0] iaddr_not_jumped;
     /* verilator lint_on UNUSEDSIGNAL*/
 
@@ -199,30 +197,20 @@ module fetch  #(
                 iaddr_rollbacked <= iaddr_not_jumped;
         end
 
-        logic jump_rollback_r;
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
                 jump_rollback_r <= 1'b0;
             else if (jump_rollback_i)
                 jump_rollback_r <= 1'b1;
-            else if (enable_i || enable_r)
-                jump_rollback_r <= 1'b0;
-        end
-
-        assign should_rollback = jump_rollback_i || (jump_rollback_r && !enable_r);
-
-        always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n)
-                bp_rollback_r <= 1'b0;
             else if (enable_i)
-                bp_rollback_r <= should_rollback;
+                jump_rollback_r <= 1'b0;
         end
 
         logic [31:0] pc_rollbacked;
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
                 pc_rollbacked <= '0;
-            else if (bp_rollback_r)
+            else if (jump_rollback_r)
                 pc_rollbacked <= pc_o;
         end
 
@@ -230,17 +218,15 @@ module fetch  #(
             if (!reset_n)
                 bp_rollback_o <= 1'b0;
             else if (enable_i)
-                bp_rollback_o <= bp_rollback_r;
+                bp_rollback_o <= jump_rollback_r;
         end
 
         assign pc = bp_rollback_o ? pc_rollbacked : pc_o;
         assign jumped = ctx_switch_i || (enable_i && bp_take_i);
         assign jump_target = ctx_switch_i ? ctx_switch_target_i : bp_target_i;
-        assign iaddr_next = should_rollback ? iaddr_rollbacked : iaddr_advance;
+        assign iaddr_next = jump_rollback_i ? iaddr_rollbacked : iaddr_advance;
     end
     else begin : gen_bp_off
-        assign bp_rollback_r   = 1'b0;
-        assign should_rollback = 1'b0;
         assign bp_rollback_o   = 1'b0;
         assign pc              = pc_o;
         assign jumped          = ctx_switch_i;
@@ -260,7 +246,6 @@ module fetch  #(
         logic [31:0] instruction_word;
         logic [31:0] instruction_built;
         logic iaddr_hold;
-        logic realign_jump;
         logic update_inst_r;
 
         logic compressed;
@@ -282,14 +267,12 @@ module fetch  #(
         logic unaligned_jump;
         assign unaligned_jump = jumped_r2 && pc_jumped_r[1];
 
-        logic unaligned_jump_r;
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
-                unaligned_jump_r <= 1'b0;
+                jump_misaligned_o <= 1'b0;
             else if (enable_i)
-                unaligned_jump_r <= unaligned_jump;
+                jump_misaligned_o <= unaligned_jump;
         end
-        assign jump_misaligned_o = unaligned_jump_r;
 
         logic [31:0] instruction_data_r;
         always_ff @(posedge clk or negedge reset_n) begin
@@ -303,13 +286,13 @@ module fetch  #(
         assign instruction_prefetched = iaddr_hold_r ? instruction_data_r : instruction_fetched;
 
         assign pc_add = compressed ? 3'd2 : 3'd4;
-        assign pc_update = (jumped_r2 || realign_jump) ? pc_jumped_r : pc_next;
+        assign pc_update = (jumped_r2 || jump_misaligned_o) ? pc_jumped_r : pc_next;
        
         always_comb begin
             if (jumped_r2)
                 // Disregard last instruction on jump
                 instruction_built = instruction_fetched;
-            else if (realign_jump || (unaligned && !compressed))
+            else if (jump_misaligned_o || (unaligned && !compressed))
                 // After bubble or unaligned 4-byte instruction we need the input of 2 fetches
                 instruction_built = {instruction_fetched[15:0], instruction_data_r[31:16]};
             else if (!unaligned &&  compressed)
@@ -352,24 +335,22 @@ module fetch  #(
             always_ff @(posedge clk or negedge reset_n) begin
                 if (!reset_n)
                     idata_rollbacked <= 32'h00000013;
-                else if (bp_rollback_r)
+                else if (jump_rollback_r)
                     idata_rollbacked <= instruction_word;
             end
 
-            assign iaddr_hold = ((!(jumping_o && !should_rollback) && unaligned && (compressed && !realign_jump)) || (iaddr_hold_r && bp_rollback_r)) && !(iaddr_hold_r && bp_rollback_o);
-            assign iaddr_continue = enable_i && (should_rollback || !iaddr_hold);
+            assign iaddr_hold = ((!(jumping_o && !jump_rollback_i) && unaligned && (compressed && !jump_misaligned_o)) || (iaddr_hold_r && jump_rollback_r)) && !(iaddr_hold_r && bp_rollback_o);
+            assign iaddr_continue = (enable_i && !iaddr_hold) || jump_rollback_i;
             assign instruction = bp_rollback_o ? idata_rollbacked : instruction_word;
             assign iaddr_not_jumped = iaddr_hold ? instruction_address_o : iaddr_advance;
-            assign realign_jump = unaligned_jump_r && !bp_rollback_o;
-            assign update_inst_r = realign_jump || (unaligned_jump && !bp_rollback_r) || ((unaligned || (compressed && !iaddr_hold_r)) && !bp_rollback_r);
+            assign update_inst_r = jump_misaligned_o || unaligned_jump || ((unaligned || (compressed && !iaddr_hold_r)) && !jump_rollback_r);
         end
         else begin : gen_compressed_wo_bp
-            assign iaddr_hold = !jumping_o && unaligned && (compressed && !realign_jump);
+            assign iaddr_hold = !jumping_o && unaligned && (compressed && !jump_misaligned_o);
             assign iaddr_continue = enable_i && !iaddr_hold;
             assign instruction = instruction_word;
             assign iaddr_not_jumped = '0;
-            assign realign_jump = unaligned_jump_r;
-            assign update_inst_r = realign_jump || unaligned_jump || (unaligned || (compressed && !iaddr_hold_r));
+            assign update_inst_r = jump_misaligned_o || unaligned_jump || (unaligned || (compressed && !iaddr_hold_r));
         end
     end
     else begin : gen_compressed_off
