@@ -42,10 +42,12 @@ int main(){
     static int input_vector[INPUT_SIZE];
     int targetLabel;
 
+    int* memadd = (int*) 0x80001000;
+
     for(int datasetIndex = 0 ; datasetIndex < DATASET_UNITS ; datasetIndex++ ){
         int startingIndex = datasetIndex * 121; //input + label
         targetLabel = dataset120[startingIndex + INPUT_SIZE]/1000;
-
+        //printf("targetLabel: %d\n", targetLabel);
         // printf( "ix %4d  target %4d  -------- \n" , startingIndex + INPUT_SIZE, targetLabel);
 
         for(i = 0 ; i < INPUT_SIZE ; i++){
@@ -76,10 +78,32 @@ int main(){
                 for (int j = 0; j < KERNEL_SIZE; j++)
                 {
                 INTtotalSum += (input_vector[i+j]) * INTconv0_currentKernel[j];
+                // *memadd = INTtotalSum;
                 }
                 INTconv0_featureMap[k][i] = INTtotalSum + INTconv0_current_bias * MULTIP_conv1 ;  // moraes
+                *memadd = INTconv0_featureMap[k][i];
+                // break;
             }
+            // break;
         }
+
+        // *memadd = INTconv0_featureMap[0][1];
+
+        // *memadd = 0x31415926;
+
+        // break;
+
+        // for(int i=0; i<NUM_FILTERS; i++) {
+        //     for(int j=0; j<CONV0_INPUT_SIZE-4; j++) {
+        //         //printf("%d\n", INTconv0_featureMap[i][j]);
+        //         *memadd = INTconv0_featureMap[i][j];
+        //     }    
+
+        // }
+
+        // map[0][1] = -207912
+
+        break;
 
     //////////////////////////////// INT HANDLER
     // divide the feature map items by MULTIP_conv1
