@@ -744,8 +744,8 @@ end
     assign ctx_switch_o = machine_return_o || raise_exception_o || interrupt_ack_o || jump_o;
 
     if (BRANCHPRED) begin : gen_bp_on
-        assign jump_o          = ( should_jump && (!bp_taken_i || interrupt_ack_o));
-        assign jump_rollback_o = (!should_jump &&  bp_taken_i);
+        assign jump_o          = ( should_jump && (!bp_taken_i ||  interrupt_ack_o));
+        assign jump_rollback_o = (!should_jump && ( bp_taken_i && !interrupt_ack_o));
     end
     else begin : gen_bp_off
         assign jump_o          = should_jump;
