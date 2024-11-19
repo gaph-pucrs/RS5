@@ -54,6 +54,10 @@ int main(){
             input_vector[i] = dataset120[startingIndex + i];
         }
 
+        // int VECTOR[256000];
+        // for(int i=0; i<256000; i++)
+        //     VECTOR[i] = i;
+
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// LAYER 1
     // CONVOLUTION 1
         static int INTconv0_featureMap[NUM_FILTERS][CONV0_INPUT_SIZE-4];
@@ -81,7 +85,8 @@ int main(){
                 // *memadd = INTtotalSum;
                 }
                 INTconv0_featureMap[k][i] = INTtotalSum + INTconv0_current_bias * MULTIP_conv1 ;  // moraes
-                *memadd = INTconv0_featureMap[k][i];
+                // *memadd = INTconv0_featureMap[k][i];
+                // if(INTconv0_featureMap[k][i] <=0) INTconv0_featureMap[k][i] = 0;
                 // break;
             }
             // break;
@@ -93,6 +98,7 @@ int main(){
 
         // break;
 
+        // DOESN'T WORK?????????????????????????????
         // for(int i=0; i<NUM_FILTERS; i++) {
         //     for(int j=0; j<CONV0_INPUT_SIZE-4; j++) {
         //         //printf("%d\n", INTconv0_featureMap[i][j]);
@@ -103,7 +109,21 @@ int main(){
 
         // map[0][1] = -207912
 
-        break;
+        // break;
+        // for (int i = 0; i < NUM_FILTERS; i++)
+        // {
+        //     for (int j = 0; j < CONV0_INPUT_SIZE-4; j++)
+        //     {   
+        //         // RELU
+        //         if (INTconv0_featureMap[i][j] <= 0) {
+        //             INTconv0_featureMap[i][j] = 0;
+        //         }
+                
+        //         // INT HANDLER
+        //         INTconv0_featureMap[i][j] = (INTconv0_featureMap[i][j])/(MULTIP_conv1);
+        //         *memadd = INTconv0_featureMap[i][j];
+        //     }
+        // }
 
     //////////////////////////////// INT HANDLER
     // divide the feature map items by MULTIP_conv1
@@ -112,8 +132,19 @@ int main(){
             for (int j = 0; j < CONV0_INPUT_SIZE-4; j++)
             {
                 INTconv0_featureMap[i][j] = (INTconv0_featureMap[i][j])/(MULTIP_conv1);
+                // *memadd = INTconv0_featureMap[i][j];
             }
         }
+
+        for (int i = 0; i < NUM_FILTERS; i++)
+        {
+            for (int j = 0; j < CONV0_INPUT_SIZE-4; j++)
+            {
+                *memadd = INTconv0_featureMap[i][j];
+            }
+        }
+
+    // break;
 
     ///// RELU
         for (int i = 0; i < NUM_FILTERS; i++)
@@ -122,8 +153,13 @@ int main(){
             {
                 if (INTconv0_featureMap[i][j] <= 0)
                     INTconv0_featureMap[i][j] = 0;
+
+                // *memadd = INTconv0_featureMap[i][j];
             }
         }
+
+        break;
+
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// LAYER 3
     // CONVOLUTION 3

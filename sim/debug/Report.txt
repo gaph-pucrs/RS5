@@ -1,0 +1,36 @@
+Clock Cycles:            167501
+Instructions Retired:    52947
+Instructions Compressed: 0
+Instructions Killed:     16683
+Context Switches:        65
+Exceptions Raised:       0
+Interrupts Acked:        0
+Misaligned Jumps:        0
+
+CYCLES WITH::
+HAZARDS:                 7424
+STALL:                   0
+BUBBLES (INC. HAZARDS):  24108
+
+INSTRUCTION COUNTERS:
+LUI_SLT:                 5
+LOGIC:                   0
+ADDSUB:                  18361
+SHIFT:                   244
+BRANCH:                  8373
+JUMP:                    7488
+LOAD:                    8128
+STORE:                   7424
+SYS:                     0
+CSR:                     0
+MUL:                     64
+DIV:                     0
+
+VECTOR EXTENSION:
+VADDSUB:                 244
+VMUL:                    116
+VDIV:                    0
+VMAC:                    640
+VRED:                    0
+VLOAD/VSTORE:            1000
+VOTHERS:                 488

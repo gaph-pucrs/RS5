@@ -63,8 +63,9 @@ SKIP1:
     mv      s5,  a2 
 
 #----------------------------------------------------------------
-LOOP:
     vsetvli a1, a7, e32, m8, ta, ma 
+LOOP:
+    # vsetvli a1, a7, e32, m8, ta, ma 
     vle32.v v8, (s5) 
 
     lw      t4, (a4)
@@ -80,7 +81,11 @@ LOOP:
     vadd.vx v24, v24, t2  
     vsetvli zero, a7, e32, m8, ta, ma 
     addi    a2, a2, 256    
-    vse32.v v24, (a3)
+
+    vmsgt.vi v0, v24, 0                    # RELU 
+
+    vse32.v v24, (a3), v0.t
+    # vse32.v v24, (a3)
     slli     t1, a1, 2
 
     # li      s10, 0x80001000 
@@ -100,6 +105,63 @@ SKIP2:
     bne     s3, s4, BEGIN_BIAS 
     
     # j .end     
+
+# INT HANDLER 
+
+    li  a5, 0x10624dd3                  # magic number 
+
+    #li  a5, 0x10625000 
+    #addi a5, a5, -557 
+
+    la  a4, conv0_featureMap2 
+    li  a1, 7424                        # NUM_FILTERS * (CONV0_INPUT_SIZE-4) 
+    
+INT_HANDLER:
+    vsetvli a0, a1, e32, m8, ta, ma 
+    vle32.v v8, (a4)                    # featureMap.vreg 
+    sub     a1, a1, a0 
+    
+#------------------------------------------------------------------------------------
+    vmulh.vx  v16, v8, a5   
+    vsra.vi   v8,  v8, 31               # sign bit 
+    vsra.vi   v16, v16, 6               # /= 64 
+    vsub.vv   v16, v16, v8              # -= sign_bit 
+#------------------------------------------------------------------------------------ ok 
+
+    slli      t1,  a0,  2 
+    vse32.v   v16, (a4)                 # featureMap[i] = featureMap[i]/1000 
+    add       a4, a4, t1 
+    bnez      a1, INT_HANDLER 
+
+    #j .end  
+
+# RELU
+
+#     la  a4, conv0_featureMap2 
+#     li a1, 7424
+#     li t0, 0 
+
+# RELU:
+#     lw a2, (a4)
+#     bgtz a2, SKIP3
+#     li a2, 0 
+# SKIP3:
+#     sw a2, 0(a4)
+#     addi a4, a4, 4 
+#     addi t0, t0, 1
+#     bne t0, a1, RELU
+
+# RELU:
+#     vsetvli a0, a1, e32, m8, ta, ma 
+#     sub a1, a1, a0 
+    
+#     vle32.v v8, (a4) 
+#     vmsgt.vi v0, v8, 0
+#     vse32.v v8, (a4), v0.t 
+
+#     slli t1, a0, 2
+#     add a4, a4, t1
+#     bnez a1, RELU 
 
 print_routine:
     la a2, conv0_featureMap2            # Load address of the words array
