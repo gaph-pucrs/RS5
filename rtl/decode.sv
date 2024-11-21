@@ -258,7 +258,7 @@ module decode
                 6'b001001:     decode_vector_opi = VAND;
                 6'b001010:     decode_vector_opi = VOR;
                 6'b001011:     decode_vector_opi = VXOR;
-                6'b010111:     decode_vector_opi = VMV;
+                6'b010111:     decode_vector_opi = (funct7[0]) ? VMV : VMERGE;
                 6'b011000:     decode_vector_opi = VMSEQ;
                 6'b011001:     decode_vector_opi = VMSNE;
                 6'b011010:     decode_vector_opi = VMSLTU;
