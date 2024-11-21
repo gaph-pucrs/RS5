@@ -45,7 +45,7 @@ int main(){
     for(int datasetIndex = 0 ; datasetIndex < DATASET_UNITS ; datasetIndex++ ){
         int startingIndex = datasetIndex * 121; //input + label
         targetLabel = dataset120[startingIndex + INPUT_SIZE]/1000;
-        //printf("targetLabel: %d\n", targetLabel);
+
         // printf( "ix %4d  target %4d  -------- \n" , startingIndex + INPUT_SIZE, targetLabel);
 
         for(i = 0 ; i < INPUT_SIZE ; i++){
@@ -80,7 +80,6 @@ int main(){
                 INTconv0_featureMap[k][i] = INTtotalSum + INTconv0_current_bias * MULTIP_conv1 ;  // moraes
             }
         }
-
 
     //////////////////////////////// INT HANDLER
     // divide the feature map items by MULTIP_conv1
