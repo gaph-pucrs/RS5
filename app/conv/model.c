@@ -89,7 +89,6 @@ int main(){
             for (int j = 0; j < CONV0_INPUT_SIZE-4; j++)
             {
                 INTconv0_featureMap[i][j] = (INTconv0_featureMap[i][j])/(MULTIP_conv1);
-                // *memadd = INTconv0_featureMap[i][j];
             }
         }
 
@@ -100,8 +99,6 @@ int main(){
             {
                 if (INTconv0_featureMap[i][j] <= 0)
                     INTconv0_featureMap[i][j] = 0;
-
-                // *memadd = INTconv0_featureMap[i][j];
             }
         }
 
