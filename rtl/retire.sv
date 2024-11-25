@@ -24,11 +24,21 @@
 
 module retire
     import RS5_pkg::*;
+#(
+    parameter atomic_e AMOEXT = AMO_A
+)
 (
+    /* Not used without zalrsc */
+    /* verilator lint_off UNUSEDSIGNAL */
+    input   logic           clk,
+    input   logic           reset_n,
+    /* verilator lint_on UNUSEDSIGNAL */
+
     input   iType_e         instruction_operation_i,
     input   logic [31:0]    result_i,
     input   logic [31:0]    mem_data_i,
 
+    output  logic [31:0]    reservation_data_o,
     output  logic [31:0]    regbank_data_o
 );
 
@@ -92,6 +102,7 @@ module retire
                 endcase
             end
 
+            // LW, LR_W
             default: memory_data = mem_data_i;
         endcase
     end
@@ -102,9 +113,31 @@ module retire
 
     always_comb begin
         unique case (instruction_operation_i)
-            LB,LBU,LH,LHU,LW:   regbank_data_o = memory_data;
-            default:            regbank_data_o = result_i;
+            LB,LBU,LH,LHU,LW,LR_W: regbank_data_o = memory_data;
+            default:               regbank_data_o = result_i;
         endcase         
+    end
+
+////////////////////////////////////////////////////////////////////////////////
+// LR/SC registers
+////////////////////////////////////////////////////////////////////////////////
+
+    if (AMOEXT inside {AMO_A, AMO_ZALRSC}) begin : gen_zalrsc_on
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n) begin
+                reservation_data_o <= '0;
+            end
+            else begin
+                unique case (instruction_operation_i)
+                    LR_W:    reservation_data_o <= mem_data_i;
+                    SC_W:    reservation_data_o <= '0;
+                    default: ;
+                endcase
+            end
+        end
+    end
+    else begin : gen_zalrsc_off
+        assign reservation_data_o = '0;
     end
 
 endmodule

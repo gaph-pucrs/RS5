@@ -27,6 +27,7 @@ module decode
     import RS5_pkg::*;
 #(
     parameter mul_e         MULEXT      = MUL_M,
+    parameter atomic_e      AMOEXT      = AMO_A,
     parameter bit           COMPRESSED  = 1'b1,
     parameter bit           ZKNEEnable  = 1'b0,
     parameter bit           VEnable     = 1'b0,
@@ -54,13 +55,15 @@ module decode
     output  logic  [4:0]    rd_o,
     output  logic  [4:0]    instr_rs1_o,
     output  logic [11:0]    csr_address_o,
-    output  logic [31:0]    first_operand_o,
+    output  logic [31:0]    rs1_data_o,
+    output  logic [31:0]    rs2_data_o,
     output  logic [31:0]    second_operand_o,
-    output  logic [31:0]    third_operand_o,
     output  logic [31:0]    pc_o,
     output  logic [31:0]    instruction_o,
+    output  logic [31:0]    jump_imm_target_o,
     output  logic           compressed_o,
     output  iType_e         instruction_operation_o,
+    output  iTypeAtomic_e   atomic_operation_o,
     output  iTypeVector_e   vector_operation_o,
     output  logic           hazard_o,
     output  logic           killed_o,
@@ -89,13 +92,16 @@ module decode
 // Find out the type of the instruction
 //////////////////////////////////////////////////////////////////////////////
 
+    logic   killed;
+    iType_e instruction_operation;
+
     logic [2:0] funct3;
     logic [6:0] funct7;
-    logic [6:0] opcode;
+    logic [4:0] opcode;
     
     assign funct3 = instruction_i[14:12];
     assign funct7 = instruction_i[31:25];
-    assign opcode = instruction_i[6:0];
+    assign opcode = instruction_i[6:2];
 
     iType_e decode_branch;
     always_comb begin
@@ -201,24 +207,72 @@ module decode
         endcase
     end
 
-    iType_e instruction_operation;
+    logic         amo_invalid;
+    iType_e       decode_atomic;
+    if (AMOEXT != AMO_OFF) begin : gen_amo_on
+        always_comb begin
+            unique case (funct7[6:2])
+                5'b00010: decode_atomic = (AMOEXT != AMO_ZAAMO)  ? LR_W  : INVALID;
+                5'b00011: decode_atomic = (AMOEXT != AMO_ZAAMO)  ? SC_W  : INVALID;
+                default:  decode_atomic = (AMOEXT != AMO_ZALRSC) ? AMO_W : INVALID;
+            endcase
+        end
+
+        if (AMOEXT != AMO_ZALRSC) begin : gen_zaamo_on
+            iTypeAtomic_e decode_amo;
+            always_comb begin
+                unique case (funct7[6:2])
+                    5'b00000: decode_amo = AMOADD;
+                    5'b00001: decode_amo = AMOSWAP;
+                    5'b00100: decode_amo = AMOXOR;
+                    5'b01000: decode_amo = AMOOR;
+                    5'b01100: decode_amo = AMOAND;
+                    5'b10000: decode_amo = AMOMIN;
+                    5'b10100: decode_amo = AMOMAX;
+                    5'b11000: decode_amo = AMOMINU;
+                    5'b11100: decode_amo = AMOMAXU;
+                    default:  decode_amo = AMONOP;
+                endcase
+            end
+
+            assign amo_invalid = (instruction_operation == AMO_W) && (decode_amo == AMONOP);
+
+            always_ff @(posedge clk or negedge reset_n) begin
+                if (!reset_n)
+                    atomic_operation_o <= AMONOP;
+                else if (enable)
+                    atomic_operation_o <= decode_amo;
+            end
+        end
+        else begin : gen_zaamo_off
+            assign amo_invalid        = 1'b0;
+            assign atomic_operation_o = AMONOP;
+        end
+    end
+    else begin : gen_amo_off
+        assign decode_atomic      = INVALID;
+        assign amo_invalid        = 1'b0;
+        assign atomic_operation_o = AMONOP;
+    end
+
     always_comb begin
         unique case (opcode)
-            7'b0110111: instruction_operation = LUI;
-            7'b0010111: instruction_operation = ADD;                        /* AUIPC */
-            7'b1101111: instruction_operation = JAL;
-            7'b1100111: instruction_operation = JALR;
-            7'b1100011: instruction_operation = decode_branch;              /* BRANCH */
-            7'b0000011: instruction_operation = decode_load;                /* LOAD */
-            7'b0100011: instruction_operation = decode_store;               /* STORE */
-            7'b0010011: instruction_operation = decode_op_imm;              /* OP-IMM */
-            7'b0110011: instruction_operation = decode_op;                  /* OP */
-            7'b0001111: instruction_operation = decode_misc_mem;            /* MISC-MEM */
-            7'b1110011: instruction_operation = decode_system;              /* SYSTEM */
-            7'b1010111: instruction_operation = VEnable ? VECTOR : INVALID; /* OP-V */
-            7'b0000111: instruction_operation = VEnable ? VLOAD  : INVALID; /* LOAD-FP */
-            7'b0100111: instruction_operation = VEnable ? VSTORE : INVALID; /* STORE-FP */
-            default:    instruction_operation = INVALID;
+            5'b01101: instruction_operation = LUI;
+            5'b00101: instruction_operation = AUIPC;
+            5'b11011: instruction_operation = JAL;
+            5'b11001: instruction_operation = JALR;
+            5'b11000: instruction_operation = decode_branch;              /* BRANCH */
+            5'b00000: instruction_operation = decode_load;                /* LOAD */
+            5'b01000: instruction_operation = decode_store;               /* STORE */
+            5'b00100: instruction_operation = decode_op_imm;              /* OP-IMM */
+            5'b01100: instruction_operation = decode_op;                  /* OP */
+            5'b00011: instruction_operation = decode_misc_mem;            /* MISC-MEM */
+            5'b11100: instruction_operation = decode_system;              /* SYSTEM */
+            5'b10101: instruction_operation = VEnable ? VECTOR : INVALID; /* OP-V */
+            5'b00001: instruction_operation = VEnable ? VLOAD  : INVALID; /* LOAD-FP */
+            5'b01001: instruction_operation = VEnable ? VSTORE : INVALID; /* STORE-FP */
+            5'b01011: instruction_operation = decode_atomic;
+            default:  instruction_operation = INVALID;
         endcase
     end
 
@@ -325,9 +379,21 @@ module decode
             if (instruction_operation == VECTOR && vector_operation == VNOP)
                 $display("INVALID VECTOR INST!!!");
 
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n) begin
+                vector_operation_o <= VNOP;
+            end
+            else if (enable) begin
+                if (hazard_o || killed)
+                    vector_operation_o <= VNOP;
+                else
+                    vector_operation_o <= vector_operation;
+            end
+        end
     end
     else begin : v_enable_decode_gen_on
         assign vector_operation = VNOP;
+        assign vector_operation_o = VNOP;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -336,7 +402,7 @@ module decode
 
     formatType_e instruction_format;
     always_comb begin
-        unique case (opcode[6:2])
+        unique case (opcode)
             5'b11001, 5'b00000, 5'b00100:   instruction_format = I_TYPE;        /* JALR, LOAD, OP-IMM */
             5'b01000:                       instruction_format = S_TYPE;        /* STORE */
             5'b11000:                       instruction_format = B_TYPE;        /* BRANCH */
@@ -379,23 +445,39 @@ module decode
 ////////////////////////////////////////////////////////////////////////////////
 
     logic jump_confirmed;
+    
+    /* We add this adder here regardless of using BP or not */
+    /* Because if we don't add here, we have to add in exec */
+    assign bp_target_o = pc_i + immediate;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            jump_imm_target_o <= '0;
+        else if (enable)
+            jump_imm_target_o <= bp_target_o;
+    end
 
     if (BRANCHPRED) begin : gen_bp_on
         logic bp_branch_taken;
         logic bp_jump_taken;
 
-        assign bp_branch_taken = (opcode[6:2] == 5'b11000 && imm_b[31]);
-        assign bp_jump_taken   = (opcode[6:2] == 5'b11011);
+        /* We really can't add jalr here */
+        assign bp_branch_taken = (opcode == 5'b11000 && imm_b[31]);
+        assign bp_jump_taken   = (opcode == 5'b11011);
 
-        // bp_take_o should use !jump_confirmed instead of !jumping_i but that is causing problems
-        assign bp_take_o   = (bp_jump_taken || bp_branch_taken) && !jumping_i && !rollback_i;
-        assign bp_target_o = pc_i + immediate;
+        assign bp_take_o   = (bp_jump_taken || bp_branch_taken) && !jumping_i && !killed;
 
         assign jump_confirmed = ctx_switch_i || (jumping_i && !jump_rollback_i);
+        
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                bp_taken_o <= 1'b0;
+            else if (enable && !hazard_o)
+                bp_taken_o <= bp_take_o;
+        end
     end
     else begin : gen_bp_off
         assign bp_take_o   = 1'b0;
-        assign bp_target_o = '0;
+        assign bp_taken_o  = 1'b0;
         assign jump_confirmed = ctx_switch_i || jumping_i;
     end
 
@@ -405,11 +487,12 @@ module decode
 
     logic is_load;
     logic is_store;
+    logic forwardingless;
 
-    assign is_load  = (opcode[6:2] == 5'b00000);
-    assign is_store = (opcode[6:2] == 5'b01000);
+    assign is_load  = (opcode == 5'b00000) || (instruction_operation == LR_W);
+    assign is_store = (opcode == 5'b01000) || (instruction_operation inside {SC_W, AMO_W});
+    assign forwardingless = (instruction_operation inside {SC_W});
     
-    logic           killed;
     logic           locked_memory;
     logic  [4:0]    locked_register;
     logic  [4:0]    rd;
@@ -419,21 +502,32 @@ module decode
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             locked_register <= '0;
-            locked_memory   <= '0;
         end
         else if (enable) begin
-            if (hazard_o || killed) begin
+            if (hazard_o || killed)
                 locked_register <= '0;
-                locked_memory   <= '0;
-            end
-            else begin
-                // Read-after-write on LOAD
-                locked_register <= is_load ? rd : '0;
-
-                // Read-after-write on STORE
-                locked_memory   <= is_store;
-            end
+            else    // Read-after-write on LOAD
+                locked_register <= (is_load || forwardingless) ? rd : '0;
         end
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            locked_memory <= '0;
+        end
+        else if (enable) begin
+            if (hazard_o || killed) 
+                locked_memory <= '0;
+            else    // Read-after-write on STORE
+                locked_memory <= is_store;
+        end
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            rd_o <= '0;
+        else if (enable)
+            rd_o <= rd;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -446,9 +540,25 @@ module decode
     logic [11:0] csr_address;
     assign csr_address = instruction_i[31:20];
 
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            csr_address_o <= '0;
+        else if (enable)
+            csr_address_o <= csr_address;
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            instr_rs1_o <= '0;
+        else if (enable)
+            instr_rs1_o <= rs1_o;
+    end
+
 //////////////////////////////////////////////////////////////////////////////
 // Hazard signal generation
 //////////////////////////////////////////////////////////////////////////////
+    
+    logic exception;
 
     logic use_rs1;
     logic use_rs2;
@@ -495,7 +605,7 @@ module decode
     assign hazard_rs2 = locked_rs2      && use_rs2;
 
     assign killed   = jump_confirmed || jump_misaligned_i || rollback_i;
-    assign hazard_o = (hazard_mem || hazard_rs1 || hazard_rs2) && !killed;
+    assign hazard_o = (hazard_mem || hazard_rs1 || hazard_rs2) && !killed && !exception;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
@@ -510,21 +620,45 @@ module decode
 
     logic invalid_inst;
     logic misaligned_fetch;
+    logic exc_inst_access_fault;
 
-    assign invalid_inst     = instruction_operation == INVALID;
+    assign invalid_inst = ((instruction_i[1:0] != '1) || instruction_operation == INVALID || amo_invalid);
 
     if (COMPRESSED) begin : gen_compressed_on
-        assign misaligned_fetch = pc_i[0] != 1'b0;
+        assign misaligned_fetch = (pc_i[0] != 1'b0);
     end
     else begin : gen_compressed_off
-        assign misaligned_fetch = pc_i[1:0] != 2'b00;
+        assign misaligned_fetch = (pc_i[1:0] != 2'b00);
+    end
+
+    assign exc_inst_access_fault = exc_inst_access_fault_i;
+
+    assign exception = exc_inst_access_fault || invalid_inst || misaligned_fetch;
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            exc_ilegal_inst_o <= 1'b0;
+        else if (enable)
+            exc_ilegal_inst_o <= invalid_inst;
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            exc_misaligned_fetch_o <= 1'b0;
+        else if (enable)
+            exc_misaligned_fetch_o <= misaligned_fetch;
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            exc_inst_access_fault_o <= 1'b0;
+        else if (enable)
+            exc_inst_access_fault_o <= exc_inst_access_fault;
     end
 
 //////////////////////////////////////////////////////////////////////////////
 // Control of the operands based on format
 //////////////////////////////////////////////////////////////////////////////
-
-    logic [31:0]    first_operand, second_operand, third_operand;
 
     logic [31:0] rs1_data;
     logic [31:0] rs2_data;
@@ -547,25 +681,35 @@ module decode
             rs2_data = rs2_data_read_i;
     end
 
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            rs1_data_o <= '0;
+        else if (enable)
+            rs1_data_o <= rs1_data;
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            rs2_data_o <= '0;
+        else if (enable)
+            rs2_data_o <= rs2_data;
+    end
+
+    logic [31:0] second_operand;
     always_comb begin
         unique case (instruction_format)
-            U_TYPE, J_TYPE:     first_operand   = pc_i;
-            default:            first_operand   = rs1_data;
+            I_TYPE,
+            S_TYPE,
+            U_TYPE:  second_operand = immediate;
+            default: second_operand =  rs2_data;
         endcase
     end
 
-    always_comb begin
-        unique case (instruction_format)
-            R_TYPE, B_TYPE:     second_operand   = rs2_data;
-            default:            second_operand   = immediate;
-        endcase
-    end
-
-    always_comb begin
-        unique case (instruction_format)
-            S_TYPE:             third_operand   = rs2_data;
-            default:            third_operand   = immediate;
-        endcase
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            second_operand_o <= '0;
+        else if (enable)
+            second_operand_o <= second_operand;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -573,58 +717,35 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            pc_o <= '0;
+        else if (enable)
+            pc_o <= pc_i;
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            instruction_o <= '0;
+        else if (enable)
+            instruction_o <= instruction_i;
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            compressed_o <= 1'b0;
+        else if (enable)
+            compressed_o <= compressed_i;
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
-            first_operand_o         <= '0;
-            second_operand_o        <= '0;
-            third_operand_o         <= '0;
-            pc_o                    <= '0;
-            instruction_o           <= '0;
-            compressed_o            <= 1'b0;
             instruction_operation_o <= NOP;
-            exc_ilegal_inst_o       <= 1'b0;
-            exc_misaligned_fetch_o  <= 1'b0;
-            exc_inst_access_fault_o <= 1'b0;
-            vector_operation_o      <= VNOP;
-            bp_taken_o              <= 1'b0;
-            rd_o                    <= '0;
-            csr_address_o           <= '0;
-            instr_rs1_o             <= '0;
         end
         else if (enable) begin
-            if (hazard_o || killed) begin
-                first_operand_o         <= '0;
-                second_operand_o        <= '0;
-                third_operand_o         <= '0;
-                pc_o                    <= '0;
-                instruction_o           <= '0;
-                compressed_o            <= 1'b0;
+            if (hazard_o || killed)
                 instruction_operation_o <= NOP;
-                exc_ilegal_inst_o       <= 1'b0;
-                exc_misaligned_fetch_o  <= 1'b0;
-                exc_inst_access_fault_o <= 1'b0;
-                vector_operation_o      <= VNOP;
-                bp_taken_o              <= 1'b0;
-                rd_o                    <= '0;
-                csr_address_o           <= '0;
-                instr_rs1_o             <= '0;
-            end
-            else begin
-                first_operand_o         <= first_operand;
-                second_operand_o        <= second_operand;
-                third_operand_o         <= third_operand;
-                pc_o                    <= pc_i;
-                instruction_o           <= instruction_i;
-                compressed_o            <= compressed_i;
+            else
                 instruction_operation_o <= instruction_operation;
-                exc_ilegal_inst_o       <= invalid_inst;
-                exc_misaligned_fetch_o  <= misaligned_fetch;
-                exc_inst_access_fault_o <= exc_inst_access_fault_i;
-                vector_operation_o      <= vector_operation;
-                bp_taken_o              <= bp_take_o;
-                rd_o                    <= rd;
-                csr_address_o           <= csr_address;
-                instr_rs1_o             <= rs1_o;
-            end
         end
     end
 
