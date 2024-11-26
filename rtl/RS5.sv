@@ -431,6 +431,7 @@ module RS5
         .killed                     (killed),
         .out                        (csr_data_read),
         .instruction_operation_i    (instruction_operation_execute),
+        .vector_operation_i         (vector_operation_execute),
         .hazard                     (hazard),
         .stall                      (stall),
         .hold                       (hold),
