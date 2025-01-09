@@ -2,8 +2,8 @@
 CFLAGS_STRIP = -fdata-sections -ffunction-sections
 LDFLAGS_STRIP = --gc-sections
 
-GCC_RISCV = riscv64-elf-gcc -march=rv32imc_zicsr -mabi=ilp32 -O2 -c -nostdinc -fno-builtin -I ./../../hf_risc_test/include $(CFLAGS_STRIP) -DDEBUG_PORT -static -mcmodel=medany -fvisibility=hidden -nostdlib -nostartfiles -mno-relax
-AS_RISCV = riscv64-elf-as -march=rv32imc_zicsr -mabi=ilp32
+GCC_RISCV = riscv64-elf-gcc -march=rv32imac_zicsr -mabi=ilp32 -O2 -c -nostdinc -fno-builtin -I ./../../hf_risc_test/include $(CFLAGS_STRIP) -DDEBUG_PORT -static -mcmodel=medany -fvisibility=hidden -nostdlib -nostartfiles -mno-relax
+AS_RISCV = riscv64-elf-as -march=rv32imac_zicsr -mabi=ilp32
 LD_RISCV = riscv64-elf-ld -melf32lriscv
 DUMP_RISCV = riscv64-elf-objdump #-Mno-aliases
 READ_RISCV = riscv64-elf-readelf

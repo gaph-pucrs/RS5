@@ -32,11 +32,12 @@ module testbench
 //////////////////////////////////////////////////////////////////////////////
 
     localparam mul_e         MULEXT          = MUL_M;
+    localparam atomic_e      AMOEXT          = AMO_A;
     localparam bit           COMPRESSED      = 1'b1;
     localparam bit           USE_XOSVM       = 1'b0;
     localparam bit           USE_ZIHPM       = 1'b1;
     localparam bit           USE_ZKNE        = 1'b1;
-    localparam bit           VEnable         = 1'b1;
+    localparam bit           VEnable         = 1'b0;
     localparam int           VLEN            = 256;
     localparam bit           BRANCHPRED      = 1'b1;
 
@@ -171,6 +172,7 @@ module testbench
     `endif
         .Environment(ASIC           ),
         .MULEXT     (MULEXT         ),
+        .AMOEXT     (AMOEXT         ),
         .COMPRESSED (COMPRESSED     ),
         .VEnable    (VEnable        ),
         .VLEN       (VLEN           ),
@@ -273,6 +275,10 @@ module testbench
             if ((mem_address == 32'h80004000 || mem_address == 32'h80001000) && mem_write_enable != '0) begin
                 char <= mem_data_write[7:0];
                 $write("%c",char);
+                $fflush();
+            end
+            else if (mem_address == 32'h80002000 && mem_write_enable != '0) begin
+                $write("%0d\n",mem_data_write);
                 $fflush();
             end
             // END REG
