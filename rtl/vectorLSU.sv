@@ -511,33 +511,36 @@ module vectorLSU
         end
     end
 
-    always_comb begin
-        unique case (width)
-            EW8: begin
-                read_data[(8*elementsProcessedRegister_r)+:8] = read_data_8b[0];
-                if (elementsProcessedCycle_r > 1)
-                    read_data[(8*(elementsProcessedRegister_r+1))+:8] = read_data_8b[1];
-                if (elementsProcessedCycle_r > 2)
-                    read_data[(8*(elementsProcessedRegister_r+2))+:8] = read_data_8b[2];
-                if (elementsProcessedCycle_r > 3)
-                    read_data[(8*(elementsProcessedRegister_r+3))+:8] = read_data_8b[3];
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            read_data_o = '0;
+        end
+        else begin 
+            if (state_r != VLSU_IDLE) begin
+                    case (width)
+                        EW8: begin
+                            read_data_o[(8*elementsProcessedRegister_r)+:8] = read_data_8b[0];
+                            if (elementsProcessedCycle_r > 1)
+                                read_data_o[(8*(elementsProcessedRegister_r+1))+:8] = read_data_8b[1];
+                            if (elementsProcessedCycle_r > 2)
+                                read_data_o[(8*(elementsProcessedRegister_r+2))+:8] = read_data_8b[2];
+                            if (elementsProcessedCycle_r > 3)
+                                read_data_o[(8*(elementsProcessedRegister_r+3))+:8] = read_data_8b[3];
+                        end
+                        EW16: begin
+                            read_data_o[(16*elementsProcessedRegister_r)+:16] = read_data_16b[0];
+                            if (elementsProcessedCycle_r > 1)
+                                read_data_o[(16*(elementsProcessedRegister_r+1))+:16] = read_data_16b[1];
+                        end
+                        default: begin
+                            read_data_o[(32*elementsProcessedRegister_r)+:32] = mem_read_data_i;
+                        end
+                    endcase
             end
-            EW16: begin
-                read_data[(16*elementsProcessedRegister_r)+:16] = read_data_16b[0];
-                if (elementsProcessedCycle_r > 1)
-                    read_data[(16*(elementsProcessedRegister_r+1))+:16] = read_data_16b[1];
+            else begin
+                read_data_o = '0;
             end
-            default: begin
-                read_data[(32*elementsProcessedRegister_r)+:32] = mem_read_data_i;
-            end
-        endcase
-    end
-
-    always @(posedge clk) begin
-        if (state_r != VLSU_IDLE)
-            read_data_o <= read_data;
-        else
-            read_data_o <= '0;
+        end
     end
 
 //////////////////////////////////////////////////////////////////////////////
