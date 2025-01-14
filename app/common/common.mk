@@ -19,7 +19,7 @@ LDFLAGS = --specs=nano.specs -T ../common/link.ld -march=$(ARCH) -mabi=ilp32 -no
 CCSRC = $(wildcard $(SRCDIR)/*.c) $(wildcard ../common/*.c)
 CCOBJ = $(patsubst %.c, %.o, $(CCSRC))
 
-ASSRC = $(wildcard ../common/*.S)
+ASSRC = $(wildcard $(SRCDIR)/*.S) $(wildcard ../common/*.S)
 ASOBJ = $(patsubst %.S,%.o, $(ASSRC))
 
 all: $(TARGET).bin $(TARGET).lst
