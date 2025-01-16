@@ -1,0 +1,268 @@
+.section .data,"aw",@progbits
+.global vsize
+.balign 8
+vsize:
+    .word 0x00000040
+    .word 0x00000000
+.global v32a
+.balign NR_LANES*4
+v32a:
+    .word 0x0007a920
+    .word 0xfff04876
+    .word 0xfff24d2a
+    .word 0x00037ab9
+    .word 0x000f0d84
+    .word 0xfff4c6ff
+    .word 0x000f5a35
+    .word 0x0006fb98
+    .word 0xfff4ba1f
+    .word 0x0002b73a
+    .word 0x00039afc
+    .word 0xfff22a6a
+    .word 0x000ec77f
+    .word 0x000f1f14
+    .word 0xfff100e4
+    .word 0x000f11f9
+    .word 0xfff0ceee
+    .word 0xfff3a4a3
+    .word 0x000b68b5
+    .word 0xfffb501d
+    .word 0xfff2a0d9
+    .word 0x00071ad1
+    .word 0xfff8f9d6
+    .word 0xfff7bef3
+    .word 0xfff17431
+    .word 0x000df107
+    .word 0xfff0df43
+    .word 0x000854fa
+    .word 0x000c4a82
+    .word 0xfffafa00
+    .word 0xfff70bc0
+    .word 0x000b1b42
+    .word 0xfffbb124
+    .word 0x00057afb
+    .word 0x00004219
+    .word 0xfff9f309
+    .word 0x000fdc28
+    .word 0xfffd103b
+    .word 0xfffe22eb
+    .word 0xfff1a0f2
+    .word 0xfffe2136
+    .word 0xfffb2903
+    .word 0x00032cb6
+    .word 0xfff3cf8d
+    .word 0xfff3c4eb
+    .word 0xfff4a3cd
+    .word 0x000d7ca9
+    .word 0xfffee1dd
+    .word 0xfffc20b4
+    .word 0x00022f97
+    .word 0x0005bc34
+    .word 0xfff97958
+    .word 0x0001cda3
+    .word 0x0001cdda
+    .word 0xfffbebfe
+    .word 0xfff003c7
+    .word 0x00056b25
+    .word 0xfffd72fa
+    .word 0x0000a6c9
+    .word 0xfff835c8
+    .word 0xfff1259f
+    .word 0xfff9b898
+    .word 0xfff37a6e
+    .word 0xfff14c68
+.global v32b
+.balign NR_LANES*4
+v32b:
+    .word 0xfffdeca2
+    .word 0xfff4d9c4
+    .word 0x000881aa
+    .word 0xfffb9f90
+    .word 0xfffc144d
+    .word 0x00078bf3
+    .word 0xfffc28b4
+    .word 0x0001b4e3
+    .word 0xfffe81f4
+    .word 0x0004df80
+    .word 0xfff6337d
+    .word 0x00079005
+    .word 0x000cede7
+    .word 0xfffcfa3d
+    .word 0x0004f49f
+    .word 0xfff7f80a
+    .word 0xfffe7b8f
+    .word 0xfffafd14
+    .word 0xfff9ee99
+    .word 0xfff0fa16
+    .word 0xfff7b9f2
+    .word 0xfffa4269
+    .word 0x000747a7
+    .word 0xfff4a1e0
+    .word 0xfff2c32b
+    .word 0xfffff15c
+    .word 0xfff91f65
+    .word 0x00026d46
+    .word 0x0002fe97
+    .word 0x000e70d2
+    .word 0x00069e7a
+    .word 0x000e109c
+    .word 0xfff6a2b9
+    .word 0x00048532
+    .word 0x00042607
+    .word 0xfff1f7ad
+    .word 0xfffcb5ab
+    .word 0xfff38a30
+    .word 0x000caf39
+    .word 0x000f9be0
+    .word 0x000288a4
+    .word 0x0000be4f
+    .word 0xfffc476c
+    .word 0x00058c62
+    .word 0xfff535f5
+    .word 0xffffb78a
+    .word 0xfffce613
+    .word 0xfffd0ad5
+    .word 0xfff629c5
+    .word 0x000c7605
+    .word 0x0009714a
+    .word 0x00067a4b
+    .word 0x000525c9
+    .word 0xfff4f0a4
+    .word 0x0000ba6b
+    .word 0x00091956
+    .word 0xfff32656
+    .word 0xfff4082d
+    .word 0x000ab815
+    .word 0xfff19256
+    .word 0x0007b8b7
+    .word 0xfff98053
+    .word 0xfffac64e
+    .word 0xfffb2455
+.global v16a
+.balign NR_LANES*4
+v16a:
+    .word 0x0108fdf3
+    .word 0xfd630331
+    .word 0x02fefed3
+    .word 0x003ffdfa
+    .word 0xfc97fea7
+    .word 0xfe7e0385
+    .word 0xfd6afd28
+    .word 0x01860309
+    .word 0xfc9c0250
+    .word 0xfd380389
+    .word 0xfc35fc2a
+    .word 0xfeea00db
+    .word 0xfc0c02e7
+    .word 0xffe701bf
+    .word 0xfef5002d
+    .word 0xfe66fe72
+    .word 0xfce4fc59
+    .word 0xfd7dfd41
+    .word 0xfe1aff72
+    .word 0xfd0e00c5
+    .word 0xfc130211
+    .word 0x002e037a
+    .word 0xfed90209
+    .word 0x03ecff78
+    .word 0x038a029a
+    .word 0x0021fc0b
+    .word 0xfcb60338
+    .word 0x030ffd50
+    .word 0xff0afeeb
+    .word 0x00c0feac
+    .word 0x02c7fcc6
+    .word 0xfd22fd6f
+.global v16b
+.balign NR_LANES*4
+v16b:
+    .word 0x008dfc4c
+    .word 0x02770253
+    .word 0xff9003fb
+    .word 0x030f00d8
+    .word 0xfcb3feb0
+    .word 0xfd73ff59
+    .word 0xff620068
+    .word 0x011dfcf1
+    .word 0x003d030d
+    .word 0x00a20213
+    .word 0xfeebfd11
+    .word 0xfcbe013d
+    .word 0xfed8026e
+    .word 0xfde6fce3
+    .word 0x0006000d
+    .word 0xfc38fd18
+    .word 0xfe810378
+    .word 0x032d022d
+    .word 0xffad0223
+    .word 0xfdeafc21
+    .word 0xfddf02d0
+    .word 0xffe402e3
+    .word 0xfe96035d
+    .word 0x03b1017b
+    .word 0xfdbafc10
+    .word 0x01cbfc90
+    .word 0x0076ff5f
+    .word 0xff3e0258
+    .word 0x00570055
+    .word 0x0136011f
+    .word 0x035703c6
+    .word 0x020affaf
+.global v8a
+.balign NR_LANES*4
+v8a:
+    .word 0xfe0202fc
+    .word 0x02fffefc
+    .word 0x01fe02fc
+    .word 0x01ff0101
+    .word 0xfdfdfe02
+    .word 0x00fffefe
+    .word 0xfc01fefc
+    .word 0xfcfdff02
+    .word 0x01010000
+    .word 0xfdfd01ff
+    .word 0x00fe0002
+    .word 0x01fc00ff
+    .word 0xfdfc0200
+    .word 0xff01fe01
+    .word 0xfdfd00fe
+    .word 0xfffefeff
+.global v8b
+.balign NR_LANES*4
+v8b:
+    .word 0x01fd02fd
+    .word 0x00fcfdff
+    .word 0xff0200fe
+    .word 0xfdfd0001
+    .word 0x010200fd
+    .word 0x01020001
+    .word 0xfffffffd
+    .word 0x01fffdfe
+    .word 0x020001fc
+    .word 0xfc02ffff
+    .word 0xfd02ff02
+    .word 0xfc02fdfe
+    .word 0x0002fe02
+    .word 0x01000100
+    .word 0xfdfdfe02
+    .word 0xfefcff01
+.global res16_v
+.balign 8
+res16_v:
+    .word 0x00000000
+.global res8_v
+.balign 8
+res8_v:
+    .word 0x00000000
+.global res32_s
+.balign 8
+res32_s:
+    .word 0x00000000
+.global res16_s
+.balign 8
+res16_s:
+    .word 0x00000000
+.global res8_s
+.balign 8
+res8_s:
+    .word 0x00000000
