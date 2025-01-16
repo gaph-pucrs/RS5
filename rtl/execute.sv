@@ -644,7 +644,7 @@ end
             BGE,BGEU:   write_enable = 1'b0;
             VECTOR,
             VLOAD,
-            VSTORE:     write_enable = vector_wr_en;
+            VSTORE:     write_enable =  rd_i != '0 && vector_wr_en;
             default:    write_enable = (rd_i != '0 && !hold_o && !raise_exception_o);
         endcase
     end
