@@ -43,7 +43,7 @@ module decode
     input   logic [31:0]    rs1_data_read_i,
     input   logic [31:0]    rs2_data_read_i,
     input   logic [31:0]    writeback_i,
-    input   logic [31:0]    result_i, 
+    input   logic [31:0]    result_i,
     input   logic [ 4:0]    rd_retire_i,
     input   logic           regbank_we_i,
     input   logic           execute_we_i,
@@ -377,7 +377,7 @@ module decode
 
         always_ff @(posedge clk)
             if (instruction_operation == VECTOR && vector_operation == VNOP)
-                $display("INVALID VECTOR INST!!!");
+                $display("%0t - INVALID VECTOR INST!!! - %h", $time, instruction_i);
 
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n) begin

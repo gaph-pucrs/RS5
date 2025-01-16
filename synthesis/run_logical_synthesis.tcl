@@ -19,7 +19,7 @@ set synthesis                 1
 set save_reports              1
 set write_netlist             1
 set export_innovus            1
-set stop                      1
+set stop                      0
 
 
 ###############################################################################
@@ -86,7 +86,7 @@ puts "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 puts "Load hdl files"
 puts "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 
-	read_hdl -sv "../rtl/RS5_pkg.sv 						\
+	read_hdl -define SYNTH -sv "../rtl/RS5_pkg.sv 						\
 				 #../rtl/aes/riscv_crypto_sbox_aes_out.sv 	\
 				 #../rtl/aes/riscv_crypto_sbox_aes_top.sv 	\
 				 #../rtl/aes/riscv_crypto_sbox_inv_mid.sv 	\

@@ -269,7 +269,7 @@ module vectorUnit
     always_ff @(posedge clk or negedge reset_n)
         if (!reset_n)
             cycle_count_r <= 0;
-        else if (widening_instruction)
+        else if (widening_instruction && (!hold || hold_widening))
             cycle_count_r <= cycle_count_vd;
         else if (!hold)
             cycle_count_r <= cycle_count;

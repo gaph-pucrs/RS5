@@ -81,23 +81,20 @@ module vectorALU
 // Widening Control
 //////////////////////////////////////////////////////////////////////////////
     logic widening_instruction;
-    logic widening_counter;
+    logic hold_widening_r;
 
     assign widening_instruction = (vector_operation_i inside {VWMUL, VWMULU, VWMULSU});
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
-            widening_counter <= 1'b0;
-        end
-        else if (widening_instruction && !hold && current_state == V_EXEC) begin
-            widening_counter <= widening_counter + 1'b1;
+            hold_widening_r <= 1'b0;
         end
         else begin
-            widening_counter <= 1'b0;
+            hold_widening_r <= hold_widening_o;
         end
     end
 
-    assign hold_widening_o = widening_instruction & !widening_counter && current_state == V_EXEC;
+    assign hold_widening_o = widening_instruction && !hold && current_state == V_EXEC && !hold_widening_r;
 
 //////////////////////////////////////////////////////////////////////////////
 // Accumulation Control
@@ -1129,13 +1126,13 @@ module vectorALU
                             );
 
     assign mult_enable = (
-                            (vector_operation_i inside {VMUL, VMULH, VMULHSU, VMULHU, VMACC, VNMSAC, VMADD, VNMSUB})
+                            (vector_operation_i inside {VMUL, VMULH, VMULHSU, VMULHU, VMACC, VNMSAC, VMADD, VNMSUB} || widening_instruction)
                         &&  (current_state == V_EXEC)
-                        &&  (vsew == EW32)
                         &&  (!ended_acc)
+                        &&  (!hold_widening_r == 1'b1)
                         &&  (!hold_accumulation_r)
                         );
-    assign mult_low    = (vector_operation_i inside {VMUL, VMACC, VNMSAC, VMADD, VNMSUB});
+    assign mult_low    = (vector_operation_i inside {VMUL, VMACC, VNMSAC, VMADD, VNMSUB} || widening_instruction);
     assign hold_mult   = |hold_mult_int;
 
     generate
@@ -1149,7 +1146,7 @@ module vectorALU
                 .signed_mode_i   (mult_signed_mode),
                 .enable_i        (mult_enable),
                 .mul_low_i       (mult_low),
-                .single_cycle_i  (vsew inside {EW8, EW16}),
+                .single_cycle_i  (vsew inside {EW8, EW16} || widening_instruction),
                 .hold_o          (hold_mult_int[i_mul32b]),
                 .result_o        (mult_result_32b[i_mul32b])
             );
@@ -1385,7 +1382,7 @@ module vectorALU
             VMUL, VMULH,
             VMULHU, VMULHSU: result_o <= result_mult[VLEN-1:0];
             VWMUL, VWMULU,
-            VWMULSU:         result_o <= (widening_counter == 1'b1) ? result_mult[(2*VLEN)-1:VLEN] : result_mult[VLEN-1:0];
+            VWMULSU:         result_o <= (hold_widening_r == 1'b1) ? result_mult[(2*VLEN)-1:VLEN] : result_mult[VLEN-1:0];
             VDIV, VDIVU:     result_o <= result_div;
             VREM, VREMU:     result_o <= result_rem;
             VREDAND:         result_o <= result_redand;
