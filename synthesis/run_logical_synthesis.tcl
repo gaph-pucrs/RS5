@@ -86,30 +86,31 @@ puts "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 puts "Load hdl files"
 puts "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 
-	read_hdl -define SYNTH -sv "../rtl/RS5_pkg.sv 						\
-				 #../rtl/aes/riscv_crypto_sbox_aes_out.sv 	\
-				 #../rtl/aes/riscv_crypto_sbox_aes_top.sv 	\
-				 #../rtl/aes/riscv_crypto_sbox_inv_mid.sv 	\
-				 #../rtl/aes/riscv_crypto_aes_fwd_sbox.sv 	\
-				 #../rtl/aes_unit.sv 						\
-				 #../rtl/align.sv 	 						\
-				 #../rtl/decompresser.sv 					\
-				  ../rtl/fetch.sv 							\
- 				  ../rtl/decode.sv 							\
- 				  ../rtl/div.sv 							\
- 				  ../rtl/mul.sv 							\
- 				  ../rtl/mulNbits.sv						\
- 				  ../rtl/vectorALU.sv						\
- 				  ../rtl/vectorCSRs.sv						\
- 				  ../rtl/vectorLSU.sv						\
- 				  ../rtl/vectorRegbank.sv  					\
- 				  ../rtl/vectorUnit.sv						\
- 				  ../rtl/execute.sv 						\
-				 #../rtl/mmu.sv 							\
- 				  ../rtl/retire.sv 							\
- 				  ../rtl/regbank.sv 						\
- 				  ../rtl/CSRBank.sv 						\
- 				  ../rtl/RS5.sv"
+	read_hdl -define SYNTH -sv "../rtl/RS5_pkg.sv			\
+								../rtl/aes/riscv_crypto_sbox_aes_out.sv 	\
+								../rtl/aes/riscv_crypto_sbox_aes_top.sv 	\
+								../rtl/aes/riscv_crypto_sbox_inv_mid.sv 	\
+								../rtl/aes/riscv_crypto_aes_fwd_sbox.sv 	\
+								../rtl/aes_unit.sv 						\
+								../rtl/amo.sv 							\
+								../rtl/CSRBank.sv 						\
+								../rtl/decode.sv 							\
+								../rtl/decompresser.sv 					\
+								../rtl/div.sv 							\
+								../rtl/execute.sv 						\
+								../rtl/fetch.sv 							\
+								../rtl/lrsc.sv 							\
+								../rtl/mmu.sv 							\
+								../rtl/mulNbits.sv						\
+								../rtl/mul.sv 							\
+								../rtl/regbank.sv 						\
+								../rtl/retire.sv 							\
+								../rtl/vectorALU.sv						\
+								../rtl/vectorCSRs.sv						\
+								../rtl/vectorLSU.sv						\
+								../rtl/vectorRegbank.sv  					\
+								../rtl/vectorUnit.sv						\
+								../rtl/RS5.sv"
 
 }
 
