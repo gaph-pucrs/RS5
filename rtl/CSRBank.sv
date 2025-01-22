@@ -55,7 +55,7 @@ module CSRBank
     /* verilator lint_off UNUSEDSIGNAL */
     input   logic               instruction_compressed_i,
     input   iType_e             instruction_operation_i,
-    input   iTypeVector_e       vector_operation_i,          
+    input   iTypeVector_e       vector_operation_i,
 
     input   logic               hazard,
     input   logic               stall,

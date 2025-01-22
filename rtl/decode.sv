@@ -98,7 +98,7 @@ module decode
     logic [2:0] funct3;
     logic [6:0] funct7;
     logic [4:0] opcode;
-    
+
     assign funct3 = instruction_i[14:12];
     assign funct7 = instruction_i[31:25];
     assign opcode = instruction_i[6:2];
@@ -339,7 +339,7 @@ module decode
                 6'b000101:     decode_vector_opm = VREDMIN;
                 6'b000110:     decode_vector_opm = VREDMAXU;
                 6'b000111:     decode_vector_opm = VREDMAX;
-                6'b010000:     decode_vector_opm = (rs2_o == '0)
+                6'b010000:     decode_vector_opm = (opCat == OPMVX)
                                                 ? VMVSX
                                                 : VMVXS;
                 6'b100000:     decode_vector_opm = VDIVU;
@@ -376,8 +376,8 @@ module decode
         end
 
         always_ff @(posedge clk)
-            if (instruction_operation == VECTOR && vector_operation == VNOP)
-                $display("%0t - INVALID VECTOR INST!!! - %h", $time, instruction_i);
+            if (instruction_operation_o == VECTOR && vector_operation_o == VNOP)
+                $display("%0t - INVALID VECTOR INST!!! - %h", $time, instruction_o);
 
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n) begin
