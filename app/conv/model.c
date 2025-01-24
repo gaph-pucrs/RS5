@@ -45,7 +45,7 @@ int main(){
     for(int datasetIndex = 0 ; datasetIndex < DATASET_UNITS ; datasetIndex++ ){
         int startingIndex = datasetIndex * 121; //input + label
         targetLabel = dataset120[startingIndex + INPUT_SIZE]/1000;
-        //printf("targetLabel: %d\n", targetLabel);
+
         // printf( "ix %4d  target %4d  -------- \n" , startingIndex + INPUT_SIZE, targetLabel);
 
         for(i = 0 ; i < INPUT_SIZE ; i++){
@@ -81,7 +81,6 @@ int main(){
             }
         }
 
-
     //////////////////////////////// INT HANDLER
     // divide the feature map items by MULTIP_conv1
         for (int i = 0; i < NUM_FILTERS; i++)
@@ -89,7 +88,6 @@ int main(){
             for (int j = 0; j < CONV0_INPUT_SIZE-4; j++)
             {
                 INTconv0_featureMap[i][j] = (INTconv0_featureMap[i][j])/(MULTIP_conv1);
-                // *memadd = INTconv0_featureMap[i][j];
             }
         }
 
@@ -100,8 +98,6 @@ int main(){
             {
                 if (INTconv0_featureMap[i][j] <= 0)
                     INTconv0_featureMap[i][j] = 0;
-
-                // *memadd = INTconv0_featureMap[i][j];
             }
         }
 
