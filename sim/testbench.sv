@@ -25,7 +25,7 @@ module testbench
     import RS5_pkg::*;
 (
 );
-    timeunit 1ns; timeprecision 1ns;
+//    timeunit 1ns; timeprecision 1ns;
 
 //////////////////////////////////////////////////////////////////////////////
 // PARAMETERS FOR CORE INSTANTIATION
@@ -33,21 +33,22 @@ module testbench
 
     localparam mul_e         MULEXT          = MUL_M;
     localparam atomic_e      AMOEXT          = AMO_A;
-    localparam bit           COMPRESSED      = 1'b1;
+    localparam bit           COMPRESSED      = 1'b0;
     localparam bit           USE_XOSVM       = 1'b0;
     localparam bit           USE_ZIHPM       = 1'b1;
     localparam bit           USE_ZKNE        = 1'b1;
-    localparam bit           VEnable         = 1'b0;
+    localparam bit           VEnable         = 1'b1;
     localparam int           VLEN            = 256;
     localparam bit           BRANCHPRED      = 1'b1;
 
 `ifndef SYNTH
-    localparam bit           PROFILING       = 1'b1;
+    localparam bit           PROFILING       = 1'b0;
     localparam bit           DEBUG           = 1'b0;
 `endif
 
-    localparam int           MEM_WIDTH       = 65_536;
-    localparam string        BIN_FILE        = "../app/riscv-tests/test.bin";
+    localparam int           MEM_WIDTH       = 16_384_000;
+//    localparam string        BIN_FILE        = "../app/conv-assembly/test.bin";
+    localparam string        BIN_FILE        = "../app/hello/hello.bin";
 
     localparam int           i_cnt = 1;
 

@@ -31,6 +31,7 @@ module Testbench_FPGA_Platform
 );
 
     logic           clk=1, rstCPU;
+    logic           clk_n=0;
     logic           BTND;
     logic           UART_RX;
 
@@ -55,8 +56,10 @@ module Testbench_FPGA_Platform
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     
     always begin
-        #5.0 clk = 0;
-        #5.0 clk = 1;
+        #10.0 clk = 0;
+        clk_n = 1;
+        #10.0 clk = 1;
+        clk_n = 0;
     end
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,9 +70,11 @@ module Testbench_FPGA_Platform
 
     RS5_FPGA_Platform #(
         .i_cnt      (i_cnt),
-        .CLKS_PER_BIT_UART(5)
+        // .CLKS_PER_BIT_UART(5)
+        .CLKS_PER_BIT_UART(2)
     ) dut (
-        .clk        (clk), 
+        .clk_p        (clk), 
+        .clk_n      (clk_n),
         .reset_n    (rstCPU), 
         .BTND       (BTND),
         .UART_RX    (UART_RX),

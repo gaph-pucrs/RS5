@@ -5,11 +5,14 @@ module RS5_FPGA_Platform
 #(
     parameter int           i_cnt       = 2,
     parameter environment_e Environment = FPGA,
-    parameter rv32_e        RV32        = RV32M,
+    // parameter rv32_e        RV32        = RV32M,
     parameter bit           XOSVMEnable = 1'b0,
     parameter bit           ZIHPMEnable = 1'b0,
     parameter bit           ZKNEEnable  = 1'b0,
-    parameter int           CLKS_PER_BIT_UART = 20833
+    parameter bit           VEnable     = 1'b0,
+    parameter int           VLEN        = 256,
+    // parameter int           CLKS_PER_BIT_UART = 20833
+    parameter int           CLKS_PER_BIT_UART = 434
 )
 (
     input  logic       clk_p,
@@ -20,9 +23,9 @@ module RS5_FPGA_Platform
     output logic       UART_TX
     
 );
-
+    logic clk_sys;
     logic clk;
-    IBUFDS CLK_IBUFDS (.I(clk_p), .IB(clk_n), .O(clk));
+    // IBUFDS CLK_IBUFDS (.I(clk_p), .IB(clk_n), .O(clk_sys));
 
     logic [31:0]            cpu_instruction_address, cpu_instruction;
     logic [31:0]            cpu_data_address, cpu_data_in, cpu_data_out;
@@ -39,6 +42,16 @@ module RS5_FPGA_Platform
     logic [i_cnt:1]         irq_peripherals, iack_peripherals;
     
     assign irq = {20'h0, mei, 3'h0, mti, 7'h0};
+    
+    clk_wiz_0 instance_name (
+        // Clock out ports
+        .clk_out1(clk_sys),  // output clk_out1
+        // Clock in ports
+        .clk_in1_p(clk_p),   // input clk_in1_p
+        .clk_in1_n(clk_n)    // input clk_in1_n
+    );
+
+    logic reset_sys = !reset_n;
 
 //////////////////////////////////////////////////////////////////////////////
 // Control
@@ -79,7 +92,7 @@ module RS5_FPGA_Platform
         end
     end
 
-    always_ff @(posedge clk) begin
+    always_ff @(posedge clk_sys) begin
         enable_rtc_r            <= enable_rtc;
         enable_plic_r           <= enable_plic;
         enable_peripherals_r    <= enable_peripherals;
@@ -106,13 +119,15 @@ module RS5_FPGA_Platform
 
     RS5 #(
         .Environment    (Environment),
-        .RV32           (RV32),
+        // .RV32           (RV32),
         .XOSVMEnable    (XOSVMEnable),
         .ZIHPMEnable    (ZIHPMEnable),
-        .ZKNEEnable     (ZKNEEnable)
+        .ZKNEEnable     (ZKNEEnable),
+        .VEnable        (VEnable),
+        .VLEN           (VLEN)
     ) dut (
-        .clk                    (clk), 
-        .reset_n                (reset_n),
+        .clk                    (clk_sys), 
+        .reset_n                (reset_sys),
         .sys_reset_i            (1'b0),
         .stall                  (stall),
         .instruction_i          (cpu_instruction), 
@@ -132,14 +147,14 @@ module RS5_FPGA_Platform
 //////////////////////////////////////////////////////////////////////////////
 
     BRAM RAM (
-        .clka   (clk),                      // input wire clka
+        .clka   (clk_sys),                      // input wire clka
         .ena    (!stall),                   // input wire ena
         .wea    (4'h0),                     // input wire [3 : 0] wea
         .addra  (cpu_instruction_address),  // input wire [31 : 0] addra
         .dina   (0),                        // input wire [31 : 0] dina
         .douta  (cpu_instruction),          // output wire [31 : 0] douta
         //////////////////////////////////////////////////////
-        .clkb   (clk),                      // input wire clkb
+        .clkb   (clk_sys),                      // input wire clkb
         .enb    (enable_ram),               // input wire enb
         .web    (cpu_write_enable),         // input wire [3 : 0] web
         .addrb  (cpu_data_address),         // input wire [31 : 0] addrb
@@ -152,8 +167,8 @@ module RS5_FPGA_Platform
 //////////////////////////////////////////////////////////////////////////////
 
     rtc rtc(
-        .clk        (clk),
-        .reset_n    (reset_n),
+        .clk        (clk_sys),
+        .reset_n    (reset_sys),
         .en_i       (enable_rtc),
         .addr_i     (cpu_data_address[3:0]),
         .we_i       ({4'h0, cpu_write_enable}),
@@ -170,8 +185,8 @@ module RS5_FPGA_Platform
     plic #(
         .i_cnt(i_cnt)
     ) plic1 (
-        .clk    (clk),
-        .reset_n(reset_n),
+        .clk    (clk_sys),
+        .reset_n(reset_sys),
         .en_i   (enable_plic),
         .we_i   (cpu_write_enable),
         .addr_i (cpu_data_address[23:0]),
@@ -191,8 +206,8 @@ module RS5_FPGA_Platform
         .i_cnt(i_cnt),
         .CLKS_PER_BIT_UART(CLKS_PER_BIT_UART)
     ) Peripherals1 (
-        .clk            (clk), 
-        .reset_n        (reset_n), 
+        .clk            (clk_sys), 
+        .reset_n        (reset_sys), 
         .stall_o        (stall),
         .enable_i       (enable_peripherals), 
         .write_enable_i (cpu_write_enable),

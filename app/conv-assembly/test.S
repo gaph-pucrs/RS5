@@ -27,6 +27,26 @@
 .equ    MULTIP_fc2,         1000
 
 .globl boot 
+      li          t0, 0x80001000
+   
+      addi        a0, zero, 'C'
+      sb          a0, 0(t0)
+      addi        a1, zero, 'O'
+      sb          a1, 0(t0)
+      addi        a2, zero, 'N'
+      sb          a2, 0(t0)
+      addi        a3, zero, 'V'
+      sb          a3, 0(t0)
+      addi        a4, zero, ' '
+      sb          a4, 0(t0)
+      addi        a5, zero, 'A'
+      sb          a5, 0(t0)
+      addi        a6, zero, 'S'
+      sb          a6, 0(t0)
+      addi        a0, zero, 'M'
+      sb          a0, 0(t0)
+      addi        a1, zero, '\n'
+      sb          a1, 0(t0)
 
 DATASET_LOOP:
     la          a3, conv0_featureMap2  
@@ -124,22 +144,33 @@ INT_HANDLER:
 #--------------------------------------------------------------------------------------------------
 # PRINT
 #--------------------------------------------------------------------------------------------------
-
-print_routine:
-    la a2, conv0_featureMap2            # Load address of the words array
-    la a5, 0x80001000 
-    li a1, 7424                         # Load the number of words
-    li t0, 0                            # Initialize index to 0
-
 print_loop:
-    beq t0, a1, .end                    # If index == count, exit the loop
-
-    lw t1, 0(a2)                        # Load current word into t1
-    sw t1, 0(a5) 
-
-    addi a2, a2, 4                      # Move to the next word
-    addi t0, t0, 1                      # Increment index
-    j print_loop                        # Repeat the loop
+     addi t3, zero, 10
+     sw t3, 0(a5)
+     beq t0, a1, .end                    # If index == count, exit the loop
+ 
+     lw t1, 0(a2)                        # Load current word into t1
+     li t2, 8
+     li t4, 10
+print_digit:
+      li t3, 0xF0000000
+      and t3, t3, t1
+      srli t3, t3, 28
+      blt t3, t4, number
+      addi t3, t3, 39
+number:
+      addi t3, t3, 48
+      sw t3, 0(a5)
+      sll t1, t1, 4
+ 
+      addi t2, t2, -1
+      bnez t2, print_digit
+      #addi t3, zero, '\n'
+      #sb t3, 0(a5)
+ 
+      addi a2, a2, 4                      # Move to the next word
+      addi t0, t0, 1                      # Increment index
+      j print_loop                        # Repeat the loop
 
 .end:
     li      s10,    0x80000000
