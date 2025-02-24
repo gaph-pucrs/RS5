@@ -141,7 +141,7 @@ module vectorUnit
 
     assign hazard_detected = (state == V_IDLE && |write_enable == 1'b1 && (vs1_addr == vd_addr_r || vs2_addr == vd_addr_r));
 
-    assign hold_o = (next_state == V_EXEC || hazard_detected == 1'b1);
+    assign hold_o = (instruction_operation_i inside {VECTOR, VLOAD, VSTORE}) && (next_state == V_EXEC || hazard_detected == 1'b1);
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
