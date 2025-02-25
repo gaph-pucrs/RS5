@@ -73,8 +73,9 @@ module Testbench_FPGA_Platform
         // .CLKS_PER_BIT_UART(5)
         .CLKS_PER_BIT_UART(2)
     ) dut (
-        .clk_p        (clk), 
-        .clk_n      (clk_n),
+//        .clk_p        (clk), 
+//        .clk_n      (clk_n),
+        .clk        (clk),
         .reset_n    (rstCPU), 
         .BTND       (BTND),
         .UART_RX    (UART_RX),

@@ -59,7 +59,7 @@
     <Option Name="IPStaticSourceDir" Val="$PIPUSERFILESDIR/ipstatic"/>
     <Option Name="EnableBDX" Val="FALSE"/>
     <Option Name="FeatureSet" Val="FeatureSet_Classic"/>
-    <Option Name="WTXSimLaunchSim" Val="83"/>
+    <Option Name="WTXSimLaunchSim" Val="87"/>
     <Option Name="WTModelSimLaunchSim" Val="0"/>
     <Option Name="WTQuestaLaunchSim" Val="0"/>
     <Option Name="WTIesLaunchSim" Val="0"/>
@@ -127,6 +127,13 @@
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
+      <File Path="$PPRDIR/../../rtl/RS5_pkg.sv">
+        <FileInfo>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
       <File Path="$PPRDIR/../../rtl/CSRBank.sv">
         <FileInfo>
           <Attr Name="UsedIn" Val="synthesis"/>
@@ -155,34 +162,28 @@
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
-      <File Path="$PSRCDIR/sources_1/imports/rtl/RS5_pkg.sv">
+      <File Path="$PPRDIR/../../rtl/aes_unit.sv">
         <FileInfo>
-          <Attr Name="ImportPath" Val="$PPRDIR/../../rtl/RS5_pkg.sv"/>
-          <Attr Name="ImportTime" Val="1740418383"/>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
-      <File Path="$PSRCDIR/sources_1/imports/rtl/aes_unit.sv">
+      <File Path="$PPRDIR/../../rtl/amo.sv">
         <FileInfo>
-          <Attr Name="ImportPath" Val="$PPRDIR/../../rtl/aes_unit.sv"/>
-          <Attr Name="ImportTime" Val="1740418383"/>
-          <Attr Name="UsedIn" Val="synthesis"/>
-          <Attr Name="UsedIn" Val="implementation"/>
-          <Attr Name="UsedIn" Val="simulation"/>
-        </FileInfo>
-      </File>
-      <File Path="$PSRCDIR/sources_1/imports/rtl/amo.sv">
-        <FileInfo>
-          <Attr Name="ImportPath" Val="$PPRDIR/../../rtl/amo.sv"/>
-          <Attr Name="ImportTime" Val="1740418383"/>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
       <File Path="$PPRDIR/../../rtl/decode.sv">
+        <FileInfo>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PPRDIR/../../rtl/decompresser.sv">
         <FileInfo>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
@@ -210,10 +211,8 @@
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
-      <File Path="$PSRCDIR/sources_1/imports/rtl/lrsc.sv">
+      <File Path="$PPRDIR/../../rtl/lrsc.sv">
         <FileInfo>
-          <Attr Name="ImportPath" Val="$PPRDIR/../../rtl/lrsc.sv"/>
-          <Attr Name="ImportTime" Val="1740418383"/>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
           <Attr Name="UsedIn" Val="simulation"/>
@@ -233,10 +232,8 @@
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
-      <File Path="$PSRCDIR/sources_1/imports/rtl/mulNbits.sv">
+      <File Path="$PPRDIR/../../rtl/mulNbits.sv">
         <FileInfo>
-          <Attr Name="ImportPath" Val="$PPRDIR/../../rtl/mulNbits.sv"/>
-          <Attr Name="ImportTime" Val="1740418383"/>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
           <Attr Name="UsedIn" Val="simulation"/>
@@ -263,46 +260,36 @@
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
-      <File Path="$PSRCDIR/sources_1/imports/aes/riscv_crypto_aes_fwd_sbox.sv">
+      <File Path="$PPRDIR/../../rtl/aes/riscv_crypto_aes_fwd_sbox.sv">
         <FileInfo>
-          <Attr Name="ImportPath" Val="$PPRDIR/../../rtl/aes/riscv_crypto_aes_fwd_sbox.sv"/>
-          <Attr Name="ImportTime" Val="1740418383"/>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
-      <File Path="$PSRCDIR/sources_1/imports/aes/riscv_crypto_aes_sbox.sv">
+      <File Path="$PPRDIR/../../rtl/aes/riscv_crypto_aes_sbox.sv">
         <FileInfo>
-          <Attr Name="ImportPath" Val="$PPRDIR/../../rtl/aes/riscv_crypto_aes_sbox.sv"/>
-          <Attr Name="ImportTime" Val="1740418383"/>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
-      <File Path="$PSRCDIR/sources_1/imports/aes/riscv_crypto_sbox_aes_out.sv">
+      <File Path="$PPRDIR/../../rtl/aes/riscv_crypto_sbox_aes_out.sv">
         <FileInfo>
-          <Attr Name="ImportPath" Val="$PPRDIR/../../rtl/aes/riscv_crypto_sbox_aes_out.sv"/>
-          <Attr Name="ImportTime" Val="1740418383"/>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
-      <File Path="$PSRCDIR/sources_1/imports/aes/riscv_crypto_sbox_aes_top.sv">
+      <File Path="$PPRDIR/../../rtl/aes/riscv_crypto_sbox_aes_top.sv">
         <FileInfo>
-          <Attr Name="ImportPath" Val="$PPRDIR/../../rtl/aes/riscv_crypto_sbox_aes_top.sv"/>
-          <Attr Name="ImportTime" Val="1740418383"/>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
-      <File Path="$PSRCDIR/sources_1/imports/aes/riscv_crypto_sbox_inv_mid.sv">
+      <File Path="$PPRDIR/../../rtl/aes/riscv_crypto_sbox_inv_mid.sv">
         <FileInfo>
-          <Attr Name="ImportPath" Val="$PPRDIR/../../rtl/aes/riscv_crypto_sbox_inv_mid.sv"/>
-          <Attr Name="ImportTime" Val="1740418383"/>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
           <Attr Name="UsedIn" Val="simulation"/>
@@ -315,46 +302,36 @@
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
-      <File Path="$PSRCDIR/sources_1/imports/rtl/vectorALU.sv">
+      <File Path="$PPRDIR/../../rtl/vectorALU.sv">
         <FileInfo>
-          <Attr Name="ImportPath" Val="$PPRDIR/../../rtl/vectorALU.sv"/>
-          <Attr Name="ImportTime" Val="1740418383"/>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
-      <File Path="$PSRCDIR/sources_1/imports/rtl/vectorCSRs.sv">
+      <File Path="$PPRDIR/../../rtl/vectorCSRs.sv">
         <FileInfo>
-          <Attr Name="ImportPath" Val="$PPRDIR/../../rtl/vectorCSRs.sv"/>
-          <Attr Name="ImportTime" Val="1740418383"/>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
-      <File Path="$PSRCDIR/sources_1/imports/rtl/vectorLSU.sv">
+      <File Path="$PPRDIR/../../rtl/vectorLSU.sv">
         <FileInfo>
-          <Attr Name="ImportPath" Val="$PPRDIR/../../rtl/vectorLSU.sv"/>
-          <Attr Name="ImportTime" Val="1740419068"/>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
-      <File Path="$PSRCDIR/sources_1/imports/rtl/vectorRegbank.sv">
+      <File Path="$PPRDIR/../../rtl/vectorRegbank.sv">
         <FileInfo>
-          <Attr Name="ImportPath" Val="$PPRDIR/../../rtl/vectorRegbank.sv"/>
-          <Attr Name="ImportTime" Val="1740418383"/>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
-      <File Path="$PSRCDIR/sources_1/imports/rtl/vectorUnit.sv">
+      <File Path="$PPRDIR/../../rtl/vectorUnit.sv">
         <FileInfo>
-          <Attr Name="ImportPath" Val="$PPRDIR/../../rtl/vectorUnit.sv"/>
-          <Attr Name="ImportTime" Val="1740418383"/>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
           <Attr Name="UsedIn" Val="simulation"/>
@@ -374,6 +351,156 @@
       </File>
       <File Path="$PPRDIR/../RS5_FPGA_Platform_SUME.sv">
         <FileInfo>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PSRCDIR/sources_1/imports/rtl/RS5_pkg.sv">
+        <FileInfo>
+          <Attr Name="AutoDisabled" Val="1"/>
+          <Attr Name="ImportPath" Val="$PPRDIR/../../rtl/RS5_pkg.sv"/>
+          <Attr Name="ImportTime" Val="1740418383"/>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PSRCDIR/sources_1/imports/rtl/aes_unit.sv">
+        <FileInfo>
+          <Attr Name="AutoDisabled" Val="1"/>
+          <Attr Name="ImportPath" Val="$PPRDIR/../../rtl/aes_unit.sv"/>
+          <Attr Name="ImportTime" Val="1740418383"/>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PSRCDIR/sources_1/imports/rtl/amo.sv">
+        <FileInfo>
+          <Attr Name="AutoDisabled" Val="1"/>
+          <Attr Name="ImportPath" Val="$PPRDIR/../../rtl/amo.sv"/>
+          <Attr Name="ImportTime" Val="1740418383"/>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PSRCDIR/sources_1/imports/rtl/lrsc.sv">
+        <FileInfo>
+          <Attr Name="AutoDisabled" Val="1"/>
+          <Attr Name="ImportPath" Val="$PPRDIR/../../rtl/lrsc.sv"/>
+          <Attr Name="ImportTime" Val="1740418383"/>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PSRCDIR/sources_1/imports/rtl/mulNbits.sv">
+        <FileInfo>
+          <Attr Name="AutoDisabled" Val="1"/>
+          <Attr Name="ImportPath" Val="$PPRDIR/../../rtl/mulNbits.sv"/>
+          <Attr Name="ImportTime" Val="1740418383"/>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PSRCDIR/sources_1/imports/aes/riscv_crypto_aes_fwd_sbox.sv">
+        <FileInfo>
+          <Attr Name="AutoDisabled" Val="1"/>
+          <Attr Name="ImportPath" Val="$PPRDIR/../../rtl/aes/riscv_crypto_aes_fwd_sbox.sv"/>
+          <Attr Name="ImportTime" Val="1740418383"/>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PSRCDIR/sources_1/imports/aes/riscv_crypto_aes_sbox.sv">
+        <FileInfo>
+          <Attr Name="AutoDisabled" Val="1"/>
+          <Attr Name="ImportPath" Val="$PPRDIR/../../rtl/aes/riscv_crypto_aes_sbox.sv"/>
+          <Attr Name="ImportTime" Val="1740418383"/>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PSRCDIR/sources_1/imports/aes/riscv_crypto_sbox_aes_out.sv">
+        <FileInfo>
+          <Attr Name="AutoDisabled" Val="1"/>
+          <Attr Name="ImportPath" Val="$PPRDIR/../../rtl/aes/riscv_crypto_sbox_aes_out.sv"/>
+          <Attr Name="ImportTime" Val="1740418383"/>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PSRCDIR/sources_1/imports/aes/riscv_crypto_sbox_aes_top.sv">
+        <FileInfo>
+          <Attr Name="AutoDisabled" Val="1"/>
+          <Attr Name="ImportPath" Val="$PPRDIR/../../rtl/aes/riscv_crypto_sbox_aes_top.sv"/>
+          <Attr Name="ImportTime" Val="1740418383"/>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PSRCDIR/sources_1/imports/aes/riscv_crypto_sbox_inv_mid.sv">
+        <FileInfo>
+          <Attr Name="AutoDisabled" Val="1"/>
+          <Attr Name="ImportPath" Val="$PPRDIR/../../rtl/aes/riscv_crypto_sbox_inv_mid.sv"/>
+          <Attr Name="ImportTime" Val="1740418383"/>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PSRCDIR/sources_1/imports/rtl/vectorALU.sv">
+        <FileInfo>
+          <Attr Name="AutoDisabled" Val="1"/>
+          <Attr Name="ImportPath" Val="$PPRDIR/../../rtl/vectorALU.sv"/>
+          <Attr Name="ImportTime" Val="1740418383"/>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PSRCDIR/sources_1/imports/rtl/vectorCSRs.sv">
+        <FileInfo>
+          <Attr Name="AutoDisabled" Val="1"/>
+          <Attr Name="ImportPath" Val="$PPRDIR/../../rtl/vectorCSRs.sv"/>
+          <Attr Name="ImportTime" Val="1740418383"/>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PSRCDIR/sources_1/imports/rtl/vectorLSU.sv">
+        <FileInfo>
+          <Attr Name="AutoDisabled" Val="1"/>
+          <Attr Name="ImportPath" Val="$PPRDIR/../../rtl/vectorLSU.sv"/>
+          <Attr Name="ImportTime" Val="1740419068"/>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PSRCDIR/sources_1/imports/rtl/vectorRegbank.sv">
+        <FileInfo>
+          <Attr Name="AutoDisabled" Val="1"/>
+          <Attr Name="ImportPath" Val="$PPRDIR/../../rtl/vectorRegbank.sv"/>
+          <Attr Name="ImportTime" Val="1740418383"/>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PSRCDIR/sources_1/imports/rtl/vectorUnit.sv">
+        <FileInfo>
+          <Attr Name="AutoDisabled" Val="1"/>
+          <Attr Name="ImportPath" Val="$PPRDIR/../../rtl/vectorUnit.sv"/>
+          <Attr Name="ImportTime" Val="1740418383"/>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
           <Attr Name="UsedIn" Val="simulation"/>

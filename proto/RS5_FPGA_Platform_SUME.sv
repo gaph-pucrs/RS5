@@ -3,16 +3,28 @@
 module RS5_FPGA_Platform
     import RS5_pkg::*;
 #(
+    // parameter int           i_cnt       = 2,
+    // parameter environment_e Environment = FPGA,
+    // parameter rv32_e        RV32        = RV32M,
+    // parameter bit           XOSVMEnable = 1'b0,
+    // parameter bit           ZIHPMEnable = 1'b0,
+    // parameter bit           ZKNEEnable  = 1'b0,
+    // parameter bit           VEnable     = 1'b0,
+    // parameter int           VLEN        = 256,
+    // // parameter int           CLKS_PER_BIT_UART = 20833
+    // parameter int           CLKS_PER_BIT_UART = 434
     parameter int           i_cnt       = 2,
     parameter environment_e Environment = FPGA,
-    // parameter rv32_e        RV32        = RV32M,
+    parameter mul_e         MULEXT      = MUL_M,
+    parameter atomic_e      AMOEXT      = AMO_A,
+    parameter bit           COMPRESSED  = 1'b1,
     parameter bit           XOSVMEnable = 1'b0,
     parameter bit           ZIHPMEnable = 1'b0,
     parameter bit           ZKNEEnable  = 1'b0,
     parameter bit           VEnable     = 1'b0,
-    parameter int           VLEN        = 256,
-    // parameter int           CLKS_PER_BIT_UART = 20833
-    parameter int           CLKS_PER_BIT_UART = 434
+    parameter bit           BRANCHPRED  = 1'b1,
+    parameter int           VLEN        = 64,
+    parameter int           CLKS_PER_BIT_UART = 868
 )
 (
     input  logic       clk_p,
@@ -119,12 +131,15 @@ module RS5_FPGA_Platform
 
     RS5 #(
         .Environment    (Environment),
-        // .RV32           (RV32),
+        .MULEXT         (MULEXT),
+        .AMOEXT         (AMOEXT),
         .XOSVMEnable    (XOSVMEnable),
         .ZIHPMEnable    (ZIHPMEnable),
         .ZKNEEnable     (ZKNEEnable),
+        .COMPRESSED     (COMPRESSED),
         .VEnable        (VEnable),
-        .VLEN           (VLEN)
+        .VLEN           (VLEN),
+        .BRANCHPRED     (BRANCHPRED)
     ) dut (
         .clk                    (clk_sys), 
         .reset_n                (reset_sys),
