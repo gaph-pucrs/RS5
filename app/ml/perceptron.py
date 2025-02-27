@@ -120,7 +120,9 @@ owl_dic = {
 # put values in a relational table (pandas dataframe)
 owl_df = pd.DataFrame(owl_dic)
 
-df = albatross_df.append(owl_df, ignore_index=True)
+#df = albatross_df.append(owl_df, ignore_index=True)
+#df = albatross_df.concat(owl_df, ignore_index=True)
+df = pd.concat([albatross_df, owl_df], ignore_index=True)
 
 alt.Chart(df).mark_image(
     width=20,
@@ -145,5 +147,8 @@ accuracy = (num_correct_predictions / y.shape[0]) * 100
 print('Perceptron accuracy: %.2f%%' % accuracy)
 
 error_df = pd.DataFrame({'error': errors, 'time-step': np.arange(0, len(errors))})
-alt.Chart(error_df).mark_line().encode(x="time-step", y="error").properties(title='Chart 2')
+chart = alt.Chart(error_df).mark_line().encode(x="time-step", y="error").properties(title='Chart 2')
+
+chart.save('chart.html')
+
 

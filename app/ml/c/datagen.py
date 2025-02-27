@@ -71,9 +71,10 @@ file_path = 'data.h'
 with open(file_path, 'w') as file:
     #file.write(f"int weights = {weights_c_array};\n")
     #file.write(f"int wingspans = {wingspans_c_array};\n")
-    file.write(f"int n_samples = {n_samples};\n\n")
+    file.write(f"#define N_SAMPLES {2*n_samples}\n\n")
+    #file.write(f"int n_samples = {n_samples};\n\n")
     file.write(f"int n_features = 2;\n\n")
-    file.write(f"double dataset[][] = {dataset_c_array};\n\n")
+    file.write(f"double dataset[][{2*n_samples}] = {dataset_c_array};\n\n")
     file.write(f"int species[] = {species_c_array};\n")
 
 print(f"(+) Data generated into {file_path} file\n")

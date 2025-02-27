@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    #vis.vega-embed {
+      width: 100%;
+      display: flex;
+    }
+
+    #vis.vega-embed details,
+    #vis.vega-embed details summary {
+      position: relative;
+    }
+  </style>
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/vega-lite@5.20.1"></script>
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+</head>
+<body>
+  <div id="vis"></div>
+  <script>
+    (function(vegaEmbed) {
+      var spec = {"config": {"view": {"continuousWidth": 300, "continuousHeight": 300}}, "data": {"name": "data-4ccaf76e0db4b646cd81d47e3ffb87cc"}, "mark": {"type": "line"}, "encoding": {"x": {"field": "time-step", "type": "quantitative"}, "y": {"field": "error", "type": "quantitative"}}, "title": "Chart 2", "$schema": "https://vega.github.io/schema/vega-lite/v5.20.1.json", "datasets": {"data-4ccaf76e0db4b646cd81d47e3ffb87cc": [{"error": 69, "time-step": 0}, {"error": 87, "time-step": 1}, {"error": 79, "time-step": 2}, {"error": 7, "time-step": 3}, {"error": 19, "time-step": 4}, {"error": 19, "time-step": 5}, {"error": 46, "time-step": 6}, {"error": 19, "time-step": 7}, {"error": 19, "time-step": 8}, {"error": 19, "time-step": 9}, {"error": 36, "time-step": 10}, {"error": 19, "time-step": 11}, {"error": 36, "time-step": 12}, {"error": 47, "time-step": 13}, {"error": 19, "time-step": 14}, {"error": 46, "time-step": 15}, {"error": 19, "time-step": 16}, {"error": 19, "time-step": 17}, {"error": 36, "time-step": 18}, {"error": 27, "time-step": 19}, {"error": 9, "time-step": 20}, {"error": 27, "time-step": 21}, {"error": 26, "time-step": 22}, {"error": 9, "time-step": 23}, {"error": 26, "time-step": 24}, {"error": 9, "time-step": 25}, {"error": 26, "time-step": 26}, {"error": 9, "time-step": 27}, {"error": 26, "time-step": 28}, {"error": 9, "time-step": 29}, {"error": 26, "time-step": 30}, {"error": 9, "time-step": 31}, {"error": 26, "time-step": 32}, {"error": 9, "time-step": 33}, {"error": 9, "time-step": 34}, {"error": 18, "time-step": 35}, {"error": 9, "time-step": 36}, {"error": 9, "time-step": 37}, {"error": 26, "time-step": 38}, {"error": 9, "time-step": 39}, {"error": 26, "time-step": 40}, {"error": 9, "time-step": 41}, {"error": 26, "time-step": 42}, {"error": 9, "time-step": 43}, {"error": 26, "time-step": 44}, {"error": 9, "time-step": 45}, {"error": 18, "time-step": 46}, {"error": 8, "time-step": 47}, {"error": 8, "time-step": 48}, {"error": 17, "time-step": 49}, {"error": 9, "time-step": 50}, {"error": 17, "time-step": 51}, {"error": 8, "time-step": 52}, {"error": 18, "time-step": 53}, {"error": 17, "time-step": 54}, {"error": 9, "time-step": 55}, {"error": 17, "time-step": 56}, {"error": 17, "time-step": 57}, {"error": 8, "time-step": 58}, {"error": 17, "time-step": 59}, {"error": 9, "time-step": 60}, {"error": 17, "time-step": 61}, {"error": 17, "time-step": 62}, {"error": 17, "time-step": 63}, {"error": 17, "time-step": 64}, {"error": 17, "time-step": 65}, {"error": 17, "time-step": 66}, {"error": 17, "time-step": 67}, {"error": 17, "time-step": 68}, {"error": 17, "time-step": 69}, {"error": 17, "time-step": 70}, {"error": 17, "time-step": 71}, {"error": 17, "time-step": 72}, {"error": 17, "time-step": 73}, {"error": 16, "time-step": 74}, {"error": 8, "time-step": 75}, {"error": 8, "time-step": 76}, {"error": 8, "time-step": 77}, {"error": 8, "time-step": 78}, {"error": 8, "time-step": 79}, {"error": 8, "time-step": 80}, {"error": 8, "time-step": 81}, {"error": 8, "time-step": 82}, {"error": 8, "time-step": 83}, {"error": 8, "time-step": 84}, {"error": 8, "time-step": 85}, {"error": 8, "time-step": 86}, {"error": 8, "time-step": 87}, {"error": 8, "time-step": 88}, {"error": 8, "time-step": 89}, {"error": 8, "time-step": 90}, {"error": 8, "time-step": 91}, {"error": 8, "time-step": 92}, {"error": 8, "time-step": 93}, {"error": 8, "time-step": 94}, {"error": 8, "time-step": 95}, {"error": 8, "time-step": 96}, {"error": 16, "time-step": 97}, {"error": 8, "time-step": 98}, {"error": 9, "time-step": 99}, {"error": 16, "time-step": 100}, {"error": 8, "time-step": 101}, {"error": 8, "time-step": 102}, {"error": 8, "time-step": 103}, {"error": 8, "time-step": 104}, {"error": 8, "time-step": 105}, {"error": 8, "time-step": 106}, {"error": 8, "time-step": 107}, {"error": 8, "time-step": 108}, {"error": 8, "time-step": 109}, {"error": 8, "time-step": 110}, {"error": 8, "time-step": 111}, {"error": 8, "time-step": 112}, {"error": 8, "time-step": 113}, {"error": 8, "time-step": 114}, {"error": 8, "time-step": 115}, {"error": 8, "time-step": 116}, {"error": 8, "time-step": 117}, {"error": 8, "time-step": 118}, {"error": 8, "time-step": 119}, {"error": 16, "time-step": 120}, {"error": 15, "time-step": 121}, {"error": 16, "time-step": 122}, {"error": 15, "time-step": 123}, {"error": 16, "time-step": 124}, {"error": 8, "time-step": 125}, {"error": 8, "time-step": 126}, {"error": 8, "time-step": 127}, {"error": 8, "time-step": 128}, {"error": 8, "time-step": 129}, {"error": 1, "time-step": 130}, {"error": 16, "time-step": 131}, {"error": 15, "time-step": 132}, {"error": 8, "time-step": 133}, {"error": 8, "time-step": 134}, {"error": 8, "time-step": 135}, {"error": 8, "time-step": 136}, {"error": 8, "time-step": 137}, {"error": 7, "time-step": 138}, {"error": 1, "time-step": 139}, {"error": 15, "time-step": 140}, {"error": 8, "time-step": 141}, {"error": 8, "time-step": 142}, {"error": 8, "time-step": 143}, {"error": 7, "time-step": 144}, {"error": 1, "time-step": 145}, {"error": 14, "time-step": 146}, {"error": 1, "time-step": 147}, {"error": 14, "time-step": 148}, {"error": 1, "time-step": 149}, {"error": 14, "time-step": 150}, {"error": 1, "time-step": 151}, {"error": 15, "time-step": 152}, {"error": 8, "time-step": 153}, {"error": 8, "time-step": 154}, {"error": 8, "time-step": 155}, {"error": 7, "time-step": 156}, {"error": 1, "time-step": 157}, {"error": 14, "time-step": 158}, {"error": 1, "time-step": 159}, {"error": 14, "time-step": 160}, {"error": 1, "time-step": 161}, {"error": 14, "time-step": 162}, {"error": 1, "time-step": 163}, {"error": 14, "time-step": 164}, {"error": 1, "time-step": 165}, {"error": 8, "time-step": 166}, {"error": 15, "time-step": 167}, {"error": 1, "time-step": 168}, {"error": 14, "time-step": 169}, {"error": 1, "time-step": 170}, {"error": 14, "time-step": 171}, {"error": 1, "time-step": 172}, {"error": 14, "time-step": 173}, {"error": 1, "time-step": 174}, {"error": 14, "time-step": 175}, {"error": 1, "time-step": 176}, {"error": 8, "time-step": 177}, {"error": 15, "time-step": 178}, {"error": 1, "time-step": 179}, {"error": 14, "time-step": 180}, {"error": 1, "time-step": 181}, {"error": 14, "time-step": 182}, {"error": 1, "time-step": 183}, {"error": 14, "time-step": 184}, {"error": 1, "time-step": 185}, {"error": 14, "time-step": 186}, {"error": 1, "time-step": 187}, {"error": 8, "time-step": 188}, {"error": 8, "time-step": 189}, {"error": 8, "time-step": 190}, {"error": 8, "time-step": 191}, {"error": 8, "time-step": 192}, {"error": 8, "time-step": 193}, {"error": 7, "time-step": 194}, {"error": 1, "time-step": 195}, {"error": 14, "time-step": 196}, {"error": 1, "time-step": 197}, {"error": 14, "time-step": 198}, {"error": 1, "time-step": 199}]}};
+      var embedOpt = {"mode": "vega-lite"};
+
+      function showError(el, error){
+          el.innerHTML = ('<div style="color:red;">'
+                          + '<p>JavaScript Error: ' + error.message + '</p>'
+                          + "<p>This usually means there's a typo in your chart specification. "
+                          + "See the javascript console for the full traceback.</p>"
+                          + '</div>');
+          throw error;
+      }
+      const el = document.getElementById('vis');
+      vegaEmbed("#vis", spec, embedOpt)
+        .catch(error => showError(el, error));
+    })(vegaEmbed);
+
+  </script>
+</body>
+</html>

@@ -11,6 +11,6 @@ w_c_array = "{\n" + ",\n".join(map(str, w_array)) + "\n}"
 
 file_path = 'weights.h'
 with open(file_path, 'w') as file:
-    file.write(f"double weights = {w_c_array};\n")
+    file.write(f"double weights[] = {w_c_array};\n")
 
 print(f"(+) Weights generated in {file_path} file\n")

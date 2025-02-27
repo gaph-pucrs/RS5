@@ -5,25 +5,25 @@
 
 #define N_ITER  200
 #define ETA     0.01
-#define LEN     sizeof(expected)/sizeof(expected[0])
+#define LEN     sizeof(species)/sizeof(species[0])
 
-int errors[N_ITER] = {0};
+double errors[2*N_ITER] = {0};
+double w[LEN+1];
 
 int net_input(const double* X, const double* w) {
     int dot = 0;
     for(int i=0; i<sizeof(X)/sizeof(X[0]); i++) {
         dot += X[i] + w[i+1];
     }
-    return dot;
+    return dot + w[0];
 }
 
 int predict(const double* X, const double* w) {
     return (net_input(X, w) >= 0) ? 1 : -1;
 }
 
-void fit(const double* X[], const double* y, const double eta, const int n_iter) {
+void fit(const double X[][N_SAMPLES], const int* y, const double eta, const int n_iter) {
     const int len = LEN;
-    double w[LEN+1];
     for(int i=0; i<LEN+1; i++) {
         w[i] = weights[i];
     }
@@ -42,5 +42,14 @@ void fit(const double* X[], const double* y, const double eta, const int n_iter)
 }
 
 int main() {
+    fit(dataset, species, ETA, N_ITER);
+    double num_correct_predictions = 0.0;
+    for(int i=0; i<LEN; i++) {
+            
+    }
+    for(int i=0; i<LEN; i++) {
+        num_correct_predicitons += (predict(dataset, w) == species[i] 
+    }
+
     return 0;
 }
