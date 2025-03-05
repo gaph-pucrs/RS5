@@ -37,6 +37,7 @@ module decode
     input   logic           clk,
     input   logic           reset_n,
     input   logic           enable,
+    input   logic           sys_reset,
 
     input   logic [31:0]    instruction_i,
     input   logic [31:0]    pc_i,
@@ -471,6 +472,8 @@ module decode
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
                 bp_taken_o <= 1'b0;
+            else if (sys_reset)
+                bp_taken_o <= 1'b0;
             else if (enable && !hazard_o)
                 bp_taken_o <= bp_take_o;
         end
@@ -739,6 +742,9 @@ module decode
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
+            instruction_operation_o <= NOP;
+        end
+        else if (sys_reset) begin
             instruction_operation_o <= NOP;
         end
         else if (enable) begin
