@@ -134,8 +134,6 @@ module fetch  #(
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             pc_jumped_r <= '0;
-        else if (sys_reset)
-            pc_jumped_r <= '0;
         else if (jumped_r)
             pc_jumped_r <= pc_jumped;
     end
@@ -151,8 +149,6 @@ module fetch  #(
     /* at the moment the instruction arrives     */
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
-            pc_o <= '0;
-        else if (sys_reset)
             pc_o <= '0;
         else if (enable_i) 
             pc_o <= pc_update;
@@ -207,8 +203,6 @@ module fetch  #(
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
                 iaddr_rollbacked <= '0;
-            else if (sys_reset)
-                iaddr_rollbacked <= '0;
             else if (enable_i && bp_take_i)
                 iaddr_rollbacked <= iaddr_not_jumped;
         end
@@ -227,8 +221,6 @@ module fetch  #(
         logic [31:0] pc_rollbacked;
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
-                pc_rollbacked <= '0;
-            else if (sys_reset)
                 pc_rollbacked <= '0;
             else if (jump_rollback_r)
                 pc_rollbacked <= pc_o;
@@ -356,8 +348,6 @@ module fetch  #(
             logic [31:0] idata_rollbacked;
             always_ff @(posedge clk or negedge reset_n) begin
                 if (!reset_n)
-                    idata_rollbacked <= 32'h00000013;
-                else if (sys_reset)
                     idata_rollbacked <= 32'h00000013;
                 else if (jump_rollback_r)
                     idata_rollbacked <= instruction_word;
