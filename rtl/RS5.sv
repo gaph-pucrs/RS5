@@ -236,6 +236,7 @@ module RS5
         .clk                        (clk),
         .reset_n                    (reset_n),
         .enable                     (enable_decode),
+        .sys_reset                  (sys_reset_i),
         .instruction_i              (instruction_decode),
         .pc_i                       (pc_decode),
         .rs1_data_read_i            (regbank_data1),
