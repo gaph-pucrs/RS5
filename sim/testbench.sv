@@ -42,12 +42,16 @@ module testbench
     localparam bit           BRANCHPRED      = 1'b1;
 
 `ifndef SYNTH
-    localparam bit           PROFILING       = 1'b1;
+    // localparam bit           PROFILING       = 1'b1;
+    localparam bit           PROFILING       = 1'b0;
     localparam bit           DEBUG           = 1'b0;
+    localparam bit           ENABLE_TRACER   = 1'b1;
+    localparam bit           ENABLE_PROFILER = 1'b1;
 `endif
 
     localparam int           MEM_WIDTH       = 65_536;
-    localparam string        BIN_FILE        = "../app/riscv-tests/test.bin";
+    // localparam string        BIN_FILE        = "../app/riscv-tests/test.bin";
+    localparam string        BIN_FILE        = "../app/aes-test/aes128_nist_enc_test.bin";
 
     localparam int           i_cnt = 1;
 
@@ -100,6 +104,31 @@ module testbench
     logic [31:0]            irq;
 
     assign irq = {20'h0, mei, 3'h0, mti, 7'h0};
+
+    `ifdef RVFI
+    logic                    rvfi_valid;
+    logic [63:0]             rvfi_order;
+    logic [31:0]             rvfi_insn;
+    logic                    rvfi_trap;
+    logic                    rvfi_halt;
+    logic                    rvfi_intr;
+    logic [ 1:0]             rvfi_mode;
+    logic [ 1:0]             rvfi_ixl;
+    logic [ 4:0]             rvfi_rs1_addr;
+    logic [ 4:0]             rvfi_rs2_addr;
+    logic [31:0]             rvfi_rs1_rdata;
+    logic [31:0]             rvfi_rs2_rdata;
+    logic [ 4:0]             rvfi_rd_addr;
+    logic [31:0]             rvfi_rd_wdata;
+    logic [31:0]             rvfi_pc_rdata;
+    logic [31:0]             rvfi_pc_wdata;
+    logic [31:0]             rvfi_mem_addr;
+    logic [ 3:0]             rvfi_mem_rmask;
+    logic [ 3:0]             rvfi_mem_wmask;
+    logic [31:0]             rvfi_mem_rdata;
+    logic [31:0]             rvfi_mem_wdata;
+    `endif
+
 
 //////////////////////////////////////////////////////////////////////////////
 // Control
@@ -181,10 +210,36 @@ module testbench
         .ZKNEEnable (USE_ZKNE       ),
         .BRANCHPRED (BRANCHPRED     )
     ) dut (
+
         .clk                    (clk),
         .reset_n                (reset_n),
         .sys_reset_i            (1'b0),
         .stall                  (1'b0),
+
+        `ifdef RVFI
+        .rvfi_valid(rvfi_valid),
+        .rvfi_order(rvfi_order),
+        .rvfi_insn(rvfi_insn),
+        .rvfi_trap(rvfi_trap),
+        .rvfi_halt(rvfi_halt),
+        .rvfi_intr(rvfi_intr),
+        .rvfi_mode(rvfi_mode),
+        .rvfi_ixl(rvfi_ixl),
+        .rvfi_rs1_addr(rvfi_rs1_addr),
+        .rvfi_rs2_addr(rvfi_rs2_addr),
+        .rvfi_rs1_rdata(rvfi_rs1_rdata),
+        .rvfi_rs2_rdata(rvfi_rs2_rdata),
+        .rvfi_rd_addr(rvfi_rd_addr),
+        .rvfi_rd_wdata(rvfi_rd_wdata),
+        .rvfi_pc_rdata(rvfi_pc_rdata),
+        .rvfi_pc_wdata(rvfi_pc_wdata),
+        .rvfi_mem_addr(rvfi_mem_addr),
+        .rvfi_mem_rmask(rvfi_mem_rmask),
+        .rvfi_mem_wmask(rvfi_mem_wmask),
+        .rvfi_mem_rdata(rvfi_mem_rdata),
+        .rvfi_mem_wdata(rvfi_mem_wdata),
+        `endif
+
         .instruction_i          (instruction),
         .mem_data_i             (mem_data_read),
         .mtime_i                (mtime),
@@ -195,6 +250,7 @@ module testbench
         .mem_address_o          (mem_address),
         .mem_data_o             (mem_data_write),
         .interrupt_ack_o        (interrupt_ack)
+
     );
 
 //////////////////////////////////////////////////////////////////////////////
@@ -287,5 +343,39 @@ module testbench
             data_tb <= '0;
         end
     end
+
+    `ifdef RVFI
+    rvfi_monitor #(
+        .ENABLE_TRACER(ENABLE_TRACER),
+        .ENABLE_PROFILER(ENABLE_PROFILER)
+    ) u_rvfi_monitor (
+
+        .rvfi_ext_clk(clk),
+        .rvfi_ext_reset_n(reset_n),
+
+        .rvfi_valid(rvfi_valid),
+        .rvfi_order(rvfi_order),
+        .rvfi_insn(rvfi_insn),
+        .rvfi_trap(rvfi_trap),
+        .rvfi_halt(rvfi_halt),
+        .rvfi_intr(rvfi_intr),
+        .rvfi_mode(rvfi_mode),
+        .rvfi_ixl(rvfi_ixl),
+        .rvfi_rs1_addr(rvfi_rs1_addr),
+        .rvfi_rs2_addr(rvfi_rs2_addr),
+        .rvfi_rs1_rdata(rvfi_rs1_rdata),
+        .rvfi_rs2_rdata(rvfi_rs2_rdata),
+        .rvfi_rd_addr(rvfi_rd_addr),
+        .rvfi_rd_wdata(rvfi_rd_wdata),
+        .rvfi_pc_rdata(rvfi_pc_rdata),
+        .rvfi_pc_wdata(rvfi_pc_wdata),
+        .rvfi_mem_addr(rvfi_mem_addr),
+        .rvfi_mem_rmask(rvfi_mem_rmask),
+        .rvfi_mem_wmask(rvfi_mem_wmask),
+        .rvfi_mem_rdata(rvfi_mem_rdata),
+        .rvfi_mem_wdata(rvfi_mem_wdata)
+
+    );
+    `endif
 
 endmodule

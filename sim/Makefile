@@ -19,6 +19,22 @@ VERILATOR_FLAGS += -Wall
 # Input files for Verilator
 VERILATOR_INPUT = testbench.sv
 
+RVFI_TRACER_ENABLE?=1
+RVFI_PROFILER_ENABLE?=1
+RVFI_TRACER_LOG_FILE?=rvfi_tracer_log.txt
+RVFI_PROFILER_LOG_FILE?=rvfi_profiler_log.txt
+RVFI_PROFILER_SYMBOL_LIST_FILE?=rvfi_profiler_symbol_table.txt
+RVFI_PROFILER_WATCHLIST_FILE?=rvfi_profiler_watchlist.txt
+
+PLUSARGS = "\
++RVFI_TRACER_ENABLE=$(RVFI_TRACER_ENABLE) \
++RVFI_PROFILER_ENABLE=$(RVFI_PROFILER_ENABLE) \
++RVFI_TRACER_LOG_FILE=$(RVFI_TRACER_LOG_FILE) \
++RVFI_PROFILER_LOG_FILE=$(RVFI_PROFILER_LOG_FILE) \
++RVFI_PROFILER_SYMBOL_LIST_FILE=$(RVFI_PROFILER_SYMBOL_LIST_FILE) \
++RVFI_PROFILER_WATCHLIST_FILE=$(RVFI_PROFILER_WATCHLIST_FILE)\
+"
+
 default: run
 
 run:
@@ -38,9 +54,21 @@ run:
 lint:
 	@$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_INPUT) --lint-only -I../rtl -I../rtl/aes --timing
 
+# Internally xrun uses gcc 9.3
+xrun:
+	gcc -shared -fPIC rvfi_tools/*.c -o rvfi_tools.so -std=c11 -I/usr/include/glib-2.0 -I/usr/lib64/glib-2.0/include -L/usr/lib64 -lglib-2.0
+	xrun -sv -sv_lib rvfi_tools.so -timescale 1ns/1ps -define RVFI -F ../rtl/rtl.f -F tb.f -incdir ../rtl -top testbench -access rwc -input scripts/cadence/xmsim_probe.tcl $(PLUSARGS)
+
 clean:
 	@echo
 	@echo "-- CLEAN -------------------"
 	rm -rf obj_dir debug
+	rm -rf rvfi_tools.so
+	rm -rf waves.shm
+	rm -rf xcelium.d
+	rm -rf .bpad
+	rm -rf *.err
+	rm -rf sigusrdump.out
+	rm -rf xrun.*
 
 .PHONY: run clean

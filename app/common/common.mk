@@ -22,6 +22,8 @@ CCOBJ = $(patsubst %.c, %.o, $(CCSRC))
 ASSRC = $(wildcard ../common/*.S)
 ASOBJ = $(patsubst %.S,%.o, $(ASSRC))
 
+RVFI_PROFILER_SYMBOL_LIST_FILE?=rvfi_profiler_symbol_table.txt
+
 all: $(TARGET).bin $(TARGET).lst
 
 $(TARGET).bin: $(TARGET).elf
@@ -35,6 +37,7 @@ $(TARGET).lst: $(TARGET).elf
 $(TARGET).elf: $(CCOBJ) $(ASOBJ)
 	@printf "${RED}Linking %s...${NC}\n" "$@"
 	@$(CC) $(CCOBJ) $(ASOBJ) -Wl,-Map=$(TARGET).map -N -o $@ $(LDFLAGS)
+	// TODO: Dump symbol table to $RVFI_PROFILER_SYMBOL_LIST_FILE
 
 %.o: %.S
 	@printf "${RED}Assemblying %s...${NC}\n" "$<"

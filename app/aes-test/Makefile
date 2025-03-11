@@ -4,14 +4,17 @@ LDFLAGS_STRIP = -Wl,--gc-sections
 
 TRIPLET = riscv64-elf
 CC = $(TRIPLET)-gcc
-CFLAGS = -IbareOS/include -Itinycrypt/include -O2 -fno-builtin -march=rv32i_zkne -mabi=ilp32 -mbranch-cost=7 -DAES_RISCV_ASM -DTC_AES_128 $(CFLAGS_STRIP)
+# CFLAGS = -IbareOS/include -Itinycrypt/include -O2 -fno-builtin -march=rv32i_zkne -mabi=ilp32 -mbranch-cost=7 -DAES_RISCV_ASM -DTC_AES_128 $(CFLAGS_STRIP)
+CFLAGS = -IbareOS/include -Itinycrypt/include -O2 -fno-builtin -march=rv32imc_zkne -mabi=ilp32 -mbranch-cost=7 -DAES_RISCV_ASM -DTC_AES_128 $(CFLAGS_STRIP)
 AS = $(TRIPLET)-as
-ASFLAGS = -march=rv32i_zicsr_zkne -mabi=ilp32
+# ASFLAGS = -march=rv32i_zicsr_zkne -mabi=ilp32
+ASFLAGS = -march=rv32imc_zicsr_zkne -mabi=ilp32
 CPP = $(TRIPLET)-g++
 CCFLAGS = $(CFLAGS)
 LD = $(TRIPLET)-gcc
 #LD = $(TRIPLET)-ld
-LDFLAGS = $(LDFLAGS_STRIP) -nostdlib -march=rv32i_zkne -mabi=ilp32 -Triscv.ld
+# LDFLAGS = $(LDFLAGS_STRIP) -nostdlib -march=rv32i_zkne -mabi=ilp32 -Triscv.ld
+LDFLAGS = $(LDFLAGS_STRIP) -nostdlib -march=rv32imc_zkne -mabi=ilp32 -Triscv.ld
 OBJCOPY = $(TRIPLET)-objcopy
 OBJDUMP = $(TRIPLET)-objdump
 
@@ -47,6 +50,9 @@ all : $(BIN_FILES) $(LST_FILES)
 
 %.elf: $(BARE_OS) $(TINYCRYPT) %.o
 	$(LD) -o $@ $+ $(LDFLAGS)
+	nm $@ -C > ../../sim/rvfi_profiler_symbol_table.txt
 
-clean :
-	rm -f $(BIN_FILES) $(LST_FILES) $(BARE_OS) $(wildcard *~) $(wildcard *.o)
+clean:
+	rm -f $(BIN_FILES) $(LST_FILES) $(BARE_OS) $(PROGNAME).elf $(wildcard *~) $(wildcard *.o)
+
+.SECONDARY:  %.elf

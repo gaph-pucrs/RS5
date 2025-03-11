@@ -46,6 +46,30 @@ module RS5
     input  logic                    sys_reset_i,
     input  logic                    stall,
 
+    `ifdef RVFI
+    output logic                    rvfi_valid,
+    output logic [63:0]             rvfi_order,
+    output logic [31:0]             rvfi_insn,
+    output logic                    rvfi_trap,
+    output logic                    rvfi_halt,
+    output logic                    rvfi_intr,
+    output logic [ 1:0]             rvfi_mode,
+    output logic [ 1:0]             rvfi_ixl,
+    output logic [ 4:0]             rvfi_rs1_addr,
+    output logic [ 4:0]             rvfi_rs2_addr,
+    output logic [31:0]             rvfi_rs1_rdata,
+    output logic [31:0]             rvfi_rs2_rdata,
+    output logic [ 4:0]             rvfi_rd_addr,
+    output logic [31:0]             rvfi_rd_wdata,
+    output logic [31:0]             rvfi_pc_rdata,
+    output logic [31:0]             rvfi_pc_wdata,
+    output logic [31:0]             rvfi_mem_addr,
+    output logic [ 3:0]             rvfi_mem_rmask,
+    output logic [ 3:0]             rvfi_mem_wmask,
+    output logic [31:0]             rvfi_mem_rdata,
+    output logic [31:0]             rvfi_mem_wdata,
+    `endif
+
     input  logic [31:0]             instruction_i,
     input  logic [31:0]             mem_data_i,
     input  logic [63:0]             mtime_i,
@@ -57,6 +81,7 @@ module RS5
     output logic [31:0]             mem_address_o,
     output logic [31:0]             mem_data_o,
     output logic                    interrupt_ack_o
+
 );
 
 //////////////////////////////////////////////////////////////////////////////
@@ -194,7 +219,7 @@ module RS5
         .bp_rollback_o          (bp_rollback),
         .jump_misaligned_o      (jump_misaligned),
         .compressed_o           (compressed_decode),
-        .instruction_address_o  (instruction_address), 
+        .instruction_address_o  (instruction_address),
         .instruction_data_i     (instruction_i),
         .instruction_o          (instruction_decode),
         .pc_o                   (pc_decode)
@@ -492,5 +517,251 @@ module RS5
     end
 
     assign mem_write_enable_o = mem_write_enable;
+
+    `ifdef RVFI
+
+    // localparam RVFI_STAGES = 3;
+    localparam RVFI_STAGES = 2;
+
+    logic       rvfi_stage_valid_d[RVFI_STAGES];
+    logic[63:0] rvfi_stage_order_d[RVFI_STAGES];
+    logic[31:0] rvfi_stage_insn_d[RVFI_STAGES];
+    logic       rvfi_stage_trap_d[RVFI_STAGES];
+    logic       rvfi_stage_halt_d[RVFI_STAGES];
+    logic       rvfi_stage_intr_d[RVFI_STAGES];
+    logic[1:0]  rvfi_stage_mode_d[RVFI_STAGES];
+    logic[1:0]  rvfi_stage_ixl_d[RVFI_STAGES];
+    logic[4:0]  rvfi_stage_rs1_addr_d[RVFI_STAGES];
+    logic[4:0]  rvfi_stage_rs2_addr_d[RVFI_STAGES];
+    logic[31:0] rvfi_stage_rs1_rdata_d[RVFI_STAGES];
+    logic[31:0] rvfi_stage_rs2_rdata_d[RVFI_STAGES];
+    logic[4:0]  rvfi_stage_rd_addr_d[RVFI_STAGES];
+    logic[31:0] rvfi_stage_rd_wdata_d[RVFI_STAGES];
+    logic[31:0] rvfi_stage_pc_rdata_d[RVFI_STAGES];
+    logic[31:0] rvfi_stage_pc_wdata_d[RVFI_STAGES];
+    logic[31:0] rvfi_stage_mem_addr_d[RVFI_STAGES];
+    logic[3:0]  rvfi_stage_mem_rmask_d[RVFI_STAGES];
+    logic[3:0]  rvfi_stage_mem_wmask_d[RVFI_STAGES];
+    logic[31:0] rvfi_stage_mem_rdata_d[RVFI_STAGES];
+    logic[31:0] rvfi_stage_mem_wdata_d[RVFI_STAGES];
+
+    logic       rvfi_stage_valid[RVFI_STAGES];
+    logic[63:0] rvfi_stage_order[RVFI_STAGES];
+    logic[31:0] rvfi_stage_insn[RVFI_STAGES];
+    logic       rvfi_stage_trap[RVFI_STAGES];
+    logic       rvfi_stage_halt[RVFI_STAGES];
+    logic       rvfi_stage_intr[RVFI_STAGES];
+    logic[1:0]  rvfi_stage_mode[RVFI_STAGES];
+    logic[1:0]  rvfi_stage_ixl[RVFI_STAGES];
+    logic[4:0]  rvfi_stage_rs1_addr[RVFI_STAGES];
+    logic[4:0]  rvfi_stage_rs2_addr[RVFI_STAGES];
+    // logic[4:0]  rvfi_stage_rs3_addr[RVFI_STAGES];
+    logic[31:0] rvfi_stage_rs1_rdata[RVFI_STAGES];
+    logic[31:0] rvfi_stage_rs2_rdata[RVFI_STAGES];
+    // logic[31:0] rvfi_stage_rs3_rdata[RVFI_STAGES];
+    logic[4:0]  rvfi_stage_rd_addr[RVFI_STAGES];
+    logic[31:0] rvfi_stage_rd_wdata[RVFI_STAGES];
+    logic[31:0] rvfi_stage_pc_rdata[RVFI_STAGES];
+    logic[31:0] rvfi_stage_pc_wdata[RVFI_STAGES];
+    logic[31:0] rvfi_stage_mem_addr[RVFI_STAGES];
+    logic[3:0]  rvfi_stage_mem_rmask[RVFI_STAGES];
+    logic[3:0]  rvfi_stage_mem_wmask[RVFI_STAGES];
+    logic[31:0] rvfi_stage_mem_rdata[RVFI_STAGES];
+    logic[31:0] rvfi_stage_mem_wdata[RVFI_STAGES];
+
+    logic[31:0] instruction_built_q, instruction_built_2q;
+    logic[4:0] rs1_q, rs2_q;
+    logic compressed_q, enable_decode_q;
+
+    always_ff @(posedge clk or negedge reset_n) begin
+
+        if (!reset_n) begin
+            instruction_built_q <= '0;
+            instruction_built_2q <= '0;
+            rs1_q <= '0;
+            rs2_q <= '0;
+
+        // FIXME: May need to be revisited for multi-cycle instructions
+        // end else begin
+        // end else if (!execute1.hold_o) begin
+        end else if (rvfi_stage_valid_d[0]) begin
+            instruction_built_q <= fetch1.gen_compressed_on.instruction_built;
+            instruction_built_2q <= instruction_built_q;
+            compressed_q <= instruction_compressed_execute;
+            rs1_q <= rs1;
+            rs2_q <= rs2;
+        end
+
+    end
+
+    // TODO: Consider jump_rollback_o = 1 in case of branch misprediction
+
+    // assign rvfi_stage_valid_d[0] = !hazard && !decoder1.killed;
+    // assign rvfi_stage_order_d[0] = rvfi_stage_order[0] + 1'b1;
+    // assign rvfi_stage_insn_d[0] = compressed_decode ? {16'd0, instruction_built_q[15:0]} : instruction_decode;
+    // assign rvfi_stage_trap_d[0] = decoder1.exception;
+    // assign rvfi_stage_halt_d[0] = decoder1.instruction_operation == WFI;
+    // assign rvfi_stage_intr_d[0] = 1'b0;  // FIXME: This bit needs to be set when jumping to ISR
+    // assign rvfi_stage_mode_d[0] = 2'b00;  // NOTE: Final value gets set at execute RVFI stage
+    // assign rvfi_stage_ixl_d[0] = 2'b00;  // NOTE: Final value gets set at execute RVFI stage
+    // assign rvfi_stage_rs1_addr_d[0] = rs1;
+    // assign rvfi_stage_rs2_addr_d[0] = rs2;
+    // assign rvfi_stage_rs1_rdata_d[0] = regbank_data1;
+    // assign rvfi_stage_rs2_rdata_d[0] = regbank_data2;
+    // assign rvfi_stage_rd_addr_d[0] = decoder1.rd;
+    // assign rvfi_stage_rd_wdata_d[0] = {32{1'bX}};
+    // assign rvfi_stage_pc_rdata_d[0] = pc_decode;
+    // assign rvfi_stage_pc_wdata_d[0] = {32{1'bX}};  // NOTE: Final value gets set at execute RVFI stage
+    // assign rvfi_stage_mem_addr_d[0] = {32{1'bX}};  // NOTE: Final value gets set at execute RVFI stage
+    // assign rvfi_stage_mem_rmask_d[0] = {4{1'bX}};  // NOTE: Final value gets set at execute RVFI stage
+    // assign rvfi_stage_mem_wmask_d[0] = {4{1'bX}};  // NOTE: Final value gets set at execute RVFI stage
+    // assign rvfi_stage_mem_rdata_d[0] = {32{1'bX}};  // NOTE: Final value gets set at execute RVFI stage
+    // assign rvfi_stage_mem_wdata_d[0] = {32{1'bX}};  // NOTE: Final value gets set at execute RVFI stage
+
+    // assign rvfi_stage_valid_d[1] = !hold;
+    // assign rvfi_stage_order_d[1] = rvfi_stage_order[0];
+
+    // assign rvfi_stage_valid_d[0] = !hazard && !decoder1.killed;
+
+    assign rvfi_stage_valid_d[0] = !hold && !stall &&!killed;
+    assign rvfi_stage_order_d[0] = rvfi_stage_order[0] + 1'b1;
+    // assign rvfi_stage_insn_d[0] = compressed_decode ? {16'd0, instruction_built_q[15:0]} : instruction_decode;
+    assign rvfi_stage_insn_d[0] = instruction_compressed_execute ? {16'd0, instruction_built_2q[15:0]} : instruction_execute;
+    // assign rvfi_stage_insn_d[0] = compressed_q ? {16'd0, instruction_built_2q[15:0]} : instruction_built_2q;
+    assign rvfi_stage_trap_d[0] = exc_ilegal_inst_execute;
+    assign rvfi_stage_halt_d[0] = execute1.instruction_operation_i == WFI;
+    assign rvfi_stage_intr_d[0] = execute1.machine_return_o || execute1.raise_exception_o || execute1.interrupt_ack_o;  // FIXME: Use signals in this hierarchical level instead
+    assign rvfi_stage_mode_d[0] = privilege;
+    assign rvfi_stage_ixl_d[0] = privilege;  // FIXME: This doesnt feel right but it doesnt matter in the short term, revisit this in the future and get correct value from CSR
+    assign rvfi_stage_rs1_addr_d[0] = rs1_q;
+    assign rvfi_stage_rs2_addr_d[0] = rs2_q;
+    assign rvfi_stage_rs1_rdata_d[0] = rs1_data_execute;
+    assign rvfi_stage_rs2_rdata_d[0] = rs2_data_execute;
+    assign rvfi_stage_rd_addr_d[0] = rd_execute;
+    assign rvfi_stage_rd_wdata_d[0] = result_exec;
+    assign rvfi_stage_pc_rdata_d[0] = pc_execute;
+    // assign rvfi_stage_pc_wdata_d[0] = ctx_switch ? ctx_switch_target : (pc_execute + (compressed_q ? 32'd2 : 32'd4));
+    assign rvfi_stage_pc_wdata_d[0] = (ctx_switch || bp_taken_exec) ? ctx_switch_target : pc_decode;
+    assign rvfi_stage_mem_addr_d[0] = mem_address;
+    assign rvfi_stage_mem_rmask_d[0] = {4{mem_read_enable}};
+    assign rvfi_stage_mem_wmask_d[0] = mem_write_enable;
+    assign rvfi_stage_mem_rdata_d[0] = mem_data_i;
+    // assign rvfi_stage_mem_rdata_d[0] = 'x;
+    // assign rvfi_stage_mem_wdata_d[0] = mem_data_o;
+    assign rvfi_stage_mem_wdata_d[0] = 'x;
+
+    assign rvfi_stage_valid_d[1] = rvfi_stage_valid[0];
+    assign rvfi_stage_order_d[1] = rvfi_stage_order[0];
+    assign rvfi_stage_insn_d[1] = rvfi_stage_insn[0];
+    assign rvfi_stage_trap_d[1] = rvfi_stage_trap[0];
+    assign rvfi_stage_halt_d[1] = rvfi_stage_halt[0];
+    assign rvfi_stage_intr_d[1] = rvfi_stage_intr[0];
+    assign rvfi_stage_mode_d[1] = rvfi_stage_mode[0];
+    assign rvfi_stage_ixl_d[1] = rvfi_stage_ixl[0];
+    assign rvfi_stage_rs1_addr_d[1] = rvfi_stage_rs1_addr[0];
+    assign rvfi_stage_rs2_addr_d[1] = rvfi_stage_rs2_addr[0];
+    assign rvfi_stage_rs1_rdata_d[1] = rvfi_stage_rs1_rdata[0];
+    assign rvfi_stage_rs2_rdata_d[1] = rvfi_stage_rs2_rdata[0];
+    assign rvfi_stage_rd_addr_d[1] = rvfi_stage_rd_addr[0];
+    // assign rvfi_stage_rd_wdata_d[1] = rvfi_stage_rd_wdata[0];
+    assign rvfi_stage_rd_wdata_d[1] = regbank_data_writeback;
+    assign rvfi_stage_pc_rdata_d[1] = rvfi_stage_pc_rdata[0];
+    assign rvfi_stage_pc_wdata_d[1] = rvfi_stage_pc_wdata[0];
+    assign rvfi_stage_mem_addr_d[1] = rvfi_stage_mem_addr[0];
+    assign rvfi_stage_mem_rmask_d[1] = rvfi_stage_mem_rmask[0];
+    assign rvfi_stage_mem_wmask_d[1] = rvfi_stage_mem_wmask[0];
+    // assign rvfi_stage_mem_rdata_d[1] = rvfi_stage_mem_rdata[0];
+    assign rvfi_stage_mem_rdata_d[1] = mem_data_i;
+    assign rvfi_stage_mem_wdata_d[1] = mem_data_o;
+
+    assign rvfi_valid = rvfi_stage_valid[1];
+    assign rvfi_order = rvfi_stage_order[1];
+    assign rvfi_insn = rvfi_stage_insn[1];
+    assign rvfi_trap = rvfi_stage_trap[1];
+    assign rvfi_halt = rvfi_stage_halt[1];
+    assign rvfi_intr = rvfi_stage_intr[1];
+    assign rvfi_mode = rvfi_stage_mode[1];
+    assign rvfi_ixl = rvfi_stage_ixl[1];
+    assign rvfi_rs1_addr = rvfi_stage_rs1_addr[1];
+    assign rvfi_rs2_addr = rvfi_stage_rs2_addr[1];
+    assign rvfi_rs1_rdata = rvfi_stage_rs1_rdata[1];
+    assign rvfi_rs2_rdata = rvfi_stage_rs2_rdata[1];
+    assign rvfi_rd_addr = rvfi_stage_rd_addr[1];
+    assign rvfi_rd_wdata = rvfi_stage_rd_wdata[1];
+    assign rvfi_pc_rdata = rvfi_stage_pc_rdata[1];
+    assign rvfi_pc_wdata = rvfi_stage_pc_wdata[1];
+    assign rvfi_mem_addr = rvfi_stage_mem_addr[1];
+    assign rvfi_mem_rmask = rvfi_stage_mem_rmask[1];
+    assign rvfi_mem_wmask = rvfi_stage_mem_wmask[1];
+    assign rvfi_mem_rdata = rvfi_stage_mem_rdata[1];
+    assign rvfi_mem_wdata = rvfi_stage_mem_wdata[1];
+
+    always_ff @(posedge clk or negedge reset_n) begin
+
+        if (!reset_n) begin
+
+            for (int i = 0; i < RVFI_STAGES; i++) begin
+
+                rvfi_stage_valid[i] <= 1'b0;
+                rvfi_stage_order[i] <= '0;
+                rvfi_stage_insn[i] <= '0;
+                rvfi_stage_trap[i] <= 1'b0;
+                rvfi_stage_halt[i] <= 1'b0;
+                rvfi_stage_intr[i] <= 1'b0;
+                rvfi_stage_mode[i] <= '0;
+                rvfi_stage_ixl[i] <= '0;
+                rvfi_stage_rs1_addr[i] <= '0;
+                rvfi_stage_rs2_addr[i] <= '0;
+                rvfi_stage_rs1_rdata[i] <= '0;
+                rvfi_stage_rs2_rdata[i] <= '0;
+                rvfi_stage_rd_addr[i] <= '0;
+                rvfi_stage_rd_wdata[i] <= '0;
+                rvfi_stage_pc_rdata[i] <= '0;
+                rvfi_stage_pc_wdata[i] <= '0;
+                rvfi_stage_mem_addr[i] <= '0;
+                rvfi_stage_mem_rmask[i] <= '0;
+                rvfi_stage_mem_wmask[i] <= '0;
+                rvfi_stage_mem_rdata[i] <= '0;
+                rvfi_stage_mem_wdata[i] <= '0;
+
+            end
+
+        end else begin
+
+            for (int i = 0; i < RVFI_STAGES; i++) begin
+
+                rvfi_stage_valid[i] <= rvfi_stage_valid_d[i];
+
+                // if (rvfi_stage_valid_d[i]) begin
+
+                    rvfi_stage_order[i] <= rvfi_stage_order_d[i];
+                    rvfi_stage_insn[i] <= rvfi_stage_insn_d[i];
+                    rvfi_stage_trap[i] <= rvfi_stage_trap_d[i];
+                    rvfi_stage_halt[i] <= rvfi_stage_halt_d[i];
+                    rvfi_stage_intr[i] <= rvfi_stage_intr_d[i];
+                    rvfi_stage_mode[i] <= rvfi_stage_mode_d[i];
+                    rvfi_stage_ixl[i] <= rvfi_stage_ixl_d[i];
+                    rvfi_stage_rs1_addr[i] <= rvfi_stage_rs1_addr_d[i];
+                    rvfi_stage_rs2_addr[i] <= rvfi_stage_rs2_addr_d[i];
+                    rvfi_stage_rs1_rdata[i] <= rvfi_stage_rs1_rdata_d[i];
+                    rvfi_stage_rs2_rdata[i] <= rvfi_stage_rs2_rdata_d[i];
+                    rvfi_stage_rd_addr[i] <= rvfi_stage_rd_addr_d[i];
+                    rvfi_stage_rd_wdata[i] <= rvfi_stage_rd_wdata_d[i];
+                    rvfi_stage_pc_rdata[i] <= rvfi_stage_pc_rdata_d[i];
+                    rvfi_stage_pc_wdata[i] <= rvfi_stage_pc_wdata_d[i];
+                    rvfi_stage_mem_addr[i] <= rvfi_stage_mem_addr_d[i];
+                    rvfi_stage_mem_rmask[i] <= rvfi_stage_mem_rmask_d[i];
+                    rvfi_stage_mem_wmask[i] <= rvfi_stage_mem_wmask_d[i];
+                    rvfi_stage_mem_rdata[i] <= rvfi_stage_mem_rdata_d[i];
+                    rvfi_stage_mem_wdata[i] <= rvfi_stage_mem_wdata_d[i];
+
+                // end
+
+            end
+
+        end
+
+    end
+    `endif
 
 endmodule
