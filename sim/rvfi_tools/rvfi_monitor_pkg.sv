@@ -57,37 +57,4 @@ typedef enum int {
     rv128
 } rv_isa;
 
-typedef struct {
-    string function_name;
-    int start_pc;
-    int ret_pc;
-    chandle counters;
-} counter_info_t;
-
-typedef struct {
-
-    rv_isa isa;
-
-    int en_tracer;
-    int en_profiler;
-    int en_checker;
-
-    string tracer_log_file_name;
-    string profiler_log_file_name;
-    string symbol_table_file_name;
-    string symbol_watchlist_file_name;
-
-    chandle tracer_log_file;
-    chandle profiler_log_file;
-    chandle symbol_table_file;
-    chandle symbol_watchlist_file;
-
-    chandle symbol_table_hash_table;
-    chandle performance_counters;
-    chandle counter_stack;
-
-    counter_info_t last_counter_state;
-
-} rvfi_monitor_context;
-
 endpackage
