@@ -6,7 +6,6 @@
 #include <stdint.h>
 
 #include "riscv-disas.h"
-// #include "uthash.h"
 #include "glib.h"
 
 #ifdef RV64
@@ -43,11 +42,8 @@ typedef struct {
     uint32_t is_watched;
     uint32_t is_function;
     uint32_t times_called;
-    // uint32_t* start_cycles;
     GArray* start_cycles;
-    // uint32_t* end_cycles;
     GArray* end_cycles;
-    // uint32_t key;  // PC of the first instruction
     char function_name[200];
 } symbol_info_t;
 
@@ -65,8 +61,39 @@ typedef struct {
     char* function_name;
     uint32_t start_pc;
     uint32_t ret_pc;
-    uint64_t* counters;
+    // uint64_t* counters;
+    GArray* counters;
 } counter_info_t;
+
+typedef struct {
+
+    char* monitor_prefix;
+
+    rv_isa isa;
+
+    int en_tracer;
+    int en_profiler;
+    int en_checker;
+
+    char* tracer_log_file_name;
+    char* profiler_log_file_name;
+    char* symbol_table_file_name;
+    char* symbol_watchlist_file_name;
+
+    FILE* tracer_log_file;
+    FILE* profiler_log_file;
+    FILE* symbol_table_file;
+    FILE* symbol_watchlist_file;
+
+    GHashTable* symbol_table_hash_table;
+    GArray* performance_counters;
+    GArray* counter_stack;
+
+    counter_info_t last_counter_state;  // Counter state as of the last call to a function in the watchlist
+
+    int n_counters;
+
+} rvfi_monitor_context;
 
 // From riscv-dis.c
 
@@ -87,79 +114,13 @@ typedef struct {
 } rv_opcode_data;
 
 extern rv_opcode_data *opcode_data;
-// extern char rv_ireg_name_sym[32][5];
+
 static const char rv_ireg_name_sym[32][5] = {
     "zero", "ra",   "sp",   "gp",   "tp",   "t0",   "t1",   "t2",
     "s0",   "s1",   "a0",   "a1",   "a2",   "a3",   "a4",   "a5",
     "a6",   "a7",   "s2",   "s3",   "s4",   "s5",   "s6",   "s7",
     "s8",   "s9",   "s10",  "s11",  "t3",   "t4",   "t5",   "t6",
 };
-
-// #if !defined(DISASSEMBLY_BACKEND)
-// #define DISASSEMBLY_BACKEND RISCV_DIS
-// #endif
-
-// #if DISASSEMBLY_BACKEND == RISCV_DIS
-
-// #define MATCH_MEM_INSN(op)
-//     switch (op) {\
-//         case rv_op_lb:\
-//         case rv_op_lh:\
-//         case rv_op_lw:\
-//         case rv_op_lbu:\
-//         case rv_op_lhu:\
-//         case rv_op_sb:\
-//         case rv_op_sh:\
-//         case rv_op_sw:\
-//         case rv_op_lwu:\
-//         case rv_op_ld:\
-//         case rv_op_sd:\
-//         case rv_op_ldu:\
-//         case rv_op_lq:\
-//         case rv_op_sq:\
-//         case rv_op_c_fld:\
-//         case rv_op_c_lw:\
-//         case rv_op_c_flw:\
-//         case rv_op_c_fsd:\
-//         case rv_op_c_sw:\
-//         case rv_op_c_fsw:\
-//         case rv_op_c_fldsp:\
-//         case rv_op_c_lwsp:\
-//         case rv_op_c_flwsp:\
-//         case rv_op_c_fsdsp:\
-//         case rv_op_c_swsp:\
-//         case rv_op_c_fswsp:\
-//         case rv_op_c_ld:\
-//         case rv_op_c_sd:\
-//         case rv_op_c_ldsp:\
-//         case rv_op_c_sdsp:\
-//         case rv_op_c_lq:\
-//         case rv_op_c_sq:\
-//         case rv_op_c_lqsp:\
-//         case rv_op_c_sqsp:
-
-// #endif
-
-    // uint64_t rvfi_order;
-    // uint32_t rvfi_insn;
-    // uint8_t rvfi_trap;
-    // uint8_t rvfi_halt;
-    // uint8_t rvfi_intr;
-    // uint8_t rvfi_mode;
-    // uint8_t rvfi_ixl;
-    // uint8_t rvfi_rs1_addr;
-    // uint8_t rvfi_rs2_addr;
-    // uint8_t rvfi_rd_addr;
-    // rv_xlen_t rvfi_rs1_rdata;
-    // rv_xlen_t rvfi_rs2_rdata;
-    // rv_xlen_t rvfi_rd_wdata;
-    // uint32_t rvfi_pc_rdata;
-    // uint32_t rvfi_pc_wdata;
-    // uint32_t rvfi_mem_addr;
-    // uint8_t rvfi_mem_rmask;
-    // uint8_t rvfi_mem_wmask;
-    // rv_xlen_t rvfi_mem_rdata;
-    // rv_xlen_t rvfi_mem_wdata;
 
 #define RVFI_PRINT_TRACE(trace) do {\
     printf("rvfi_order = %d\n", trace.rvfi_order);\
@@ -185,3 +146,10 @@ static const char rv_ireg_name_sym[32][5] = {
 } while (0)
 
 #endif
+
+rvfi_monitor_context* rvfi_monitor_init(char* monitor_prefix, rv_isa isa, int en_tracer, int en_profiler, int en_checker, char* tracer_log_file_name, char* profiler_log_file_name, char* symbol_table_file_name, char* symbol_watchlist_file_name);
+void rvfi_monitor_add_counter(rvfi_monitor_context* ctx, rvfi_performance_counter_t ctr);
+void rvfi_monitor_add_default_performance_counters(rvfi_monitor_context* ctx);
+void rvfi_monitor_push_counters_to_stack(rvfi_monitor_context *ctx, symbol_info_t *current_symbol, const rvfi_trace_t *rvfi_trace);
+void rvfi_monitor_step(rvfi_monitor_context* ctx, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle);
+void rvfi_monitor_final(rvfi_monitor_context* ctx);
