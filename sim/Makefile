@@ -29,7 +29,9 @@ run:
 	@echo
 	@echo "-- RUN ---------------------"
 	@rm -rf debug
+	@rm -rf results
 	@mkdir -p debug
+	@mkdir -p results
 	@obj_dir/Vtestbench
 
 	@echo
@@ -41,6 +43,6 @@ lint:
 clean:
 	@echo
 	@echo "-- CLEAN -------------------"
-	rm -rf obj_dir debug
+	rm -rf obj_dir debug results
 
 .PHONY: run clean
