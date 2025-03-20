@@ -1,6 +1,6 @@
-set FREQ 500
-set DB_FILE ./results_${FREQ}/gate_level/RS5_logic_mapped.db
-set APP conv_compressed
+set ISA rv32imc
+set DB_FILE ./results_${ISA}/gate_level/RS5_logic_mapped.db
+set APP test
 set START_TIME 0ns
 set CONSTRAINTS_PATH ./scripts
 
@@ -43,8 +43,8 @@ read_db ${DB_FILE}
 
 set_db interconnect_mode ple
 
-read_stimulus ../sim_final_${FREQ}/${APP}.shm -dut_instance testbench.dut -start ${START_TIME}
-#compute_power -mode average
-report_power -header -unit mW > ./results_${FREQ}/reports/rpt_power_${APP}.txt
+read_stimulus ../sim_mapped/${APP}.shm -dut_instance testbench.dut -start ${START_TIME}
+##compute_power -mode average
+report_power -header -unit mW > ./results_${ISA}/reports/rpt_power_${APP}.txt
 
 exit

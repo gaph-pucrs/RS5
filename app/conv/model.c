@@ -111,10 +111,10 @@ int main(){
                 INTconv3_totalSum = 0;
                 for (int filterIn = 0 ; filterIn < NUM_FILTERS ; filterIn++){
                     for (int kernelIndex = 0 ; kernelIndex < KERNEL_SIZE ; kernelIndex++){
-                        int weightIndex = kernelIndex + (filterIn * KERNEL_SIZE) + ( filterToGenerate * NUM_FILTERS * KERNEL_SIZE ) ;
+                        int weightIndex = kernelIndex + (filterIn * KERNEL_SIZE) + ( filterToGenerate * NUM_FILTERS * KERNEL_SIZE );
                         int indexIn = kernelIndex + (inputOffset);
 
-                        INTconv3_totalSum += ((INTconv0_featureMap[filterIn][indexIn] * MULTIP_conv3) / MULTIP_conv1)    *  ((int) (conv3_weights[weightIndex]))  ; 
+                        INTconv3_totalSum += ((INTconv0_featureMap[filterIn][indexIn] * MULTIP_conv3) / MULTIP_conv1)    *  ((int) (conv3_weights[weightIndex]));
                     }
                 }
                 INTconv3_totalSum += ( (int) conv3_bias[filterToGenerate])* MULTIP_conv3 ;  // moraes;
@@ -236,7 +236,7 @@ int main(){
             // if ( datasetIndex == 4)  printf("totalvalue------");
             for (int i = 0; i < FC1_OUTPUT_SIZE; i++)
             {
-                INTfc2_totalValue += ((INTfc1_out_vector[i] * MULTIP_fc2 ) / MULTIP_fc1) * ( (int) (fc2_weights[(FC1_OUTPUT_SIZE*outputIndex)+i])); 
+                INTfc2_totalValue += ((INTfc1_out_vector[i] * MULTIP_fc2 ) / MULTIP_fc1) * ( (int) (fc2_weights[(FC1_OUTPUT_SIZE*outputIndex)+i]));
                 // if ( datasetIndex == 4) printf("%f  %d \n ",fc2_totalValue,INTfc2_totalValue);
             }
             INTfc2_out_vector[outputIndex] = INTfc2_totalValue + ( (int) fc2_bias[outputIndex]) * MULTIP_fc2; // moraes
