@@ -45,6 +45,7 @@ module vectorALU
     localparam TREE_LEVELS_32b = $clog2(VLENB/4);
 
     logic hold_mult;
+    logic hold_reductions;
     logic hold;
 
     logic [(VLENB)  -1:0][ 7:0] first_operand_8b,  second_operand_8b;
@@ -162,6 +163,35 @@ module vectorALU
         end
     end
 
+`ifdef REDUCTIONS_FF
+    logic [$clog2(TREE_LEVELS_8b):0] reduction_cycle_counter;
+    logic reduction_instruction;
+    logic reduction_last_cycle;
+
+    assign reduction_instruction  = (vector_operation_i inside {VREDSUM, VREDMAXU, VREDMAX, VREDMINU, VREDMIN, VREDAND, VREDOR, VREDXOR});
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            reduction_cycle_counter <= '0;
+        else if (reduction_instruction && !reduction_last_cycle && current_state == V_EXEC)
+            reduction_cycle_counter <= reduction_cycle_counter + 1;
+        else
+            reduction_cycle_counter <= '0;
+    end
+
+    always_comb begin
+        unique case (vsew)
+            EW8:    reduction_last_cycle = (reduction_cycle_counter == TREE_LEVELS_8b+1);
+            EW16:   reduction_last_cycle = (reduction_cycle_counter == TREE_LEVELS_16b+1);
+            default:reduction_last_cycle = (reduction_cycle_counter == TREE_LEVELS_32b+1);
+        endcase
+    end
+
+    assign hold_reductions = reduction_instruction && current_state == V_EXEC && !reduction_last_cycle;
+`else
+    assign hold_reductions = 1'b0;
+`endif
+
 //////////////////////////////////////////////////////////////////////////////
 // Reductions Min-Max
 //////////////////////////////////////////////////////////////////////////////
@@ -184,6 +214,67 @@ module vectorALU
         // *********************************
         //  8 Bits
         // *********************************
+    `ifdef REDUCTIONS_FF
+        always_ff @(posedge clk) begin
+            // First Level
+            for (int i = 0; i < VLENB; i++) begin
+                if (i == 0) begin
+                    if ((vm || mask_sew8[cycle_count_r][0]) && i < vl) begin
+                        result_redmin_8b [0][i] <= ($signed(first_operand_8b[0]) > $signed(second_operand_reductions_8b))
+                                                ? second_operand_reductions_8b
+                                                : first_operand_8b [0];
+                        result_redminu_8b[0][i] <= (first_operand_8b[0] > second_operand_reductions_8b)
+                                                ? second_operand_reductions_8b
+                                                : first_operand_8b [0];
+                        result_redmax_8b [0][i] <= ($signed(first_operand_8b[0]) > $signed(second_operand_reductions_8b))
+                                                ? first_operand_8b [0]
+                                                : second_operand_reductions_8b;
+                        result_redmaxu_8b[0][i] <= (first_operand_8b[0] > second_operand_reductions_8b)
+                                                ? first_operand_8b [0]
+                                                : second_operand_reductions_8b;
+                    end
+                    else begin
+                        result_redmin_8b [0][i] <= second_operand_reductions_8b;
+                        result_redminu_8b[0][i] <= second_operand_reductions_8b;
+                        result_redmax_8b [0][i] <= second_operand_reductions_8b;
+                        result_redmaxu_8b[0][i] <= second_operand_reductions_8b;
+                    end
+                end
+                else begin
+                    if ((vm || mask_sew8[cycle_count_r][i]) && i < vl) begin
+                        result_redmin_8b [0][i] <= first_operand_8b[i];
+                        result_redminu_8b[0][i] <= first_operand_8b[i];
+                        result_redmax_8b [0][i] <= first_operand_8b[i];
+                        result_redmaxu_8b[0][i] <= first_operand_8b[i];
+                    end
+                    else begin
+                        result_redmin_8b [0][i] <= 8'h7F;
+                        result_redminu_8b[0][i] <= '1;
+                        result_redmax_8b [0][i] <= 8'h80;
+                        result_redmaxu_8b[0][i] <= '0;
+                    end
+                end
+            end
+
+            // Other Levels
+            for (int i = 0; i < TREE_LEVELS_8b; i++) begin
+                for (int j = 0; j < VLENB/(2**(i+1)); j++) begin
+                    result_redmin_8b [i+1][j] <= ($signed(result_redmin_8b[i][2*j]) > $signed(result_redmin_8b[i][2*j+1]))
+                                                ? result_redmin_8b[i][2*j+1]
+                                                : result_redmin_8b[i][2*j];
+                    result_redminu_8b[i+1][j] <= (result_redminu_8b [i][2*j] > result_redminu_8b[i][2*j+1])
+                                                ? result_redminu_8b[i][2*j+1]
+                                                : result_redminu_8b[i][2*j];
+                    result_redmax_8b [i+1][j] <= ($signed(result_redmax_8b[i][2*j]) > $signed(result_redmax_8b[i][2*j+1]))
+                                                ? result_redmax_8b[i][2*j]
+                                                : result_redmax_8b[i][2*j+1];
+                    result_redmaxu_8b[i+1][j] <= (result_redmaxu_8b[i][2*j] > result_redmaxu_8b[i][2*j+1])
+                                                ? result_redmaxu_8b[i][2*j]
+                                                : result_redmaxu_8b[i][2*j+1];
+                end
+            end
+        end
+    `else
         always_comb begin
             // First Level
             for (int i = 0; i < VLENB; i++) begin
@@ -243,10 +334,72 @@ module vectorALU
                 end
             end
         end
+    `endif
 
         // *********************************
         //  16 Bits
         // *********************************
+    `ifdef REDUCTIONS_FF
+        always_ff @(posedge clk) begin
+                        // First Level
+            for (int i = 0; i < VLENB/2; i++) begin
+                if (i == 0) begin
+                    if ((vm || mask_sew16[cycle_count_r][0]) && i < vl) begin
+                        result_redmin_16b [0][i] <= ($signed(first_operand_16b[0]) > $signed(second_operand_reductions_16b))
+                                                ? second_operand_reductions_16b
+                                                : first_operand_16b [0];
+                        result_redminu_16b[0][i] <= (first_operand_16b[0] > second_operand_reductions_16b)
+                                                ? second_operand_reductions_16b
+                                                : first_operand_16b [0];
+                        result_redmax_16b [0][i] <= ($signed(first_operand_16b[0]) > $signed(second_operand_reductions_16b))
+                                                ? first_operand_16b [0]
+                                                : second_operand_reductions_16b;
+                        result_redmaxu_16b[0][i] <= (first_operand_16b[0] > second_operand_reductions_16b)
+                                                ? first_operand_16b [0]
+                                                : second_operand_reductions_16b;
+                    end
+                    else begin
+                        result_redmin_16b [0][i] <= second_operand_reductions_16b;
+                        result_redminu_16b[0][i] <= second_operand_reductions_16b;
+                        result_redmax_16b [0][i] <= second_operand_reductions_16b;
+                        result_redmaxu_16b[0][i] <= second_operand_reductions_16b;
+                    end
+                end
+                else begin
+                    if ((vm || mask_sew16[cycle_count_r][i]) && i < vl) begin
+                        result_redmin_16b [0][i] <= first_operand_16b[i];
+                        result_redminu_16b[0][i] <= first_operand_16b[i];
+                        result_redmax_16b [0][i] <= first_operand_16b[i];
+                        result_redmaxu_16b[0][i] <= first_operand_16b[i];
+                    end
+                    else begin
+                        result_redmin_16b [0][i] <= 16'h7FFF;
+                        result_redminu_16b[0][i] <= '1;
+                        result_redmax_16b [0][i] <= 16'h8000;
+                        result_redmaxu_16b[0][i] <= '0;
+                    end
+                end
+            end
+
+            // Other Levels
+            for (int i = 0; i < TREE_LEVELS_16b; i++) begin
+                for (int j = 0; j < (VLENB/2)/(2**(i+1)); j++) begin
+                    result_redmin_16b [i+1][j] <= ($signed(result_redmin_16b[i][2*j]) > $signed(result_redmin_16b[i][2*j+1]))
+                                                ? result_redmin_16b[i][2*j+1]
+                                                : result_redmin_16b[i][2*j];
+                    result_redminu_16b[i+1][j] <= (result_redminu_16b [i][2*j] > result_redminu_16b[i][2*j+1])
+                                                ? result_redminu_16b[i][2*j+1]
+                                                : result_redminu_16b[i][2*j];
+                    result_redmax_16b [i+1][j] <= ($signed(result_redmax_16b[i][2*j]) > $signed(result_redmax_16b[i][2*j+1]))
+                                                ? result_redmax_16b[i][2*j]
+                                                : result_redmax_16b[i][2*j+1];
+                    result_redmaxu_16b[i+1][j] <= (result_redmaxu_16b[i][2*j] > result_redmaxu_16b[i][2*j+1])
+                                                ? result_redmaxu_16b[i][2*j]
+                                                : result_redmaxu_16b[i][2*j+1];
+                end
+            end
+        end
+    `else
         always_comb begin
             // First Level
             for (int i = 0; i < VLENB/2; i++) begin
@@ -306,10 +459,72 @@ module vectorALU
                 end
             end
         end
+    `endif
 
         // *********************************
         //  32 Bits
         // *********************************
+    `ifdef REDUCTIONS_FF
+        always_ff @(posedge clk) begin
+            // First Level
+            for (int i = 0; i < VLENB/4; i++) begin
+                if (i == 0) begin
+                    if ((vm || mask_sew32[cycle_count_r][0]) && i < vl) begin
+                        result_redmin_32b [0][i] <= ($signed(first_operand_32b[0]) > $signed(second_operand_reductions_32b))
+                                                ? second_operand_reductions_32b
+                                                : first_operand_32b [0];
+                        result_redminu_32b[0][i] <= (first_operand_32b[0] > second_operand_reductions_32b)
+                                                ? second_operand_reductions_32b
+                                                : first_operand_32b [0];
+                        result_redmax_32b [0][i] <= ($signed(first_operand_32b[0]) > $signed(second_operand_reductions_32b))
+                                                ? first_operand_32b [0]
+                                                : second_operand_reductions_32b;
+                        result_redmaxu_32b[0][i] <= (first_operand_32b[0] > second_operand_reductions_32b)
+                                                ? first_operand_32b [0]
+                                                : second_operand_reductions_32b;
+                    end
+                    else begin
+                        result_redmin_32b [0][i] <= second_operand_reductions_32b;
+                        result_redminu_32b[0][i] <= second_operand_reductions_32b;
+                        result_redmax_32b [0][i] <= second_operand_reductions_32b;
+                        result_redmaxu_32b[0][i] <= second_operand_reductions_32b;
+                    end
+                end
+                else begin
+                    if ((vm || mask_sew32[cycle_count_r][i]) && i < vl) begin
+                        result_redmin_32b [0][i] <= first_operand_32b[i];
+                        result_redminu_32b[0][i] <= first_operand_32b[i];
+                        result_redmax_32b [0][i] <= first_operand_32b[i];
+                        result_redmaxu_32b[0][i] <= first_operand_32b[i];
+                    end
+                    else begin
+                        result_redmin_32b [0][i] <= 32'h7FFFFFFF;
+                        result_redminu_32b[0][i] <= '1;
+                        result_redmax_32b [0][i] <= 32'h80000000;
+                        result_redmaxu_32b[0][i] <= '0;
+                    end
+                end
+            end
+
+            // Other Levels
+            for (int i = 0; i < TREE_LEVELS_32b; i++) begin
+                for (int j = 0; j < (VLENB/4)/(2**(i+1)); j++) begin
+                    result_redmin_32b [i+1][j] <= ($signed(result_redmin_32b[i][2*j]) > $signed(result_redmin_32b[i][2*j+1]))
+                                                ? result_redmin_32b[i][2*j+1]
+                                                : result_redmin_32b[i][2*j];
+                    result_redminu_32b[i+1][j] <= (result_redminu_32b [i][2*j] > result_redminu_32b[i][2*j+1])
+                                                ? result_redminu_32b[i][2*j+1]
+                                                : result_redminu_32b[i][2*j];
+                    result_redmax_32b [i+1][j] <= ($signed(result_redmax_32b[i][2*j]) > $signed(result_redmax_32b[i][2*j+1]))
+                                                ? result_redmax_32b[i][2*j]
+                                                : result_redmax_32b[i][2*j+1];
+                    result_redmaxu_32b[i+1][j] <= (result_redmaxu_32b[i][2*j] > result_redmaxu_32b[i][2*j+1])
+                                                ? result_redmaxu_32b[i][2*j]
+                                                : result_redmaxu_32b[i][2*j+1];
+                end
+            end
+        end
+    `else
         always_comb begin
             // First Level
             for (int i = 0; i < VLENB/4; i++) begin
@@ -369,6 +584,7 @@ module vectorALU
                 end
             end
         end
+    `endif
 
         // *********************************
         //  Sew Demux
@@ -424,6 +640,46 @@ module vectorALU
         // *********************************
         //  8 Bits
         // *********************************
+    `ifdef REDUCTIONS_FF
+        always_ff @(posedge clk) begin
+             // First Level
+            for (int i = 0; i < VLENB; i++) begin
+                if (i == 0) begin
+                    if ((vm || mask_sew8[cycle_count_r][0]) && i < vl) begin
+                        result_redand_8b[0][i] <= first_operand_8b[0] & second_operand_reductions_8b;
+                        result_redor_8b [0][i] <= first_operand_8b[0] | second_operand_reductions_8b;
+                        result_redxor_8b[0][i] <= first_operand_8b[0] ^ second_operand_reductions_8b;
+                    end
+                    else begin
+                        result_redand_8b[0][i] <= second_operand_reductions_8b;
+                        result_redor_8b [0][i] <= second_operand_reductions_8b;
+                        result_redxor_8b[0][i] <= second_operand_reductions_8b;
+                    end
+                end
+                else begin
+                    if ((vm || mask_sew8[cycle_count_r][i]) && i < vl) begin
+                        result_redand_8b[0][i] <= first_operand_8b[i];
+                        result_redor_8b [0][i] <= first_operand_8b[i];
+                        result_redxor_8b[0][i] <= first_operand_8b[i];
+                    end
+                    else begin
+                        result_redand_8b[0][i] <= '1;
+                        result_redor_8b [0][i] <= '0;
+                        result_redxor_8b[0][i] <= '0;
+                    end
+                end
+            end
+
+            // Other Levels
+            for (int i = 0; i < TREE_LEVELS_8b; i++) begin
+                for (int j = 0; j < VLENB/(2**(i+1)); j++) begin
+                    result_redand_8b[i+1][j] <= result_redand_8b[i][2*j] & result_redand_8b[i][2*j+1];
+                    result_redor_8b [i+1][j] <= result_redor_8b [i][2*j] | result_redor_8b[i][2*j+1];
+                    result_redxor_8b[i+1][j] <= result_redxor_8b[i][2*j] ^ result_redxor_8b[i][2*j+1];
+                end
+            end
+        end
+    `else
         always_comb begin
             // First Level
             for (int i = 0; i < VLENB; i++) begin
@@ -462,10 +718,51 @@ module vectorALU
                 end
             end
         end
+    `endif
 
         // *********************************
         //  16 Bits
         // *********************************
+    `ifdef REDUCTIONS_FF
+        always_ff @(posedge clk) begin
+            // First Level
+            for (int i = 0; i < VLENB/2; i++) begin
+                if (i == 0) begin
+                    if ((vm || mask_sew16[cycle_count_r][0]) && i < vl) begin
+                        result_redand_16b[0][i] <= first_operand_16b[0] & second_operand_reductions_16b;
+                        result_redor_16b [0][i] <= first_operand_16b[0] | second_operand_reductions_16b;
+                        result_redxor_16b[0][i] <= first_operand_16b[0] ^ second_operand_reductions_16b;
+                    end
+                    else begin
+                        result_redand_16b[0][i] <= second_operand_reductions_16b;
+                        result_redor_16b [0][i] <= second_operand_reductions_16b;
+                        result_redxor_16b[0][i] <= second_operand_reductions_16b;
+                    end
+                end
+                else begin
+                    if ((vm || mask_sew16[cycle_count_r][i]) && i < vl) begin
+                        result_redand_16b[0][i] <= first_operand_16b[i];
+                        result_redor_16b [0][i] <= first_operand_16b[i];
+                        result_redxor_16b[0][i] <= first_operand_16b[i];
+                    end
+                    else begin
+                        result_redand_16b[0][i] <= '1;
+                        result_redor_16b [0][i] <= '0;
+                        result_redxor_16b[0][i] <= '0;
+                    end
+                end
+            end
+
+            // Other Levels
+            for (int i = 0; i < TREE_LEVELS_16b; i++) begin
+                for (int j = 0; j < (VLENB/2)/(2**(i+1)); j++) begin
+                    result_redand_16b[i+1][j] <= result_redand_16b[i][2*j] & result_redand_16b[i][2*j+1];
+                    result_redor_16b [i+1][j] <= result_redor_16b [i][2*j] | result_redor_16b [i][2*j+1];
+                    result_redxor_16b[i+1][j] <= result_redxor_16b[i][2*j] ^ result_redxor_16b[i][2*j+1];
+                end
+            end
+        end
+    `else
         always_comb begin
             // First Level
             for (int i = 0; i < VLENB/2; i++) begin
@@ -504,11 +801,52 @@ module vectorALU
                 end
             end
         end
+    `endif
 
 
         // *********************************
         //  32 Bits
         // *********************************
+    `ifdef REDUCTIONS_FF
+        always_ff @(posedge clk) begin
+            // First Level
+            for (int i = 0; i < VLENB/4; i++) begin
+                if (i == 0) begin
+                    if ((vm || mask_sew32[cycle_count_r][0]) && i < vl) begin
+                        result_redand_32b[0][i] <= first_operand_32b[0] & second_operand_reductions_32b;
+                        result_redor_32b [0][i] <= first_operand_32b[0] | second_operand_reductions_32b;
+                        result_redxor_32b[0][i] <= first_operand_32b[0] ^ second_operand_reductions_32b;
+                    end
+                    else begin
+                        result_redand_32b[0][i] <= second_operand_reductions_32b;
+                        result_redor_32b [0][i] <= second_operand_reductions_32b;
+                        result_redxor_32b[0][i] <= second_operand_reductions_32b;
+                    end
+                end
+                else begin
+                    if ((vm || mask_sew32[cycle_count_r][i]) && i < vl) begin
+                        result_redand_32b[0][i] <= first_operand_32b[i];
+                        result_redor_32b [0][i] <= first_operand_32b[i];
+                        result_redxor_32b[0][i] <= first_operand_32b[i];
+                    end
+                    else begin
+                        result_redand_32b[0][i] <= '1;
+                        result_redor_32b [0][i] <= '0;
+                        result_redxor_32b[0][i] <= '0;
+                    end
+                end
+            end
+
+            // Other Levels
+            for (int i = 0; i < TREE_LEVELS_32b; i++) begin
+                for (int j = 0; j < (VLENB/4)/(2**(i+1)); j++) begin
+                    result_redand_32b[i+1][j] <= result_redand_32b[i][2*j] & result_redand_32b[i][2*j+1];
+                    result_redor_32b [i+1][j] <= result_redor_32b [i][2*j] | result_redor_32b [i][2*j+1];
+                    result_redxor_32b[i+1][j] <= result_redxor_32b[i][2*j] ^ result_redxor_32b[i][2*j+1];
+                end
+            end
+        end
+    `else
         always_comb begin
             // First Level
             for (int i = 0; i < VLENB/4; i++) begin
@@ -547,6 +885,7 @@ module vectorALU
                 end
             end
         end
+    `endif
 
         // *********************************
         //  Sew Demux
@@ -592,6 +931,36 @@ module vectorALU
         // *********************************
         //  8 Bits
         // *********************************
+    `ifdef REDUCTIONS_FF
+        always_ff @(posedge clk) begin
+            // First Level
+            for (int i = 0; i < VLENB; i++) begin
+                if (i == 0) begin
+                    if ((vm || mask_sew8[cycle_count_r][0]) && i < vl) begin
+                        result_redsum_8b[0][i] <= first_operand_8b[0] + second_operand_reductions_8b;
+                    end
+                    else begin
+                        result_redsum_8b[0][i] <= second_operand_reductions_8b;
+                    end
+                end
+                else begin
+                    if ((vm || mask_sew8[cycle_count_r][i]) && i < vl) begin
+                        result_redsum_8b[0][i] <= first_operand_8b[i];
+                    end
+                    else begin
+                        result_redsum_8b[0][i] <= '0;
+                    end
+                end
+            end
+
+            // Other Levels
+            for (int i = 0; i < TREE_LEVELS_8b; i++) begin
+                for (int j = 0; j < VLENB/(2**(i+1)); j++) begin
+                    result_redsum_8b[i+1][j] <= result_redsum_8b[i][2*j] + result_redsum_8b[i][2*j+1];
+                end
+            end
+        end
+    `else
         always_comb begin
             // First Level
             for (int i = 0; i < VLENB; i++) begin
@@ -620,10 +989,41 @@ module vectorALU
                 end
             end
         end
+    `endif
 
         // *********************************
         //  16 Bits
         // *********************************
+    `ifdef REDUCTIONS_FF
+        always_ff @(posedge clk) begin
+            // First Level
+            for (int i = 0; i < VLENB/2; i++) begin
+                if (i == 0) begin
+                    if ((vm || mask_sew16[cycle_count_r][0]) && i < vl) begin
+                        result_redsum_16b[0][i] <= first_operand_16b[0] + second_operand_reductions_16b;
+                    end
+                    else begin
+                        result_redsum_16b[0][i] <= second_operand_reductions_16b;
+                    end
+                end
+                else begin
+                    if ((vm || mask_sew16[cycle_count_r][i]) && i < vl) begin
+                        result_redsum_16b[0][i] <= first_operand_16b[i];
+                    end
+                    else begin
+                        result_redsum_16b[0][i] <= '0;
+                    end
+                end
+            end
+
+            // Other Levels
+            for (int i = 0; i < TREE_LEVELS_16b; i++) begin
+                for (int j = 0; j < (VLENB/2)/(2**(i+1)); j++) begin
+                    result_redsum_16b[i+1][j] <= result_redsum_16b[i][2*j] + result_redsum_16b[i][2*j+1];
+                end
+            end
+        end
+    `else
         always_comb begin
             // First Level
             for (int i = 0; i < VLENB/2; i++) begin
@@ -652,14 +1052,41 @@ module vectorALU
                 end
             end
         end
-
-        always_comb begin
-
-        end
+    `endif
 
         // *********************************
         //  32 Bits
         // *********************************
+    `ifdef REDUCTIONS_FF
+        always_ff @(posedge clk) begin
+            // First Level
+            for (int i = 0; i < VLENB/4; i++) begin
+                if (i == 0) begin
+                    if ((vm || mask_sew32[cycle_count_r][0]) && i < vl) begin
+                        result_redsum_32b[0][i] <= first_operand_32b[0] + second_operand_reductions_32b;
+                    end
+                    else begin
+                        result_redsum_32b[0][i] <= second_operand_reductions_32b;
+                    end
+                end
+                else begin
+                    if ((vm || mask_sew32[cycle_count_r][i]) && i < vl) begin
+                        result_redsum_32b[0][i] <= first_operand_32b[i];
+                    end
+                    else begin
+                        result_redsum_32b[0][i] <= '0;
+                    end
+                end
+            end
+
+            // Other Levels
+            for (int i = 0; i < TREE_LEVELS_32b; i++) begin
+                for (int j = 0; j < (VLENB/4)/(2**(i+1)); j++) begin
+                    result_redsum_32b[i+1][j] <= result_redsum_32b[i][2*j] + result_redsum_32b[i][2*j+1];
+                end
+            end
+        end
+    `else
         always_comb begin
             // First Level
             for (int i = 0; i < VLENB/4; i++) begin
@@ -688,6 +1115,7 @@ module vectorALU
                 end
             end
         end
+    `endif
 
         // *********************************
         //  Sew Demux
@@ -1361,7 +1789,7 @@ module vectorALU
 
     assign hold   = hold_mult | hold_div;
 
-    assign hold_o = hold | hold_widening_o | hold_accumulation_o;
+    assign hold_o = hold | hold_widening_o | hold_accumulation_o | hold_reductions;
 
 //////////////////////////////////////////////////////////////////////////////
 // Result Demux
