@@ -29,9 +29,9 @@ typedef struct {
     rv_xlen_t rvfi_rs1_rdata;
     rv_xlen_t rvfi_rs2_rdata;
     rv_xlen_t rvfi_rd_wdata;
-    uint32_t rvfi_pc_rdata;
-    uint32_t rvfi_pc_wdata;
-    uint32_t rvfi_mem_addr;
+    rv_xlen_t rvfi_pc_rdata;
+    rv_xlen_t rvfi_pc_wdata;
+    rv_xlen_t rvfi_mem_addr;
     uint8_t rvfi_mem_rmask;
     uint8_t rvfi_mem_wmask;
     rv_xlen_t rvfi_mem_rdata;
@@ -39,13 +39,20 @@ typedef struct {
 } rvfi_trace_t;
 
 typedef struct {
+    char function_name[200];
     uint32_t is_watched;
     uint32_t is_function;
     uint32_t times_called;
-    GArray* start_cycles;
-    GArray* end_cycles;
-    char function_name[200];
+    // GArray* start_cycles;
+    // GArray* end_cycles;
 } symbol_info_t;
+
+typedef struct {
+    char* function_name;
+    uint32_t call_id;
+    uint64_t start_cycle;
+    uint64_t end_cycle;
+} call_info_t;
 
 struct rvfi_perf_count_t;
 
@@ -77,19 +84,22 @@ typedef struct {
 
     char* tracer_log_file_name;
     char* profiler_log_file_name;
+    char* profiler_call_graph_file_name;
     char* symbol_table_file_name;
     char* symbol_watchlist_file_name;
 
     FILE* tracer_log_file;
     FILE* profiler_log_file;
+    FILE* profiler_call_graph_file;
     FILE* symbol_table_file;
     FILE* symbol_watchlist_file;
 
     GHashTable* symbol_table_hash_table;
     GArray* performance_counters;
-    GArray* counter_stack;
+    GPtrArray* counter_stack;
+    GNode* current_call_node;
 
-    counter_info_t last_counter_state;  // Counter state as of the last call to a function in the watchlist
+    // counter_info_t* counter_stack_top;
 
     int n_counters;
 
@@ -147,9 +157,12 @@ static const char rv_ireg_name_sym[32][5] = {
 
 #endif
 
-rvfi_monitor_context* rvfi_monitor_init(char* monitor_prefix, rv_isa isa, int en_tracer, int en_profiler, int en_checker, char* tracer_log_file_name, char* profiler_log_file_name, char* symbol_table_file_name, char* symbol_watchlist_file_name);
+rvfi_monitor_context* rvfi_monitor_init(char* monitor_prefix, rv_isa isa, int en_tracer, int en_profiler, int en_checker, char* tracer_log_file_name, char* profiler_log_file_name, char* profiler_call_graph_file_name, char* symbol_table_file_name, char* symbol_watchlist_file_name);
 void rvfi_monitor_add_counter(rvfi_monitor_context* ctx, rvfi_performance_counter_t ctr);
 void rvfi_monitor_add_default_performance_counters(rvfi_monitor_context* ctx);
 void rvfi_monitor_push_counters_to_stack(rvfi_monitor_context *ctx, symbol_info_t *current_symbol, const rvfi_trace_t *rvfi_trace);
 void rvfi_monitor_step(rvfi_monitor_context* ctx, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle);
 void rvfi_monitor_final(rvfi_monitor_context* ctx);
+
+void rvfi_monitor_print_call_graph(rvfi_monitor_context* ctx, GNode* call_node, int indent_level);
+void _debug_hash_table_iterator(gpointer key, gpointer value, gpointer user_data);

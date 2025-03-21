@@ -8,6 +8,7 @@ module rvfi_monitor #(
     parameter int ENABLE_CHECKER = 1'b1,
     parameter string TRACER_LOG_FILE_NAME = "rvfi_tracer_log.txt",
     parameter string PROFILER_LOG_FILE_NAME = "rvfi_profiler_log.txt",
+    parameter string PROFILER_CALL_GRAPH_FILE_NAME = "rvfi_profiler_call_graph.txt",
     parameter string SYMBOL_TABLE_FILE_NAME = "rvfi_profiler_symbol_table.txt",
     parameter string SYMBOL_WATCHLIST_FILE_NAME = "rvfi_profiler_watchlist.txt"
 ) (
@@ -41,7 +42,7 @@ module rvfi_monitor #(
 
     chandle ctx;
 
-    import "DPI" function chandle rvfi_monitor_init(string monitor_prefix, rv_isa isa, int en_tracer, int en_profiler, int en_checker, string tracer_log_file_name, string profiler_log_file_name, string symbol_table_file_name, string symbol_watchlist_file_name);
+    import "DPI" function chandle rvfi_monitor_init(string monitor_prefix, rv_isa isa, int en_tracer, int en_profiler, int en_checker, string tracer_log_file_name, string profiler_log_file_name, string profiler_call_graph_file_name, string symbol_table_file_name, string symbol_watchlist_file_name);
     import "DPI" function void rvfi_monitor_add_default_performance_counters(chandle ctx);
     import "DPI" function void rvfi_monitor_step(chandle ctx, rvfi_trace_t rvfi_trace, longint current_clock_cycle);
     import "DPI" function void rvfi_monitor_final(chandle ctx);
@@ -60,9 +61,11 @@ module rvfi_monitor #(
 
     initial begin
 
-        $timeformat(-9, 2, " ns");
+        string time_string;
 
-        ctx = rvfi_monitor_init(MONITOR_PREFIX, ISA, ENABLE_TRACER, ENABLE_PROFILER, ENABLE_CHECKER, TRACER_LOG_FILE_NAME, PROFILER_LOG_FILE_NAME, SYMBOL_TABLE_FILE_NAME, SYMBOL_WATCHLIST_FILE_NAME);
+        $timeformat(-9, 3, " ns");
+
+        ctx = rvfi_monitor_init(MONITOR_PREFIX, ISA, ENABLE_TRACER, ENABLE_PROFILER, ENABLE_CHECKER, TRACER_LOG_FILE_NAME, PROFILER_LOG_FILE_NAME, PROFILER_CALL_GRAPH_FILE_NAME, SYMBOL_TABLE_FILE_NAME, SYMBOL_WATCHLIST_FILE_NAME);
         rvfi_monitor_add_default_performance_counters(ctx);
 
         forever begin
@@ -96,7 +99,10 @@ module rvfi_monitor #(
                     rvfi_mem_wdata:rvfi_mem_wdata
                 };
 
+                // time_string = $sformatf("%t", $realtime);
+
                 rvfi_monitor_step(ctx, rvfi_trace, cycle_counter);
+                // rvfi_monitor_step(ctx, rvfi_trace, cycle_counter, time_string);
 
             end
 
