@@ -4,8 +4,8 @@ LDFLAGS_STRIP = -Wl,--gc-sections
 
 TRIPLET = riscv64-elf
 CC = $(TRIPLET)-gcc
-# CFLAGS = -IbareOS/include -Itinycrypt/include -O2 -fno-builtin -march=rv32i_zkne -mabi=ilp32 -mbranch-cost=7 -DAES_RISCV_ASM -DTC_AES_128 $(CFLAGS_STRIP)
-CFLAGS = -IbareOS/include -Itinycrypt/include -O2 -fno-builtin -march=rv32imc_zkne -mabi=ilp32 -mbranch-cost=7 -DAES_RISCV_ASM -DTC_AES_128 $(CFLAGS_STRIP)
+# CFLAGS = -IbareOS/include -Itinycrypt/include -O2 -fno-builtin -march=rv32imc_zkne -mabi=ilp32 -mbranch-cost=7 -DAES_RISCV_ASM -DTC_AES_128 $(CFLAGS_STRIP)
+CFLAGS = -IbareOS/include -Itinycrypt/include -Os -fno-builtin -march=rv32imc_zkne -mabi=ilp32 -mbranch-cost=7 -DTC_AES_128 $(CFLAGS_STRIP)
 AS = $(TRIPLET)-as
 # ASFLAGS = -march=rv32i_zicsr_zkne -mabi=ilp32
 ASFLAGS = -march=rv32imc_zicsr_zkne -mabi=ilp32
@@ -50,7 +50,7 @@ all : $(BIN_FILES) $(LST_FILES)
 
 %.elf: $(BARE_OS) $(TINYCRYPT) %.o
 	$(LD) -o $@ $+ $(LDFLAGS)
-	nm $@ -C > ../../sim/rvfi_profiler_symbol_table.txt
+	nm $@ -C > ../../sim/rvfi_monitor_profiler_symbol_table.txt
 
 clean:
 	rm -f $(BIN_FILES) $(LST_FILES) $(BARE_OS) $(PROGNAME).elf $(wildcard *~) $(wildcard *.o)

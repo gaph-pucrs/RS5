@@ -2,7 +2,9 @@
 #include "rvfi_tools.h"
 #include "rvfi_callbacks.h"
 
-rvfi_monitor_context* rvfi_monitor_init(char* monitor_prefix, rv_isa isa, int en_tracer, int en_profiler, int en_checker, char* tracer_log_file_name, char* profiler_log_file_name, char* profiler_call_graph_file_name, char* symbol_table_file_name, char* symbol_watchlist_file_name) {
+rvfi_monitor_context* rvfi_monitor_init(char* monitor_prefix, char* time_unit_suffix, rv_isa isa, int en_tracer, int en_profiler, int en_checker) {
+
+    printf("Initializing monitor [%s]\n", monitor_prefix);
 
     rvfi_monitor_context *ctx = malloc(sizeof(rvfi_monitor_context));
 
@@ -10,22 +12,28 @@ rvfi_monitor_context* rvfi_monitor_init(char* monitor_prefix, rv_isa isa, int en
     strcpy(ctx->monitor_prefix, monitor_prefix);
 
     ctx->isa = isa;
+    ctx->time_unit_suffix = time_unit_suffix;
 
     ctx->en_tracer = en_tracer;
     ctx->en_profiler = en_profiler;
     ctx->en_checker = en_checker;
 
-    ctx->tracer_log_file_name = tracer_log_file_name;
-    ctx->profiler_log_file_name = profiler_log_file_name;
-    ctx->profiler_call_graph_file_name = profiler_call_graph_file_name;
-    ctx->symbol_table_file_name = symbol_table_file_name;
-    ctx->symbol_watchlist_file_name = symbol_watchlist_file_name;
+    ctx->tracer_log_file_name = malloc(200);
+    ctx->profiler_log_file_name = malloc(200);
+    ctx->profiler_call_graph_file_name = malloc(200);
+    ctx->symbol_table_file_name = malloc(200);
+    ctx->symbol_watchlist_file_name = malloc(200);
+
+    snprintf(ctx->tracer_log_file_name, 200, "%s_tracer_log.txt", monitor_prefix);
+    snprintf(ctx->profiler_log_file_name, 200, "%s_profiler_log.txt", monitor_prefix);
+    snprintf(ctx->profiler_call_graph_file_name, 200, "%s_profiler_call_graph.txt", monitor_prefix);
+    snprintf(ctx->symbol_table_file_name, 200, "%s_profiler_symbol_table.txt", monitor_prefix);
+    snprintf(ctx->symbol_watchlist_file_name, 200, "%s_profiler_watchlist.txt", monitor_prefix);
 
     GArray *symbol_watchlist = NULL;
     symbol_watchlist = g_array_new(FALSE, FALSE, sizeof(char*));
 
     ctx->symbol_table_hash_table = g_hash_table_new(g_direct_hash, g_direct_equal);
-    // ctx->counter_stack = g_array_new(FALSE, FALSE, sizeof(counter_info_t));
     ctx->counter_stack = g_ptr_array_new();
 
     call_info_t* dummy_info = malloc(sizeof(call_info_t));
@@ -242,7 +250,7 @@ void rvfi_monitor_push_counters_to_stack(rvfi_monitor_context *ctx, symbol_info_
 
 }
 
-void rvfi_monitor_step(rvfi_monitor_context *ctx, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle) {  // TODO: Pass simulation time as argument, print messages with timestamp
+void rvfi_monitor_step(rvfi_monitor_context *ctx, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, char* time_string, double time_float) {
 
     char disassembly_buffer[200];
     rv_decode decoded_instruction;  // rv_decode is defined in the Michael Clark riscv-dis library, this needs to be changed if libopcodes is used in the future
@@ -319,8 +327,10 @@ void rvfi_monitor_step(rvfi_monitor_context *ctx, const rvfi_trace_t *rvfi_trace
         // if (function_call && current_symbol != NULL && current_symbol->is_function && current_symbol->is_watched) {
         if (control_flow_change && current_symbol != NULL && current_symbol->is_function && current_symbol->is_watched) {
 
-            printf("[%s] About to enter function <%s> at PC <0x%x> from PC <0x%x> at clock cycle <%0d>\n", ctx->monitor_prefix, current_symbol->function_name, next_pc, current_pc, current_clock_cycle);
-            fprintf(ctx->profiler_log_file, "[%s] About to enter function <%s> at PC <0x%x> from PC <0x%x> at clock cycle <%0d>\n", ctx->monitor_prefix, current_symbol->function_name, next_pc, current_pc, current_clock_cycle);
+            // printf("[%s] About to enter function <%s> at PC <0x%x> from PC <0x%x> at clock cycle <%0d>\n", ctx->monitor_prefix, current_symbol->function_name, next_pc, current_pc, current_clock_cycle);
+            printf("[%s] About to enter function <%s> at PC <0x%x> from PC <0x%x> at clock cycle <%0d> time <%s>\n", ctx->monitor_prefix, current_symbol->function_name, next_pc, current_pc, current_clock_cycle, time_string);
+            // fprintf(ctx->profiler_log_file, "[%s] About to enter function <%s> at PC <0x%x> from PC <0x%x> at clock cycle <%0d>\n", ctx->monitor_prefix, current_symbol->function_name, next_pc, current_pc, current_clock_cycle);
+            fprintf(ctx->profiler_log_file, "[%s] About to enter function <%s> at PC <0x%x> from PC <0x%x> at clock cycle <%0d> time <%s>\n", ctx->monitor_prefix, current_symbol->function_name, next_pc, current_pc, current_clock_cycle, time_string);
 
             // Print counters at function entry, might be useful for debug
             // for (int i = 0; i < ctx->n_counters; i++) {
@@ -331,10 +341,12 @@ void rvfi_monitor_step(rvfi_monitor_context *ctx, const rvfi_trace_t *rvfi_trace
             call_info_t* new_call_node_data = malloc(sizeof(call_info_t));
             GNode* new_call_node = g_node_new(new_call_node_data);
 
+            new_call_node_data->function_name = current_symbol->function_name;
             new_call_node_data->call_id = current_symbol->times_called;
             new_call_node_data->start_cycle = current_clock_cycle;
             new_call_node_data->end_cycle = 0;
-            new_call_node_data->function_name = current_symbol->function_name;
+            new_call_node_data->start_time = time_float;
+            // strncpy(new_call_node_data->start_time_string, time_string, 100);
 
             current_symbol->times_called += 1;
 
@@ -355,8 +367,8 @@ void rvfi_monitor_step(rvfi_monitor_context *ctx, const rvfi_trace_t *rvfi_trace
 
             if (next_pc == counter_stack_top->ret_pc) {
 
-                printf("[%s] About to return from function <%s> from PC <0x%x> to PC <0x%x> at clock cycle <%0d>\n", ctx->monitor_prefix, counter_stack_top->function_name, current_pc, next_pc, current_clock_cycle);
-                fprintf(ctx->profiler_log_file, "[%s] About to return from function <%s> from PC <0x%x> to PC <0x%x> at clock cycle <%0d>\n", ctx->monitor_prefix, counter_stack_top->function_name, current_pc, next_pc, current_clock_cycle);
+                printf("[%s] About to return from function <%s> from PC <0x%x> to PC <0x%x> at clock cycle <%0d> time <%s>\n", ctx->monitor_prefix, counter_stack_top->function_name, current_pc, next_pc, current_clock_cycle, time_string);
+                fprintf(ctx->profiler_log_file, "[%s] About to return from function <%s> from PC <0x%x> to PC <0x%x> at clock cycle <%0d> time <%s>\n", ctx->monitor_prefix, counter_stack_top->function_name, current_pc, next_pc, current_clock_cycle, time_string);
 
                 current_symbol = g_hash_table_lookup(ctx->symbol_table_hash_table, GINT_TO_POINTER(counter_stack_top->start_pc));
 
@@ -370,6 +382,8 @@ void rvfi_monitor_step(rvfi_monitor_context *ctx, const rvfi_trace_t *rvfi_trace
                 // Recover parent call graph node and set it as the current node
                 printf("Prev call graph node <%s>\n", ((call_info_t*) ctx->current_call_node->data)->function_name);
                 ((call_info_t*) ctx->current_call_node->data)->end_cycle = current_clock_cycle;
+                ((call_info_t*) ctx->current_call_node->data)->end_time = time_float;
+                // strncpy(((call_info_t*) ctx->current_call_node->data)->end_time_string, time_string, 100);
                 ctx->current_call_node = ctx->current_call_node->parent;
                 printf("Updated call graph node <%s>\n", ((call_info_t*) ctx->current_call_node->data)->function_name);
 
@@ -423,9 +437,9 @@ void rvfi_monitor_print_call_graph(rvfi_monitor_context* ctx, GNode* call_node, 
         indent_string[i] = '-';
     indent_string[indent_level] = '\0';
 
-    fprintf(ctx->profiler_call_graph_file, "|%s%s_%d: Start Cycle <%d> End Cycle <%d> # Cycles <%d>\n",
-    // printf("|%s%s_%d: Start Cycle <%d> End Cycle <%d> # Cycles <%d>\n",
-        indent_string, call_info->function_name, call_info->call_id, call_info->start_cycle, call_info->end_cycle, call_info->end_cycle - call_info->start_cycle);
+    // fprintf(ctx->profiler_call_graph_file, "|%s%s_%d: Start Cycle <%d> End Cycle <%d> # Cycles <%d>\n",
+    fprintf(ctx->profiler_call_graph_file, "|%s%s_%d: Start Time <%.3f%s> End Time <%.3f%s> Total Cycles <%.3f%s>\n",
+        indent_string, call_info->function_name, call_info->call_id, call_info->start_time, ctx->time_unit_suffix, call_info->end_time, ctx->time_unit_suffix, call_info->end_time - call_info->start_time, ctx->time_unit_suffix);
 
     // Depth-first
     if (call_node->children != NULL)

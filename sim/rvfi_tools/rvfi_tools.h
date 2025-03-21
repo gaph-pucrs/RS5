@@ -52,6 +52,10 @@ typedef struct {
     uint32_t call_id;
     uint64_t start_cycle;
     uint64_t end_cycle;
+    double start_time;
+    double end_time;
+    // char start_time_string[100];
+    // char end_time_string[100];
 } call_info_t;
 
 struct rvfi_perf_count_t;
@@ -75,6 +79,7 @@ typedef struct {
 typedef struct {
 
     char* monitor_prefix;
+    char* time_unit_suffix;
 
     rv_isa isa;
 
@@ -157,11 +162,11 @@ static const char rv_ireg_name_sym[32][5] = {
 
 #endif
 
-rvfi_monitor_context* rvfi_monitor_init(char* monitor_prefix, rv_isa isa, int en_tracer, int en_profiler, int en_checker, char* tracer_log_file_name, char* profiler_log_file_name, char* profiler_call_graph_file_name, char* symbol_table_file_name, char* symbol_watchlist_file_name);
+rvfi_monitor_context* rvfi_monitor_init(char* monitor_prefix, char* time_unit_suffix, rv_isa isa, int en_tracer, int en_profiler, int en_checker);
 void rvfi_monitor_add_counter(rvfi_monitor_context* ctx, rvfi_performance_counter_t ctr);
 void rvfi_monitor_add_default_performance_counters(rvfi_monitor_context* ctx);
 void rvfi_monitor_push_counters_to_stack(rvfi_monitor_context *ctx, symbol_info_t *current_symbol, const rvfi_trace_t *rvfi_trace);
-void rvfi_monitor_step(rvfi_monitor_context* ctx, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle);
+void rvfi_monitor_step(rvfi_monitor_context* ctx, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, char* time_string, double time_float);
 void rvfi_monitor_final(rvfi_monitor_context* ctx);
 
 void rvfi_monitor_print_call_graph(rvfi_monitor_context* ctx, GNode* call_node, int indent_level);
