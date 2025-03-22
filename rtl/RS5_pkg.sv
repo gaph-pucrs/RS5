@@ -277,6 +277,17 @@ package RS5_pkg;
         INDEXED_ORDERED
     } addrModes_e;
 
+    typedef enum integer {
+        RED_MAX,
+        RED_MAXU,
+        RED_MIN,
+        RED_MINU,
+        RED_AND,
+        RED_OR,
+        RED_XOR,
+        RED_SUM
+    } red_op_e;
+
 endpackage
 
 `endif

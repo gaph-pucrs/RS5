@@ -24,7 +24,7 @@ default: run
 run:
 	@echo
 	@echo "-- VERILATE ----------------"
-	@$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_INPUT) --binary -j 0 -I../rtl -I../rtl/aes --timescale 1ns/1ns
+	@$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_INPUT) --binary -j 0 -I../rtl -I../rtl/aes -I../rtl/vector --timescale 1ns/1ns
 
 	@echo
 	@echo "-- RUN ---------------------"
