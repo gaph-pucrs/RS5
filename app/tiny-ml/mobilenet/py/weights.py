@@ -13,13 +13,13 @@ def create_c_array(layer):
         print(f"weights_t.shape: {weights_t.shape}")
     else:
         weights_t = weights
-    c_weights = [w*1000 for w in weights_t.flatten()]
+    c_weights = [w*1 for w in weights_t.flatten()]
 
     with open(filename, "w") as f:
-        f.write(f"#ifndef   __{layer.name}.h__\n")
-        f.write(f"#define   __{layer.name}.h__\n\n")
+        f.write(f"#ifndef   __{layer.name}_h__\n")
+        f.write(f"#define   __{layer.name}_h__\n\n")
         f.write(f"//{layer.name}: {weights_t.shape}\n")
-        f.write(f"const int {layer.name}[{len(c_weights)}] = {{\n")
+        f.write(f"const double {layer.name}[{len(c_weights)}] = {{\n")
         f.write(f",\n".join(map(str, c_weights)))
         f.write(f"\n}};")
         f.write(f"\n\n#endif")
