@@ -1,8 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 #include "params/data.h"
+//------------------------------
+// LAYER1
 #include "params/conv1.h"
+#include "params/conv1_bn_avg.h"
+#include "params/conv1_bn_var.h"
+#include "params/conv1_bn_gamma.h"
+#include "params/conv1_bn_beta.h"
+#include "params/conv1_bn_eps.h"
 
 #define INPUT_HEIGHT    224
 #define INPUT_WIDTH     224
@@ -13,11 +21,26 @@
 
 #define type    double
 
-void batch_normaliztion (
-    int input[],
-    const int mean[],
-    const int avg[]
+void batch_normalization (
+    const int filters,
+    const int size,
+    type input[],
+    const type mean[],
+    const type var[],
+    const type gamma[],
+    const type beta[],
+    const double eps
 ) {
+    for (int n=0; n<filters; n++) {
+        for (int i=0; i<size; i++) {
+            int id = i+n*size;
+            input[id] -= mean[n];
+            input[id] /= sqrt(var[n] + eps);
+            input[id] *= gamma[n];
+            input[id] += beta[n];
+        }
+    }
+
 }
 
 void relu (
@@ -39,7 +62,12 @@ void _conv_block (
     int filters,
     const double alpha,
     const int kernel_size,
-    const int stride
+    const int stride,
+    const type mean[],
+    const type var[],
+    const type gamma[],
+    const type beta[],
+    const double eps
 ) {
     filters = (int)(filters*alpha);
 
@@ -82,6 +110,10 @@ void _conv_block (
 
     }
 
+    const int size = CONV1_FEATUREMAP_HEIGHT*CONV1_FEATUREMAP_WIDTH;
+    batch_normalization(filters, size, output, mean, var, gamma, beta, eps);
+
+
     //relu(output);
 
     //free(G);
@@ -99,7 +131,12 @@ int main()
        CONV1_FILTERS,
        1,
        3,
-       2
+       2,
+       conv1_bn_avg,
+       conv1_bn_var,
+       conv1_bn_gamma,
+       conv1_bn_beta,
+       conv1_bn_eps
     );
 
     const int size = CONV1_FEATUREMAP_HEIGHT*CONV1_FEATUREMAP_WIDTH*CONV1_FILTERS;

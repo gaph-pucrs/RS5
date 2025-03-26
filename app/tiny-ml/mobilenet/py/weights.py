@@ -40,5 +40,6 @@ def create_c_array(layer):
 for layer in model.layers:
     if layer.weights:
         #print(f"{layer.name}.input_shape: {layer.input_shape}")
-        create_c_array(layer)
-        print(f"(+) Weights generated in params/{layer.name} file")
+        if "_bn" not in layer.name:
+            create_c_array(layer)
+            print(f"(+) Weights generated in params/{layer.name} file")
