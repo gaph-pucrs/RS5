@@ -1,6 +1,8 @@
 #ifndef RVFI_TOOLS_H
 #define RVFI_TOOLS_H
 
+#include "config.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -49,7 +51,7 @@ typedef struct {
 
 struct rvfi_perf_count_t;
 
-typedef void (*rvfi_tools_counter_cb_t)(struct rvfi_perf_count_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, rv_decode decoded_instruction);
+typedef void (*rvfi_tools_counter_cb_t)(struct rvfi_perf_count_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* decoded_instruction);
 
 typedef struct rvfi_perf_count_t {
     char name[100];
@@ -69,7 +71,7 @@ typedef struct {
 
     char* monitor_prefix;
 
-    rv_isa isa;
+    unsigned long march;
 
     int en_tracer;
     int en_profiler;
@@ -94,26 +96,6 @@ typedef struct {
     int n_counters;
 
 } rvfi_monitor_context;
-
-// From riscv-dis.c
-
-typedef struct {
-    const int op;
-    const rvc_constraint *constraints;
-} rv_comp_data;
-
-typedef struct {
-    const char * const name;
-    const rv_codec codec;
-    const char * const format;
-    const rv_comp_data *pseudo;
-    const short decomp_rv32;
-    const short decomp_rv64;
-    const short decomp_rv128;
-    const short decomp_data;
-} rv_opcode_data;
-
-extern rv_opcode_data *opcode_data;
 
 static const char rv_ireg_name_sym[32][5] = {
     "zero", "ra",   "sp",   "gp",   "tp",   "t0",   "t1",   "t2",
@@ -147,7 +129,7 @@ static const char rv_ireg_name_sym[32][5] = {
 
 #endif
 
-rvfi_monitor_context* rvfi_monitor_init(char* monitor_prefix, rv_isa isa, int en_tracer, int en_profiler, int en_checker, char* tracer_log_file_name, char* profiler_log_file_name, char* symbol_table_file_name, char* symbol_watchlist_file_name);
+rvfi_monitor_context* rvfi_monitor_init(char* monitor_prefix, unsigned long isa, int en_tracer, int en_profiler, int en_checker, char* tracer_log_file_name, char* profiler_log_file_name, char* symbol_table_file_name, char* symbol_watchlist_file_name);
 void rvfi_monitor_add_counter(rvfi_monitor_context* ctx, rvfi_performance_counter_t ctr);
 void rvfi_monitor_add_default_performance_counters(rvfi_monitor_context* ctx);
 void rvfi_monitor_push_counters_to_stack(rvfi_monitor_context *ctx, symbol_info_t *current_symbol, const rvfi_trace_t *rvfi_trace);

@@ -2,14 +2,14 @@
 #include "rvfi_tools.h"
 #include "rvfi_callbacks.h"
 
-rvfi_monitor_context* rvfi_monitor_init(char* monitor_prefix, rv_isa isa, int en_tracer, int en_profiler, int en_checker, char* tracer_log_file_name, char* profiler_log_file_name, char* symbol_table_file_name, char* symbol_watchlist_file_name) {
+rvfi_monitor_context* rvfi_monitor_init(char* monitor_prefix, unsigned long march, int en_tracer, int en_profiler, int en_checker, char* tracer_log_file_name, char* profiler_log_file_name, char* symbol_table_file_name, char* symbol_watchlist_file_name) {
 
     rvfi_monitor_context *ctx = malloc(sizeof(rvfi_monitor_context));
 
     ctx->monitor_prefix = malloc(100);
     strcpy(ctx->monitor_prefix, monitor_prefix);
 
-    ctx->isa = isa;
+    ctx->march = march;
 
     ctx->en_tracer = en_tracer;
     ctx->en_profiler = en_profiler;
@@ -87,31 +87,65 @@ rvfi_monitor_context* rvfi_monitor_init(char* monitor_prefix, rv_isa isa, int en
     // Parse ELF symbols into 2 hash tables, one containing all symbol name and PC and another containing the names of watched symbols
     if (ctx->en_tracer || ctx->en_profiler) {
 
-        ctx->symbol_table_file = fopen(ctx->symbol_table_file_name, "r");
+        // ctx->symbol_table_file = fopen(ctx->symbol_table_file_name, "r");
 
-        if (ctx->symbol_table_file == NULL) {
+        // if (ctx->symbol_table_file == NULL) {
+        //     printf("[%s] Cant open file <%s> in read mode\n", ctx->monitor_prefix, ctx->symbol_table_file_name);
+        //     exit(1);
+        // }
+
+        bfd *abfd;
+        char *target = "elf32-littleriscv";
+        
+        abfd = bfd_openr (ctx->symbol_table_file_name, target);
+        if (abfd == NULL) {
             printf("[%s] Cant open file <%s> in read mode\n", ctx->monitor_prefix, ctx->symbol_table_file_name);
             exit(1);
         }
+        char* matching;
+        if (!bfd_check_format_matches (abfd, bfd_object, &matching)) {
+            printf("[%s] Invalid ELF file <%s>\n", ctx->monitor_prefix, ctx->symbol_table_file_name);
+            exit(1);
+        }
+
+        long syms_size = bfd_get_symtab_upper_bound (abfd);
+
+        asymbol** syms = (asymbol **) xmalloc (syms_size);
+
+        int symcount = get_symtab(abfd, syms);
+        asymbol *current;
+
+        // for (int count = 0; count < symcount; count++) {
+        //     current = syms[count];
+        //     const char *section_name = current->section->name;
+            
+        //     printf ("%s %s %c",
+        //     section_name,
+        //     current->name,
+        //     (current->flags & BSF_DEBUGGING) ? 'D' : 'F');
+        //     // if (current->name)
+        //     //   printf(" %s", current->name);
+        //     printf("\n");
+        // }
 
         // Fill out symbol PC and name hash table
-        // Parse symbol table dump from "nm" where is line follows the form "<pc> <function_name>\n"
-        while (1) {
+        for (int count = 0; count < symcount; count++) {
+
+            current = syms[count];
 
             symbol_info_t* new_symbol = malloc(sizeof(symbol_info_t));
-            char symbol_type;
-            uint32_t symbol_pc;
+            uint32_t symbol_pc = aout_symbol(current)->addr & 0xffff;
 
-            if (fscanf(ctx->symbol_table_file, "%x %c %s", &symbol_pc, &symbol_type, new_symbol->function_name) == EOF)
-                break;
+            // if (fscanf(ctx->symbol_table_file, "%x %c %s", &symbol_pc, &symbol_type, new_symbol->function_name) == EOF)
+            //     break;
 
-            // 'T' = function, 't' == label
-            if (!(symbol_type == 'T' || symbol_type == 't'))
-            // if (symbol_type != 'T')
+            strcpy(new_symbol->function_name, current->name);
+
+            if (current->flags & BSF_DEBUGGING)
                 continue;
 
             new_symbol->is_watched = 0;
-            new_symbol->is_function = (symbol_type == 'T');
+            new_symbol->is_function = true; // TODO: identify if it's a function with bfd flags
             new_symbol->times_called = 0;
             new_symbol->start_cycles = g_array_new(FALSE, FALSE, sizeof(uint64_t));
             new_symbol->end_cycles = g_array_new(FALSE, FALSE, sizeof(uint64_t));
@@ -159,7 +193,7 @@ rvfi_monitor_context* rvfi_monitor_init(char* monitor_prefix, rv_isa isa, int en
 
     }
 
-    fclose(ctx->symbol_table_file);
+    //fclose(ctx->symbol_table_file);
     fclose(ctx->symbol_watchlist_file);
 
     return ctx;
@@ -213,7 +247,7 @@ void rvfi_monitor_push_counters_to_stack(rvfi_monitor_context *ctx, symbol_info_
 
     ctx->last_counter_state.function_name = current_symbol->function_name;
     ctx->last_counter_state.start_pc = rvfi_trace->rvfi_pc_wdata;
-    ctx->last_counter_state.ret_pc = rvfi_trace->rvfi_pc_rdata + inst_length(rvfi_trace->rvfi_insn);  // NOTE: inst_length() comes from the MJC disassembly library, this function must be brought to this source file if migrating to libopcodes
+    ctx->last_counter_state.ret_pc = rvfi_trace->rvfi_pc_rdata + riscv_insn_length(rvfi_trace->rvfi_insn);
     // ctx->last_counter_state->counters = malloc(RVFI_N_COUNTERS*sizeof(uint64_t));
 
     g_array_free(ctx->last_counter_state.counters, FALSE);
@@ -230,11 +264,10 @@ void rvfi_monitor_push_counters_to_stack(rvfi_monitor_context *ctx, symbol_info_
 void rvfi_monitor_step(rvfi_monitor_context *ctx, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle) {  // TODO: Pass simulation time as argument, print messages with timestamp
 
     char disassembly_buffer[200];
-    rv_decode decoded_instruction;  // rv_decode is defined in the Michael Clark riscv-dis library, this needs to be changed if libopcodes is used in the future
-
+    const struct riscv_opcode* decoded_instruction;  
     // FIXME: This call will also need to change if libopcoes is used in the future
     if (ctx->en_profiler || ctx->en_tracer)
-        decoded_instruction = disasm_inst(disassembly_buffer, 200, ctx->isa, (uint64_t) rvfi_trace->rvfi_pc_rdata, (rv_inst) rvfi_trace->rvfi_insn);
+        decoded_instruction = disasm_inst(disassembly_buffer, 200, (uint64_t) rvfi_trace->rvfi_pc_rdata, rvfi_trace->rvfi_insn);
 
     if (ctx->en_tracer) {
 
@@ -242,18 +275,22 @@ void rvfi_monitor_step(rvfi_monitor_context *ctx, const rvfi_trace_t *rvfi_trace
 
         fprintf(ctx->tracer_log_file, "%0d", current_clock_cycle);
         fprintf(ctx->tracer_log_file, "\t%0x", rvfi_trace->rvfi_pc_rdata);
-        // fprintf(tracer_log_file, "\t%0x", (rvfi_trace->rvfi_insn & 0x3) ? rvfi_trace->rvfi_insn : rvfi_trace->rvfi_insn & 0xFFFF);
+
+        if (riscv_insn_length(rvfi_trace->rvfi_insn) == 4) 
+            fprintf(ctx->tracer_log_file, "\t%08x", rvfi_trace->rvfi_insn);
+        else
+            fprintf(ctx->tracer_log_file, "\t%04x    ", rvfi_trace->rvfi_insn & 0xFFFF);
 
         // Writes the actual disassembled instruction from riscv-dis
         fprintf(ctx->tracer_log_file, "\t%s", disassembly_buffer);
 
-        if (decoded_instruction.rs1)
+        if (rvfi_trace->rvfi_rs1_addr)
             fprintf(ctx->tracer_log_file, " rs1=%s=<0x%x>", rv_ireg_name_sym[rvfi_trace->rvfi_rs1_addr], rvfi_trace->rvfi_rs1_rdata);
 
-        if (decoded_instruction.rs2)
+        if (rvfi_trace->rvfi_rs2_addr)
             fprintf(ctx->tracer_log_file, " rs2=%s=<0x%x>", rv_ireg_name_sym[rvfi_trace->rvfi_rs2_addr], rvfi_trace->rvfi_rs2_rdata);
 
-        if (decoded_instruction.rd)
+        if (rvfi_trace->rvfi_rd_addr)
             fprintf(ctx->tracer_log_file, " rd=%s:=<0x%x>", rv_ireg_name_sym[rvfi_trace->rvfi_rd_addr], rvfi_trace->rvfi_rd_wdata);
 
         if (rvfi_trace->rvfi_mem_rmask | rvfi_trace->rvfi_mem_wmask)
@@ -265,7 +302,7 @@ void rvfi_monitor_step(rvfi_monitor_context *ctx, const rvfi_trace_t *rvfi_trace
         if (rvfi_trace->rvfi_mem_wmask)
             fprintf(ctx->tracer_log_file, " data_to_mem <0x%x>", rvfi_trace->rvfi_mem_wdata);
 
-        if (rvfi_trace->rvfi_pc_wdata != (rvfi_trace->rvfi_pc_rdata + inst_length(rvfi_trace->rvfi_insn))) {
+        if (rvfi_trace->rvfi_pc_wdata != (rvfi_trace->rvfi_pc_rdata + riscv_insn_length(rvfi_trace->rvfi_insn))) {
 
             symbol_info_t* symbol = g_hash_table_lookup(ctx->symbol_table_hash_table, GINT_TO_POINTER(rvfi_trace->rvfi_pc_wdata));
 
@@ -295,7 +332,7 @@ void rvfi_monitor_step(rvfi_monitor_context *ctx, const rvfi_trace_t *rvfi_trace
         uint32_t next_pc = rvfi_trace->rvfi_pc_wdata;
         symbol_info_t* current_symbol = g_hash_table_lookup(ctx->symbol_table_hash_table, GINT_TO_POINTER(next_pc));
 
-        uint32_t function_call = decoded_instruction.op == rv_op_jal || decoded_instruction.op == rv_op_jalr;
+        uint32_t function_call = decoded_instruction->match == MATCH_JAL || decoded_instruction->match == MATCH_JALR;
 
         if (function_call && current_symbol != NULL && current_symbol->is_function && current_symbol->is_watched) {
 

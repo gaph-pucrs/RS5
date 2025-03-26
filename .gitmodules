@@ -1,0 +1,3 @@
+[submodule "sim/rvfi_tools/lib/binutils"]
+	path = sim/rvfi_tools/lib/binutils
+	url = git://sourceware.org/git/binutils-gdb.git

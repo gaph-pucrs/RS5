@@ -1,6 +1,6 @@
 #include "rvfi_callbacks.h"
 
-void rvfi_tools_perfcount_cb_clock_cycles(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, rv_decode decoded_instruction) {
+void rvfi_tools_perfcount_cb_clock_cycles(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* decoded_instruction) {
 
     static uint64_t running_clock_cycle_count = 0;
 
@@ -10,22 +10,22 @@ void rvfi_tools_perfcount_cb_clock_cycles(rvfi_performance_counter_t* self, cons
 }
 
 // TODO: Consider machines capable of retiring multiple instruction per cycle
-void rvfi_tools_perfcount_cb_insn_retired(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, rv_decode decoded_instruction) {
+void rvfi_tools_perfcount_cb_insn_retired(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* decoded_instruction) {
     self->val += 1;
 }
 
-void rvfi_tools_perfcount_cb_cmprss_insn_retired(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, rv_decode decoded_instruction) {
-    if ((decoded_instruction.inst & 0x3) != 0x3)
+void rvfi_tools_perfcount_cb_cmprss_insn_retired(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* decoded_instruction) {
+    if (decoded_instruction->insn_class == INSN_CLASS_C)
         self->val += 1;
 }
 
-void rvfi_tools_perfcount_cb_unkwown_insn_retired(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, rv_decode decoded_instruction) {
-    if (decoded_instruction.op == rv_op_illegal)
+void rvfi_tools_perfcount_cb_unkwown_insn_retired(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* decoded_instruction) {
+    if (decoded_instruction->match == 0)
         self->val += 1;
 }
 
 // TODO: Consider WFI instruction and multicycle instructions
-void rvfi_tools_perfcount_cb_stall_cycles(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, rv_decode decoded_instruction) {
+void rvfi_tools_perfcount_cb_stall_cycles(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* decoded_instruction) {
 
     static uint64_t last_clock_cycle = 0;
 
@@ -35,46 +35,36 @@ void rvfi_tools_perfcount_cb_stall_cycles(rvfi_performance_counter_t* self, cons
 }
 
 // These are instructions than generally re-use the same ALU adder (add, sub and set-less-than)
-void rvfi_tools_perfcount_cb_arith(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, rv_decode decoded_instruction) {
+void rvfi_tools_perfcount_cb_arith(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
 
-    rv_op op = (rv_op) decoded_instruction.op;
-
-    switch (op) {
-        case rv_op_auipc:
-        case rv_op_add:
-        case rv_op_sub:
-        case rv_op_addi:
-        case rv_op_addw:
-        case rv_op_subw:
-        case rv_op_addiw:
-        case rv_op_addd:
-        case rv_op_subd:
-        case rv_op_addid:
-        case rv_op_slt:
-        case rv_op_sltu:
-        case rv_op_slti:
-        case rv_op_sltiu:
-        case rv_op_c_add:
-        case rv_op_c_sub:
-        case rv_op_c_addi:
-        case rv_op_c_addiw:
-        case rv_op_c_addi16sp:
-        case rv_op_c_addi4spn:
-        case rv_op_amoadd_w:
-        case rv_op_amomin_w:
-        case rv_op_amomax_w:
-        case rv_op_amominu_w:
-        case rv_op_amomaxu_w:
-        case rv_op_amoadd_d:
-        case rv_op_amomin_d:
-        case rv_op_amomax_d:
-        case rv_op_amominu_d:
-        case rv_op_amomaxu_d:
-        case rv_op_amoadd_q:
-        case rv_op_amomin_q:
-        case rv_op_amomax_q:
-        case rv_op_amominu_q:
-        case rv_op_amomaxu_q:
+    switch (op->match) {
+        case MATCH_AUIPC:
+        case MATCH_ADD:
+        case MATCH_SUB:
+        case MATCH_ADDI:
+        case MATCH_ADDW:
+        case MATCH_SUBW:
+        case MATCH_ADDIW:
+        case MATCH_SLT:
+        case MATCH_SLTU:
+        case MATCH_SLTI:
+        case MATCH_SLTIU:
+        case MATCH_C_ADD:
+        case MATCH_C_SUB:
+        case MATCH_C_ADDI:
+        case MATCH_C_ADDIW:
+        case MATCH_C_ADDI16SP:
+        case MATCH_C_ADDI4SPN:
+        case MATCH_AMOADD_W:
+        case MATCH_AMOMIN_W:
+        case MATCH_AMOMAX_W:
+        case MATCH_AMOMINU_W:
+        case MATCH_AMOMAXU_W:
+        case MATCH_AMOADD_D:
+        case MATCH_AMOMIN_D:
+        case MATCH_AMOMAX_D:
+        case MATCH_AMOMINU_D:
+        case MATCH_AMOMAXU_D:
             self->val += 1;
 
         default:
@@ -84,20 +74,17 @@ void rvfi_tools_perfcount_cb_arith(rvfi_performance_counter_t* self, const rvfi_
 }
 
 // Shifts/rotates
-void rvfi_tools_perfcount_cb_shift(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, rv_decode decoded_instruction) {
+void rvfi_tools_perfcount_cb_shift(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
 
-    rv_op op = (rv_op) decoded_instruction.op;
-
-    switch (op) {
-        case rv_op_slli:
-        case rv_op_srli:
-        case rv_op_srai:
-        case rv_op_sll:
-        case rv_op_srl:
-        case rv_op_sra:
-        // FIXME: Michael Clark's disassembler does not support bitmanip rotates (ror/rori)
-        // case rv_op_ror:
-        // case rv_op_rori:
+    switch (op->match) {
+        case MATCH_SLLI:
+        case MATCH_SRLI:
+        case MATCH_SRAI:
+        case MATCH_SLL:
+        case MATCH_SRL:
+        case MATCH_SRA:
+        case MATCH_ROR:
+        case MATCH_RORI:
             self->val += 1;
 
         default:
@@ -107,34 +94,28 @@ void rvfi_tools_perfcount_cb_shift(rvfi_performance_counter_t* self, const rvfi_
 }
 
 // Bitwise logical ops
-void rvfi_tools_perfcount_cb_bitwise(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, rv_decode decoded_instruction) {
+void rvfi_tools_perfcount_cb_bitwise(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
 
-    rv_op op = (rv_op) decoded_instruction.op;
-
-    switch (op) {
-        case rv_op_and:
-        case rv_op_andi:
-        case rv_op_or:
-        case rv_op_ori:
-        case rv_op_xor:
-        case rv_op_xori:
-        case rv_op_not:
-        case rv_op_c_andi:
-        case rv_op_c_or:
-        case rv_op_c_xor:
-        case rv_op_amoxor_w:
-        case rv_op_amoor_w:
-        case rv_op_amoand_w:
-        case rv_op_amoxor_d:
-        case rv_op_amoor_d:
-        case rv_op_amoand_d:
-        case rv_op_amoxor_q:
-        case rv_op_amoor_q:
-        case rv_op_amoand_q:
-        // FIXME: Michael Clark's disassembler does not support bitmanip bitwise with negated operand (andn/orn/xnor)
-        // case rv_op_andn:
-        // case rv_op_orn:
-        // case rv_op_xnor:
+    switch (op->match) {
+        case MATCH_AND:
+        case MATCH_ANDI:
+        case MATCH_OR:
+        case MATCH_ORI:
+        case MATCH_XOR:
+        case MATCH_XORI:
+        case MATCH_C_NOT:
+        case MATCH_C_ANDI:
+        case MATCH_C_OR:
+        case MATCH_C_XOR:
+        case MATCH_AMOXOR_W:
+        case MATCH_AMOOR_W:
+        case MATCH_AMOAND_W:
+        case MATCH_AMOXOR_D:
+        case MATCH_AMOOR_D:
+        case MATCH_AMOAND_D:
+        case MATCH_ANDN:
+        case MATCH_ORN:
+        case MATCH_XNOR:
             self->val += 1;
 
         default:
@@ -144,17 +125,14 @@ void rvfi_tools_perfcount_cb_bitwise(rvfi_performance_counter_t* self, const rvf
 }
 
 // Multiplications
-void rvfi_tools_perfcount_cb_mult(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, rv_decode decoded_instruction) {
+void rvfi_tools_perfcount_cb_mult(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
 
-    rv_op op = (rv_op) decoded_instruction.op;
-
-    switch (op) {
-        case rv_op_mul:
-        case rv_op_mulh:
-        case rv_op_mulhsu:
-        case rv_op_mulhu:
-        case rv_op_mulw:
-        case rv_op_muld:
+    switch (op->match) {
+        case MATCH_MUL:
+        case MATCH_MULH:
+        case MATCH_MULHSU:
+        case MATCH_MULHU:
+        case MATCH_MULW:
             self->val += 1;
 
         default:
@@ -164,23 +142,17 @@ void rvfi_tools_perfcount_cb_mult(rvfi_performance_counter_t* self, const rvfi_t
 }
 
 // Divisions/remainer
-void rvfi_tools_perfcount_cb_div(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, rv_decode decoded_instruction) {
+void rvfi_tools_perfcount_cb_div(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
 
-    rv_op op = (rv_op) decoded_instruction.op;
-
-    switch (op) {
-        case rv_op_div:
-        case rv_op_divu:
-        case rv_op_rem:
-        case rv_op_remu:
-        case rv_op_divw:
-        case rv_op_divuw:
-        case rv_op_remw:
-        case rv_op_remuw:
-        case rv_op_divd:
-        case rv_op_divud:
-        case rv_op_remd:
-        case rv_op_remud:
+    switch (op->match) {
+        case MATCH_DIV:
+        case MATCH_DIVU:
+        case MATCH_REM:
+        case MATCH_REMU:
+        case MATCH_DIVW:
+        case MATCH_DIVUW:
+        case MATCH_REMW:
+        case MATCH_REMUW:
             self->val += 1;
 
         default:
@@ -188,15 +160,12 @@ void rvfi_tools_perfcount_cb_div(rvfi_performance_counter_t* self, const rvfi_tr
     }
 }
 
-void rvfi_tools_perfcount_cb_fwd_static_jumps(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, rv_decode decoded_instruction) {
+void rvfi_tools_perfcount_cb_fwd_static_jumps(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
 
-    rv_op op = (rv_op) decoded_instruction.op;
-
-    switch (op) {
-        case rv_op_j:
-        case rv_op_jal:
-        case rv_op_c_jal:
-        case rv_op_c_j:
+    switch (op->match) {
+        case MATCH_JAL:
+        case MATCH_C_JAL:
+        case MATCH_C_J:
             if (rvfi_trace->rvfi_pc_wdata > rvfi_trace->rvfi_pc_rdata)
                 self->val += 1;
 
@@ -206,15 +175,12 @@ void rvfi_tools_perfcount_cb_fwd_static_jumps(rvfi_performance_counter_t* self, 
 
 }
 
-void rvfi_tools_perfcount_cb_bwd_static_jumps(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, rv_decode decoded_instruction) {
+void rvfi_tools_perfcount_cb_bwd_static_jumps(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
 
-    rv_op op = (rv_op) decoded_instruction.op;
-
-    switch (op) {
-        case rv_op_j:
-        case rv_op_jal:
-        case rv_op_c_jal:
-        case rv_op_c_j:
+    switch (op->match) {
+        case MATCH_JAL:
+        case MATCH_C_JAL:
+        case MATCH_C_J:
             if (rvfi_trace->rvfi_pc_wdata < rvfi_trace->rvfi_pc_rdata)
                 self->val += 1;
 
@@ -224,16 +190,12 @@ void rvfi_tools_perfcount_cb_bwd_static_jumps(rvfi_performance_counter_t* self, 
 
 }
 
-void rvfi_tools_perfcount_cb_fwd_reg_jumps(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, rv_decode decoded_instruction) {
+void rvfi_tools_perfcount_cb_fwd_reg_jumps(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
 
-    rv_op op = (rv_op) decoded_instruction.op;
-
-    switch (op) {
-        case rv_op_jr:
-        case rv_op_ret:
-        case rv_op_jalr:
-        case rv_op_c_jalr:
-        case rv_op_c_jr:
+    switch (op->match) {
+        case MATCH_JALR:
+        case MATCH_C_JALR:
+        case MATCH_C_JR:
             if (rvfi_trace->rvfi_pc_wdata > rvfi_trace->rvfi_pc_rdata)
                 self->val += 1;
 
@@ -243,16 +205,12 @@ void rvfi_tools_perfcount_cb_fwd_reg_jumps(rvfi_performance_counter_t* self, con
 
 }
 
-void rvfi_tools_perfcount_cb_bwd_reg_jumps(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, rv_decode decoded_instruction) {
+void rvfi_tools_perfcount_cb_bwd_reg_jumps(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
 
-    rv_op op = (rv_op) decoded_instruction.op;
-
-    switch (op) {
-        case rv_op_jr:
-        case rv_op_ret:
-        case rv_op_jalr:
-        case rv_op_c_jalr:
-        case rv_op_c_jr:
+    switch (op->match) {
+        case MATCH_JALR:
+        case MATCH_C_JALR:
+        case MATCH_C_JR:
             if (rvfi_trace->rvfi_pc_wdata < rvfi_trace->rvfi_pc_rdata)
                 self->val += 1;
 
@@ -262,31 +220,19 @@ void rvfi_tools_perfcount_cb_bwd_reg_jumps(rvfi_performance_counter_t* self, con
 
 }
 
-void rvfi_tools_perfcount_cb_taken_fwd_branches(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, rv_decode decoded_instruction) {
-
-    rv_op op = (rv_op) decoded_instruction.op;
+void rvfi_tools_perfcount_cb_taken_fwd_branches(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
 
 // size_t inst_length(rv_inst inst);
-    switch (op) {
-        case rv_op_beq:
-        case rv_op_bne:
-        case rv_op_blt:
-        case rv_op_bge:
-        case rv_op_bltu:
-        case rv_op_bgeu:
-        case rv_op_beqz:
-        case rv_op_bnez:
-        case rv_op_blez:
-        case rv_op_bgez:
-        case rv_op_bltz:
-        case rv_op_bgtz:
-        case rv_op_ble:
-        case rv_op_bleu:
-        case rv_op_bgt:
-        case rv_op_bgtu:
-        case rv_op_c_beqz:
-        case rv_op_c_bnez:
-            if (rvfi_trace->rvfi_pc_wdata != (rvfi_trace->rvfi_pc_rdata + inst_length((rv_inst) rvfi_trace->rvfi_pc_rdata)) && rvfi_trace->rvfi_pc_wdata > rvfi_trace->rvfi_pc_rdata)
+    switch (op->match) {
+        case MATCH_BEQ:
+        case MATCH_BNE:
+        case MATCH_BLT:
+        case MATCH_BGE:
+        case MATCH_BLTU:
+        case MATCH_BGEU:
+        case MATCH_C_BEQZ:
+        case MATCH_C_BNEZ:
+            if (rvfi_trace->rvfi_pc_wdata != (rvfi_trace->rvfi_pc_rdata + riscv_insn_length(rvfi_trace->rvfi_pc_rdata)) && rvfi_trace->rvfi_pc_wdata > rvfi_trace->rvfi_pc_rdata)
                 self->val += 1;
 
         default:
@@ -295,30 +241,18 @@ void rvfi_tools_perfcount_cb_taken_fwd_branches(rvfi_performance_counter_t* self
 
 }
 
-void rvfi_tools_perfcount_cb_taken_bwd_branches(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, rv_decode decoded_instruction) {
+void rvfi_tools_perfcount_cb_taken_bwd_branches(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
 
-    rv_op op = (rv_op) decoded_instruction.op;
-
-    switch (op) {
-        case rv_op_beq:
-        case rv_op_bne:
-        case rv_op_blt:
-        case rv_op_bge:
-        case rv_op_bltu:
-        case rv_op_bgeu:
-        case rv_op_beqz:
-        case rv_op_bnez:
-        case rv_op_blez:
-        case rv_op_bgez:
-        case rv_op_bltz:
-        case rv_op_bgtz:
-        case rv_op_ble:
-        case rv_op_bleu:
-        case rv_op_bgt:
-        case rv_op_bgtu:
-        case rv_op_c_beqz:
-        case rv_op_c_bnez:
-            if (rvfi_trace->rvfi_pc_wdata != (rvfi_trace->rvfi_pc_rdata + inst_length((rv_inst) rvfi_trace->rvfi_pc_rdata)) && rvfi_trace->rvfi_pc_wdata < rvfi_trace->rvfi_pc_rdata)
+    switch (op->match) {
+        case MATCH_BEQ:
+        case MATCH_BNE:
+        case MATCH_BLT:
+        case MATCH_BGE:
+        case MATCH_BLTU:
+        case MATCH_BGEU:
+        case MATCH_C_BEQZ:
+        case MATCH_C_BNEZ:
+            if (rvfi_trace->rvfi_pc_wdata != (rvfi_trace->rvfi_pc_rdata + riscv_insn_length(rvfi_trace->rvfi_pc_rdata)) && rvfi_trace->rvfi_pc_wdata < rvfi_trace->rvfi_pc_rdata)
                 self->val += 1;
 
         default:
@@ -327,144 +261,108 @@ void rvfi_tools_perfcount_cb_taken_bwd_branches(rvfi_performance_counter_t* self
 
 }
 
-void rvfi_tools_perfcount_cb_not_taken_fwd_branches(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, rv_decode decoded_instruction) {
+void rvfi_tools_perfcount_cb_not_taken_fwd_branches(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
 
-    rv_op op = (rv_op) decoded_instruction.op;
-
-    switch (op) {
-        case rv_op_beq:
-        case rv_op_bne:
-        case rv_op_blt:
-        case rv_op_bge:
-        case rv_op_bltu:
-        case rv_op_bgeu:
-        case rv_op_beqz:
-        case rv_op_bnez:
-        case rv_op_blez:
-        case rv_op_bgez:
-        case rv_op_bltz:
-        case rv_op_bgtz:
-        case rv_op_ble:
-        case rv_op_bleu:
-        case rv_op_bgt:
-        case rv_op_bgtu:
-        case rv_op_c_beqz:
-        case rv_op_c_bnez:
-            if (rvfi_trace->rvfi_pc_wdata == (rvfi_trace->rvfi_pc_rdata + inst_length((rv_inst) rvfi_trace->rvfi_pc_rdata)) && rvfi_trace->rvfi_pc_wdata > rvfi_trace->rvfi_pc_rdata)
+    switch (op->match) {
+        case MATCH_BEQ:
+        case MATCH_BNE:
+        case MATCH_BLT:
+        case MATCH_BGE:
+        case MATCH_BLTU:
+        case MATCH_BGEU:
+        case MATCH_C_BEQZ:
+        case MATCH_C_BNEZ:
+            if (rvfi_trace->rvfi_pc_wdata == (rvfi_trace->rvfi_pc_rdata + riscv_insn_length(rvfi_trace->rvfi_pc_rdata)) && rvfi_trace->rvfi_pc_wdata > rvfi_trace->rvfi_pc_rdata)
                 self->val += 1;
     }
 
 }
 
-void rvfi_tools_perfcount_cb_not_taken_bwd_branches(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, rv_decode decoded_instruction) {
+void rvfi_tools_perfcount_cb_not_taken_bwd_branches(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
 
-    rv_op op = (rv_op) decoded_instruction.op;
-
-    switch (op) {
-        case rv_op_beq:
-        case rv_op_bne:
-        case rv_op_blt:
-        case rv_op_bge:
-        case rv_op_bltu:
-        case rv_op_bgeu:
-        case rv_op_beqz:
-        case rv_op_bnez:
-        case rv_op_blez:
-        case rv_op_bgez:
-        case rv_op_bltz:
-        case rv_op_bgtz:
-        case rv_op_ble:
-        case rv_op_bleu:
-        case rv_op_bgt:
-        case rv_op_bgtu:
-        case rv_op_c_beqz:
-        case rv_op_c_bnez:
-            if (rvfi_trace->rvfi_pc_wdata == (rvfi_trace->rvfi_pc_rdata + inst_length((rv_inst) rvfi_trace->rvfi_pc_rdata)) && rvfi_trace->rvfi_pc_wdata < rvfi_trace->rvfi_pc_rdata)
+    switch (op->match) {
+        case MATCH_BEQ:
+        case MATCH_BNE:
+        case MATCH_BLT:
+        case MATCH_BGE:
+        case MATCH_BLTU:
+        case MATCH_BGEU:
+        case MATCH_C_BEQZ:
+        case MATCH_C_BNEZ:
+            if (rvfi_trace->rvfi_pc_wdata == (rvfi_trace->rvfi_pc_rdata + riscv_insn_length(rvfi_trace->rvfi_pc_rdata)) && rvfi_trace->rvfi_pc_wdata < rvfi_trace->rvfi_pc_rdata)
                 self->val += 1;
     }
 
 }
 
-void rvfi_tools_perfcount_cb_byte_loads(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, rv_decode decoded_instruction) {
-
-    rv_op op = (rv_op) decoded_instruction.op;
+void rvfi_tools_perfcount_cb_byte_loads(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
 
     // TODO: AMO conditional load/store
-    switch (op) {
-        case rv_op_lb:
-        case rv_op_lbu:
+    switch (op->match) {
+        case MATCH_LB:
+        case MATCH_LBU:
             self->val += 1;
 
     }
 
 }
 
-void rvfi_tools_perfcount_cb_halfword_loads(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, rv_decode decoded_instruction) {
-
-    rv_op op = (rv_op) decoded_instruction.op;
+void rvfi_tools_perfcount_cb_halfword_loads(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
 
     // TODO: AMO conditional load/store
-    switch (op) {
-        case rv_op_lh:
-        case rv_op_lhu:
+    switch (op->match) {
+        case MATCH_LH:
+        case MATCH_LHU:
             self->val += 1;
 
     }
 
 }
 
-void rvfi_tools_perfcount_cb_word_loads(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, rv_decode decoded_instruction) {
-
-    rv_op op = (rv_op) decoded_instruction.op;
+void rvfi_tools_perfcount_cb_word_loads(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
 
     // TODO: AMO conditional load/store
-    switch (op) {
-        case rv_op_lw:
-        case rv_op_lwu:
-        case rv_op_c_lw:
-        case rv_op_c_flw:
-        case rv_op_c_fldsp:
-        case rv_op_c_lwsp:
-        case rv_op_c_flwsp:
+    switch (op->match) {
+        case MATCH_LW:
+        case MATCH_LWU:
+        case MATCH_C_LW:
+        case MATCH_C_FLW:
+        case MATCH_C_FLDSP:
+        case MATCH_C_LWSP:
+        case MATCH_C_FLWSP:
             self->val += 1;
     }
 
 }
 
-void rvfi_tools_perfcount_cb_byte_stores(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, rv_decode decoded_instruction) {
-
-    rv_op op = (rv_op) decoded_instruction.op;
+void rvfi_tools_perfcount_cb_byte_stores(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
 
     // TODO: AMO conditional load/store
-    switch (op) {
-        case rv_op_sb:
+    switch (op->match) {
+        case MATCH_SB:
             self->val += 1;
     }
 }
 
-void rvfi_tools_perfcount_cb_halfword_stores(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, rv_decode decoded_instruction) {
-
-    rv_op op = (rv_op) decoded_instruction.op;
+void rvfi_tools_perfcount_cb_halfword_stores(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
 
     // TODO: AMO conditional load/store
-    switch (op) {
-        case rv_op_sh:
+    switch (op->match) {
+        case MATCH_SH:
             self->val += 1;
     }
 
 }
 
-void rvfi_tools_perfcount_cb_word_stores(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, rv_decode decoded_instruction) {
-
-    rv_op op = (rv_op) decoded_instruction.op;
+void rvfi_tools_perfcount_cb_word_stores(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
 
     // TODO: AMO conditional load/store
-    switch (op) {
-        case rv_op_sw:
-        case rv_op_c_sw:
-        case rv_op_c_fsw:
-        case rv_op_c_swsp:
-        case rv_op_c_fswsp:
+    switch (op->match) {
+        case MATCH_SW:
+        case MATCH_C_SW:
+        case MATCH_C_FSW:
+        case MATCH_C_SWSP:
+        case MATCH_C_FSWSP:
             self->val += 1;
 
     }

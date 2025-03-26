@@ -51,10 +51,10 @@ typedef struct {
     int rvfi_mem_wdata;
 } rvfi_trace_t;
 
-typedef enum int {
-    rv32,
-    rv64,
-    rv128
+// Equivalent to bfd_march_riscv32 and bfd_march_riscv64
+typedef enum longint {
+    rv32 = 132,
+    rv64 = 164
 } rv_isa;
 
 endpackage

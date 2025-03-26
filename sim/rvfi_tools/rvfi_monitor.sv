@@ -2,13 +2,13 @@ import rvfi_monitor_pkg::*;
 
 module rvfi_monitor #(
     parameter string MONITOR_PREFIX = "RVFI_MONITOR",
-    parameter rv_isa ISA = rv32,  // TODO: This should probably be replaced by a bfd -march enum
+    parameter rv_isa ISA = rv32,
     parameter int ENABLE_TRACER = 1'b1,
     parameter int ENABLE_PROFILER = 1'b1,
     parameter int ENABLE_CHECKER = 1'b1,
     parameter string TRACER_LOG_FILE_NAME = "rvfi_tracer_log.txt",
     parameter string PROFILER_LOG_FILE_NAME = "rvfi_profiler_log.txt",
-    parameter string SYMBOL_TABLE_FILE_NAME = "rvfi_profiler_symbol_table.txt",
+    parameter string SYMBOL_TABLE_FILE_NAME = "aes128_nist_enc_test.elf",
     parameter string SYMBOL_WATCHLIST_FILE_NAME = "rvfi_profiler_watchlist.txt"
 ) (
 
@@ -41,7 +41,7 @@ module rvfi_monitor #(
 
     chandle ctx;
 
-    import "DPI" function chandle rvfi_monitor_init(string monitor_prefix, rv_isa isa, int en_tracer, int en_profiler, int en_checker, string tracer_log_file_name, string profiler_log_file_name, string symbol_table_file_name, string symbol_watchlist_file_name);
+    import "DPI" function chandle rvfi_monitor_init(string monitor_prefix, longint march, int en_tracer, int en_profiler, int en_checker, string tracer_log_file_name, string profiler_log_file_name, string symbol_table_file_name, string symbol_watchlist_file_name);
     import "DPI" function void rvfi_monitor_add_default_performance_counters(chandle ctx);
     import "DPI" function void rvfi_monitor_step(chandle ctx, rvfi_trace_t rvfi_trace, longint current_clock_cycle);
     import "DPI" function void rvfi_monitor_final(chandle ctx);
