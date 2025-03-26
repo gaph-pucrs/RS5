@@ -1,15 +1,12 @@
 import rvfi_monitor_pkg::*;
 
 module rvfi_monitor #(
-    parameter string MONITOR_PREFIX = "RVFI_MONITOR",
+    parameter string MONITOR_PREFIX = "rvfi_monitor",
+    parameter string TIME_UNIT = "ns",
     parameter rv_isa ISA = rv32,
     parameter int ENABLE_TRACER = 1'b1,
     parameter int ENABLE_PROFILER = 1'b1,
-    parameter int ENABLE_CHECKER = 1'b1,
-    parameter string TRACER_LOG_FILE_NAME = "rvfi_tracer_log.txt",
-    parameter string PROFILER_LOG_FILE_NAME = "rvfi_profiler_log.txt",
-    parameter string SYMBOL_TABLE_FILE_NAME = "aes128_nist_enc_test.elf",
-    parameter string SYMBOL_WATCHLIST_FILE_NAME = "rvfi_profiler_watchlist.txt"
+    parameter int ENABLE_CHECKER = 1'b1
 ) (
 
     input logic rvfi_ext_clk,
@@ -39,11 +36,15 @@ module rvfi_monitor #(
 
 );
 
+    int time_unit_lut[string] = '{"s": 0, "ms": -3, "us": -6, "ns": -9, "ps": -12, "fs":-15};
+
     chandle ctx;
 
-    import "DPI" function chandle rvfi_monitor_init(string monitor_prefix, longint march, int en_tracer, int en_profiler, int en_checker, string tracer_log_file_name, string profiler_log_file_name, string symbol_table_file_name, string symbol_watchlist_file_name);
+    // import "DPI" function chandle rvfi_monitor_init(string monitor_prefix, rv_isa isa, int en_tracer, int en_profiler, int en_checker, string tracer_log_file_name, string profiler_log_file_name, string profiler_call_graph_file_name, string symbol_table_file_name, string symbol_watchlist_file_name);
+    import "DPI" function chandle rvfi_monitor_init(string monitor_prefix, string time_unit, longint march, int en_tracer, int en_profiler, int en_checker);
     import "DPI" function void rvfi_monitor_add_default_performance_counters(chandle ctx);
-    import "DPI" function void rvfi_monitor_step(chandle ctx, rvfi_trace_t rvfi_trace, longint current_clock_cycle);
+    // import "DPI" function void rvfi_monitor_step(chandle ctx, rvfi_trace_t rvfi_trace, longint current_clock_cycle);
+    import "DPI" function void rvfi_monitor_step(chandle ctx, rvfi_trace_t rvfi_trace, longint current_clock_cycle, string time_string, real time_float);
     import "DPI" function void rvfi_monitor_final(chandle ctx);
 
     longint cycle_counter;
@@ -60,9 +61,12 @@ module rvfi_monitor #(
 
     initial begin
 
-        $timeformat(-9, 2, " ns");
+        string time_string;
+        realtime time_float;
 
-        ctx = rvfi_monitor_init(MONITOR_PREFIX, ISA, ENABLE_TRACER, ENABLE_PROFILER, ENABLE_CHECKER, TRACER_LOG_FILE_NAME, PROFILER_LOG_FILE_NAME, SYMBOL_TABLE_FILE_NAME, SYMBOL_WATCHLIST_FILE_NAME);
+        $timeformat(time_unit_lut[TIME_UNIT], 3, TIME_UNIT, 0);
+
+        ctx = rvfi_monitor_init(MONITOR_PREFIX, TIME_UNIT, ISA, ENABLE_TRACER, ENABLE_PROFILER, ENABLE_CHECKER);
         rvfi_monitor_add_default_performance_counters(ctx);
 
         forever begin
@@ -96,7 +100,12 @@ module rvfi_monitor #(
                     rvfi_mem_wdata:rvfi_mem_wdata
                 };
 
-                rvfi_monitor_step(ctx, rvfi_trace, cycle_counter);
+                // rvfi_monitor_step(ctx, rvfi_trace, cycle_counter);
+
+                time_string = $sformatf("%t", $realtime);
+                time_float = $realtime;
+
+                rvfi_monitor_step(ctx, rvfi_trace, cycle_counter, time_string, time_float);
 
             end
 

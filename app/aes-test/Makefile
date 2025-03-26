@@ -22,6 +22,7 @@ PROGNAME = aes128_nist_enc_test
 
 BIN_FILES = $(addsuffix .bin, $(PROGNAME))
 LST_FILES = $(addsuffix .lst, $(PROGNAME))
+ELF_FILES = $(addsuffix .elf, $(PROGNAME))
 
 BARE_OS = bareOS/crt0.o \
 	bareOS/arch.o \
@@ -31,7 +32,7 @@ BARE_OS = bareOS/crt0.o \
 
 TINYCRYPT = $(patsubst %.c,%.o,$(wildcard tinycrypt/*.c))
 
-all : $(BIN_FILES) $(LST_FILES)
+all : $(BIN_FILES) $(LST_FILES) $(ELF_FILES)
 
 %.bin : %.elf
 	$(OBJCOPY) -O binary $< $@
@@ -50,7 +51,7 @@ all : $(BIN_FILES) $(LST_FILES)
 
 %.elf: $(BARE_OS) $(TINYCRYPT) %.o
 	$(LD) -o $@ $+ $(LDFLAGS)
-	nm $@ -C > ../../sim/rvfi_profiler_symbol_table.txt
+	cp $@ ../../sim/rvfi_monitor_profiler_elf.elf
 
 clean:
 	rm -f $(BIN_FILES) $(LST_FILES) $(BARE_OS) $(PROGNAME).elf $(wildcard *~) $(wildcard *.o)

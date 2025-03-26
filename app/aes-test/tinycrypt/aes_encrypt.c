@@ -68,7 +68,8 @@ static inline unsigned int rotword(unsigned int a)
 #define subbyte(a, o)(sbox[((a) >> (o))&0xff] << (o))
 #define subword(a)(subbyte(a, 24)|subbyte(a, 16)|subbyte(a, 8)|subbyte(a, 0))
 
-static inline void add_round_key(uint8_t *s, const unsigned int *k)
+// static inline void add_round_key(uint8_t *s, const unsigned int *k)
+static void add_round_key(uint8_t *s, const unsigned int *k)
 {
 	s[0] ^= (uint8_t)(k[0] >> 24); s[1] ^= (uint8_t)(k[0] >> 16);
 	s[2] ^= (uint8_t)(k[0] >> 8); s[3] ^= (uint8_t)(k[0]);
@@ -80,7 +81,8 @@ static inline void add_round_key(uint8_t *s, const unsigned int *k)
 	s[14] ^= (uint8_t)(k[3] >> 8); s[15] ^= (uint8_t)(k[3]);
 }
 
-static inline void sub_bytes(uint8_t *s)
+// static inline void sub_bytes(uint8_t *s)
+static void sub_bytes(uint8_t *s)
 {
 	unsigned int i;
 
@@ -92,7 +94,8 @@ static inline void sub_bytes(uint8_t *s)
 
 #define triple(a)(_double_byte(a)^(a))
 
-static inline void mult_row_column(uint8_t *out, const uint8_t *in)
+// static inline void mult_row_column(uint8_t *out, const uint8_t *in)
+static void mult_row_column(uint8_t *out, const uint8_t *in)
 {
 	out[0] = _double_byte(in[0]) ^ triple(in[1]) ^ in[2] ^ in[3];
 	out[1] = in[0] ^ _double_byte(in[1]) ^ triple(in[2]) ^ in[3];
@@ -100,7 +103,8 @@ static inline void mult_row_column(uint8_t *out, const uint8_t *in)
 	out[3] = triple(in[0]) ^ in[1] ^ in[2] ^ _double_byte(in[3]);
 }
 
-static inline void mix_columns(uint8_t *s)
+// static inline void mix_columns(uint8_t *s)
+static void mix_columns(uint8_t *s)
 {
 	//uint8_t t[Nb*Nk];
 	uint8_t t[4*Nb];
@@ -116,7 +120,8 @@ static inline void mix_columns(uint8_t *s)
  * This shift_rows also implements the matrix flip required for mix_columns, but
  * performs it here to reduce the number of memory operations.
  */
-static inline void shift_rows(uint8_t *s)
+// static inline void shift_rows(uint8_t *s)
+static void shift_rows(uint8_t *s)
 {
 	//uint8_t t[Nb * Nk];
 	uint8_t t[4 * Nb];

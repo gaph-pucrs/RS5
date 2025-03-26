@@ -2,7 +2,9 @@
 #include "rvfi_tools.h"
 #include "rvfi_callbacks.h"
 
-rvfi_monitor_context* rvfi_monitor_init(char* monitor_prefix, unsigned long march, int en_tracer, int en_profiler, int en_checker, char* tracer_log_file_name, char* profiler_log_file_name, char* symbol_table_file_name, char* symbol_watchlist_file_name) {
+rvfi_monitor_context* rvfi_monitor_init(char* monitor_prefix, char* time_unit_suffix, unsigned long march, int en_tracer, int en_profiler, int en_checker) {
+
+    printf("Initializing monitor [%s]\n", monitor_prefix);
 
     rvfi_monitor_context *ctx = malloc(sizeof(rvfi_monitor_context));
 
@@ -10,21 +12,36 @@ rvfi_monitor_context* rvfi_monitor_init(char* monitor_prefix, unsigned long marc
     strcpy(ctx->monitor_prefix, monitor_prefix);
 
     ctx->march = march;
+    ctx->time_unit_suffix = time_unit_suffix;
 
     ctx->en_tracer = en_tracer;
     ctx->en_profiler = en_profiler;
     ctx->en_checker = en_checker;
 
-    ctx->tracer_log_file_name = tracer_log_file_name;
-    ctx->profiler_log_file_name = profiler_log_file_name;
-    ctx->symbol_table_file_name = symbol_table_file_name;
-    ctx->symbol_watchlist_file_name = symbol_watchlist_file_name;
+    ctx->tracer_log_file_name = malloc(200);
+    ctx->profiler_log_file_name = malloc(200);
+    ctx->profiler_call_graph_file_name = malloc(200);
+    ctx->symbol_table_file_name = malloc(200);
+    ctx->symbol_watchlist_file_name = malloc(200);
+
+    snprintf(ctx->tracer_log_file_name, 200, "%s_tracer_log.txt", monitor_prefix);
+    snprintf(ctx->profiler_log_file_name, 200, "%s_profiler_log.txt", monitor_prefix);
+    snprintf(ctx->profiler_call_graph_file_name, 200, "%s_profiler_call_graph.txt", monitor_prefix);
+    snprintf(ctx->symbol_table_file_name, 200, "%s_profiler_elf.elf", monitor_prefix);
+    snprintf(ctx->symbol_watchlist_file_name, 200, "%s_profiler_watchlist.txt", monitor_prefix);
 
     GArray *symbol_watchlist = NULL;
     symbol_watchlist = g_array_new(FALSE, FALSE, sizeof(char*));
 
     ctx->symbol_table_hash_table = g_hash_table_new(g_direct_hash, g_direct_equal);
-    ctx->counter_stack = g_array_new(FALSE, FALSE, sizeof(counter_info_t));
+    ctx->counter_stack = g_ptr_array_new();
+
+    call_info_t* dummy_info = malloc(sizeof(call_info_t));
+    dummy_info->start_cycle = 0;
+    dummy_info->end_cycle = 0;
+    dummy_info->function_name = "Root";
+
+    ctx->current_call_node = g_node_new(dummy_info);
 
     ctx->n_counters = 0;
 
@@ -43,16 +60,19 @@ rvfi_monitor_context* rvfi_monitor_init(char* monitor_prefix, unsigned long marc
 
     if (ctx->en_profiler) {
 
-        printf("Init ctx->performance_counters\n");
         ctx->performance_counters = g_array_new(FALSE, FALSE, sizeof(rvfi_performance_counter_t));
-        printf("Init ctx->performance_counters = %d\n", ctx->performance_counters);
-        // ctx->last_counter_state = malloc(sizeof(counter_info_t));
-        ctx->last_counter_state.counters = g_array_new(FALSE, FALSE, sizeof(uint64_t));
 
         ctx->profiler_log_file = fopen(ctx->profiler_log_file_name, "w");
 
         if (ctx->profiler_log_file == NULL) {
             printf("[%s] Cant open file <%s> in write mode\n", ctx->monitor_prefix, ctx->profiler_log_file_name);
+            exit(1);
+        }
+
+        ctx->profiler_call_graph_file = fopen(ctx->profiler_call_graph_file_name, "w");
+
+        if (ctx->profiler_call_graph_file == NULL) {
+            printf("[%s] Cant open file <%s> in write mode\n", ctx->monitor_prefix, ctx->profiler_call_graph_file_name);
             exit(1);
         }
 
@@ -141,30 +161,24 @@ rvfi_monitor_context* rvfi_monitor_init(char* monitor_prefix, unsigned long marc
 
             strcpy(new_symbol->function_name, current->name);
 
-            if (current->flags & BSF_DEBUGGING)
+            if (current->flags & BSF_DEBUGGING) {
+                free(new_symbol);
                 continue;
+            }
 
             new_symbol->is_watched = 0;
-            new_symbol->is_function = true; // TODO: identify if it's a function with bfd flags
+            new_symbol->is_function = 1;
             new_symbol->times_called = 0;
-            new_symbol->start_cycles = g_array_new(FALSE, FALSE, sizeof(uint64_t));
-            new_symbol->end_cycles = g_array_new(FALSE, FALSE, sizeof(uint64_t));
 
-            // g_hash_table_insert(symbol_table_hash_table, &symbol_pc, new_symbol);
             g_hash_table_insert(ctx->symbol_table_hash_table, GINT_TO_POINTER(symbol_pc), new_symbol);
 
             uint32_t new_pc = symbol_pc;
             symbol_info_t* temp_symbol = g_hash_table_lookup(ctx->symbol_table_hash_table, GINT_TO_POINTER(new_pc));
-            if (new_symbol == NULL)
-                printf("NULL\n");
-            else
-                printf("Correctly added key <%d> value <%s> to hash table\n", new_pc, temp_symbol->function_name);
 
             // Look for the current symbol in the watchlist array, tag it as watched if so
             // Note that this only tags symbols in the given symbol list, if there are symbols in the watchlist but not in the symbol list, NO ERROR OR WARNING WILL BE RETURNED
             if (ctx->en_profiler) {
 
-                // for (int i = 0; i < arrlen(symbol_watchlist); i++)
                 for (int i = 0; i < symbol_watchlist->len; i++)
                     if (strncmp(g_array_index(symbol_watchlist, char*, i), new_symbol->function_name, 100) == 0) {
 
@@ -182,13 +196,21 @@ rvfi_monitor_context* rvfi_monitor_init(char* monitor_prefix, unsigned long marc
 
         }
 
-        // Loop through hash tablke, print all KV pairs
-        void _debug_hash_table_iterator(gpointer key, gpointer value, gpointer user_data);
-        g_hash_table_foreach(ctx->symbol_table_hash_table, (GHFunc) _debug_hash_table_iterator, NULL);
+        // Loop through hash table, print all KV pairs
+        printf("[%s] Parsed symbol table:\n", ctx->monitor_prefix);
+        g_hash_table_foreach(ctx->symbol_table_hash_table, (GHFunc) _debug_hash_table_iterator, ctx);
+
+        // If symbol_watchlist is not empty by now, print warning for each function still on the watchlist
+        if (symbol_watchlist->len) {
+            for (int i = 0; i < symbol_watchlist->len; i++) {
+                printf("[%s] WARNING: Symbol name <%s> given in the watchlist was not found in the symbol table\n", ctx->monitor_prefix, g_array_index(symbol_watchlist, char*, i));
+                free(g_array_index(symbol_watchlist, char*, i));
+            }
+        }
 
         // Free watchlist array, we dont needed anymore after the all symbols hash table was tagged in the inner loop above
         if (ctx->en_profiler) {
-            g_array_free(symbol_watchlist, FALSE);
+            g_array_free(symbol_watchlist, TRUE);
         }
 
     }
@@ -202,7 +224,6 @@ rvfi_monitor_context* rvfi_monitor_init(char* monitor_prefix, unsigned long marc
 
 void rvfi_monitor_add_counter(rvfi_monitor_context *ctx, rvfi_performance_counter_t ctr) {
 
-    // printf("Using ctx->performance_counters = %d\n", ctx->performance_counters);
     g_array_append_val(ctx->performance_counters, ctr);
     ctx->n_counters += 1;
 
@@ -211,8 +232,7 @@ void rvfi_monitor_add_counter(rvfi_monitor_context *ctx, rvfi_performance_counte
 // Add default virtual performance counters to context
 void rvfi_monitor_add_default_performance_counters(rvfi_monitor_context *ctx) {
 
-    // printf("Adding counters\n");
-    // printf("Using ctx = %d\n", ctx);
+    printf("[%s] Adding default performance counters\n", ctx->monitor_prefix);
 
     rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Clock cycles", .val = 0, .update = rvfi_tools_perfcount_cb_clock_cycles});
     rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Instructions retired", .val = 0, .update = rvfi_tools_perfcount_cb_insn_retired});
@@ -239,29 +259,31 @@ void rvfi_monitor_add_default_performance_counters(rvfi_monitor_context *ctx) {
     rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Half-word (16 bits) stores", .val = 0, .update = rvfi_tools_perfcount_cb_halfword_stores});
     rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Word stores", .val = 0, .update = rvfi_tools_perfcount_cb_word_stores});
 
-    // printf("Finish adding counters\n");
-
 }
 
 void rvfi_monitor_push_counters_to_stack(rvfi_monitor_context *ctx, symbol_info_t *current_symbol, const rvfi_trace_t *rvfi_trace) {
 
-    ctx->last_counter_state.function_name = current_symbol->function_name;
-    ctx->last_counter_state.start_pc = rvfi_trace->rvfi_pc_wdata;
-    ctx->last_counter_state.ret_pc = rvfi_trace->rvfi_pc_rdata + riscv_insn_length(rvfi_trace->rvfi_insn);
-    // ctx->last_counter_state->counters = malloc(RVFI_N_COUNTERS*sizeof(uint64_t));
+    counter_info_t* current_counter_state = malloc(sizeof(counter_info_t));
 
-    g_array_free(ctx->last_counter_state.counters, FALSE);
-    ctx->last_counter_state.counters = g_array_sized_new(FALSE, FALSE, sizeof(uint64_t), ctx->n_counters*sizeof(uint64_t));
-    // g_array_set_size(ctx->last_counter_state.counters, ctx->n_counters*sizeof(uint64_t));
+    current_counter_state->function_name = current_symbol->function_name;
+    current_counter_state->start_pc = rvfi_trace->rvfi_pc_wdata;
+    current_counter_state->ret_pc =rvfi_trace->rvfi_pc_rdata + riscv_insn_length(rvfi_trace->rvfi_insn);
+    current_counter_state->counters = g_array_sized_new(FALSE, FALSE, sizeof(uint64_t), ctx->n_counters*sizeof(uint64_t));
 
     for (int i = 0; i < ctx->n_counters; i++) {
         rvfi_performance_counter_t perf_ctr = g_array_index(ctx->performance_counters, rvfi_performance_counter_t, i);
-        g_array_append_val(ctx->last_counter_state.counters, perf_ctr.val);
+        g_array_append_val(current_counter_state->counters, perf_ctr.val);
     }
+
+    // g_array_append_val(ctx->counter_stack, *current_counter_state);
+    g_ptr_array_add(ctx->counter_stack, current_counter_state);
+    // ctx->counter_stack_top = current_counter_state;
+    // printf("Pushed ctx->counter_stack_top = <%p>\n", ctx->counter_stack_top);
+    // printf("ctx->counter_stack->len = <%d>\n", ctx->counter_stack->len);
 
 }
 
-void rvfi_monitor_step(rvfi_monitor_context *ctx, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle) {  // TODO: Pass simulation time as argument, print messages with timestamp
+void rvfi_monitor_step(rvfi_monitor_context *ctx, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, char* time_string, double time_float) {
 
     char disassembly_buffer[200];
     const struct riscv_opcode* decoded_instruction;  
@@ -320,8 +342,6 @@ void rvfi_monitor_step(rvfi_monitor_context *ctx, const rvfi_trace_t *rvfi_trace
     if (ctx->en_profiler) {
 
         // Update virtual performance counter via callback functions
-        // for (int i = 0; i < RVFI_N_COUNTERS; i++)
-        //    (rvfi_performance_counters[i].update)(&(rvfi_performance_counters[i]), rvfi_trace, current_clock_cycle, decoded_instruction);
         for (int i = 0; i < ctx->n_counters; i++) {
             rvfi_performance_counter_t* perf_ctr = &(g_array_index(ctx->performance_counters, rvfi_performance_counter_t, i));
            (perf_ctr->update)(perf_ctr, rvfi_trace, current_clock_cycle, decoded_instruction);
@@ -332,66 +352,88 @@ void rvfi_monitor_step(rvfi_monitor_context *ctx, const rvfi_trace_t *rvfi_trace
         uint32_t next_pc = rvfi_trace->rvfi_pc_wdata;
         symbol_info_t* current_symbol = g_hash_table_lookup(ctx->symbol_table_hash_table, GINT_TO_POINTER(next_pc));
 
-        uint32_t function_call = decoded_instruction->match == MATCH_JAL || decoded_instruction->match == MATCH_JALR;
+        // uint32_t function_call = decoded_instruction.op == rv_op_jal || decoded_instruction.op == rv_op_jalr || decoded_instruction.op == rv_op_c_jal || decoded_instruction.op == rv_op_c_jalr;
+        uint32_t control_flow_change = (rvfi_trace->rvfi_pc_wdata != (rvfi_trace->rvfi_pc_rdata + riscv_insn_length(rvfi_trace->rvfi_insn)));
 
-        if (function_call && current_symbol != NULL && current_symbol->is_function && current_symbol->is_watched) {
+        // JAL to add_round_key
+        // if (rvfi_trace->rvfi_pc_rdata == 0x7ec)
+        //     printf("rvfi_pc_rdata <0x%x> rvfi_pc_wdata <0x%x> control_flow_change <%d> is_function <%d> is_watched <%d> func_name <%s>\n", rvfi_trace->rvfi_pc_rdata, rvfi_trace->rvfi_pc_wdata, control_flow_change, current_symbol->is_function, current_symbol->is_watched, current_symbol->function_name);
 
-            printf("[%s] About to enter function <%s> at PC <0x%x> from PC <0x%x> at clock cycle <%0d>\n", ctx->monitor_prefix, current_symbol->function_name, next_pc, current_pc, current_clock_cycle);
-            fprintf(ctx->profiler_log_file, "[%s] About to enter function <%s> at PC <0x%x> from PC <0x%x> at clock cycle <%0d>\n", ctx->monitor_prefix, current_symbol->function_name, next_pc, current_pc, current_clock_cycle);
+        // Detect function entry event
+        // if (function_call && current_symbol != NULL && current_symbol->is_function && current_symbol->is_watched) {
+        if (control_flow_change && current_symbol != NULL && current_symbol->is_function && current_symbol->is_watched) {
 
-            // TODO: Start VCD dump
+            // printf("[%s] About to enter function <%s> at PC <0x%x> from PC <0x%x> at clock cycle <%0d>\n", ctx->monitor_prefix, current_symbol->function_name, next_pc, current_pc, current_clock_cycle);
+            printf("[%s] About to enter function <%s> at PC <0x%x> from PC <0x%x> at clock cycle <%0d> time <%s>\n", ctx->monitor_prefix, current_symbol->function_name, next_pc, current_pc, current_clock_cycle, time_string);
+            // fprintf(ctx->profiler_log_file, "[%s] About to enter function <%s> at PC <0x%x> from PC <0x%x> at clock cycle <%0d>\n", ctx->monitor_prefix, current_symbol->function_name, next_pc, current_pc, current_clock_cycle);
+            fprintf(ctx->profiler_log_file, "[%s] About to enter function <%s> at PC <0x%x> from PC <0x%x> at clock cycle <%0d> time <%s>\n", ctx->monitor_prefix, current_symbol->function_name, next_pc, current_pc, current_clock_cycle, time_string);
+
+            // Print counters at function entry, might be useful for debug
+            // for (int i = 0; i < ctx->n_counters; i++) {
+            //     rvfi_performance_counter_t perf_ctr = g_array_index(ctx->performance_counters, rvfi_performance_counter_t, i);
+            //     printf("[%s] \t%s: %d\n", ctx->monitor_prefix, perf_ctr.name, perf_ctr.val);
+            // }
+
+            call_info_t* new_call_node_data = malloc(sizeof(call_info_t));
+            GNode* new_call_node = g_node_new(new_call_node_data);
+
+            new_call_node_data->function_name = current_symbol->function_name;
+            new_call_node_data->call_id = current_symbol->times_called;
+            new_call_node_data->start_cycle = current_clock_cycle;
+            new_call_node_data->end_cycle = 0;
+            new_call_node_data->start_time = time_float;
+            // strncpy(new_call_node_data->start_time_string, time_string, 100);
 
             current_symbol->times_called += 1;
-            g_array_append_val(current_symbol->start_cycles, current_clock_cycle);
 
-            // TODO: Print counters now for debug, remove later
-            // for (int i = 0; i < RVFI_N_COUNTERS; i++)
-            //     printf("[%s] \t%s: %d\n", rvfi_performance_counters[i].name, ctx->monitor_prefix, rvfi_performance_counters[i].val);
-            for (int i = 0; i < ctx->n_counters; i++) {
-                rvfi_performance_counter_t perf_ctr = g_array_index(ctx->performance_counters, rvfi_performance_counter_t, i);
-                printf("[%s] \t%s: %d\n", ctx->monitor_prefix, perf_ctr.name, perf_ctr.val);
-            }
+            // printf("New node function name: <%s>\n", ((call_info_t*) new_call_node->data)->function_name);
 
-            // ctx->last_counter_state.function_name = current_symbol->function_name;
-            // ctx->last_counter_state.start_pc = rvfi_trace->rvfi_pc_wdata;
-            // ctx->last_counter_state.ret_pc = rvfi_trace->rvfi_pc_rdata + inst_length(rvfi_trace->rvfi_insn);  // NOTE: inst_length() comes from the MJC disassembly library, this function must be brought to this source file if migrating to libopcodes
-            // ctx->last_counter_state->counters = malloc(RVFI_N_COUNTERS*sizeof(uint64_t));
+            g_node_insert(ctx->current_call_node, -1, new_call_node);
+            ctx->current_call_node = new_call_node;
 
             rvfi_monitor_push_counters_to_stack(ctx, current_symbol, rvfi_trace);
 
-            // for (int i = 0; i < RVFI_N_COUNTERS; i++)
-            //     last_counter_state.counters[i] = rvfi_performance_counters[i].val;
-
-            // counter_stack = g_array_append_val(ctx->counter_stack, last_counter_state);
-            g_array_append_val(ctx->counter_stack, ctx->last_counter_state);
-
         }
 
-        if (ctx->counter_stack->len > 0 && next_pc == ctx->last_counter_state.ret_pc) {
+        // Detect function return event
+        // if (ctx->counter_stack->len > 0 && next_pc == counter_stack_top->ret_pc) {
+        if (ctx->counter_stack->len > 0) {
 
-            printf("[%s] About to return from function <%s> from PC <0x%x> to PC <0x%x> at clock cycle <%0d>\n", ctx->monitor_prefix, ctx->last_counter_state.function_name, current_pc, next_pc, current_clock_cycle);
-            fprintf(ctx->profiler_log_file, "[%s] About to return from function <%s> from PC <0x%x> to PC <0x%x> at clock cycle <%0d>\n", ctx->monitor_prefix, ctx->last_counter_state.function_name, current_pc, next_pc, current_clock_cycle);
+            counter_info_t* counter_stack_top = g_ptr_array_index(ctx->counter_stack, ctx->counter_stack->len - 1);
 
-            // TODO: End VCD dump
+            if (next_pc == counter_stack_top->ret_pc) {
 
-            current_symbol = g_hash_table_lookup(ctx->symbol_table_hash_table, GINT_TO_POINTER(ctx->last_counter_state.start_pc));
+                printf("[%s] About to return from function <%s> from PC <0x%x> to PC <0x%x> at clock cycle <%0d> time <%s>\n", ctx->monitor_prefix, counter_stack_top->function_name, current_pc, next_pc, current_clock_cycle, time_string);
+                fprintf(ctx->profiler_log_file, "[%s] About to return from function <%s> from PC <0x%x> to PC <0x%x> at clock cycle <%0d> time <%s>\n", ctx->monitor_prefix, counter_stack_top->function_name, current_pc, next_pc, current_clock_cycle, time_string);
 
-            g_array_append_val(current_symbol->end_cycles, current_clock_cycle);
+                current_symbol = g_hash_table_lookup(ctx->symbol_table_hash_table, GINT_TO_POINTER(counter_stack_top->start_pc));
 
-            // Print out diff between virtual performance counters as they were in the moment of function entry and current state of counters (at function exit)
-            // for (int i = 0; i < RVFI_N_COUNTERS; i++)
-            //     fprintf(ctx->profiler_log_file, "[%s] \t%s: %d\n", ctx->monitor_prefix, rvfi_performance_counters[i].name, rvfi_performance_counters[i].val - last_counter_state.counters[i]);
-            for (int i = 0; i < ctx->n_counters; i++) {
-                rvfi_performance_counter_t current_ctr = g_array_index(ctx->performance_counters, rvfi_performance_counter_t, i);
-                uint64_t saved_ctr = g_array_index(ctx->last_counter_state.counters, uint64_t, i);
-                fprintf(ctx->profiler_log_file, "[%s] \t%s: %d\n", ctx->monitor_prefix, current_ctr.name, current_ctr.val - saved_ctr);
+                // Print out diff between virtual performance counters as they were in the moment of function entry and current state of counters (at function exit)
+                for (int i = 0; i < ctx->n_counters; i++) {
+                    rvfi_performance_counter_t current_ctr = g_array_index(ctx->performance_counters, rvfi_performance_counter_t, i);
+                    uint64_t saved_ctr = g_array_index(counter_stack_top->counters, uint64_t, i);
+                    fprintf(ctx->profiler_log_file, "[%s]   %s: %d\n", ctx->monitor_prefix, current_ctr.name, current_ctr.val - saved_ctr);
+                }
+
+                // Recover parent call graph node and set it as the current node
+                printf("Prev call graph node <%s>\n", ((call_info_t*) ctx->current_call_node->data)->function_name);
+                ((call_info_t*) ctx->current_call_node->data)->end_cycle = current_clock_cycle;
+                ((call_info_t*) ctx->current_call_node->data)->end_time = time_float;
+                // strncpy(((call_info_t*) ctx->current_call_node->data)->end_time_string, time_string, 100);
+                ctx->current_call_node = ctx->current_call_node->parent;
+                printf("Updated call graph node <%s>\n", ((call_info_t*) ctx->current_call_node->data)->function_name);
+
+                // Pop last counter state off the stack
+                g_ptr_array_remove_index(ctx->counter_stack, ctx->counter_stack->len - 1);
+                g_array_free(counter_stack_top->counters, TRUE);
+                free(counter_stack_top);
+                // printf("ctx->counter_stack->len = <%d>\n", ctx->counter_stack->len);
+                // printf("Current ctx->counter_stack_top before free = <%p>\n", ctx->counter_stack_top);
+
+                // if (ctx->counter_stack->len)
+                //     counter_stack_top = &g_array_index(ctx->counter_stack, counter_info_t, ctx->counter_stack->len - 1);
+
             }
-
-            // TODO: g_array_free(array, TRUE)
-            // free(ctx->last_counter_state.counters);
-            g_array_free(ctx->last_counter_state.counters, FALSE);
-            ctx->last_counter_state = g_array_index(ctx->counter_stack, counter_info_t, ctx->counter_stack->len - 1);
-            g_array_remove_index(ctx->counter_stack, ctx->counter_stack->len - 1);
 
         }
 
@@ -403,14 +445,17 @@ void rvfi_monitor_final(rvfi_monitor_context* ctx) {
 
     if (ctx->en_profiler) {
 
-        printf("=============================================================\n");
-        printf("[%s] Profiling summary\n", ctx->monitor_prefix);
-        printf("FunctionName_TimesCalled | Start Cycle | End Cycle | # Cycles\n");
-        printf("=============================================================\n");
+        fprintf(ctx->profiler_call_graph_file, "##################################################################\n");
+        fprintf(ctx->profiler_call_graph_file, "#[%s] Profiler call graph\n", ctx->monitor_prefix);
+        fprintf(ctx->profiler_call_graph_file, "#FunctionName_TimesCalled: Start Cycle <> End Cycle <> # Cycles <>\n");
+        fprintf(ctx->profiler_call_graph_file, "##################################################################\n");
 
-        void _final_hash_table_iterator(gpointer key, gpointer value, gpointer user_data);
+        // void _final_hash_table_iterator(gpointer key, gpointer value, gpointer user_data);
+        // g_hash_table_foreach(ctx->symbol_table_hash_table, (GHFunc) _final_hash_table_iterator, NULL);
 
-        g_hash_table_foreach(ctx->symbol_table_hash_table, (GHFunc) _final_hash_table_iterator, NULL);
+        GNode* root_node = ctx->current_call_node;
+        GNode* first_child_node = root_node->children;
+        rvfi_monitor_print_call_graph(ctx, first_child_node, 0);
 
     }
 
@@ -418,19 +463,43 @@ void rvfi_monitor_final(rvfi_monitor_context* ctx) {
 
 }
 
-void _final_hash_table_iterator(gpointer key, gpointer value, gpointer user_data) {
+void rvfi_monitor_print_call_graph(rvfi_monitor_context* ctx, GNode* call_node, int indent_level) {
 
-    symbol_info_t *current_symbol = (symbol_info_t*) value;
+    call_info_t* call_info;
+    call_info = (call_info_t*) call_node->data;
+    char indent_string[indent_level+1];
 
-    for (int i = 0; i < current_symbol->times_called; i++)
-        printf("%s_%0d\t%d %d %d\n", current_symbol->function_name, i, g_array_index(current_symbol->start_cycles, uint64_t, i),
-          g_array_index(current_symbol->end_cycles, uint64_t, i), g_array_index(current_symbol->end_cycles, uint64_t, i) - g_array_index(current_symbol->start_cycles, uint64_t, i));
+    for (int i = 0; i < indent_level; i++)
+        indent_string[i] = '-';
+    indent_string[indent_level] = '\0';
+
+    // fprintf(ctx->profiler_call_graph_file, "|%s%s_%d: Start Cycle <%d> End Cycle <%d> # Cycles <%d>\n",
+    fprintf(ctx->profiler_call_graph_file, "|%s%s_%d: Start Time <%.3f%s> End Time <%.3f%s> Total Cycles <%.3f%s>\n",
+        indent_string, call_info->function_name, call_info->call_id, call_info->start_time, ctx->time_unit_suffix, call_info->end_time, ctx->time_unit_suffix, call_info->end_time - call_info->start_time, ctx->time_unit_suffix);
+
+    // Depth-first
+    if (call_node->children != NULL)
+        rvfi_monitor_print_call_graph(ctx, call_node->children, indent_level + 1);
+
+    if (call_node->next != NULL)
+        rvfi_monitor_print_call_graph(ctx, call_node->next, indent_level);
 
 }
+
+// void _final_hash_table_iterator(gpointer key, gpointer value, gpointer user_data) {
+
+//     symbol_info_t *current_symbol = (symbol_info_t*) value;
+
+//     for (int i = 0; i < current_symbol->times_called; i++)
+//         printf("%s_%0d\t%d %d %d\n", current_symbol->function_name, i, g_array_index(current_symbol->start_cycles, uint64_t, i),
+//           g_array_index(current_symbol->end_cycles, uint64_t, i), g_array_index(current_symbol->end_cycles, uint64_t, i) - g_array_index(current_symbol->start_cycles, uint64_t, i));
+
+// }
 
 void _debug_hash_table_iterator(gpointer key, gpointer value, gpointer user_data) {
 
     symbol_info_t *current_symbol = (symbol_info_t*) value;
-    printf("Key: <0x%0x> Value: <%s>\n", GPOINTER_TO_INT(key), current_symbol->function_name);
+    rvfi_monitor_context* ctx = (rvfi_monitor_context*) user_data;
+    printf("[%s]   Key: <0x%0x> Value: <%s>\n", ctx->monitor_prefix, GPOINTER_TO_INT(key), current_symbol->function_name);
 
 }
