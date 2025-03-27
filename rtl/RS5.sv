@@ -571,7 +571,7 @@ module RS5
 
     logic[31:0] instruction_built_q, instruction_built_2q;
     logic[4:0] rs1_q, rs2_q;
-    logic compressed_q, enable_decode_q;
+    logic compressed_q, enable_decode_q, hazard_q;
 
     always_ff @(posedge clk or negedge reset_n) begin
 
@@ -580,16 +580,26 @@ module RS5
             instruction_built_2q <= '0;
             rs1_q <= '0;
             rs2_q <= '0;
+            hazard_q <= '0;
 
         // FIXME: May need to be revisited for multi-cycle instructions
         // end else begin
         // end else if (!execute1.hold_o) begin
-        end else if (rvfi_stage_valid_d[0]) begin
-            instruction_built_q <= fetch1.gen_compressed_on.instruction_built;
-            instruction_built_2q <= instruction_built_q;
+        end else begin
+
+            if (enable_fetch) begin
+
+                // instruction_built_q <= fetch1.gen_compressed_on.instruction_built;
+                instruction_built_q <= COMPRESSED ? fetch1.gen_compressed_on.instruction_built : fetch1.instruction_next;
+                instruction_built_2q <= instruction_built_q;
+
+            end
+
             compressed_q <= instruction_compressed_execute;
             rs1_q <= rs1;
             rs2_q <= rs2;
+            hazard_q <= hazard;
+
         end
 
     end
@@ -623,7 +633,9 @@ module RS5
 
     // assign rvfi_stage_valid_d[0] = !hazard && !decoder1.killed;
 
-    assign rvfi_stage_valid_d[0] = !hold && !stall &&!killed;
+    // assign rvfi_stage_valid_d[0] = !hold && !stall &&!killed;
+    // assign rvfi_stage_valid_d[0] = !hold && !stall && !killed && !hazard;
+    assign rvfi_stage_valid_d[0] = !hold && !stall && !killed && !hazard_q;
     assign rvfi_stage_order_d[0] = rvfi_stage_order[0] + 1'b1;
     // assign rvfi_stage_insn_d[0] = compressed_decode ? {16'd0, instruction_built_q[15:0]} : instruction_decode;
     assign rvfi_stage_insn_d[0] = instruction_compressed_execute ? {16'd0, instruction_built_2q[15:0]} : instruction_execute;
@@ -645,10 +657,10 @@ module RS5
     assign rvfi_stage_mem_addr_d[0] = mem_address;
     assign rvfi_stage_mem_rmask_d[0] = {4{mem_read_enable}};
     assign rvfi_stage_mem_wmask_d[0] = mem_write_enable;
-    assign rvfi_stage_mem_rdata_d[0] = mem_data_i;
-    // assign rvfi_stage_mem_rdata_d[0] = 'x;
-    // assign rvfi_stage_mem_wdata_d[0] = mem_data_o;
-    assign rvfi_stage_mem_wdata_d[0] = 'x;
+    // assign rvfi_stage_mem_rdata_d[0] = mem_data_i;
+    assign rvfi_stage_mem_rdata_d[0] = 'x;
+    assign rvfi_stage_mem_wdata_d[0] = mem_data_o;
+    // assign rvfi_stage_mem_wdata_d[0] = 'x;
 
     assign rvfi_stage_valid_d[1] = rvfi_stage_valid[0];
     assign rvfi_stage_order_d[1] = rvfi_stage_order[0];
@@ -672,7 +684,8 @@ module RS5
     assign rvfi_stage_mem_wmask_d[1] = rvfi_stage_mem_wmask[0];
     // assign rvfi_stage_mem_rdata_d[1] = rvfi_stage_mem_rdata[0];
     assign rvfi_stage_mem_rdata_d[1] = mem_data_i;
-    assign rvfi_stage_mem_wdata_d[1] = mem_data_o;
+    // assign rvfi_stage_mem_wdata_d[1] = mem_data_o;
+    assign rvfi_stage_mem_wdata_d[1] = rvfi_stage_mem_wdata[0];
 
     assign rvfi_valid = rvfi_stage_valid[1];
     assign rvfi_order = rvfi_stage_order[1];
