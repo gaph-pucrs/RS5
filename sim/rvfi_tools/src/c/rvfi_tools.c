@@ -466,8 +466,7 @@ void rvfi_monitor_print_call_graph(rvfi_monitor_context* ctx, GNode* call_node, 
         indent_string[i] = '-';
     indent_string[indent_level] = '\0';
 
-    // fprintf(ctx->profiler_call_graph_file, "|%s%s_%d: Start Cycle <%d> End Cycle <%d> # Cycles <%d>\n",
-    fprintf(ctx->profiler_call_graph_file, "|%s%s_%d: Start Time <%.3f%s> End Time <%.3f%s> Total Cycles <%.3f%s>\n",
+    fprintf(ctx->profiler_call_graph_file, "|%s%s_%d: Start Time <%.3f%s> End Time <%.3f%s> Total Time <%.3f%s>\n",
         indent_string, call_info->function_name, call_info->call_id, call_info->start_time, ctx->time_unit_suffix, call_info->end_time, ctx->time_unit_suffix, call_info->end_time - call_info->start_time, ctx->time_unit_suffix);
 
     // Depth-first
