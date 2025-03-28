@@ -242,10 +242,12 @@ void rvfi_monitor_add_default_performance_counters(rvfi_monitor_context *ctx) {
     rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Backward static jumps", .val = 0, .update = rvfi_tools_perfcount_cb_bwd_static_jumps, .local_ctx = NULL});
     rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Forward register jumps", .val = 0, .update = rvfi_tools_perfcount_cb_fwd_reg_jumps, .local_ctx = NULL});
     rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Backward register jumps", .val = 0, .update = rvfi_tools_perfcount_cb_bwd_reg_jumps, .local_ctx = NULL});
+    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Misaligned jumps", .val = 0, .update = rvfi_tools_perfcount_cb_misaligned_jumps, .local_ctx = NULL});
     rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Taken forward branches", .val = 0, .update = rvfi_tools_perfcount_cb_taken_fwd_branches, .local_ctx = NULL});
     rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Not-taken forward branches", .val = 0, .update = rvfi_tools_perfcount_cb_not_taken_fwd_branches, .local_ctx = NULL});
     rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Taken backward branches", .val = 0, .update = rvfi_tools_perfcount_cb_taken_bwd_branches, .local_ctx = NULL});
     rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Not-taken backward branches", .val = 0, .update = rvfi_tools_perfcount_cb_not_taken_bwd_branches, .local_ctx = NULL});
+    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Misaligned branches", .val = 0, .update = rvfi_tools_perfcount_cb_misaligned_branches, .local_ctx = NULL});
     rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Byte loads", .val = 0, .update = rvfi_tools_perfcount_cb_byte_loads, .local_ctx = NULL});
     rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Half-word (16 bits) loads", .val = 0, .update = rvfi_tools_perfcount_cb_halfword_loads, .local_ctx = NULL});
     rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Word loads", .val = 0, .update = rvfi_tools_perfcount_cb_word_loads, .local_ctx = NULL});

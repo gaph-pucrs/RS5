@@ -226,6 +226,24 @@ void rvfi_tools_perfcount_cb_bwd_reg_jumps(rvfi_performance_counter_t* self, con
 
 }
 
+void rvfi_tools_perfcount_cb_misaligned_jumps(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
+
+    switch (op->match) {
+        case MATCH_JAL:
+        case MATCH_C_JAL:
+        case MATCH_C_J:
+        case MATCH_JALR:
+        case MATCH_C_JALR:
+        case MATCH_C_JR:
+            if (rvfi_trace->rvfi_pc_wdata & 3)
+                self->val += 1;
+
+        default:
+            break;
+    }
+
+}
+
 void rvfi_tools_perfcount_cb_taken_fwd_branches(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
 // size_t inst_length(rv_inst inst);
@@ -296,6 +314,23 @@ void rvfi_tools_perfcount_cb_not_taken_bwd_branches(rvfi_performance_counter_t* 
         case MATCH_C_BEQZ:
         case MATCH_C_BNEZ:
             if (rvfi_trace->rvfi_pc_wdata == (rvfi_trace->rvfi_pc_rdata + riscv_insn_length(rvfi_trace->rvfi_pc_rdata)) && rvfi_trace->rvfi_pc_wdata < rvfi_trace->rvfi_pc_rdata)
+                self->val += 1;
+    }
+
+}
+
+void rvfi_tools_perfcount_cb_misaligned_branches(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
+
+    switch (op->match) {
+        case MATCH_BEQ:
+        case MATCH_BNE:
+        case MATCH_BLT:
+        case MATCH_BGE:
+        case MATCH_BLTU:
+        case MATCH_BGEU:
+        case MATCH_C_BEQZ:
+        case MATCH_C_BNEZ:
+            if (rvfi_trace->rvfi_pc_wdata & 3)
                 self->val += 1;
     }
 
