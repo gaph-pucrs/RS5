@@ -92,13 +92,13 @@ typedef struct {
     char* tracer_log_file_name;
     char* profiler_log_file_name;
     char* profiler_call_graph_file_name;
-    char* symbol_table_file_name;
+    char* profiler_elf_file_name;
     char* symbol_watchlist_file_name;
 
     FILE* tracer_log_file;
     FILE* profiler_log_file;
     FILE* profiler_call_graph_file;
-    FILE* symbol_table_file;
+    // FILE* profiler_elf_file;
     FILE* symbol_watchlist_file;
 
     GHashTable* symbol_table_hash_table;
@@ -144,7 +144,7 @@ static const char rv_ireg_name_sym[32][5] = {
 
 #endif
 
-rvfi_monitor_context* rvfi_monitor_init(char* monitor_prefix, char* time_unit_suffix, unsigned long isa, int en_tracer, int en_profiler, int en_checker);
+rvfi_monitor_context* rvfi_monitor_init(char* monitor_prefix, char* elf_file_name, char* time_unit_suffix, unsigned long isa, int en_tracer, int en_profiler, int en_checker);
 void rvfi_monitor_add_counter(rvfi_monitor_context* ctx, rvfi_performance_counter_t ctr);
 void rvfi_monitor_add_default_performance_counters(rvfi_monitor_context* ctx);
 void rvfi_monitor_push_counters_to_stack(rvfi_monitor_context *ctx, symbol_info_t *current_symbol, const rvfi_trace_t *rvfi_trace);

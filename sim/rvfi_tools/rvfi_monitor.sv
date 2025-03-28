@@ -40,8 +40,8 @@ module rvfi_monitor #(
 
     chandle ctx;
 
-    // import "DPI" function chandle rvfi_monitor_init(string monitor_prefix, rv_isa isa, int en_tracer, int en_profiler, int en_checker, string tracer_log_file_name, string profiler_log_file_name, string profiler_call_graph_file_name, string symbol_table_file_name, string symbol_watchlist_file_name);
-    import "DPI" function chandle rvfi_monitor_init(string monitor_prefix, string time_unit, longint march, int en_tracer, int en_profiler, int en_checker);
+    // import "DPI" function chandle rvfi_monitor_init(string monitor_prefix, string time_unit, longint march, int en_tracer, int en_profiler, int en_checker);
+    import "DPI" function chandle rvfi_monitor_init(string monitor_prefix, string elf_file_name, string time_unit, longint march, int en_tracer, int en_profiler, int en_checker);
     import "DPI" function void rvfi_monitor_add_default_performance_counters(chandle ctx);
     // import "DPI" function void rvfi_monitor_step(chandle ctx, rvfi_trace_t rvfi_trace, longint current_clock_cycle);
     import "DPI" function void rvfi_monitor_step(chandle ctx, rvfi_trace_t rvfi_trace, longint current_clock_cycle, string time_string, real time_float);
@@ -64,9 +64,15 @@ module rvfi_monitor #(
         string time_string;
         realtime time_float;
 
+        string elf_file_name;
+
+        elf_file_name = {MONITOR_PREFIX, "_profiler_elf.elf"};
+        $value$plusargs({MONITOR_PREFIX, "_profiler_elf_file_name=%s"}, elf_file_name);
+        $display("Monitor <%s> ELF file is <%s>", MONITOR_PREFIX, elf_file_name);
+
         $timeformat(time_unit_lut[TIME_UNIT], 3, TIME_UNIT, 0);
 
-        ctx = rvfi_monitor_init(MONITOR_PREFIX, TIME_UNIT, ISA, ENABLE_TRACER, ENABLE_PROFILER, ENABLE_CHECKER);
+        ctx = rvfi_monitor_init(MONITOR_PREFIX, elf_file_name, TIME_UNIT, ISA, ENABLE_TRACER, ENABLE_PROFILER, ENABLE_CHECKER);
         rvfi_monitor_add_default_performance_counters(ctx);
 
         forever begin
