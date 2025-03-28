@@ -103,6 +103,8 @@ typedef struct {
     GPtrArray* counter_stack;
     GNode* current_call_node;
 
+    disassemble_info disasm_info;
+
     int n_counters;
 
 } rvfi_monitor_context;
