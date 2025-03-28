@@ -85,7 +85,7 @@ int get_symtab (bfd *abfd, asymbol** symtab) {
   if (!(bfd_get_file_flags(abfd) & HAS_SYMS))
     return NULL;
 
-  
+
   symcount = bfd_canonicalize_symtab (abfd, symtab);
   if (symcount < 0)
     {
