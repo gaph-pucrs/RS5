@@ -338,7 +338,7 @@ void rvfi_tools_perfcount_cb_misaligned_branches(rvfi_performance_counter_t* sel
 
 void rvfi_tools_perfcount_cb_byte_loads(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
-    // TODO: AMO conditional load/store
+    // TODO: AMO conditional load/store, Zc* LSU ops
     switch (op->match) {
         case MATCH_LB:
         case MATCH_LBU:
@@ -350,7 +350,7 @@ void rvfi_tools_perfcount_cb_byte_loads(rvfi_performance_counter_t* self, const 
 
 void rvfi_tools_perfcount_cb_halfword_loads(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
-    // TODO: AMO conditional load/store
+    // TODO: AMO conditional load/store, Zc* LSU ops
     switch (op->match) {
         case MATCH_LH:
         case MATCH_LHU:
@@ -362,7 +362,7 @@ void rvfi_tools_perfcount_cb_halfword_loads(rvfi_performance_counter_t* self, co
 
 void rvfi_tools_perfcount_cb_word_loads(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
-    // TODO: AMO conditional load/store
+    // TODO: AMO conditional load/store, Zc* LSU ops
     switch (op->match) {
         case MATCH_LW:
         case MATCH_LWU:
@@ -376,9 +376,18 @@ void rvfi_tools_perfcount_cb_word_loads(rvfi_performance_counter_t* self, const 
 
 }
 
+void rvfi_tools_perfcount_cb_misaligned_loads(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
+
+    if (rvfi_trace->rvfi_mem_rmask)
+        if (((rvfi_trace->rvfi_mem_rmask == 0xF) && (rvfi_trace->rvfi_mem_addr & 3)) ||
+          ((rvfi_trace->rvfi_mem_rmask == 0xC || rvfi_trace->rvfi_mem_rmask == 0x3) && (rvfi_trace->rvfi_mem_addr & 1)))
+            self->val += 1;
+
+}
+
 void rvfi_tools_perfcount_cb_byte_stores(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
-    // TODO: AMO conditional load/store
+    // TODO: AMO conditional load/store, Zc* LSU ops
     switch (op->match) {
         case MATCH_SB:
             self->val += 1;
@@ -387,7 +396,7 @@ void rvfi_tools_perfcount_cb_byte_stores(rvfi_performance_counter_t* self, const
 
 void rvfi_tools_perfcount_cb_halfword_stores(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
-    // TODO: AMO conditional load/store
+    // TODO: AMO conditional load/store, Zc* LSU ops
     switch (op->match) {
         case MATCH_SH:
             self->val += 1;
@@ -397,7 +406,7 @@ void rvfi_tools_perfcount_cb_halfword_stores(rvfi_performance_counter_t* self, c
 
 void rvfi_tools_perfcount_cb_word_stores(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
-    // TODO: AMO conditional load/store
+    // TODO: AMO conditional load/store, Zc* LSU ops
     switch (op->match) {
         case MATCH_SW:
         case MATCH_C_SW:
@@ -407,4 +416,13 @@ void rvfi_tools_perfcount_cb_word_stores(rvfi_performance_counter_t* self, const
             self->val += 1;
 
     }
+}
+
+void rvfi_tools_perfcount_cb_misaligned_stores(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
+
+    if (rvfi_trace->rvfi_mem_wmask)
+        if (((rvfi_trace->rvfi_mem_wmask == 0xF) && (rvfi_trace->rvfi_mem_addr & 3)) ||
+          ((rvfi_trace->rvfi_mem_wmask == 0xC || rvfi_trace->rvfi_mem_wmask == 0x3) && (rvfi_trace->rvfi_mem_addr & 1)))
+            self->val += 1;
+
 }

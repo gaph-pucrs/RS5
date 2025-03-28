@@ -252,9 +252,11 @@ void rvfi_monitor_add_default_performance_counters(rvfi_monitor_context *ctx) {
     rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Byte loads", .val = 0, .update = rvfi_tools_perfcount_cb_byte_loads, .local_ctx = NULL});
     rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Half-word (16 bits) loads", .val = 0, .update = rvfi_tools_perfcount_cb_halfword_loads, .local_ctx = NULL});
     rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Word loads", .val = 0, .update = rvfi_tools_perfcount_cb_word_loads, .local_ctx = NULL});
+    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Misaligned loads", .val = 0, .update = rvfi_tools_perfcount_cb_misaligned_loads, .local_ctx = NULL});
     rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Byte stores", .val = 0, .update = rvfi_tools_perfcount_cb_byte_stores, .local_ctx = NULL});
     rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Half-word (16 bits) stores", .val = 0, .update = rvfi_tools_perfcount_cb_halfword_stores, .local_ctx = NULL});
     rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Word stores", .val = 0, .update = rvfi_tools_perfcount_cb_word_stores, .local_ctx = NULL});
+    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Misaligned stores", .val = 0, .update = rvfi_tools_perfcount_cb_misaligned_stores, .local_ctx = NULL});
 
 }
 
