@@ -358,10 +358,8 @@ void rvfi_monitor_step(rvfi_monitor_context *ctx, const rvfi_trace_t *rvfi_trace
         // if (function_call && current_symbol != NULL && current_symbol->is_function && current_symbol->is_watched) {
         if (control_flow_change && current_symbol != NULL && current_symbol->is_function && current_symbol->is_watched) {
 
-            // printf("[%s] About to enter function <%s> at PC <0x%x> from PC <0x%x> at clock cycle <%0d>\n", ctx->monitor_prefix, current_symbol->function_name, next_pc, current_pc, current_clock_cycle);
-            printf("[%s] About to enter function <%s> at PC <0x%x> from PC <0x%x> at clock cycle <%0d> time <%s>\n", ctx->monitor_prefix, current_symbol->function_name, next_pc, current_pc, current_clock_cycle, time_string);
-            // fprintf(ctx->profiler_log_file, "[%s] About to enter function <%s> at PC <0x%x> from PC <0x%x> at clock cycle <%0d>\n", ctx->monitor_prefix, current_symbol->function_name, next_pc, current_pc, current_clock_cycle);
-            fprintf(ctx->profiler_log_file, "[%s] About to enter function <%s> at PC <0x%x> from PC <0x%x> at clock cycle <%0d> time <%s>\n", ctx->monitor_prefix, current_symbol->function_name, next_pc, current_pc, current_clock_cycle, time_string);
+            printf("[%s] About to start call <%s_%d> to PC <0x%x> from PC <0x%x> at clock cycle <%0d> simulation time <%s>\n", ctx->monitor_prefix, current_symbol->function_name, current_symbol->times_called, next_pc, current_pc, current_clock_cycle, time_string);
+            fprintf(ctx->profiler_log_file, "[%s] About to start call <%s_%d> to PC <0x%x> from PC <0x%x> at clock cycle <%0d> simulation time <%s>\n", ctx->monitor_prefix, current_symbol->function_name, current_symbol->times_called, next_pc, current_pc, current_clock_cycle, time_string);
 
             // Print counters at function entry, might be useful for debug
             // for (int i = 0; i < ctx->n_counters; i++) {
@@ -398,10 +396,10 @@ void rvfi_monitor_step(rvfi_monitor_context *ctx, const rvfi_trace_t *rvfi_trace
 
             if (next_pc == counter_stack_top->ret_pc) {
 
-                printf("[%s] About to return from function <%s> from PC <0x%x> to PC <0x%x> at clock cycle <%0d> time <%s>\n", ctx->monitor_prefix, counter_stack_top->function_name, current_pc, next_pc, current_clock_cycle, time_string);
-                fprintf(ctx->profiler_log_file, "[%s] About to return from function <%s> from PC <0x%x> to PC <0x%x> at clock cycle <%0d> time <%s>\n", ctx->monitor_prefix, counter_stack_top->function_name, current_pc, next_pc, current_clock_cycle, time_string);
-
                 current_symbol = g_hash_table_lookup(ctx->symbol_table_hash_table, GINT_TO_POINTER(counter_stack_top->start_pc));
+
+                printf("[%s] About to return from call <%s_%d> from PC <0x%x> to PC <0x%x> at clock cycle <%0d> simulation time <%s>\n", ctx->monitor_prefix, counter_stack_top->function_name, ((call_info_t*) ctx->current_call_node->data)->call_id, current_pc, next_pc, current_clock_cycle, time_string);
+                fprintf(ctx->profiler_log_file, "[%s] About to return from call <%s_%d> from PC <0x%x> to PC <0x%x> at clock cycle <%0d> simulation time <%s>\n", ctx->monitor_prefix, counter_stack_top->function_name, ((call_info_t*) ctx->current_call_node->data)->call_id, current_pc, next_pc, current_clock_cycle, time_string);
 
                 // Print out diff between virtual performance counters as they were in the moment of function entry and current state of counters (at function exit)
                 for (int i = 0; i < ctx->n_counters; i++) {
