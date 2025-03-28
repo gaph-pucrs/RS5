@@ -5,7 +5,7 @@ LDFLAGS_STRIP = -Wl,--gc-sections
 TRIPLET = riscv64-elf
 CC = $(TRIPLET)-gcc
 # CFLAGS = -IbareOS/include -Itinycrypt/include -O2 -fno-builtin -march=rv32i_zkne -mabi=ilp32 -mbranch-cost=7 -DAES_RISCV_ASM -DTC_AES_128 $(CFLAGS_STRIP)
-CFLAGS = -IbareOS/include -Itinycrypt/include -O2 -fno-builtin -march=rv32imc_zkne -mabi=ilp32 -mbranch-cost=7 -DAES_RISCV_ASM -DTC_AES_128 $(CFLAGS_STRIP)
+CFLAGS = -IbareOS/include -Itinycrypt/include -O0 -fno-builtin -march=rv32imc_zkne -mabi=ilp32 -mbranch-cost=7 -DTC_AES_128 $(CFLAGS_STRIP)
 AS = $(TRIPLET)-as
 # ASFLAGS = -march=rv32i_zicsr_zkne -mabi=ilp32
 ASFLAGS = -march=rv32imc_zicsr_zkne -mabi=ilp32
