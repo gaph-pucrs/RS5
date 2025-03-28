@@ -20,7 +20,7 @@ void rvfi_tools_perfcount_cb_cmprss_insn_retired(rvfi_performance_counter_t* sel
 }
 
 void rvfi_tools_perfcount_cb_unkwown_insn_retired(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* decoded_instruction) {
-    if (decoded_instruction->match == 0)
+    if (decoded_instruction->match == 0 && decoded_instruction->mask == 0) 
         self->val += 1;
 }
 
