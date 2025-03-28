@@ -47,14 +47,14 @@ run:
 lint:
 	@$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_INPUT) --lint-only -I../rtl -I../rtl/aes --timing
 
-rvfi_tools.so:
+rvfi_tools:
 	make -C rvfi_tools rvfi_tools.so
 
 # Internally xrun uses gcc 9.3
-xrun_rvfi_tools: rvfi_tools.so
-# LD_LIBRARY_PATH=rvfi_tools/build/usr/local/x86_64-pc-linux-gnu/riscv64-unknown-linux-gnu/lib/ xrun -sv -sv_lib rvfi_tools.so -timescale 1ns/1ps -define RVFI -F ../rtl/rtl.f -F tb.f -incdir ../rtl -top testbench -access r -input scripts/cadence/xmsim_probe.tcl
-# xrun -sv -sv_lib rvfi_tools/build/rvfi_tools/rvfi_tools.so -timescale 1ns/1ps -define RVFI -F ../rtl/rtl.f -F tb.f -F rvfi_tools/rvfi_tools.f -incdir ../rtl -top testbench -access r -input scripts/cadence/xmsim_probe.tcl
-	LD_LIBRARY_PATH=rvfi_tools/build/usr/local/x86_64-pc-linux-gnu/riscv64-unknown-linux-gnu/lib/ xrun -sv -sv_lib rvfi_tools/build/rvfi_tools/rvfi_tools.so -timescale 1ns/1ps -define RVFI -F ../rtl/rtl.f -F tb.f -F rvfi_tools/rvfi_tools.f -incdir ../rtl -top testbench -access r -input scripts/cadence/xmsim_probe.tcl
+xrun_rvfi_tools: rvfi_tools
+# LD_LIBRARY_PATH=rvfi_tools/build/usr/local/x86_64-pc-linux-gnu/riscv64-unknown-linux-gnu/lib/ xrun -sv -sv_lib rvfi_tools/build/rvfi_tools/rvfi_tools.so -timescale 1ns/1ps -define RVFI -F ../rtl/rtl.f -F tb.f -F rvfi_tools/src/sv/rvfi_tools.f -incdir ../rtl -top testbench -access r -input scripts/cadence/xmsim_probe.tcl
+	export LD_LIBRARY_PATH=rvfi_tools/build/usr/local/x86_64-pc-linux-gnu/riscv64-unknown-linux-gnu/lib/
+	xrun -sv -sv_lib rvfi_tools/build/rvfi_tools/rvfi_tools.so -timescale 1ns/1ps -define RVFI -F ../rtl/rtl.f -F tb.f -F rvfi_tools/src/sv/rvfi_tools.f -incdir ../rtl -top testbench -access r -input scripts/cadence/xmsim_probe.tcl
 
 xrun:
 	xrun -sv -timescale 1ns/1ps ../rtl/rtl.f -F tb.f -incdir ../rtl -top testbench -access r -input scripts/cadence/xmsim_probe.tcl
@@ -72,3 +72,4 @@ clean:
 	rm -rf xrun.*
 
 .PHONY: run clean
+.ONESHELL: xrun_rvfi_tools

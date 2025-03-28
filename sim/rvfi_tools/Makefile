@@ -7,10 +7,10 @@ GLIB_LIBS = -L/usr/lib64 -lglib-2.0
 # BINUTILS_LIBS = -Lbuild/usr/local/x86_64-pc-linux-gnu/riscv64-unknown-linux-gnu/lib/ -lopcodes -lbfd -lz -ldl -lzstd
 BINUTILS_LIBS = -Lbuild/usr/local/x86_64-pc-linux-gnu/riscv64-unknown-linux-gnu/lib/ -lopcodes -lbfd -lz -ldl
 
-SOURCES = $(wildcard *.c)
-HEADERS = $(wildcard *.h)
+SOURCES = $(wildcard src/c/*.c)
+HEADERS = $(wildcard src/c/include/*.h)
 
-CFLAGS = -shared -fPIC -std=c11 $(GLIB_INCS) $(BINUTILS_INCS)
+CFLAGS = -shared -fPIC -std=c11 $(GLIB_INCS) $(BINUTILS_INCS) -Isrc/c/include
 LDFLAGS = $(GLIB_LIBS) $(BINUTILS_LIBS)
 
 binutils:
@@ -38,7 +38,7 @@ binutils:
 
 rvfi_tools.so: $(HEADERS) $(SOURCES)
 	mkdir -p build/rvfi_tools/
-	gcc $(SOURCES) -o build/rvfi_tools/rvfi_tools.so $(CFLAGS) $(LDFLAGS)
+	$(CC) $(SOURCES) -o build/rvfi_tools/rvfi_tools.so $(CFLAGS) $(LDFLAGS)
 
 clean:
 	rm -rf build/rvfi_tools/rvfi_tools.so
