@@ -129,18 +129,19 @@ rvfi_monitor_context* rvfi_monitor_init(char* monitor_prefix, char* elf_file_nam
         int symcount = get_symtab(abfd, syms);
         asymbol *current;
 
-        // for (int count = 0; count < symcount; count++) {
-        //     current = syms[count];
-        //     const char *section_name = current->section->name;
+        // Init disassembly info and opcode hashtable
+        stream_state ss = {};
 
-        //     printf ("%s %s %c",
-        //     section_name,
-        //     current->name,
-        //     (current->flags & BSF_DEBUGGING) ? 'D' : 'F');
-        //     // if (current->name)
-        //     //   printf(" %s", current->name);
-        //     printf("\n");
-        // }
+        disassemble_info disasm_info = {};
+        init_disassemble_info(&disasm_info, &ss, NULL, dis_fprintf_styled);
+        disasm_info.arch = bfd_arch_riscv;
+        disasm_info.mach = bfd_mach_riscv32;
+        disasm_info.read_memory_func = buffer_read_memory;
+        disasm_info.print_address_func = print_address; 
+
+        ctx->disasm_info = disasm_info;
+
+        init_hashtable();
 
         // Fill out symbol PC and name hash table
         for (int count = 0; count < symcount; count++) {
@@ -277,7 +278,7 @@ void rvfi_monitor_step(rvfi_monitor_context *ctx, const rvfi_trace_t *rvfi_trace
     const struct riscv_opcode* decoded_instruction;
 
     if (ctx->en_profiler || ctx->en_tracer)
-        decoded_instruction = disasm_inst(disassembly_buffer, 200, (uint64_t) rvfi_trace->rvfi_pc_rdata, rvfi_trace->rvfi_insn);
+        decoded_instruction = disasm_inst(disassembly_buffer, 200, &ctx->disasm_info, (uint64_t) rvfi_trace->rvfi_pc_rdata, rvfi_trace->rvfi_insn);
 
     if (ctx->en_tracer) {
 

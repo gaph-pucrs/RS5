@@ -106,6 +106,8 @@ typedef struct {
     GPtrArray* counter_stack;
     GNode* current_call_node;
 
+    disassemble_info disasm_info;
+
     // counter_info_t* counter_stack_top;
 
     int n_counters;

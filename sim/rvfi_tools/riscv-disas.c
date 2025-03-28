@@ -2,14 +2,9 @@
 
 #include <dis-asm.h>
 
-typedef struct {
-  char *insn_buffer;
-  bool reenter;
-} stream_state;
 
-
-static int dis_fprintf_styled(void *stream, enum disassembler_style style, const char *fmt, ...) {
-  stream_state *ss = (stream_state *)stream;
+int dis_fprintf_styled(void *stream, enum disassembler_style style, const char *fmt, ...) {
+  stream_state* ss = (stream_state *)stream;
 
   va_list arg;
   va_start(arg, fmt);
@@ -32,50 +27,39 @@ static int dis_fprintf_styled(void *stream, enum disassembler_style style, const
   return 0;
 }
 
-static void print_address (bfd_vma vma, struct disassemble_info *inf) {
+void print_address (bfd_vma vma, disassemble_info *inf) {
   dis_fprintf_styled(inf->stream, dis_style_address, "0x%x", vma);
 }
 
-char* disassemble_to_string(uint8_t *input_buffer, uint64_t pc) {
-    char* disassembled = NULL;
-    stream_state ss = {};
+void disassemble_to_string(disassemble_info* disasm_info, uint8_t* input_buffer, char* out_buf, uint64_t pc) {
 
-    disassemble_info disasm_info = {};
-    init_disassemble_info(&disasm_info, &ss, NULL, dis_fprintf_styled);
-    disasm_info.arch = bfd_arch_riscv;
-    disasm_info.mach = bfd_mach_riscv32;
-    disasm_info.read_memory_func = buffer_read_memory;
-    disasm_info.print_address_func = print_address; 
-    disasm_info.buffer = input_buffer;
-    disasm_info.buffer_vma = pc;
-    disasm_info.buffer_length = 4;
-    disassemble_init_for_target(&disasm_info);
+    stream_state* ss = (stream_state *)(disasm_info->stream);
+    disasm_info->buffer = input_buffer;
+    disasm_info->buffer_vma = pc;
+    disasm_info->buffer_length = 4;
+
+    disassemble_init_for_target(disasm_info);
 
     disassembler_ftype disasm;
     disasm = disassembler(bfd_arch_riscv, false, bfd_mach_riscv32, NULL);
 
-    size_t insn_size = disasm(pc, &disasm_info);
+    size_t insn_size = disasm(pc, disasm_info);
 
-    asprintf(&disassembled, "%s", ss.insn_buffer);
+    sprintf(out_buf, "%s", ss->insn_buffer);
+    free(ss->insn_buffer);
 
-    return disassembled;
 }
 
-const struct riscv_opcode* disasm_inst(char *buf, size_t buflen, uint64_t pc, insn_t inst) {
+void init_hashtable() {
   const struct riscv_opcode *op;
-  static const struct riscv_opcode *riscv_hash[OP_MASK_OP + 1];
-  static bool init = false;
+  for (op = riscv_opcodes; op->name; op++)
+    if (!riscv_hash[OP_HASH_IDX (op->match)])
+      riscv_hash[OP_HASH_IDX (op->match)] = op;
+}
 
-#define OP_HASH_IDX(i) ((i) & (riscv_insn_length (i) == 2 ? 0x3 : OP_MASK_OP))
+const struct riscv_opcode* disasm_inst(char *buf, size_t buflen, disassemble_info* disasm_info, uint64_t pc, insn_t inst) {
 
-  if (!init) {
-    for (op = riscv_opcodes; op->name; op++)
-      if (!riscv_hash[OP_HASH_IDX (op->match)])
-        riscv_hash[OP_HASH_IDX (op->match)] = op;
-    init = true;
-  }
-
-  op = riscv_hash[OP_HASH_IDX (inst)];
+  const struct riscv_opcode *op = riscv_hash[OP_HASH_IDX (inst)];
 
   for (; op->name; op++)
 	{
@@ -91,7 +75,7 @@ const struct riscv_opcode* disasm_inst(char *buf, size_t buflen, uint64_t pc, in
 
   *(uint32_t *)inst_buf = inst;
 
-  strcpy(buf, disassemble_to_string(inst_buf, pc));
+  disassemble_to_string(disasm_info, inst_buf, buf, pc);
 
   return op;
 }
