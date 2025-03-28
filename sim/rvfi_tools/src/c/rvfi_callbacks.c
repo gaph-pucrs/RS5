@@ -1,41 +1,47 @@
 #include "rvfi_callbacks.h"
 
-void rvfi_tools_perfcount_cb_clock_cycles(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* decoded_instruction) {
+void rvfi_tools_perfcount_cb_clock_cycles(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* decoded_instruction, void* local_ctx) {
 
-    static uint64_t running_clock_cycle_count = 0;
+    // static uint64_t running_clock_cycle_count = 0;
+    uint64_t running_clock_cycle_count = *((uint64_t*) local_ctx);
 
     self->val += (current_clock_cycle - running_clock_cycle_count);
     running_clock_cycle_count = current_clock_cycle;
 
+    *((uint64_t*) local_ctx) = running_clock_cycle_count;
+
 }
 
 // TODO: Consider machines capable of retiring multiple instruction per cycle
-void rvfi_tools_perfcount_cb_insn_retired(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* decoded_instruction) {
+void rvfi_tools_perfcount_cb_insn_retired(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* decoded_instruction, void* local_ctx) {
     self->val += 1;
 }
 
-void rvfi_tools_perfcount_cb_cmprss_insn_retired(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* decoded_instruction) {
+void rvfi_tools_perfcount_cb_cmprss_insn_retired(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* decoded_instruction, void* local_ctx) {
     if (decoded_instruction->insn_class == INSN_CLASS_C)
         self->val += 1;
 }
 
-void rvfi_tools_perfcount_cb_unkwown_insn_retired(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* decoded_instruction) {
+void rvfi_tools_perfcount_cb_unkwown_insn_retired(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* decoded_instruction, void* local_ctx) {
     if (decoded_instruction->match == 0)
         self->val += 1;
 }
 
 // TODO: Consider WFI instruction and multicycle instructions
-void rvfi_tools_perfcount_cb_stall_cycles(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* decoded_instruction) {
+void rvfi_tools_perfcount_cb_stall_cycles(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* decoded_instruction, void* local_ctx) {
 
-    static uint64_t last_clock_cycle = 0;
+    // static uint64_t last_clock_cycle = 0;
+    uint64_t last_clock_cycle = *((uint64_t*) local_ctx);
 
     self->val += current_clock_cycle - last_clock_cycle - 1;
     last_clock_cycle = current_clock_cycle;
 
+    *((uint64_t*) local_ctx) = last_clock_cycle;
+
 }
 
 // These are instructions than generally re-use the same ALU adder (add, sub and set-less-than)
-void rvfi_tools_perfcount_cb_arith(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
+void rvfi_tools_perfcount_cb_arith(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
     switch (op->match) {
         case MATCH_AUIPC:
@@ -74,7 +80,7 @@ void rvfi_tools_perfcount_cb_arith(rvfi_performance_counter_t* self, const rvfi_
 }
 
 // Shifts/rotates
-void rvfi_tools_perfcount_cb_shift(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
+void rvfi_tools_perfcount_cb_shift(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
     switch (op->match) {
         case MATCH_SLLI:
@@ -94,7 +100,7 @@ void rvfi_tools_perfcount_cb_shift(rvfi_performance_counter_t* self, const rvfi_
 }
 
 // Bitwise logical ops
-void rvfi_tools_perfcount_cb_bitwise(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
+void rvfi_tools_perfcount_cb_bitwise(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
     switch (op->match) {
         case MATCH_AND:
@@ -125,7 +131,7 @@ void rvfi_tools_perfcount_cb_bitwise(rvfi_performance_counter_t* self, const rvf
 }
 
 // Multiplications
-void rvfi_tools_perfcount_cb_mult(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
+void rvfi_tools_perfcount_cb_mult(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
     switch (op->match) {
         case MATCH_MUL:
@@ -142,7 +148,7 @@ void rvfi_tools_perfcount_cb_mult(rvfi_performance_counter_t* self, const rvfi_t
 }
 
 // Divisions/remainer
-void rvfi_tools_perfcount_cb_div(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
+void rvfi_tools_perfcount_cb_div(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
     switch (op->match) {
         case MATCH_DIV:
@@ -160,7 +166,7 @@ void rvfi_tools_perfcount_cb_div(rvfi_performance_counter_t* self, const rvfi_tr
     }
 }
 
-void rvfi_tools_perfcount_cb_fwd_static_jumps(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
+void rvfi_tools_perfcount_cb_fwd_static_jumps(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
     switch (op->match) {
         case MATCH_JAL:
@@ -175,7 +181,7 @@ void rvfi_tools_perfcount_cb_fwd_static_jumps(rvfi_performance_counter_t* self, 
 
 }
 
-void rvfi_tools_perfcount_cb_bwd_static_jumps(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
+void rvfi_tools_perfcount_cb_bwd_static_jumps(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
     switch (op->match) {
         case MATCH_JAL:
@@ -190,7 +196,7 @@ void rvfi_tools_perfcount_cb_bwd_static_jumps(rvfi_performance_counter_t* self, 
 
 }
 
-void rvfi_tools_perfcount_cb_fwd_reg_jumps(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
+void rvfi_tools_perfcount_cb_fwd_reg_jumps(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
     switch (op->match) {
         case MATCH_JALR:
@@ -205,7 +211,7 @@ void rvfi_tools_perfcount_cb_fwd_reg_jumps(rvfi_performance_counter_t* self, con
 
 }
 
-void rvfi_tools_perfcount_cb_bwd_reg_jumps(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
+void rvfi_tools_perfcount_cb_bwd_reg_jumps(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
     switch (op->match) {
         case MATCH_JALR:
@@ -220,7 +226,7 @@ void rvfi_tools_perfcount_cb_bwd_reg_jumps(rvfi_performance_counter_t* self, con
 
 }
 
-void rvfi_tools_perfcount_cb_taken_fwd_branches(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
+void rvfi_tools_perfcount_cb_taken_fwd_branches(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
 // size_t inst_length(rv_inst inst);
     switch (op->match) {
@@ -241,7 +247,7 @@ void rvfi_tools_perfcount_cb_taken_fwd_branches(rvfi_performance_counter_t* self
 
 }
 
-void rvfi_tools_perfcount_cb_taken_bwd_branches(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
+void rvfi_tools_perfcount_cb_taken_bwd_branches(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
     switch (op->match) {
         case MATCH_BEQ:
@@ -261,7 +267,7 @@ void rvfi_tools_perfcount_cb_taken_bwd_branches(rvfi_performance_counter_t* self
 
 }
 
-void rvfi_tools_perfcount_cb_not_taken_fwd_branches(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
+void rvfi_tools_perfcount_cb_not_taken_fwd_branches(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
     switch (op->match) {
         case MATCH_BEQ:
@@ -278,7 +284,7 @@ void rvfi_tools_perfcount_cb_not_taken_fwd_branches(rvfi_performance_counter_t* 
 
 }
 
-void rvfi_tools_perfcount_cb_not_taken_bwd_branches(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
+void rvfi_tools_perfcount_cb_not_taken_bwd_branches(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
     switch (op->match) {
         case MATCH_BEQ:
@@ -295,7 +301,7 @@ void rvfi_tools_perfcount_cb_not_taken_bwd_branches(rvfi_performance_counter_t* 
 
 }
 
-void rvfi_tools_perfcount_cb_byte_loads(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
+void rvfi_tools_perfcount_cb_byte_loads(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
     // TODO: AMO conditional load/store
     switch (op->match) {
@@ -307,7 +313,7 @@ void rvfi_tools_perfcount_cb_byte_loads(rvfi_performance_counter_t* self, const 
 
 }
 
-void rvfi_tools_perfcount_cb_halfword_loads(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
+void rvfi_tools_perfcount_cb_halfword_loads(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
     // TODO: AMO conditional load/store
     switch (op->match) {
@@ -319,7 +325,7 @@ void rvfi_tools_perfcount_cb_halfword_loads(rvfi_performance_counter_t* self, co
 
 }
 
-void rvfi_tools_perfcount_cb_word_loads(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
+void rvfi_tools_perfcount_cb_word_loads(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
     // TODO: AMO conditional load/store
     switch (op->match) {
@@ -335,7 +341,7 @@ void rvfi_tools_perfcount_cb_word_loads(rvfi_performance_counter_t* self, const 
 
 }
 
-void rvfi_tools_perfcount_cb_byte_stores(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
+void rvfi_tools_perfcount_cb_byte_stores(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
     // TODO: AMO conditional load/store
     switch (op->match) {
@@ -344,7 +350,7 @@ void rvfi_tools_perfcount_cb_byte_stores(rvfi_performance_counter_t* self, const
     }
 }
 
-void rvfi_tools_perfcount_cb_halfword_stores(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
+void rvfi_tools_perfcount_cb_halfword_stores(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
     // TODO: AMO conditional load/store
     switch (op->match) {
@@ -354,7 +360,7 @@ void rvfi_tools_perfcount_cb_halfword_stores(rvfi_performance_counter_t* self, c
 
 }
 
-void rvfi_tools_perfcount_cb_word_stores(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op) {
+void rvfi_tools_perfcount_cb_word_stores(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
     // TODO: AMO conditional load/store
     switch (op->match) {

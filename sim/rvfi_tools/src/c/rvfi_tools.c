@@ -105,7 +105,7 @@ rvfi_monitor_context* rvfi_monitor_init(char* monitor_prefix, char* elf_file_nam
 
     }
 
-    // Parse ELF symbols into 2 hash tables, one containing all symbol name and PC and another containing the names of watched symbols
+    // Parse ELF symbols into a hash table
     if (ctx->en_tracer || ctx->en_profiler) {
 
         bfd *abfd;
@@ -222,30 +222,36 @@ void rvfi_monitor_add_default_performance_counters(rvfi_monitor_context *ctx) {
 
     printf("[%s] Adding default performance counters\n", ctx->monitor_prefix);
 
-    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Clock cycles", .val = 0, .update = rvfi_tools_perfcount_cb_clock_cycles});
-    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Instructions retired", .val = 0, .update = rvfi_tools_perfcount_cb_insn_retired});
-    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Compressed instructions retired", .val = 0, .update = rvfi_tools_perfcount_cb_cmprss_insn_retired});
-    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Unidentified instructions retired", .val = 0, .update = rvfi_tools_perfcount_cb_unkwown_insn_retired});
-    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Idle/stall cycles", .val = 0, .update = rvfi_tools_perfcount_cb_stall_cycles});
-    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Arithmetic operations", .val = 0, .update = rvfi_tools_perfcount_cb_arith});
-    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Shift/rotate operations", .val = 0, .update = rvfi_tools_perfcount_cb_shift});
-    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Bitwise operations", .val = 0, .update = rvfi_tools_perfcount_cb_bitwise});
-    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Multiplication operations", .val = 0, .update = rvfi_tools_perfcount_cb_mult});
-    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Division operations", .val = 0, .update = rvfi_tools_perfcount_cb_div});
-    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Forward static jumps", .val = 0, .update = rvfi_tools_perfcount_cb_fwd_static_jumps});
-    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Backward static jumps", .val = 0, .update = rvfi_tools_perfcount_cb_bwd_static_jumps});
-    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Forward register jumps", .val = 0, .update = rvfi_tools_perfcount_cb_fwd_reg_jumps});
-    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Backward register jumps", .val = 0, .update = rvfi_tools_perfcount_cb_bwd_reg_jumps});
-    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Taken forward branches", .val = 0, .update = rvfi_tools_perfcount_cb_taken_fwd_branches});
-    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Not-taken forward branches", .val = 0, .update = rvfi_tools_perfcount_cb_not_taken_fwd_branches});
-    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Taken backward branches", .val = 0, .update = rvfi_tools_perfcount_cb_taken_bwd_branches});
-    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Not-taken backward branches", .val = 0, .update = rvfi_tools_perfcount_cb_not_taken_bwd_branches});
-    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Byte loads", .val = 0, .update = rvfi_tools_perfcount_cb_byte_loads});
-    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Half-word (16 bits) loads", .val = 0, .update = rvfi_tools_perfcount_cb_halfword_loads});
-    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Word loads", .val = 0, .update = rvfi_tools_perfcount_cb_word_loads});
-    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Byte stores", .val = 0, .update = rvfi_tools_perfcount_cb_byte_stores});
-    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Half-word (16 bits) stores", .val = 0, .update = rvfi_tools_perfcount_cb_halfword_stores});
-    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Word stores", .val = 0, .update = rvfi_tools_perfcount_cb_word_stores});
+    void* clock_cycles_ctx = malloc(sizeof(uint64_t));
+    *((uint64_t*) clock_cycles_ctx) = 0;
+
+    void* idle_stall_cycles_ctx = malloc(sizeof(uint64_t));
+    *((uint64_t*) idle_stall_cycles_ctx) = 0;
+
+    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Clock cycles", .val = 0, .update = rvfi_tools_perfcount_cb_clock_cycles, .local_ctx = clock_cycles_ctx});
+    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Instructions retired", .val = 0, .update = rvfi_tools_perfcount_cb_insn_retired, .local_ctx = NULL});
+    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Compressed instructions retired", .val = 0, .update = rvfi_tools_perfcount_cb_cmprss_insn_retired, .local_ctx = NULL});
+    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Unidentified instructions retired", .val = 0, .update = rvfi_tools_perfcount_cb_unkwown_insn_retired, .local_ctx = NULL});
+    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Idle/stall cycles", .val = 0, .update = rvfi_tools_perfcount_cb_stall_cycles, .local_ctx = idle_stall_cycles_ctx});
+    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Arithmetic operations", .val = 0, .update = rvfi_tools_perfcount_cb_arith, .local_ctx = NULL});
+    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Shift/rotate operations", .val = 0, .update = rvfi_tools_perfcount_cb_shift, .local_ctx = NULL});
+    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Bitwise operations", .val = 0, .update = rvfi_tools_perfcount_cb_bitwise, .local_ctx = NULL});
+    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Multiplication operations", .val = 0, .update = rvfi_tools_perfcount_cb_mult, .local_ctx = NULL});
+    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Division operations", .val = 0, .update = rvfi_tools_perfcount_cb_div, .local_ctx = NULL});
+    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Forward static jumps", .val = 0, .update = rvfi_tools_perfcount_cb_fwd_static_jumps, .local_ctx = NULL});
+    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Backward static jumps", .val = 0, .update = rvfi_tools_perfcount_cb_bwd_static_jumps, .local_ctx = NULL});
+    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Forward register jumps", .val = 0, .update = rvfi_tools_perfcount_cb_fwd_reg_jumps, .local_ctx = NULL});
+    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Backward register jumps", .val = 0, .update = rvfi_tools_perfcount_cb_bwd_reg_jumps, .local_ctx = NULL});
+    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Taken forward branches", .val = 0, .update = rvfi_tools_perfcount_cb_taken_fwd_branches, .local_ctx = NULL});
+    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Not-taken forward branches", .val = 0, .update = rvfi_tools_perfcount_cb_not_taken_fwd_branches, .local_ctx = NULL});
+    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Taken backward branches", .val = 0, .update = rvfi_tools_perfcount_cb_taken_bwd_branches, .local_ctx = NULL});
+    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Not-taken backward branches", .val = 0, .update = rvfi_tools_perfcount_cb_not_taken_bwd_branches, .local_ctx = NULL});
+    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Byte loads", .val = 0, .update = rvfi_tools_perfcount_cb_byte_loads, .local_ctx = NULL});
+    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Half-word (16 bits) loads", .val = 0, .update = rvfi_tools_perfcount_cb_halfword_loads, .local_ctx = NULL});
+    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Word loads", .val = 0, .update = rvfi_tools_perfcount_cb_word_loads, .local_ctx = NULL});
+    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Byte stores", .val = 0, .update = rvfi_tools_perfcount_cb_byte_stores, .local_ctx = NULL});
+    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Half-word (16 bits) stores", .val = 0, .update = rvfi_tools_perfcount_cb_halfword_stores, .local_ctx = NULL});
+    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Word stores", .val = 0, .update = rvfi_tools_perfcount_cb_word_stores, .local_ctx = NULL});
 
 }
 
@@ -332,7 +338,7 @@ void rvfi_monitor_step(rvfi_monitor_context *ctx, const rvfi_trace_t *rvfi_trace
         // Update virtual performance counter via callback functions
         for (int i = 0; i < ctx->n_counters; i++) {
             rvfi_performance_counter_t* perf_ctr = &(g_array_index(ctx->performance_counters, rvfi_performance_counter_t, i));
-           (perf_ctr->update)(perf_ctr, rvfi_trace, current_clock_cycle, decoded_instruction);
+           (perf_ctr->update)(perf_ctr, rvfi_trace, current_clock_cycle, decoded_instruction, perf_ctr->local_ctx);
         }
 
         // Signal function entry/exit from symbol watchlist

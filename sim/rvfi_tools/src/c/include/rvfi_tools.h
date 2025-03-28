@@ -45,8 +45,6 @@ typedef struct {
     uint32_t is_watched;
     uint32_t is_function;
     uint32_t times_called;
-    // GArray* start_cycles;
-    // GArray* end_cycles;
 } symbol_info_t;
 
 typedef struct {
@@ -56,18 +54,17 @@ typedef struct {
     uint64_t end_cycle;
     double start_time;
     double end_time;
-    // char start_time_string[100];
-    // char end_time_string[100];
 } call_info_t;
 
 struct rvfi_perf_count_t;
 
-typedef void (*rvfi_tools_counter_cb_t)(struct rvfi_perf_count_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* decoded_instruction);
+typedef void (*rvfi_tools_counter_cb_t)(struct rvfi_perf_count_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* decoded_instruction, void* local_ctx);
 
 typedef struct rvfi_perf_count_t {
     char name[100];
     uint64_t val;
     rvfi_tools_counter_cb_t update;
+    void* local_ctx;
 } rvfi_performance_counter_t;
 
 typedef struct {
@@ -105,8 +102,6 @@ typedef struct {
     GArray* performance_counters;
     GPtrArray* counter_stack;
     GNode* current_call_node;
-
-    // counter_info_t* counter_stack_top;
 
     int n_counters;
 
