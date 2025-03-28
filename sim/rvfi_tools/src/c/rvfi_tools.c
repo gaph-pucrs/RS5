@@ -137,7 +137,7 @@ rvfi_monitor_context* rvfi_monitor_init(char* monitor_prefix, char* elf_file_nam
         disasm_info.arch = bfd_arch_riscv;
         disasm_info.mach = bfd_mach_riscv32;
         disasm_info.read_memory_func = buffer_read_memory;
-        disasm_info.print_address_func = print_address; 
+        disasm_info.print_address_func = print_address;
 
         ctx->disasm_info = disasm_info;
 
@@ -232,7 +232,7 @@ void rvfi_monitor_add_default_performance_counters(rvfi_monitor_context *ctx) {
     rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Clock cycles", .val = 0, .update = rvfi_tools_perfcount_cb_clock_cycles, .local_ctx = clock_cycles_ctx});
     rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Instructions retired", .val = 0, .update = rvfi_tools_perfcount_cb_insn_retired, .local_ctx = NULL});
     rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Compressed instructions retired", .val = 0, .update = rvfi_tools_perfcount_cb_cmprss_insn_retired, .local_ctx = NULL});
-    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Unidentified instructions retired", .val = 0, .update = rvfi_tools_perfcount_cb_unkwown_insn_retired, .local_ctx = NULL});
+    rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Unknown instructions retired", .val = 0, .update = rvfi_tools_perfcount_cb_unknown_insn_retired, .local_ctx = NULL});
     rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Idle/stall cycles", .val = 0, .update = rvfi_tools_perfcount_cb_stall_cycles, .local_ctx = idle_stall_cycles_ctx});
     rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Arithmetic operations", .val = 0, .update = rvfi_tools_perfcount_cb_arith, .local_ctx = NULL});
     rvfi_monitor_add_counter(ctx, (rvfi_performance_counter_t) {.name = "Shift/rotate operations", .val = 0, .update = rvfi_tools_perfcount_cb_shift, .local_ctx = NULL});
