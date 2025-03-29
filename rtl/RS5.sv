@@ -596,8 +596,10 @@ module RS5
             end
 
             compressed_q <= instruction_compressed_execute;
-            rs1_q <= rs1;
-            rs2_q <= rs2;
+            // rs1_q <= rs1;
+            rs1_q <= rs1 & {5{decoder1.use_rs1}};
+            // rs2_q <= rs2;
+            rs2_q <= rs2 & {5{decoder1.use_rs2}};
             hazard_q <= hazard;
 
         end
@@ -649,7 +651,8 @@ module RS5
     assign rvfi_stage_rs2_addr_d[0] = rs2_q;
     assign rvfi_stage_rs1_rdata_d[0] = rs1_data_execute;
     assign rvfi_stage_rs2_rdata_d[0] = rs2_data_execute;
-    assign rvfi_stage_rd_addr_d[0] = rd_execute;
+    // assign rvfi_stage_rd_addr_d[0] = rd_execute;
+    assign rvfi_stage_rd_addr_d[0] = rd_execute & {5{write_enable_exec}};
     assign rvfi_stage_rd_wdata_d[0] = result_exec;
     assign rvfi_stage_pc_rdata_d[0] = pc_execute;
     // assign rvfi_stage_pc_wdata_d[0] = ctx_switch ? ctx_switch_target : (pc_execute + (compressed_q ? 32'd2 : 32'd4));
