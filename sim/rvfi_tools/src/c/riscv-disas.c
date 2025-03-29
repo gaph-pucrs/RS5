@@ -10,7 +10,7 @@ int dis_fprintf_styled(void *stream, enum disassembler_style style, const char *
   va_start(arg, fmt);
   if (!ss->reenter) {
     vasprintf(&ss->insn_buffer, fmt, arg);
-    asprintf(&ss->insn_buffer, "%s\t", ss->insn_buffer);
+    asprintf(&ss->insn_buffer, "%-6s", ss->insn_buffer);
     ss->reenter = true;
   } else {
     char *tmp;

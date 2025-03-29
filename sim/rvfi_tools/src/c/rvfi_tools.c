@@ -55,7 +55,7 @@ rvfi_monitor_context* rvfi_monitor_init(char* monitor_prefix, char* elf_file_nam
             exit(1);
         }
 
-        fprintf(ctx->tracer_log_file, "Cycle\tPC\tInstruction\tDecoded Instruction\tOperands and result\n");
+        fprintf(ctx->tracer_log_file, "#  Cycle        PC      Insn  Decoded Instruction                        rd   rd data   rs1  rs1 data  rs2  rs2 data  to mem    from mem      addr    symbol\n");
 
     }
 
@@ -294,43 +294,62 @@ void rvfi_monitor_step(rvfi_monitor_context *ctx, const rvfi_trace_t *rvfi_trace
 
         // "Cycle    PC    Instruction    Decoded Instruction    Operands and result
 
-        fprintf(ctx->tracer_log_file, "%0d", current_clock_cycle);
-        fprintf(ctx->tracer_log_file, "\t%0x", rvfi_trace->rvfi_pc_rdata);
+        fprintf(ctx->tracer_log_file, "%8d", current_clock_cycle);
+        fprintf(ctx->tracer_log_file, "  %8x", rvfi_trace->rvfi_pc_rdata);
 
         if (riscv_insn_length(rvfi_trace->rvfi_insn) == 4)
-            fprintf(ctx->tracer_log_file, "\t%08x", rvfi_trace->rvfi_insn);
+            fprintf(ctx->tracer_log_file, "  %08x", rvfi_trace->rvfi_insn);
         else
-            fprintf(ctx->tracer_log_file, "\t%04x    ", rvfi_trace->rvfi_insn & 0xFFFF);
+            fprintf(ctx->tracer_log_file, "      %04x", rvfi_trace->rvfi_insn & 0xFFFF);
 
         // Writes the actual disassembled instruction from riscv-dis
-        fprintf(ctx->tracer_log_file, "\t%s", disassembly_buffer);
-
-        if (rvfi_trace->rvfi_rs1_addr)
-            fprintf(ctx->tracer_log_file, " rs1=%s=<0x%x>", rv_ireg_name_sym[rvfi_trace->rvfi_rs1_addr], rvfi_trace->rvfi_rs1_rdata);
-
-        if (rvfi_trace->rvfi_rs2_addr)
-            fprintf(ctx->tracer_log_file, " rs2=%s=<0x%x>", rv_ireg_name_sym[rvfi_trace->rvfi_rs2_addr], rvfi_trace->rvfi_rs2_rdata);
+        fprintf(ctx->tracer_log_file, "  %-36s", disassembly_buffer);
 
         if (rvfi_trace->rvfi_rd_addr)
-            fprintf(ctx->tracer_log_file, " rd=%s:=<0x%x>", rv_ireg_name_sym[rvfi_trace->rvfi_rd_addr], rvfi_trace->rvfi_rd_wdata);
+            // fprintf(ctx->tracer_log_file, " rd=%s:=<0x%x>", rv_ireg_name_sym[rvfi_trace->rvfi_rd_addr], rvfi_trace->rvfi_rd_wdata);
+            fprintf(ctx->tracer_log_file, "  %-3s  %-8x", rv_ireg_name_sym[rvfi_trace->rvfi_rd_addr], rvfi_trace->rvfi_rd_wdata);
+        else
+            fprintf(ctx->tracer_log_file, "               ");
 
-        if (rvfi_trace->rvfi_mem_rmask | rvfi_trace->rvfi_mem_wmask)
-            fprintf(ctx->tracer_log_file, " addr <0x%x>", rvfi_trace->rvfi_mem_addr);
+        if (rvfi_trace->rvfi_rs1_addr)
+            // fprintf(ctx->tracer_log_file, " rs1=%s=<0x%x>", rv_ireg_name_sym[rvfi_trace->rvfi_rs1_addr], rvfi_trace->rvfi_rs1_rdata);
+            fprintf(ctx->tracer_log_file, "  %-3s  %-8x", rv_ireg_name_sym[rvfi_trace->rvfi_rs1_addr], rvfi_trace->rvfi_rs1_rdata);
+        else
+            fprintf(ctx->tracer_log_file, "               ");
+
+        if (rvfi_trace->rvfi_rs2_addr)
+            // fprintf(ctx->tracer_log_file, " rs2=%s=<0x%x>", rv_ireg_name_sym[rvfi_trace->rvfi_rs2_addr], rvfi_trace->rvfi_rs2_rdata);
+            fprintf(ctx->tracer_log_file, "  %-3s  %-8x", rv_ireg_name_sym[rvfi_trace->rvfi_rs2_addr], rvfi_trace->rvfi_rs2_rdata);
+        else
+            fprintf(ctx->tracer_log_file, "               ");
 
         if (rvfi_trace->rvfi_mem_rmask)
-            fprintf(ctx->tracer_log_file, " data_from_mem <0x%x>", rvfi_trace->rvfi_mem_rdata);
+            fprintf(ctx->tracer_log_file, "  %8x", rvfi_trace->rvfi_mem_rdata);
+        else
+            fprintf(ctx->tracer_log_file, "          ");
 
         if (rvfi_trace->rvfi_mem_wmask)
-            fprintf(ctx->tracer_log_file, " data_to_mem <0x%x>", rvfi_trace->rvfi_mem_wdata);
+            // fprintf(ctx->tracer_log_file, " data_to_mem <0x%x>", rvfi_trace->rvfi_mem_wdata);
+            fprintf(ctx->tracer_log_file, "  %8x", rvfi_trace->rvfi_mem_wdata);
+        else
+            fprintf(ctx->tracer_log_file, "          ");
+
+        if ((rvfi_trace->rvfi_mem_rmask | rvfi_trace->rvfi_mem_wmask) || rvfi_trace->rvfi_pc_wdata != (rvfi_trace->rvfi_pc_rdata + riscv_insn_length(rvfi_trace->rvfi_insn)))
+            // fprintf(ctx->tracer_log_file, " addr <0x%x>", rvfi_trace->rvfi_mem_addr);
+            fprintf(ctx->tracer_log_file, "  %8x", rvfi_trace->rvfi_mem_addr);
+        else
+            fprintf(ctx->tracer_log_file, "          ");
+
 
         if (rvfi_trace->rvfi_pc_wdata != (rvfi_trace->rvfi_pc_rdata + riscv_insn_length(rvfi_trace->rvfi_insn))) {
 
             symbol_info_t* symbol = g_hash_table_lookup(ctx->symbol_table_hash_table, GINT_TO_POINTER(rvfi_trace->rvfi_pc_wdata));
 
-            fprintf(ctx->tracer_log_file, " target_address <0x%x>", rvfi_trace->rvfi_pc_wdata);
+            // fprintf(ctx->tracer_log_file, " target_address <0x%x>", rvfi_trace->rvfi_pc_wdata);
 
             if (symbol != NULL)
-                fprintf(ctx->tracer_log_file, " target_symbol <%s>", symbol->function_name);
+                // fprintf(ctx->tracer_log_file, " target_symbol <%s>", symbol->function_name);
+                fprintf(ctx->tracer_log_file, "  %s", symbol->function_name);
 
         }
 
