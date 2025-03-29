@@ -458,8 +458,8 @@ void rvfi_monitor_final(rvfi_monitor_context* ctx) {
     if (ctx->en_profiler) {
 
         fprintf(ctx->profiler_call_graph_file, "##################################################################\n");
-        fprintf(ctx->profiler_call_graph_file, "#[%s] Profiler call graph\n", ctx->monitor_prefix);
-        fprintf(ctx->profiler_call_graph_file, "#FunctionName_TimesCalled: Start Cycle <> End Cycle <> # Cycles <>\n");
+        fprintf(ctx->profiler_call_graph_file, "#[%s] Profiler %s call graph\n", ctx->monitor_prefix, ctx->profiler_elf_file_name);
+        fprintf(ctx->profiler_call_graph_file, "#FunctionName_TimesCalled: <Start Cycle, End Cycle, Total Time>\n");
         fprintf(ctx->profiler_call_graph_file, "##################################################################\n");
 
         // void _final_hash_table_iterator(gpointer key, gpointer value, gpointer user_data);
@@ -485,8 +485,15 @@ void rvfi_monitor_print_call_graph(rvfi_monitor_context* ctx, GNode* call_node, 
         indent_string[i] = '-';
     indent_string[indent_level] = '\0';
 
-    fprintf(ctx->profiler_call_graph_file, "|%s%s_%d: Start Time <%.3f%s> End Time <%.3f%s> Total Time <%.3f%s>\n",
-        indent_string, call_info->function_name, call_info->call_id, call_info->start_time, ctx->time_unit_suffix, call_info->end_time, ctx->time_unit_suffix, call_info->end_time - call_info->start_time, ctx->time_unit_suffix);
+    char* name_and_call_id;
+    asprintf(&name_and_call_id, "%s%s_%d:", indent_string, call_info->function_name, call_info->call_id);
+
+    // fprintf(ctx->profiler_call_graph_file, "|%s%s_%d: Start Time <%.3f%s> End Time <%.3f%s> Total Time <%.3f%s>\n",
+    fprintf(ctx->profiler_call_graph_file, "|%-40s <%.3f%s, %.3f%s, %.3f%s>\n",
+        // indent_string, call_info->function_name, call_info->call_id, call_info->start_time, ctx->time_unit_suffix, call_info->end_time, ctx->time_unit_suffix, call_info->end_time - call_info->start_time, ctx->time_unit_suffix);
+        name_and_call_id, call_info->start_time, ctx->time_unit_suffix, call_info->end_time, ctx->time_unit_suffix, call_info->end_time - call_info->start_time, ctx->time_unit_suffix);
+
+    free(name_and_call_id);
 
     // Depth-first
     if (call_node->children != NULL)
