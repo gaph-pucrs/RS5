@@ -1,4 +1,4 @@
-`include "RS5_pkg.sv"
+`include "../RS5_pkg.sv"
 
 module vectorRegbank
     import RS5_pkg::*;

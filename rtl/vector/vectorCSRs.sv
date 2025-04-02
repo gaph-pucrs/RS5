@@ -1,4 +1,4 @@
-`include "RS5_pkg.sv"
+`include "../RS5_pkg.sv"
 
 /* verilator lint_off WIDTHEXPAND */
 /* verilator lint_off WIDTHTRUNC */

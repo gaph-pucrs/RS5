@@ -1,4 +1,4 @@
-`include "RS5_pkg.sv"
+`include "../RS5_pkg.sv"
 
 /* verilator lint_off WIDTHEXPAND */
 /* verilator lint_off WIDTHTRUNC */
@@ -19,9 +19,7 @@ module vectorReductions
     /* verilator lint_on UNUSEDSIGNAL  */
     input  iTypeVector_e               vector_operation_i,
 
-    input  logic [(VLENB)  -1:0][ 7:0] first_operand_8b,
-    input  logic [(VLENB/2)-1:0][15:0] first_operand_16b,
-    input  logic [(VLENB/4)-1:0][31:0] first_operand_32b,
+    input  logic [VLEN-1:0]            first_operand,
     input  logic [31:0]                second_operand,
 
     input  vew_e                       vsew,
@@ -37,6 +35,15 @@ module vectorReductions
     output logic                       hold_o,
     output logic [31:0]                result_o
 );
+
+    logic [31:0] result_redsum;
+    logic [31:0] result_redand;
+    logic [31:0] result_redor;
+    logic [31:0] result_redxor;
+    logic [31:0] result_redmin;
+    logic [31:0] result_redminu;
+    logic [31:0] result_redmax;
+    logic [31:0] result_redmaxu;
 
     // *********************************
     //  HOLD CONTROL
@@ -73,28 +80,22 @@ module vectorReductions
     end
 
     // *********************************
-    //  Result Demux
+    // Operands Control
     // *********************************
-    logic [31:0] result_redsum;
-    logic [31:0] result_redand;
-    logic [31:0] result_redor;
-    logic [31:0] result_redxor;
-    logic [31:0] result_redmin;
-    logic [31:0] result_redminu;
-    logic [31:0] result_redmax;
-    logic [31:0] result_redmaxu;
+    logic [(VLENB)  -1:0][ 7:0] first_operand_8b;
+    logic [(VLENB/2)-1:0][15:0] first_operand_16b;
+    logic [(VLENB/4)-1:0][31:0] first_operand_32b;
 
     always_comb begin
-        unique case(vector_operation_i)
-            VREDOR:   result_o = result_redor;
-            VREDXOR:  result_o = result_redxor;
-            VREDSUM:  result_o = result_redsum;
-            VREDMIN:  result_o = result_redmin;
-            VREDMINU: result_o = result_redminu;
-            VREDMAX:  result_o = result_redmax;
-            VREDMAXU: result_o = result_redmaxu;
-            default:  result_o = result_redand;
-        endcase
+        for (int i = 0; i < VLENB; i++) begin
+            first_operand_8b [i] = first_operand[(8*i)+:8];
+        end
+        for (int i = 0; i < VLENB/2; i++) begin
+            first_operand_16b[i] = first_operand[(16*i)+:16];
+        end
+        for (int i = 0; i < VLENB/4; i++) begin
+            first_operand_32b[i] = first_operand[(32*i)+:32];
+        end
     end
 
     // *********************************
@@ -651,6 +652,23 @@ module vectorReductions
             result_redmax  = '0;
             result_redmaxu = '0;
         end
+    end
+
+    // *********************************
+    //  Result Demux
+    // *********************************
+
+    always @(posedge clk) begin
+        unique case(vector_operation_i)
+            VREDOR:   result_o <= result_redor;
+            VREDXOR:  result_o <= result_redxor;
+            VREDSUM:  result_o <= result_redsum;
+            VREDMIN:  result_o <= result_redmin;
+            VREDMINU: result_o <= result_redminu;
+            VREDMAX:  result_o <= result_redmax;
+            VREDMAXU: result_o <= result_redmaxu;
+            default:  result_o <= result_redand;
+        endcase
     end
 
 endmodule
