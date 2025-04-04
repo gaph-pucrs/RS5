@@ -31,31 +31,20 @@ void batch_normalization (
     const type beta[],
     const double eps
 ) {
-    for (int n=0; n<filters; n++) {
-        for (int i=0; i<size; i++) {
-            int id = i+n*size;
-            input[id] -= mean[n];
-            input[id] /= sqrt(var[n] + eps);
-            input[id] *= gamma[n];
-            input[id] += beta[n];
-        }
-    }
-
-}
-
-void relu (
-    type input[]
-) {
-    const int size = CONV1_FEATUREMAP_HEIGHT*CONV1_FEATUREMAP_WIDTH*CONV1_FILTERS;
-
-    for (int i=0; i<size; i++) {
-        if (input[i] < 0) {
-            input[i] = 0;
+    for (int i=0; i<CONV1_FEATUREMAP_HEIGHT; i++) {
+        for (int j=0; j<CONV1_FEATUREMAP_WIDTH; j++) {
+            for (int n=0; n<CONV1_FILTERS; n++) {
+                int id = n + j*CONV1_FILTERS + i*CONV1_FILTERS*CONV1_FEATUREMAP_WIDTH;
+                input[id] -= mean[n];
+                input[id] /= sqrt(var[n] + eps);
+                input[id] *= gamma[n];
+                input[id] += beta[n];
+            }
         }
     }
 }
 
-void _conv_block (
+void _conv_block2 (
     const type input[],
     const type weights[],
     type output[], 
@@ -71,52 +60,34 @@ void _conv_block (
 ) {
     filters = (int)(filters*alpha);
 
-    //type *G = malloc(CONV1_FEATUREMAP_HEIGHT*CONV1_FEATUREMAP_WIDTH*filters*sizeof(type));
+    int base_y=0, base_x=0;
 
-    const int offset1 = kernel_size*kernel_size;
-    const int offset2 = INPUT_HEIGHT*INPUT_WIDTH;
-
-    int basex = 0, basey = 0;
-    for (int n=0; n<filters; n++)
+    for (int k=0; k<CONV1_FEATUREMAP_HEIGHT; k++)
     {
-        basex = 0;
-        for (int k=0; k<CONV1_FEATUREMAP_HEIGHT; k++)
+        //printf("k: %d\n", k);
+        for (int l=0; l<CONV1_FEATUREMAP_WIDTH; l++)
         {
-            basey = 0;
-            for (int l=0; l<CONV1_FEATUREMAP_WIDTH; l++)
+            for (int i=0; i<INPUT_HEIGHT; i++)
             {
-                type sum = 0;
-                for (int m=0; m<INPUT_CHANNELS; m++)
+                for (int j=0; j<INPUT_WIDTH; j++)
                 {
-                    for (int i=0; i<kernel_size; i++)
+                    for (int m=0; m<INPUT_CHANNELS; m++)
                     {
-                        for (int j=0; j<kernel_size; j++)
+                        for (int n=0; n<filters; n++)
                         {
-                            int idw = j+i*kernel_size+m*offset1+n*INPUT_CHANNELS*offset1;
-                            int idi = basex+basey+j+i*INPUT_WIDTH+m*offset2;
-                            sum += weights[idw]*input[idi];
+                            output[k*filters*CONV1_FEATUREMAP_WIDTH+l+n] += input[m+j*3+i*3*INPUT_WIDTH]*weights[n+m*32];
+                            // BE CAREFUL WITH THIS PRINTF
+                            //printf("output[%d] = input[%d] * weights[%d] : %lf = %lf * \%lf\n", n, m+j*3+i*3*INPUT_WIDTH, n+m*32, output[n], input[m+j*3+i*3*INPUT_WIDTH], weights[n+m*32]);
                         }
                     }
                 }
-
-                //*G[k*CONV1_FEATUREMAP_WIDTH + l] = sum/1000;
-                int ido = k*CONV1_FEATUREMAP_WIDTH + l + n*CONV1_FEATUREMAP_HEIGHT*CONV1_FEATUREMAP_WIDTH;
-                output[ido] = sum;
-                basey += stride;
             }
-            
-            basex += stride*INPUT_WIDTH;
+            base_x += stride;
         }
-
+        base_y += 3*stride*INPUT_WIDTH;
     }
-
     const int size = CONV1_FEATUREMAP_HEIGHT*CONV1_FEATUREMAP_WIDTH;
     batch_normalization(filters, size, output, mean, var, gamma, beta, eps);
-
-
-    //relu(output);
-
-    //free(G);
 }
 
 int main()
@@ -124,7 +95,7 @@ int main()
     
     double *output = malloc(CONV1_FEATUREMAP_HEIGHT*CONV1_FEATUREMAP_WIDTH*CONV1_FILTERS*sizeof(double));
 
-    _conv_block (
+    _conv_block2 (
        img,
        conv1,
        output, 
@@ -140,8 +111,8 @@ int main()
     );
 
     const int size = CONV1_FEATUREMAP_HEIGHT*CONV1_FEATUREMAP_WIDTH*CONV1_FILTERS;
-    
-    for (int i=0; i<size; i++) {
+
+    for (int i=0; i<5; i++) {
         printf("%lf\n", output[i]);
     }
 
