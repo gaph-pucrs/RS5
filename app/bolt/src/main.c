@@ -2,8 +2,10 @@
 #include <stdio.h>
 #include <math.h>
 
+#include "model.h"
+
 typedef struct _dataset {
-    int rel_timestamp;
+    int rel_time;
     int hops;
     int size;
     int prod;
@@ -31,7 +33,7 @@ int main()
     int sqerr = 0;
     for (int i = 0; i < n; i++) {
         dataset_t *d = &data[i];
-        int latency = model(d->rel_timestamp, d->hops, d->size, d->prod, d->cons);
+        int latency = model(d->rel_time, d->hops, d->size, d->prod, d->cons);
         int err = (d->latency - latency);
         sqerr += pow(err, 2);
     }
