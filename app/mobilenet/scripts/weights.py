@@ -48,8 +48,8 @@ model = MobileNet()
 for layer in model.layers:
     if layer.weights:
         if isinstance(layer, tf.keras.layers.BatchNormalization):
-            # create_c_array_bn(layer)
-            continue
+            create_c_array_bn(layer)
+            # continue
         else:
             create_c_array_w(layer)
     

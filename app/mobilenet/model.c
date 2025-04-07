@@ -6,11 +6,14 @@
 //------------------------------
 // LAYER1
 #include "params/conv1.h"
-// #include "params/conv1_bn_mean.h"
-// #include "params/conv1_bn_var.h"
-// #include "params/conv1_bn_gamma.h"
-// #include "params/conv1_bn_beta.h"
-// #include "params/conv1_bn_eps.h"
+
+#ifdef BATCHNORMALIZATION
+    #include "params/conv1_bn_mean.h"
+    #include "params/conv1_bn_var.h"
+    #include "params/conv1_bn_gamma.h"
+    #include "params/conv1_bn_beta.h"
+    #include "params/conv1_bn_eps.h"
+#endif
 
 #define INPUT_HEIGHT    224
 #define INPUT_WIDTH     224
@@ -22,9 +25,9 @@
 #define type    double
 
 void batch_normalization (
+    type input[],
     const int filters,
     const int size,
-    type input[],
     const type mean[],
     const type var[],
     const type gamma[],
@@ -47,6 +50,15 @@ void batch_normalization (
     }
 }
 
+void relu (
+    type input[],
+    const int size
+) {
+    for (int i=0; i<size; i++) {
+        input[i] = (input[i] >= 0) ? input[i] : 0;
+    }
+}
+
 void _conv_block (
     const type input[],
     const type weights[],
@@ -55,11 +67,14 @@ void _conv_block (
     const double alpha,
     const int kernel_size,
     const int stride
-    // const type mean[],
-    // const type var[],
-    // const type gamma[],
-    // const type beta[],
-    // const double eps
+#ifdef BATCHNORMALIZATION
+    ,
+    const type mean[],
+    const type var[],
+    const type gamma[],
+    const type beta[],
+    const double eps
+#endif
 ) {
     filters = (int)(filters*alpha);
 
@@ -91,16 +106,21 @@ void _conv_block (
         }
         base_y += stride*INPUT_CHANNELS*INPUT_WIDTH;
     }
-    // batch_normalization (
-    //     filters, 
-    //     CONV1_FEATUREMAP_HEIGHT*CONV1_FEATUREMAP_WIDTH, 
-    //     output, 
-    //     mean, 
-    //     var, 
-    //     gamma, 
-    //     beta, 
-    //     eps
-    // );
+
+    #ifdef BATCHNORMALIZATION
+    batch_normalization (
+        output, 
+        filters, 
+        CONV1_FEATUREMAP_HEIGHT*CONV1_FEATUREMAP_WIDTH, 
+        mean, 
+        var, 
+        gamma, 
+        beta, 
+        eps
+    );
+    #endif
+
+    relu(output, CONV1_FEATUREMAP_HEIGHT*CONV1_FEATUREMAP_WIDTH*filters);
 }
 
 int main()
@@ -116,17 +136,23 @@ int main()
        1,   // alpha
        3,   // kernel_size
        2    // stride
-    //    conv1_bn_mean,
-    //    conv1_bn_var,
-    //    conv1_bn_gamma,
-    //    conv1_bn_beta,
-    //    conv1_bn_eps
+    #ifdef BATCHNORMALIZATION
+       ,
+       conv1_bn_mean,
+       conv1_bn_var,
+       conv1_bn_gamma,
+       conv1_bn_beta,
+       conv1_bn_eps
+    #endif
     );
 
     const int size = CONV1_FEATUREMAP_HEIGHT*CONV1_FEATUREMAP_WIDTH*CONV1_FILTERS;
 
     for (int i=0; i<size; i++) {
-        printf("%.10lf\n", output[i]);
+        if (output[i] == 0.0)
+            printf("0.0\n");
+        else
+            printf("%.8lf\n", output[i]);
     }
 
     free(output);

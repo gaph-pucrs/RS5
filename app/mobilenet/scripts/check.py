@@ -18,7 +18,7 @@ model = MobileNet()
 # model.summary()
 # exit()
 
-layer_name = "conv1_bn"
+layer_name = "conv1_relu"
 m = tf.keras.Model (
     inputs = model.input,
     outputs = model.get_layer(layer_name).output

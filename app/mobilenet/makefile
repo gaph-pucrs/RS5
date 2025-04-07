@@ -1,2 +1,2 @@
 all:
-	gcc model.c -o model.bin -lm
+	gcc model.c -o model.bin -lm -DBATCHNORMALIZATION
