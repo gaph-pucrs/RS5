@@ -14,7 +14,8 @@ def create_c_array_bn(layer):
 
     for suffix in params_bn:
         name = layer.name + suffix
-        filename = "params/" + name + ".h"
+        # filename = "/sim/RS5/app/tiny-ml/mobilenet/py/v2/params/" + name + ".h"
+        filename = "../params/" + name + ".h"
         with open(filename, "w") as f:
             f.write(f"#ifndef   __{name}_h\n")
             f.write(f"#define   __{name}_h\n\n")
@@ -28,7 +29,8 @@ def create_c_array_bn(layer):
         print(f"(+) BatchNormalization {name} data generated in {filename} file") 
 
 def create_c_array_w(layer):
-    filename = "params/" + layer.name + ".h"
+    # filename = "/sim/RS5/app/tiny-ml/mobilenet/py/v2/params/" + layer.name + ".h"
+    filename = "../params/" + layer.name + ".h"
     ww = layer.get_weights()[0]
     weights = ww.flatten()
     with open(filename, "w") as f:
@@ -46,7 +48,8 @@ model = MobileNet()
 for layer in model.layers:
     if layer.weights:
         if isinstance(layer, tf.keras.layers.BatchNormalization):
-            create_c_array_bn(layer)
+            # create_c_array_bn(layer)
+            continue
         else:
             create_c_array_w(layer)
     

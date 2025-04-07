@@ -6,11 +6,11 @@
 //------------------------------
 // LAYER1
 #include "params/conv1.h"
-#include "params/conv1_bn_mean.h"
-#include "params/conv1_bn_var.h"
-#include "params/conv1_bn_gamma.h"
-#include "params/conv1_bn_beta.h"
-#include "params/conv1_bn_eps.h"
+// #include "params/conv1_bn_mean.h"
+// #include "params/conv1_bn_var.h"
+// #include "params/conv1_bn_gamma.h"
+// #include "params/conv1_bn_beta.h"
+// #include "params/conv1_bn_eps.h"
 
 #define INPUT_HEIGHT    224
 #define INPUT_WIDTH     224
@@ -18,8 +18,6 @@
 #define CONV1_FEATUREMAP_HEIGHT 112
 #define CONV1_FEATUREMAP_WIDTH  112
 #define CONV1_FILTERS       32
-
-#define MAX_ITERATIONS  9
 
 #define type    double
 
@@ -53,12 +51,12 @@ void _conv_block (
     int filters,
     const double alpha,
     const int kernel_size,
-    const int stride,
-    const type mean[],
-    const type var[],
-    const type gamma[],
-    const type beta[],
-    const double eps
+    const int stride
+    // const type mean[],
+    // const type var[],
+    // const type gamma[],
+    // const type beta[],
+    // const double eps
 ) {
     filters = (int)(filters*alpha);
 
@@ -78,26 +76,9 @@ void _conv_block (
                     for (int m=0; m<INPUT_CHANNELS; m++)
                     {
                         int idx_i = m+base_x+base_y+j*INPUT_CHANNELS+i*INPUT_CHANNELS*INPUT_WIDTH;
-                        // if (idx_i >= 150528) {
-                        //     printf("idx_i: %d\n", idx_i);
-                        //     return;
-                        // }
-                        // printf("idx_i: %d iterations: %d\n", idx_i, iterations);
                         for (int n=0; n<filters; n++)
                         {
-                            // if (iterations == 74) {
-                                // printf("(k,l,n): (%d, %d, %d)\n", k, l, n);
-                            // }
-                            // output[k*filters*CONV1_FEATUREMAP_WIDTH+l+n] += input[m+j*3+i*3*INPUT_WIDTH]*weights[n+m*32];
                             int idx_w = n+m*filters+j*filters*INPUT_CHANNELS+i*filters*INPUT_CHANNELS*kernel_size;
-                            // if (idx_w >= 864) {
-                            //     printf("idx_w: %d\n", idx_w);
-                            //     return;
-                            // }
-                            //(1, 224, 224, 3)
-                            // int idx_i = base_x+base_y+j*3+i*3*INPUT_WIDTH;
-                            // int id_out = k*filters*CONV1_FEATUREMAP_WIDTH+l+n;
-                            // (112, 112, 32)
                             int id_out = n+l*filters+k*filters*CONV1_FEATUREMAP_WIDTH;
                             output[id_out] += input[idx_i]*weights[idx_w];
                         }
@@ -107,14 +88,8 @@ void _conv_block (
             base_x += INPUT_CHANNELS*stride;
         }
         base_y += INPUT_CHANNELS*stride*INPUT_WIDTH;
-        iterations++;
-        // if (iterations == MAX_ITERATIONS) {
-        //     break;
-        // } 
-        // break;
     }
-    const int size = CONV1_FEATUREMAP_HEIGHT*CONV1_FEATUREMAP_WIDTH;
-    batch_normalization(filters, size, output, mean, var, gamma, beta, eps);
+    // batch_normalization(filters, CONV1_FEATUREMAP_HEIGHT*CONV1_FEATUREMAP_WIDTH, output, mean, var, gamma, beta, eps);
 }
 
 int main()
@@ -129,17 +104,16 @@ int main()
        CONV1_FILTERS,
        1,   // alpha
        3,   // kernel_size
-       2,   // stride
-       conv1_bn_mean,
-       conv1_bn_var,
-       conv1_bn_gamma,
-       conv1_bn_beta,
-       conv1_bn_eps
+       2    // stride
+    //    conv1_bn_mean,
+    //    conv1_bn_var,
+    //    conv1_bn_gamma,
+    //    conv1_bn_beta,
+    //    conv1_bn_eps
     );
 
     const int size = CONV1_FEATUREMAP_HEIGHT*CONV1_FEATUREMAP_WIDTH*CONV1_FILTERS;
 
-    // for (int i=0; i<MAX_ITERATIONS*CONV1_FILTERS; i++) {
     for (int i=0; i<size; i++) {
         printf("%.10lf\n", output[i]);
     }

@@ -3,7 +3,7 @@ import keras
 from tensorflow.keras.applications.mobilenet import preprocess_input
 from tensorflow.keras.preprocessing import image
 
-img_path = 'img/rottweiler1.jpg'
+img_path = '../img/rottweiler1.jpg'
 img = keras.utils.load_img(img_path, target_size=(224,224))
 
 x = keras.utils.img_to_array(img)
@@ -12,7 +12,8 @@ x = preprocess_input(x)
 
 img_input = x.flatten()
 
-filename = "params/data.h"
+# filename = "/sim/RS5/app/tiny-ml/mobilenet/py/v2/params/data.h"
+filename = "../params/data.h"
 
 with open(filename, "w") as f:
     f.write(f"#ifndef   __IMG_H__\n")

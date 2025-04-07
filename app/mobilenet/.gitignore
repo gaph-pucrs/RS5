@@ -1,0 +1,4 @@
+*.bin
+*.txt
+params
+logs
