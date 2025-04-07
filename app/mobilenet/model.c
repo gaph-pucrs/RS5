@@ -31,9 +31,12 @@ void batch_normalization (
     const type beta[],
     const double eps
 ) {
-    for (int i=0; i<CONV1_FEATUREMAP_HEIGHT; i++) {
-        for (int j=0; j<CONV1_FEATUREMAP_WIDTH; j++) {
-            for (int n=0; n<CONV1_FILTERS; n++) {
+    for (int i=0; i<CONV1_FEATUREMAP_HEIGHT; i++) 
+    {
+        for (int j=0; j<CONV1_FEATUREMAP_WIDTH; j++) 
+        {
+            for (int n=0; n<CONV1_FILTERS; n++) 
+            {
                 int id = n + j*CONV1_FILTERS + i*CONV1_FILTERS*CONV1_FEATUREMAP_WIDTH;
                 input[id] -= mean[n];
                 input[id] /= sqrt(var[n] + eps);
@@ -60,12 +63,11 @@ void _conv_block (
 ) {
     filters = (int)(filters*alpha);
 
+    // "(0,0)" of the 3x3 image
     int base_y=0, base_x=0;
-    int iterations = 0;
 
     for (int k=0; k<CONV1_FEATUREMAP_HEIGHT; k++)
     {
-        //printf("k: %d\n", k);
         base_x = 0;
         for (int l=0; l<CONV1_FEATUREMAP_WIDTH; l++)
         {
@@ -75,21 +77,30 @@ void _conv_block (
                 {
                     for (int m=0; m<INPUT_CHANNELS; m++)
                     {
-                        int idx_i = m+base_x+base_y+j*INPUT_CHANNELS+i*INPUT_CHANNELS*INPUT_WIDTH;
+                        int idx_i = (m)+(base_x)+(base_y)+(j*INPUT_CHANNELS+i*INPUT_CHANNELS*INPUT_WIDTH);
                         for (int n=0; n<filters; n++)
                         {
-                            int idx_w = n+m*filters+j*filters*INPUT_CHANNELS+i*filters*INPUT_CHANNELS*kernel_size;
-                            int id_out = n+l*filters+k*filters*CONV1_FEATUREMAP_WIDTH;
-                            output[id_out] += input[idx_i]*weights[idx_w];
+                            int idx_w = (n)+(m*filters)+(j*filters*INPUT_CHANNELS)+(i*filters*INPUT_CHANNELS*kernel_size);
+                            int idx_out = (n)+(l*filters)+(k*filters*CONV1_FEATUREMAP_WIDTH);
+                            output[idx_out] += input[idx_i]*weights[idx_w];
                         }
                     }
                 }
             }
-            base_x += INPUT_CHANNELS*stride;
+            base_x += stride*INPUT_CHANNELS;
         }
-        base_y += INPUT_CHANNELS*stride*INPUT_WIDTH;
+        base_y += stride*INPUT_CHANNELS*INPUT_WIDTH;
     }
-    // batch_normalization(filters, CONV1_FEATUREMAP_HEIGHT*CONV1_FEATUREMAP_WIDTH, output, mean, var, gamma, beta, eps);
+    // batch_normalization (
+    //     filters, 
+    //     CONV1_FEATUREMAP_HEIGHT*CONV1_FEATUREMAP_WIDTH, 
+    //     output, 
+    //     mean, 
+    //     var, 
+    //     gamma, 
+    //     beta, 
+    //     eps
+    // );
 }
 
 int main()
