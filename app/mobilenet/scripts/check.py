@@ -18,26 +18,25 @@ model = MobileNet()
 # model.summary()
 # exit()
 
-layer_name = "conv1_relu"
-m = tf.keras.Model (
-    inputs = model.input,
-    outputs = model.get_layer(layer_name).output
-)
-
-out = m(x)
-
-# bn = tf.keras.Model (
-#     inputs = model.input,
-#     outputs = model.get_layer("conv1_bn").output
-# )
-
-# out2 = bn(out)
-
-o = np.array(out)
-# out_t = np.transpose(out, (3,2,1,0))
 np.set_printoptions(threshold=np.inf)
-# print(f"{out_t.flatten()}")
-# print(f"{o.flatten()}")
+out = x
+
+layers = [
+    "conv1", "conv1_bn", "conv1_relu", 
+    "conv_dw_1"
+    # "conv_dw_1", "conv_dw_1_bn"
+    # "conv_dw_1", "conv_dw_1_bn", "conv_dw_1_relu"
+]
+
+for l in layers:
+    y = model.get_layer(l)
+    out = y(out)
+    print(f"{y.name}")
+    # if l == "conv_dw_1":
+    #     o = np.array(y.get_weights()[0])
+    #     # o = np.array(out)
+    #     print(f",\n".join(map(str, o.flatten())))
+
+exit()
+o = np.array(out)
 print(f",\n".join(map(str, o.flatten())))
-# print(f",\n".join(map(str, out_t.flatten())))
-# print(f"{m.get_weights()}")

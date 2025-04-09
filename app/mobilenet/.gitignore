@@ -2,3 +2,5 @@
 *.txt
 params
 logs
+scripts/*.txt
+scripts/error
