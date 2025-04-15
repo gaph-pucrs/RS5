@@ -43,14 +43,12 @@ module execute
     input   logic [31:0]        instruction_i,
     /* verilator lint_on UNUSEDSIGNAL */
 
-    input   logic [31:0]        pc_i,
     input   logic [31:0]        rs1_data_i,
     input   logic [31:0]        rs2_data_i,
     input   logic [31:0]        second_operand_i,
     input   logic  [4:0]        rd_i,
     input   logic  [4:0]        rs1_i,
     input   iType_e             instruction_operation_i,
-    input   logic               instruction_compressed_i,
     
     /* Not used without zaamo */
     /* verilator lint_off UNUSEDSIGNAL */
@@ -110,6 +108,8 @@ module execute
     input   logic [31:0]        mtvec_i,
     input   logic [31:0]        mepc_i,
     input   logic [31:0]        jump_imm_target_i,
+    input   logic [31:0]        pc_next_i,
+
 
     /* Not used without zalrsc */
     /* verilator lint_off UNUSEDSIGNAL */
@@ -152,8 +152,6 @@ module execute
     logic [31:0] sum2_opA;
     always_comb begin
         unique case (instruction_operation_i)
-            // To link register. Maybe we can remove this by using the PC in decode stage
-            JAL, JALR: sum2_opA = pc_i;
             default:   sum2_opA = first_operand;
         endcase
     end
@@ -161,8 +159,6 @@ module execute
     logic [31:0] sum2_opB;
     always_comb begin
         unique case (instruction_operation_i)
-            // To link register. Maybe we can remove this by using the PC in decode stage
-            JAL, JALR: sum2_opB = instruction_compressed_i ? 32'd2 : 32'd4;
             SUB:       sum2_opB = -second_operand_i;
             default:   sum2_opB = second_operand_i; // AMO_W
         endcase
@@ -614,7 +610,8 @@ end
         unique case (instruction_operation_i)
             CSRRW, CSRRS, CSRRC,
             CSRRWI,CSRRSI,CSRRCI:   result = csr_data_read_i;
-            JAL,JALR,SUB:           result = sum2_result;
+            SUB:                    result = sum2_result;
+            JAL,JALR:               result = pc_next_i;
             SLT:                    result = {31'b0, less_than};
             SLTU:                   result = {31'b0, less_than_unsigned};
             XOR:                    result = xor_result;
