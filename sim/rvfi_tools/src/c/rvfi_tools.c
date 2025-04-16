@@ -457,10 +457,10 @@ void rvfi_monitor_final(rvfi_monitor_context* ctx) {
 
     if (ctx->en_profiler) {
 
-        fprintf(ctx->profiler_call_graph_file, "##################################################################\n");
-        fprintf(ctx->profiler_call_graph_file, "#[%s] Profiler %s call graph\n", ctx->monitor_prefix, ctx->profiler_elf_file_name);
-        fprintf(ctx->profiler_call_graph_file, "#FunctionName_TimesCalled: <Start Cycle, End Cycle, Total Time>\n");
-        fprintf(ctx->profiler_call_graph_file, "##################################################################\n");
+        fprintf(ctx->profiler_call_graph_file, "###################################################################################\n");
+        fprintf(ctx->profiler_call_graph_file, "# [%s] Profiler %s call graph\n", ctx->monitor_prefix, ctx->profiler_elf_file_name);
+        fprintf(ctx->profiler_call_graph_file, "# FunctionName_TimesCalled:                <Start Cycle, End Cycle, Total Time>\n");
+        fprintf(ctx->profiler_call_graph_file, "###################################################################################\n");
 
         // void _final_hash_table_iterator(gpointer key, gpointer value, gpointer user_data);
         // g_hash_table_foreach(ctx->symbol_table_hash_table, (GHFunc) _final_hash_table_iterator, NULL);
