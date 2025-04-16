@@ -1,5 +1,5 @@
 all:
-	gcc model.c -o model.bin -lm -DBATCHNORMALIZATION
+	gcc model2.c -o model.bin -lm -DBATCHNORMALIZATION
 
 clean:
 	rm *.bin

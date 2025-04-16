@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 
-#include "params/data.h"
+#include "params/data2.h"
 //------------------------------
 // LAYER1
 #include "params/conv1.h"
@@ -114,20 +114,20 @@ void _conv_block (
         base_y += stride*IMAGE_CHANNELS*IMAGE_WIDTH;
     }
 
-    #ifdef BATCHNORMALIZATION
-    batch_normalization (
-        output, 
-        filters, 
-        CONV1_FEATUREMAP_HEIGHT*CONV1_FEATUREMAP_WIDTH, 
-        mean, 
-        var, 
-        gamma, 
-        beta, 
-        eps
-    );
-    #endif
+    // #ifdef BATCHNORMALIZATION
+    // batch_normalization (
+    //     output, 
+    //     filters, 
+    //     CONV1_FEATUREMAP_HEIGHT*CONV1_FEATUREMAP_WIDTH, 
+    //     mean, 
+    //     var, 
+    //     gamma, 
+    //     beta, 
+    //     eps
+    // );
+    // #endif
 
-    relu(output, CONV1_FEATUREMAP_HEIGHT*CONV1_FEATUREMAP_WIDTH*filters);
+    // relu(output, CONV1_FEATUREMAP_HEIGHT*CONV1_FEATUREMAP_WIDTH*filters);
 }
 
 void _depthwise_conv_block (
@@ -152,8 +152,8 @@ void _depthwise_conv_block (
     const double eps
 #endif
 ) {
-    // filters = (int)(filters*alpha);
-    int base_y=0, base_x=0;
+    int base_y = 0, base_x = 0;
+    int cont = 0;
 
     for (int k=0; k<OUTPUT_HEIGHT; k++)
     {
@@ -166,30 +166,25 @@ void _depthwise_conv_block (
                 {
                     for (int m=0; m<OUTPUT_CHANNELS; m++)
                     {
-                        int idx_i = (m)+(base_x)+(base_y)+(j*INPUT_CHANNELS)+(i*INPUT_CHANNELS*INPUT_WIDTH);
+                        // int idx_i = (m)+(base_x)+(base_y)+(j*INPUT_CHANNELS)+(i*INPUT_CHANNELS*INPUT_WIDTH);
+                        int idx_i = (m)+(j*32)+(i*32*112)+(l*stride*32)+(k*stride*32*112);
                         int idx_w = (m)+(j*OUTPUT_CHANNELS)+(i*OUTPUT_CHANNELS*kernel_size);
                         int idx_out = (m)+(l*OUTPUT_CHANNELS)+(k*OUTPUT_CHANNELS*OUTPUT_WIDTH);
-                        output[idx_out] += input[idx_i]*weights[idx_w];
+                        double partial_sum = input[idx_i]*weights[idx_w];
+                        // printf("\nidx_i = %d, idx_w = %d e idx_out = %d\n", idx_i, idx_w, idx_out);
+                        cont++;
+                        output[idx_out] += partial_sum;
+                        // if (isnan(partial_sum)) {
+                        //     printf("partial_sum: %lf idx:(%d, %d), base_x:%d base_y:%d\n", idx_i, idx_w, base_x, base_y);
+                        // }
                     }
+                    // if(cont >= 280) return;
                 }
             }
             base_x += stride*INPUT_CHANNELS;
         }
         base_y += stride*INPUT_CHANNELS*INPUT_WIDTH;
     }
-
-    #ifdef BATCHNORMALIZATION
-    batch_normalization (
-        output, 
-        32, 
-        112*112, 
-        mean, 
-        var, 
-        gamma, 
-        beta, 
-        eps
-    );
-    #endif
 }
 
 int main()
@@ -217,6 +212,7 @@ int main()
     );
 
     double *l2_output = calloc(112*112*32, sizeof(double));
+#if 0
     _depthwise_conv_block (
         112,
         112,
@@ -239,19 +235,19 @@ int main()
         conv_dw_1_bn_eps
      #endif
     );
-
+#endif
     const int size = CONV1_FEATUREMAP_HEIGHT*CONV1_FEATUREMAP_WIDTH*CONV1_FILTERS;
 
-    // for (int i=0; i<size; i++) {
-    //     if (l1_output[i] == 0.0)
-    //         printf("0.0\n");
-    //     else
-    //         printf("%.8lf\n", l1_output[i]);
-    // }
-
     for (int i=0; i<size; i++) {
-        printf("%lf\n", l2_output[i]);
+        if (l1_output[i] == 0.0)
+            printf("0.0\n");
+        else
+            printf("%.8lf\n", l1_output[i]);
     }
+
+    // for (int i=0; i<size; i++) {
+    //     printf("%lf\n", l2_output[i]);
+    // }
 
     free(l1_output);
     free(l2_output);

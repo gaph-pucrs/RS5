@@ -6,6 +6,8 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.applications.mobilenet import preprocess_input
 from tensorflow.keras.preprocessing import image
 
+tf.config.set_visible_devices([], 'GPU')
+
 img_path = '../img/rottweiler1.jpg'
 img = keras.utils.load_img(img_path, target_size=(224,224))
 
@@ -22,21 +24,20 @@ np.set_printoptions(threshold=np.inf)
 out = x
 
 layers = [
-    "conv1", "conv1_bn", "conv1_relu", 
+    "conv1", "conv1_bn", "conv1_relu",
     "conv_dw_1"
     # "conv_dw_1", "conv_dw_1_bn"
     # "conv_dw_1", "conv_dw_1_bn", "conv_dw_1_relu"
 ]
 
+y = 0
 for l in layers:
     y = model.get_layer(l)
     out = y(out)
-    print(f"{y.name}")
-    # if l == "conv_dw_1":
-    #     o = np.array(y.get_weights()[0])
-    #     # o = np.array(out)
-    #     print(f",\n".join(map(str, o.flatten())))
+    if y.name == "conv1":
+        break;
 
-exit()
 o = np.array(out)
 print(f",\n".join(map(str, o.flatten())))
+# print(f"{np.array(y.get_weights()).flatten()}\n")
+# print(f"{np.array(y.get_weights()) }\n")
