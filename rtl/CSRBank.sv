@@ -316,9 +316,9 @@ module CSRBank
         //////////////////////////////////////////////////////////////////////////////
         else begin
             mcycle      <= !mcountinhibit[0] ? mcycle + 1'b1 : mcycle;
-            minstret    <= (hold || instruction_operation_i == NOP)
-                            ? minstret
-                            : minstret + 1;
+            minstret    <= !(hold || instruction_operation_i == NOP) && !mcountinhibit[2]
+                            ? minstret + 1
+                            : minstret;
         //////////////////////////////////////////////////////////////////////////////
         // Machine Return
         //////////////////////////////////////////////////////////////////////////////
