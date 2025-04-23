@@ -147,22 +147,16 @@ module execute
     logic           greater_equal;
     logic           greater_equal_unsigned;
 
-    logic [31:0] first_operand;
-
-    logic [31:0] sum2_opA;
-    always_comb begin
-        unique case (instruction_operation_i)
-            default:   sum2_opA = first_operand;
-        endcase
-    end
-
     logic [31:0] sum2_opB;
     always_comb begin
         unique case (instruction_operation_i)
             SUB:       sum2_opB = -second_operand_i;
-            default:   sum2_opB = second_operand_i; // AMO_W
+            default:   sum2_opB =  second_operand_i; // AMO_W
         endcase
     end
+
+    // Can be assigned by atomic instructions or rs1_data_i
+    logic [31:0] first_operand;
 
     always_comb begin
         /* "Unmuxable" operators */
@@ -178,7 +172,7 @@ module execute
         sra_result              = $signed(rs1_data_i) >>> second_operand_i[4:0];
 
         /* "Muxable" operators */
-        sum2_result             = sum2_opA      + sum2_opB;
+        sum2_result             = first_operand + sum2_opB;
         and_result              = first_operand & second_operand_i;
         or_result               = first_operand | second_operand_i;
         xor_result              = first_operand ^ second_operand_i;
