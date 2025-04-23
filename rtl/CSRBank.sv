@@ -315,7 +315,7 @@ module CSRBank
         // Cycle Updates
         //////////////////////////////////////////////////////////////////////////////
         else begin
-            mcycle      <= mcycle + 1;
+            mcycle      <= !mcountinhibit[0] ? mcycle + 1'b1 : mcycle;
             minstret    <= (hold || instruction_operation_i == NOP)
                             ? minstret
                             : minstret + 1;
