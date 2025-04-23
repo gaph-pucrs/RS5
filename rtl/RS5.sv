@@ -224,6 +224,7 @@ module RS5
     logic        write_enable_exec;
     logic [31:0] result_exec;
     logic [31:0] jump_imm_target_exec;
+    logic [31:0] pc_next;
 
     decode # (
         .MULEXT    (MULEXT    ),
@@ -257,6 +258,7 @@ module RS5
         .pc_o                       (pc_execute),
         .instruction_o              (instruction_execute),
         .jump_imm_target_o          (jump_imm_target_exec),
+        .pc_next_o                  (pc_next),
         .compressed_o               (instruction_compressed_execute),
         .instruction_operation_o    (instruction_operation_execute),
         .atomic_operation_o         (atomic_operation_execute),
@@ -339,14 +341,12 @@ module RS5
         .reset_n                 (reset_n),
         .stall                   (stall),
         .instruction_i           (instruction_execute),
-        .pc_i                    (pc_execute),
         .rs1_data_i              (rs1_data_execute),
         .rs2_data_i              (rs2_data_execute),
         .second_operand_i        (second_operand_execute),
         .rd_i                    (rd_execute),
         .rs1_i                   (rs1_execute),
         .instruction_operation_i (instruction_operation_execute),
-        .instruction_compressed_i(instruction_compressed_execute),
         .atomic_operation_i      (atomic_operation_execute),
         .vector_operation_i      (vector_operation_execute),
         .privilege_i             (privilege),
@@ -381,6 +381,7 @@ module RS5
         .jump_imm_target_i       (jump_imm_target_exec),
         .reservation_data_i      (reservation_data),
         .jump_target_o           (jump_target),
+        .pc_next_i               (pc_next),
         .interrupt_pending_i     (interrupt_pending),
         .mtvec_i                 (mtvec),
         .mepc_i                  (mepc),
