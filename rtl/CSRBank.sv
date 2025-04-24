@@ -272,7 +272,7 @@ module CSRBank
     always_comb begin
         wmask = '1;
         case (CSR)
-            MSTATUS:       begin current_val = mstatus;         wmask = 32'h007E19AA; end
+            MSTATUS:       begin current_val = mstatus;         wmask = 32'h00001888; end
             // MEDELEG:    begin current_val = medeleg;         wmask = '1; end
             // MIDELEG:    begin current_val = mideleg;         wmask = '1; end
             MIE:           begin current_val = mie;             wmask = 32'h00000888; end
