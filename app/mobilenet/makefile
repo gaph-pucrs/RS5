@@ -1,5 +1,7 @@
+DEFINES=BATCHNORMALIZATION
+
 all:
-	gcc model2.c -o model.bin -lm -DBATCHNORMALIZATION
+	gcc model.c -o model.bin -lm -D$(DEFINES)
 
 clean:
 	rm *.bin

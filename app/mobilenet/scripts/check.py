@@ -24,8 +24,9 @@ np.set_printoptions(threshold=np.inf)
 out = x
 
 layers = [
-    "conv1", "conv1_bn", "conv1_relu",
-    "conv_dw_1"
+    # "conv1", "conv1_bn", "conv1_relu",
+    "conv1", "conv1_bn"
+    # "conv_dw_1"
     # "conv_dw_1", "conv_dw_1_bn"
     # "conv_dw_1", "conv_dw_1_bn", "conv_dw_1_relu"
 ]
@@ -34,8 +35,8 @@ y = 0
 for l in layers:
     y = model.get_layer(l)
     out = y(out)
-    if y.name == "conv1":
-        break;
+    # if y.name == "conv1":
+    #     break;
 
 o = np.array(out)
 print(f",\n".join(map(str, o.flatten())))

@@ -8,7 +8,8 @@ img = keras.utils.load_img(img_path, target_size=(224,224))
 
 x = keras.utils.img_to_array(img)
 x = preprocess_input(x)
-x = np.pad(x, pad_width=((1,1), (1,1), (0,0)), mode='constant', constant_values=0)
+# x = np.pad(x, pad_width=((1,1), (1,1), (0,0)), mode='constant', constant_values=0)
+x = np.pad(x, pad_width=((0,1), (0,1), (0,0)), mode='constant', constant_values=0)
 x = np.expand_dims(x, axis=0)
 
 img_input = x.flatten()

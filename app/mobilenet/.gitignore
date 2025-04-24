@@ -4,3 +4,5 @@ params
 logs
 scripts/*.txt
 scripts/error
+cnn_functions.c
+model2.c

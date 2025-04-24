@@ -1,8 +1,10 @@
+// http://arxiv.org/pdf/1603.07285v1
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 
-#include "params/data2.h"
+#include "params/data.h"
 //------------------------------
 // LAYER1
 #include "params/conv1.h"
@@ -22,8 +24,8 @@
     #include "params/conv_dw_1_bn_eps.h"
 #endif
 
-#define IMAGE_HEIGHT    224
-#define IMAGE_WIDTH     224
+#define IMAGE_HEIGHT    225 // 224 + 1
+#define IMAGE_WIDTH     225 // 224 + 1
 #define IMAGE_CHANNELS    3
 #define CONV1_FEATUREMAP_HEIGHT 112
 #define CONV1_FEATUREMAP_WIDTH  112
@@ -62,7 +64,8 @@ void relu (
     const int size
 ) {
     for (int i=0; i<size; i++) {
-        input[i] = (input[i] >= 0) ? input[i] : 0;
+        input[i] = (input[i] >= 0.0) ? input[i] : 0.0;
+        input[i] = (input[i] > 6.0) ? 6.0 : input[i];
     }
 }
 
@@ -114,20 +117,22 @@ void _conv_block (
         base_y += stride*IMAGE_CHANNELS*IMAGE_WIDTH;
     }
 
-    // #ifdef BATCHNORMALIZATION
-    // batch_normalization (
-    //     output, 
-    //     filters, 
-    //     CONV1_FEATUREMAP_HEIGHT*CONV1_FEATUREMAP_WIDTH, 
-    //     mean, 
-    //     var, 
-    //     gamma, 
-    //     beta, 
-    //     eps
-    // );
-    // #endif
+    #ifdef BATCHNORMALIZATION
+    batch_normalization (
+        output, 
+        filters, 
+        CONV1_FEATUREMAP_HEIGHT*CONV1_FEATUREMAP_WIDTH, 
+        mean, 
+        var, 
+        gamma, 
+        beta, 
+        eps
+    );
+    #endif
 
-    // relu(output, CONV1_FEATUREMAP_HEIGHT*CONV1_FEATUREMAP_WIDTH*filters);
+    // return;
+
+    relu(output, CONV1_FEATUREMAP_HEIGHT*CONV1_FEATUREMAP_WIDTH*filters);
 }
 
 void _depthwise_conv_block (
@@ -212,6 +217,7 @@ int main()
     );
 
     double *l2_output = calloc(112*112*32, sizeof(double));
+
 #if 0
     _depthwise_conv_block (
         112,
