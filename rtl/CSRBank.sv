@@ -36,6 +36,7 @@ module CSRBank
     parameter bit       ZIHPMEnable    = 1'b0,
     parameter bit       COMPRESSED     = 1'b0,
     parameter mul_e     MULEXT         = MUL_M,
+    parameter atomic_e  AMOEXT         = AMO_A,
     parameter bit       VEnable        = 1'b0,
     parameter int       VLEN           = 64
 )
@@ -104,38 +105,46 @@ module CSRBank
     CSRs CSR;
     privilegeLevel_e privilege;
 
-//////////////////////////////////////////////////////////////////////////////
-// CSRs definition
-//////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+// misa
+////////////////////////////////////////////////////////////////////////////////
 
     localparam logic [31:0] MISA_VALUE = {
-        1'b0,
-        1'b1,           // M-XLEN
-        6'b0,
+        2'b1,           // MXL
+        4'b0,           // 0
+        2'b0,           // YZ - Reserved
         XOSVMEnable,    // X - Non-standard extensions present
-        1'b0,
+        1'b0,           // W - Reserved
         VEnable,        // V - Vector extension
         1'b1,           // U - User mode implemented
-        1'b0,
+        1'b0,           // T - Reserved
         1'b0,           // S - Supervisor mode implemented
-        2'b0,
+        1'b0,           // R - Reserved
+        1'b0,           // Q - Quad-precision floating-point extension
         1'b0,           // P - Packed-SIMD extension
-        1'b0,
+        1'b0,           // O - Reserved
         1'b0,           // N - User level interrupts supported
         (MULEXT==MUL_M),// M - Integer Multiply/Divide extension
-        3'b0,
+        3'b0,           // JKL - Reserved
         1'b1,           // I - RV32I/64I/128I base ISA
-        1'b0,           // F - Hypervisor extension
-        1'b0,           // F - Reserved
+        1'b0,           // H - Hypervisor extension
+        1'b0,           // G - Reserved
         1'b0,           // F - Single precision floating-point extension
         1'b0,           // E - RV32E base ISA
         1'b0,           // D - Double precision floating-point extension
         (COMPRESSED),   // C - Compressed extension
         1'b0,           // B - Bit-Manipulation extension
-        1'b0            // A - Atomic Extension
+        (AMOEXT==AMO_A) // A - Atomic Extension
     };
 
-    logic [31:0] misa, mstatus, mtvec_r, mip, mie, mscratch, mepc_r, mcause, mtval;
+    logic [31:0] misa;
+    assign misa = MISA_VALUE;
+
+//////////////////////////////////////////////////////////////////////////////
+// CSRs definition
+//////////////////////////////////////////////////////////////////////////////
+
+    logic [31:0] mstatus, mtvec_r, mip, mie, mscratch, mepc_r, mcause, mtval;
     logic [63:0] mcycle, minstret;
 
     /* Signals enabled with XOSVM */
@@ -220,7 +229,6 @@ module CSRBank
         wmask = '1;
         case (CSR)
             MSTATUS:       begin current_val = mstatus;         wmask = 32'h007E19AA; end
-            MISA:          begin current_val = misa;            wmask = 32'h00301000; end
             // MEDELEG:    begin current_val = medeleg;         wmask = '1; end
             // MIDELEG:    begin current_val = mideleg;         wmask = '1; end
             MIE:           begin current_val = mie;             wmask = 32'h00000888; end
@@ -272,7 +280,7 @@ module CSRBank
         if (!reset_n) begin
             mcountinhibit    <= '0;
             mstatus_mie      <= '0;
-            misa             <= MISA_VALUE;
+            
             //medeleg        <= '0;
             //mideleg        <= '0;
             mie              <= '0;
@@ -293,7 +301,6 @@ module CSRBank
         else if(sys_reset) begin
             mcountinhibit    <= '0;
             mstatus_mie      <= '0;
-            misa             <= MISA_VALUE;
             //medeleg        <= '0;
             //mideleg        <= '0;
             mie              <= '0;
@@ -366,7 +373,6 @@ module CSRBank
         //////////////////////////////////////////////////////////////////////////////
             else if (write_enable_i) begin
                 case(CSR)
-                    MISA:           misa                <= wr_data;
                     // MEDELEG:     medeleg             <= wr_data;
                     // MIDELEG:     mideleg             <= wr_data;
                     MIE:            mie                 <= wr_data;
