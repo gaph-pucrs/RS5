@@ -25,13 +25,14 @@
 module execute
     import RS5_pkg::*;
 #(
-    parameter environment_e Environment = ASIC,
-    parameter mul_e         MULEXT      = MUL_M,
-    parameter atomic_e      AMOEXT      = AMO_A,
-    parameter bit           ZKNEEnable  = 1'b0,
-    parameter bit           VEnable     = 1'b0,
-    parameter int           VLEN        = 64,
-    parameter bit           BRANCHPRED  = 1'b1
+    parameter environment_e Environment  = ASIC,
+    parameter mul_e         MULEXT       = MUL_M,
+    parameter atomic_e      AMOEXT       = AMO_A,
+    parameter bit           ZKNEEnable   = 1'b0,
+    parameter bit           ZICONDEnable = 1'b0,
+    parameter bit           VEnable      = 1'b0,
+    parameter int           VLEN         = 64,
+    parameter bit           BRANCHPRED   = 1'b1
 )
 (
     input   logic               clk,
@@ -597,8 +598,26 @@ end
     end
 
 //////////////////////////////////////////////////////////////////////////////
+// Zicond Extension
+//////////////////////////////////////////////////////////////////////////////
+
+    logic [31:0] result_zicond;
+
+    if (ZICONDEnable) begin : gen_zicond_on
+        always_comb begin
+            unique case (instruction_operation_i)
+                CZERO_EQZ: result_zicond = rs2_data_i == '0 ? '0 : rs1_data_i;
+                default:   result_zicond = rs2_data_i != '0 ? '0 : rs1_data_i; // CZERO_NEZ
+            endcase
+        end
+    end
+    else begin : gen_zicond_off
+        assign result_zicond = '0;
+    end
+
+//////////////////////////////////////////////////////////////////////////////
 // Demux
-//////////////////////////////////////////////////////lrsc_result////////////////////////
+//////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
         unique case (instruction_operation_i)
@@ -621,6 +640,7 @@ end
             MUL,MULH,MULHU,MULHSU:  result = mul_result;
             AES32ESI, AES32ESMI:    result = aes_result;
             VECTOR, VLOAD, VSTORE:  result = vector_scalar_result;
+            CZERO_EQZ, CZERO_NEZ:   result = result_zicond;
             default:                result = sum_result;
         endcase
     end

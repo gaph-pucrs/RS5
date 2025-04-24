@@ -38,6 +38,7 @@ module RS5
     parameter bit           XOSVMEnable    = 1'b0,
     parameter bit           ZIHPMEnable    = 1'b0,
     parameter bit           ZKNEEnable     = 1'b0,
+    parameter bit           ZICONDEnable   = 1'b0,
     parameter bit           BRANCHPRED     = 1'b1
 )
 (
@@ -227,12 +228,13 @@ module RS5
     logic [31:0] pc_next;
 
     decode # (
-        .MULEXT    (MULEXT    ),
-        .AMOEXT    (AMOEXT    ),
-        .COMPRESSED(COMPRESSED),
-        .ZKNEEnable(ZKNEEnable),
-        .VEnable   (VEnable   ),
-        .BRANCHPRED(BRANCHPRED)
+        .MULEXT       (MULEXT      ),
+        .AMOEXT       (AMOEXT      ),
+        .COMPRESSED   (COMPRESSED  ),
+        .ZKNEEnable   (ZKNEEnable  ),
+        .ZICONDEnable (ZICONDEnable),
+        .VEnable      (VEnable     ),
+        .BRANCHPRED   (BRANCHPRED  )
     ) decoder1 (
         .clk                        (clk),
         .reset_n                    (reset_n),
@@ -329,13 +331,14 @@ module RS5
     logic [31:0] reservation_data;
 
     execute #(
-        .Environment (Environment),
-        .MULEXT      (MULEXT),
-        .AMOEXT      (AMOEXT),
-        .ZKNEEnable  (ZKNEEnable),
-        .VEnable     (VEnable),
-        .VLEN        (VLEN),
-        .BRANCHPRED  (BRANCHPRED)
+        .Environment  (Environment ),
+        .MULEXT       (MULEXT      ),
+        .AMOEXT       (AMOEXT      ),
+        .ZKNEEnable   (ZKNEEnable  ),
+        .ZICONDEnable (ZICONDEnable),
+        .VEnable      (VEnable     ),
+        .VLEN         (VLEN        ),
+        .BRANCHPRED   (BRANCHPRED  )
     ) execute1 (
         .clk                     (clk),
         .reset_n                 (reset_n),
