@@ -26,12 +26,13 @@
 module decode
     import RS5_pkg::*;
 #(
-    parameter mul_e         MULEXT      = MUL_M,
-    parameter atomic_e      AMOEXT      = AMO_A,
-    parameter bit           COMPRESSED  = 1'b1,
-    parameter bit           ZKNEEnable  = 1'b0,
-    parameter bit           VEnable     = 1'b0,
-    parameter bit           BRANCHPRED  = 1'b1
+    parameter mul_e         MULEXT       = MUL_M,
+    parameter atomic_e      AMOEXT       = AMO_A,
+    parameter bit           COMPRESSED   = 1'b1,
+    parameter bit           ZKNEEnable   = 1'b0,
+    parameter bit           ZICONDEnable = 1'b0,
+    parameter bit           VEnable      = 1'b0,
+    parameter bit           BRANCHPRED   = 1'b1
 )
 (
     input   logic           clk,
@@ -178,8 +179,10 @@ module decode
             10'b0000001101:     decode_op = (MULEXT == MUL_M  ) ? DIVU   : INVALID;
             10'b0000001110:     decode_op = (MULEXT == MUL_M  ) ? REM    : INVALID;
             10'b0000001111:     decode_op = (MULEXT == MUL_M  ) ? REMU   : INVALID;
-            10'b??10001000:     decode_op = ZKNEEnable ? AES32ESI  : INVALID;
-            10'b??10011000:     decode_op = ZKNEEnable ? AES32ESMI : INVALID;
+            10'b??10001000:     decode_op = ZKNEEnable   ? AES32ESI  : INVALID;
+            10'b??10011000:     decode_op = ZKNEEnable   ? AES32ESMI : INVALID;
+            10'b0000111101:     decode_op = ZICONDEnable ? CZERO_EQZ : INVALID;
+            10'b0000111111:     decode_op = ZICONDEnable ? CZERO_NEZ : INVALID;
             default:            decode_op = INVALID;
         endcase
     end
