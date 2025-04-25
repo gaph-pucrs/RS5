@@ -1432,7 +1432,64 @@ module CSRBank
             INSTRETH:       current_val = minstret[63:32];
 
             /* Zihpm */
-            /* @todo */
+            HPMCOUNTER3:   current_val = mhpmcounter[ 3][31: 0];
+            HPMCOUNTER4:   current_val = mhpmcounter[ 4][31: 0];
+            HPMCOUNTER5:   current_val = mhpmcounter[ 5][31: 0];
+            HPMCOUNTER6:   current_val = mhpmcounter[ 6][31: 0];
+            HPMCOUNTER7:   current_val = mhpmcounter[ 7][31: 0];
+            HPMCOUNTER8:   current_val = mhpmcounter[ 8][31: 0];
+            HPMCOUNTER9:   current_val = mhpmcounter[ 9][31: 0];
+            HPMCOUNTER10:  current_val = mhpmcounter[10][31: 0];
+            HPMCOUNTER11:  current_val = mhpmcounter[11][31: 0];
+            HPMCOUNTER12:  current_val = mhpmcounter[12][31: 0];
+            HPMCOUNTER13:  current_val = mhpmcounter[13][31: 0];
+            HPMCOUNTER14:  current_val = mhpmcounter[14][31: 0];
+            HPMCOUNTER15:  current_val = mhpmcounter[15][31: 0];
+            HPMCOUNTER16:  current_val = mhpmcounter[16][31: 0];
+            HPMCOUNTER17:  current_val = mhpmcounter[17][31: 0];
+            HPMCOUNTER18:  current_val = mhpmcounter[18][31: 0];
+            HPMCOUNTER19:  current_val = mhpmcounter[19][31: 0];
+            HPMCOUNTER20:  current_val = mhpmcounter[20][31: 0];
+            HPMCOUNTER21:  current_val = mhpmcounter[21][31: 0];
+            HPMCOUNTER22:  current_val = mhpmcounter[22][31: 0];
+            HPMCOUNTER23:  current_val = mhpmcounter[23][31: 0];
+            HPMCOUNTER24:  current_val = mhpmcounter[24][31: 0];
+            HPMCOUNTER25:  current_val = mhpmcounter[25][31: 0];
+            HPMCOUNTER26:  current_val = mhpmcounter[26][31: 0];
+            HPMCOUNTER27:  current_val = mhpmcounter[27][31: 0];
+            HPMCOUNTER28:  current_val = mhpmcounter[28][31: 0];
+            HPMCOUNTER29:  current_val = mhpmcounter[29][31: 0];
+            HPMCOUNTER30:  current_val = mhpmcounter[30][31: 0];
+            HPMCOUNTER31:  current_val = mhpmcounter[31][31: 0];
+            HPMCOUNTER3H:  current_val = mhpmcounter[ 3][63:32];
+            HPMCOUNTER4H:  current_val = mhpmcounter[ 4][63:32];
+            HPMCOUNTER5H:  current_val = mhpmcounter[ 5][63:32];
+            HPMCOUNTER6H:  current_val = mhpmcounter[ 6][63:32];
+            HPMCOUNTER7H:  current_val = mhpmcounter[ 7][63:32];
+            HPMCOUNTER8H:  current_val = mhpmcounter[ 8][63:32];
+            HPMCOUNTER9H:  current_val = mhpmcounter[ 9][63:32];
+            HPMCOUNTER10H: current_val = mhpmcounter[10][63:32];
+            HPMCOUNTER11H: current_val = mhpmcounter[11][63:32];
+            HPMCOUNTER12H: current_val = mhpmcounter[12][63:32];
+            HPMCOUNTER13H: current_val = mhpmcounter[13][63:32];
+            HPMCOUNTER14H: current_val = mhpmcounter[14][63:32];
+            HPMCOUNTER15H: current_val = mhpmcounter[15][63:32];
+            HPMCOUNTER16H: current_val = mhpmcounter[16][63:32];
+            HPMCOUNTER17H: current_val = mhpmcounter[17][63:32];
+            HPMCOUNTER18H: current_val = mhpmcounter[18][63:32];
+            HPMCOUNTER19H: current_val = mhpmcounter[19][63:32];
+            HPMCOUNTER20H: current_val = mhpmcounter[20][63:32];
+            HPMCOUNTER21H: current_val = mhpmcounter[21][63:32];
+            HPMCOUNTER22H: current_val = mhpmcounter[22][63:32];
+            HPMCOUNTER23H: current_val = mhpmcounter[23][63:32];
+            HPMCOUNTER24H: current_val = mhpmcounter[24][63:32];
+            HPMCOUNTER25H: current_val = mhpmcounter[25][63:32];
+            HPMCOUNTER26H: current_val = mhpmcounter[26][63:32];
+            HPMCOUNTER27H: current_val = mhpmcounter[27][63:32];
+            HPMCOUNTER28H: current_val = mhpmcounter[28][63:32];
+            HPMCOUNTER29H: current_val = mhpmcounter[29][63:32];
+            HPMCOUNTER30H: current_val = mhpmcounter[30][63:32];
+            HPMCOUNTER31H: current_val = mhpmcounter[31][63:32];
 
             /* Xosvm */
             MVMCTL:         current_val = mvmctl;
