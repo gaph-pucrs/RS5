@@ -355,12 +355,57 @@ module CSRBank
         1'b0      // 0
     };
 
+////////////////////////////////////////////////////////////////////////////////
+// mcycle and minstret
+////////////////////////////////////////////////////////////////////////////////
+
+    logic [63:0] mcycle;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mcycle <= '0;
+        else if (sys_reset)
+            mcycle <= '0;
+        else begin
+            mcycle <= mcycle + 1'b1;
+            if (write_enable_i) begin
+                unique case(CSR)
+                    MCYCLE:  mcycle[31:0] <= wr_data;
+                    MCYCLEH: mcycle[63:32] <= wr_data;
+                    default: ;
+                endcase
+            end
+        end
+    end
+
+    logic [63:0] minstret;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            minstret <= '0;
+        else if (sys_reset)
+            minstret <= '0;
+        else begin
+            if (!(hold || instruction_operation_i == NOP))
+                minstret <= minstret + 1'b1;
+
+            if (write_enable_i) begin
+                unique case(CSR)
+                    MINSTRET:  minstret[31:0] <= wr_data;
+                    MINSTRETH: minstret[63:32] <= wr_data;
+                    default: ;
+                endcase
+            end
+        end
+    end
+
+////////////////////////////////////////////////////////////////////////////////
+// mhpmcounter and mhpmevent
+////////////////////////////////////////////////////////////////////////////////
+
 //////////////////////////////////////////////////////////////////////////////
 // CSRs definition
 //////////////////////////////////////////////////////////////////////////////
 
     logic [31:0] mscratch, mepc_r, mcause, mtval;
-    logic [63:0] mcycle, minstret;
 
     /* Signals enabled with XOSVM */
     /* verilator lint_off UNUSEDSIGNAL */
@@ -419,16 +464,16 @@ module CSRBank
             MTVEC:         begin current_val = mtvec;           wmask = 32'hFFFFFFFC; end
             MIP:           begin current_val = mip;             wmask = 32'h00000888; end
             MIE:           begin current_val = mie;             wmask = 32'h00000888; end
+            MCYCLE:        begin current_val = mcycle[31:0];    wmask = 32'hFFFFFFFF; end
+            MCYCLEH:       begin current_val = mcycle[63:32];   wmask = 32'hFFFFFFFF; end
+            MINSTRET:      begin current_val = minstret[31:0];  wmask = 32'hFFFFFFFF; end
+            MINSTRETH:     begin current_val = minstret[63:32]; wmask = 32'hFFFFFFFF; end
 
             // MCOUNTEREN: begin current_val = mcounteren;      wmask = '1; end
             MSCRATCH:      begin current_val = mscratch;        wmask = 32'hFFFFFFFF; end
             MEPC:          begin current_val = mepc_r;          wmask = COMPRESSED ? 32'hFFFFFFFE : 32'hFFFFFFFC; end
             MCAUSE:        begin current_val = mcause;          wmask = 32'hFFFFFFFF; end
             MTVAL:         begin current_val = mtval;           wmask = 32'hFFFFFFFF; end
-            MCYCLE:        begin current_val = mcycle[31:0];    wmask = 32'hFFFFFFFF; end
-            MCYCLEH:       begin current_val = mcycle[63:32];   wmask = 32'hFFFFFFFF; end
-            MINSTRET:      begin current_val = minstret[31:0];  wmask = 32'hFFFFFFFF; end
-            MINSTRETH:     begin current_val = minstret[63:32]; wmask = 32'hFFFFFFFF; end
             MCOUNTINHIBIT: begin current_val = mcountinhibit;   wmask = 32'hFFFFFFFF; end
 
             MVMDO:         begin current_val = mvmdo;           wmask = 32'hFFFFFFFC; end
@@ -471,8 +516,6 @@ module CSRBank
             mcause_interrupt <= '0;
             mcause_exc_code  <= '0;
             mtval            <= '0;
-            mcycle           <= '0;
-            minstret         <= '0;
             privilege        <= privilegeLevel_e'(2'b11);
         end
         else if(sys_reset) begin
@@ -483,18 +526,12 @@ module CSRBank
             mcause_interrupt <= '0;
             mcause_exc_code  <= '0;
             mtval            <= '0;
-            mcycle           <= '0;
-            minstret         <= '0;
             privilege        <= privilegeLevel_e'(2'b11);
         end
         //////////////////////////////////////////////////////////////////////////////
         // Cycle Updates
         //////////////////////////////////////////////////////////////////////////////
         else begin
-            mcycle      <= !mcountinhibit[0] ? mcycle + 1'b1 : mcycle;
-            minstret    <= !(hold || instruction_operation_i == NOP) && !mcountinhibit[2]
-                            ? minstret + 1
-                            : minstret;
         //////////////////////////////////////////////////////////////////////////////
         // Machine Return
         //////////////////////////////////////////////////////////////////////////////
@@ -539,10 +576,6 @@ module CSRBank
                     MSCRATCH:       mscratch            <= wr_data;
                     MEPC:           mepc_r              <= wr_data;
                     MTVAL:          mtval               <= wr_data;
-                    MCYCLE:         mcycle[31:0]        <= wr_data;
-                    MCYCLEH:        mcycle[63:32]       <= wr_data;
-                    MINSTRET:       minstret[31:0]      <= wr_data;
-                    MINSTRETH:      minstret[63:32]     <= wr_data;
                     MCOUNTINHIBIT:  mcountinhibit       <= wr_data;
                     MCAUSE: begin
                                     mcause_interrupt    <= wr_data[31];
@@ -566,6 +599,10 @@ module CSRBank
                 MTVEC:          out = mtvec;
                 MIP:            out = mip;
                 MIE:            out = mie;
+                MCYCLE:         out = mcycle[31:0];
+                MCYCLEH:        out = mcycle[63:32];
+                MINSTRET:       out = minstret[31:0];
+                MINSTRETH:      out = minstret[63:32];
 
                 //RO
                 MCONFIGPTR:     out = '0;
@@ -574,10 +611,6 @@ module CSRBank
                 MEPC:           out = mepc_r;
                 MCAUSE:         out = mcause;
                 MTVAL:          out = mtval;
-                MCYCLE:         out = mcycle[31:0];
-                MCYCLEH:        out = mcycle[63:32];
-                MINSTRET:       out = minstret[31:0];
-                MINSTRETH:      out = minstret[63:32];
 
                 //RO
                 CYCLE:          out = mcycle[31:0];
