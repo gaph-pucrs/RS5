@@ -963,6 +963,23 @@ module CSRBank
         {64'h0                 }  // mhpmcounter31
     };
 
+    logic [63:0] mhpmevent [3:31];
+    if (ZIHPMEnable) begin : gen_hpmevent_on
+        always_comb begin
+            for (int i = 3; i < 31; i++)
+                mhpmevent[i] = 64'(i);   /* Non-zero event to indicate counter is present */
+            
+            mhpmevent[31] = '0; /* Currently disabled */
+        end
+    end
+    else begin : gen_hpmevent_off
+        always_comb begin
+            for (int i = 3; i < 32; i++)
+                mhpmevent[i] = '0;
+        end
+    end
+
+
 //////////////////////////////////////////////////////////////////////////////
 // CSRs definition
 //////////////////////////////////////////////////////////////////////////////
@@ -1208,6 +1225,64 @@ module CSRBank
                 MHPMCOUNTER29H: out = mhpmcounter[29][63:32];
                 MHPMCOUNTER30H: out = mhpmcounter[30][63:32];
                 MHPMCOUNTER31H: out = mhpmcounter[31][63:32];
+                MHPMEVENT3:     out = mhpmevent  [ 3][31: 0];
+                MHPMEVENT4:     out = mhpmevent  [ 4][31: 0];
+                MHPMEVENT5:     out = mhpmevent  [ 5][31: 0];
+                MHPMEVENT6:     out = mhpmevent  [ 6][31: 0];
+                MHPMEVENT7:     out = mhpmevent  [ 7][31: 0];
+                MHPMEVENT8:     out = mhpmevent  [ 8][31: 0];
+                MHPMEVENT9:     out = mhpmevent  [ 9][31: 0];
+                MHPMEVENT10:    out = mhpmevent  [10][31: 0];
+                MHPMEVENT11:    out = mhpmevent  [11][31: 0];
+                MHPMEVENT12:    out = mhpmevent  [12][31: 0];
+                MHPMEVENT13:    out = mhpmevent  [13][31: 0];
+                MHPMEVENT14:    out = mhpmevent  [14][31: 0];
+                MHPMEVENT15:    out = mhpmevent  [15][31: 0];
+                MHPMEVENT16:    out = mhpmevent  [16][31: 0];
+                MHPMEVENT17:    out = mhpmevent  [17][31: 0];
+                MHPMEVENT18:    out = mhpmevent  [18][31: 0];
+                MHPMEVENT19:    out = mhpmevent  [19][31: 0];
+                MHPMEVENT20:    out = mhpmevent  [20][31: 0];
+                MHPMEVENT21:    out = mhpmevent  [21][31: 0];
+                MHPMEVENT22:    out = mhpmevent  [22][31: 0];
+                MHPMEVENT23:    out = mhpmevent  [23][31: 0];
+                MHPMEVENT24:    out = mhpmevent  [24][31: 0];
+                MHPMEVENT25:    out = mhpmevent  [25][31: 0];
+                MHPMEVENT26:    out = mhpmevent  [26][31: 0];
+                MHPMEVENT27:    out = mhpmevent  [27][31: 0];
+                MHPMEVENT28:    out = mhpmevent  [28][31: 0];
+                MHPMEVENT29:    out = mhpmevent  [29][31: 0];
+                MHPMEVENT30:    out = mhpmevent  [30][31: 0];
+                MHPMEVENT31:    out = mhpmevent  [31][31: 0];
+                MHPMEVENT3H:    out = mhpmevent  [ 3][63:32];
+                MHPMEVENT4H:    out = mhpmevent  [ 4][63:32];
+                MHPMEVENT5H:    out = mhpmevent  [ 5][63:32];
+                MHPMEVENT6H:    out = mhpmevent  [ 6][63:32];
+                MHPMEVENT7H:    out = mhpmevent  [ 7][63:32];
+                MHPMEVENT8H:    out = mhpmevent  [ 8][63:32];
+                MHPMEVENT9H:    out = mhpmevent  [ 9][63:32];
+                MHPMEVENT10H:   out = mhpmevent  [10][63:32];
+                MHPMEVENT11H:   out = mhpmevent  [11][63:32];
+                MHPMEVENT12H:   out = mhpmevent  [12][63:32];
+                MHPMEVENT13H:   out = mhpmevent  [13][63:32];
+                MHPMEVENT14H:   out = mhpmevent  [14][63:32];
+                MHPMEVENT15H:   out = mhpmevent  [15][63:32];
+                MHPMEVENT16H:   out = mhpmevent  [16][63:32];
+                MHPMEVENT17H:   out = mhpmevent  [17][63:32];
+                MHPMEVENT18H:   out = mhpmevent  [18][63:32];
+                MHPMEVENT19H:   out = mhpmevent  [19][63:32];
+                MHPMEVENT20H:   out = mhpmevent  [20][63:32];
+                MHPMEVENT21H:   out = mhpmevent  [21][63:32];
+                MHPMEVENT22H:   out = mhpmevent  [22][63:32];
+                MHPMEVENT23H:   out = mhpmevent  [23][63:32];
+                MHPMEVENT24H:   out = mhpmevent  [24][63:32];
+                MHPMEVENT25H:   out = mhpmevent  [25][63:32];
+                MHPMEVENT26H:   out = mhpmevent  [26][63:32];
+                MHPMEVENT27H:   out = mhpmevent  [27][63:32];
+                MHPMEVENT28H:   out = mhpmevent  [28][63:32];
+                MHPMEVENT29H:   out = mhpmevent  [29][63:32];
+                MHPMEVENT30H:   out = mhpmevent  [30][63:32];
+                MHPMEVENT31H:   out = mhpmevent  [31][63:32];
 
                 //RO
                 MCONFIGPTR:     out = '0;
