@@ -1020,11 +1020,25 @@ module CSRBank
         end
     end
 
+////////////////////////////////////////////////////////////////////////////////
+// mscratch
+////////////////////////////////////////////////////////////////////////////////
+
+    logic [31:0] mscratch;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mscratch <= '0;
+        else begin
+            if (write_enable_i && CSR == MSCRATCH)
+                mscratch <= wr_data;
+        end
+    end
+
 //////////////////////////////////////////////////////////////////////////////
 // CSRs definition
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [31:0] mscratch, mepc_r, mcause, mtval;
+    logic [31:0] mepc_r, mcause, mtval;
 
     /* Signals enabled with XOSVM */
     /* verilator lint_off UNUSEDSIGNAL */
@@ -1073,8 +1087,8 @@ module CSRBank
             MINSTRET:      begin current_val = minstret[31:0];  wmask = 32'hFFFFFFFF; end
             MINSTRETH:     begin current_val = minstret[63:32]; wmask = 32'hFFFFFFFF; end
             /* @todo All mphmpcounter as RW */
-
             MSCRATCH:      begin current_val = mscratch;        wmask = 32'hFFFFFFFF; end
+
             MEPC:          begin current_val = mepc_r;          wmask = COMPRESSED ? 32'hFFFFFFFE : 32'hFFFFFFFC; end
             MCAUSE:        begin current_val = mcause;          wmask = 32'hFFFFFFFF; end
             MTVAL:         begin current_val = mtval;           wmask = 32'hFFFFFFFF; end
@@ -1112,7 +1126,6 @@ module CSRBank
         // Reset
         //////////////////////////////////////////////////////////////////////////////
         if (!reset_n) begin
-            mscratch         <= '0;
             mepc_r           <= '0;
             mcause_interrupt <= '0;
             mcause_exc_code  <= '0;
@@ -1120,7 +1133,6 @@ module CSRBank
             privilege        <= privilegeLevel_e'(2'b11);
         end
         else if(sys_reset) begin
-            mscratch         <= '0;
             mepc_r           <= '0;
             mcause_interrupt <= '0;
             mcause_exc_code  <= '0;
@@ -1171,7 +1183,6 @@ module CSRBank
         //////////////////////////////////////////////////////////////////////////////
             else if (write_enable_i) begin
                 case(CSR)
-                    MSCRATCH:       mscratch            <= wr_data;
                     MEPC:           mepc_r              <= wr_data;
                     MTVAL:          mtval               <= wr_data;
                     MCAUSE: begin
@@ -1323,10 +1334,10 @@ module CSRBank
                 MHPMEVENT29H:   out = mhpmevent  [29][63:32];
                 MHPMEVENT30H:   out = mhpmevent  [30][63:32];
                 MHPMEVENT31H:   out = mhpmevent  [31][63:32];
+                MSCRATCH:       out = mscratch;
 
                 //RO
                 MCONFIGPTR:     out = '0;
-                MSCRATCH:       out = mscratch;
                 MEPC:           out = mepc_r;
                 MCAUSE:         out = mcause;
                 MTVAL:          out = mtval;
