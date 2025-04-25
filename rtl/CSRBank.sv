@@ -91,7 +91,7 @@ module CSRBank
     output  privilegeLevel_e    privilege_o,
 
     output  logic [31:0]        mepc,
-    output  logic [31:0]        mtvec,
+    output  logic [31:0]        mtvec_o,
 
     output  logic               mvmctl_o,
     output  logic [31:0]        mvmdo_o,
@@ -141,6 +141,8 @@ module CSRBank
 ////////////////////////////////////////////////////////////////////////////////
 // mstatus
 ////////////////////////////////////////////////////////////////////////////////
+
+    /* @todo What if an interrupt occurs during mstatus write? */
 
     logic mstatus_mie;
     logic mstatus_mpie;
@@ -212,11 +214,33 @@ module CSRBank
         1'b0         // WPRI
     };
 
+////////////////////////////////////////////////////////////////////////////////
+// mtvec
+////////////////////////////////////////////////////////////////////////////////
+
+    logic [31:2] mtvec_base;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mtvec_base <= '0;
+        else begin 
+            if (write_enable_i && CSR == MTVEC)
+                mtvec_base <= wr_data[31:2];
+        end
+    end
+
+    logic [31:0] mtvec;
+    assign mtvec = {
+        mtvec_base, // BASE
+        2'b0        // MODE
+    };
+
+    assign mtvec_o = mtvec;
+
 //////////////////////////////////////////////////////////////////////////////
 // CSRs definition
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [31:0] mtvec_r, mip, mie, mscratch, mepc_r, mcause, mtval;
+    logic [31:0] mip, mie, mscratch, mepc_r, mcause, mtval;
     logic [63:0] mcycle, minstret;
 
     /* Signals enabled with XOSVM */
@@ -260,7 +284,7 @@ module CSRBank
 //////////////////////////////////////////////////////////////////////////////
 
     assign privilege_o = privilege;
-    assign mtvec       = mtvec_r;
+    
     assign mepc        = mepc_r;
 
     assign CSR = CSRs'(address_i);
@@ -273,10 +297,10 @@ module CSRBank
         wmask = '1;
         case (CSR)
             MSTATUS:       begin current_val = mstatus;         wmask = 32'h00001888; end
+            MTVEC:         begin current_val = mtvec;           wmask = 32'hFFFFFFFC; end
             // MEDELEG:    begin current_val = medeleg;         wmask = '1; end
             // MIDELEG:    begin current_val = mideleg;         wmask = '1; end
             MIE:           begin current_val = mie;             wmask = 32'h00000888; end
-            MTVEC:         begin current_val = mtvec_r;         wmask = COMPRESSED ? 32'hFFFFFFFE : 32'hFFFFFFFC; end
             // MCOUNTEREN: begin current_val = mcounteren;      wmask = '1; end
             // MSTATUSH:   begin current_val = mstatush;        wmask = '1; end
             MSCRATCH:      begin current_val = mscratch;        wmask = 32'hFFFFFFFF; end
@@ -326,7 +350,6 @@ module CSRBank
             //medeleg        <= '0;
             //mideleg        <= '0;
             mie              <= '0;
-            mtvec_r          <= '0;
             //mcounteren     <= '0;
             //mstatush       <= '0;
             mscratch         <= '0;
@@ -343,7 +366,6 @@ module CSRBank
             //medeleg        <= '0;
             //mideleg        <= '0;
             mie              <= '0;
-            mtvec_r          <= '0;
             //mcounteren     <= '0;
             //mstatush       <= '0;
             mscratch         <= '0;
@@ -406,7 +428,6 @@ module CSRBank
                     // MEDELEG:     medeleg             <= wr_data;
                     // MIDELEG:     mideleg             <= wr_data;
                     MIE:            mie                 <= wr_data;
-                    MTVEC:          mtvec_r             <= wr_data;
                     // MCOUNTEREN:  mcounteren          <= wr_data;
                     // MSTATUSH:    mstatush            <= wr_data;
                     MSCRATCH:       mscratch            <= wr_data;
@@ -434,16 +455,17 @@ module CSRBank
     always_comb begin
         if (read_enable_i) begin
             case(CSR)
+                MISA:           out = misa;
+                MSTATUS:        out = mstatus;
+                MTVEC:          out = mtvec;
+                
                 //RO
                 MCONFIGPTR:     out = '0;
-
-                //RW
-                MSTATUS:        out = mstatus;
-                MISA:           out = misa;
+                
                 // MEDELEG:     out = medeleg;
                 // MIDELEG:     out = mideleg;
                 MIE:            out = mie;
-                MTVEC:          out = mtvec_r;
+                
                 // MCOUNTEREN:  out = mcounteren;
                 // MSTATUSH:    out = mstatush;
                 MSCRATCH:       out = mscratch;
