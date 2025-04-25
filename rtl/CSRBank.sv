@@ -84,7 +84,8 @@ module CSRBank
 
     input   logic [63:0]        mtime_i,
 
-    input   logic [31:0]        irq_i,
+    input   logic               tip_i,
+    input   logic               eip_i,
     input   logic               interrupt_ack_i,
     output  logic               interrupt_pending_o,
 
@@ -236,11 +237,129 @@ module CSRBank
 
     assign mtvec_o = mtvec;
 
+////////////////////////////////////////////////////////////////////////////////
+// mip and mie
+////////////////////////////////////////////////////////////////////////////////
+
+    logic mip_msip;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mip_msip <= 1'b0;
+        else if (sys_reset)
+            mip_msip <= 1'b0;
+        else begin
+            if (write_enable_i && CSR == MIP)
+                mip_msip <= wr_data[3];
+        end
+    end
+
+    logic mip_mtip;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mip_mtip <= 1'b0;
+        else if (sys_reset)
+            mip_mtip <= 1'b0;
+        else begin
+            mip_mtip <= tip_i;
+            if (write_enable_i && CSR == MIP)
+                mip_mtip <= wr_data[7];
+        end
+    end
+
+    logic mip_meip;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mip_meip <= 1'b0;
+        else if (sys_reset)
+            mip_meip <= 1'b0;
+        else begin
+            mip_meip <= eip_i;
+            if (write_enable_i && CSR == MIP)
+                mip_meip <= wr_data[11];
+        end
+    end
+
+    logic [31:0] mip;
+    assign mip = {
+        16'b0,    // Designated for platform use
+        2'b0,     // 0
+        1'b0,     // LCOFIP
+        1'b0,     // 0
+        mip_meip, // MEIP
+        1'b0,     // 0
+        1'b0,     // SEIP
+        1'b0,     // 0
+        mip_mtip, // MTIP
+        1'b0,     // 0
+        1'b0,     // STIP
+        1'b0,     // 0
+        mip_msip, // MSIP
+        1'b0,     // 0
+        1'b0,     // SSIP
+        1'b0      // 0
+    };
+
+    logic mie_msie;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mie_msie <= 1'b0;
+        else if (sys_reset)
+            mie_msie <= 1'b0;
+        else begin 
+            if (write_enable_i && CSR == MIE)
+                mie_msie <= wr_data[3];
+        end
+    end
+
+    logic mie_mtie;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mie_mtie <= 1'b0;
+        else if (sys_reset)
+            mie_mtie <= 1'b0;
+        else begin 
+            if (write_enable_i && CSR == MIE)
+                mie_mtie <= wr_data[7];
+        end
+    end
+
+    logic mie_meie;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mie_meie <= 1'b0;
+        else if (sys_reset)
+            mie_meie <= 1'b0;
+        else begin 
+            if (write_enable_i && CSR == MIE)
+                mie_meie <= wr_data[11];
+        end
+    end
+
+    logic [31:0] mie;
+    assign mie = {
+        16'b0,    // Designated for platform use
+        2'b0,     // 0
+        1'b0,     // LCOFIE
+        1'b0,     // 0
+        mie_meie, // MEIE
+        1'b0,     // 0
+        1'b0,     // SEIE
+        1'b0,     // 0
+        mie_mtie, // MTIE
+        1'b0,     // 0
+        1'b0,     // STIE
+        1'b0,     // 0
+        mie_msie, // MSIE
+        1'b0,     // 0
+        1'b0,     // SSIE
+        1'b0      // 0
+    };
+
 //////////////////////////////////////////////////////////////////////////////
 // CSRs definition
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [31:0] mip, mie, mscratch, mepc_r, mcause, mtval;
+    logic [31:0] mscratch, mepc_r, mcause, mtval;
     logic [63:0] mcycle, minstret;
 
     /* Signals enabled with XOSVM */
@@ -298,11 +417,10 @@ module CSRBank
         case (CSR)
             MSTATUS:       begin current_val = mstatus;         wmask = 32'h00001888; end
             MTVEC:         begin current_val = mtvec;           wmask = 32'hFFFFFFFC; end
-            // MEDELEG:    begin current_val = medeleg;         wmask = '1; end
-            // MIDELEG:    begin current_val = mideleg;         wmask = '1; end
+            MIP:           begin current_val = mip;             wmask = 32'h00000888; end
             MIE:           begin current_val = mie;             wmask = 32'h00000888; end
+
             // MCOUNTEREN: begin current_val = mcounteren;      wmask = '1; end
-            // MSTATUSH:   begin current_val = mstatush;        wmask = '1; end
             MSCRATCH:      begin current_val = mscratch;        wmask = 32'hFFFFFFFF; end
             MEPC:          begin current_val = mepc_r;          wmask = COMPRESSED ? 32'hFFFFFFFE : 32'hFFFFFFFC; end
             MCAUSE:        begin current_val = mcause;          wmask = 32'hFFFFFFFF; end
@@ -347,11 +465,7 @@ module CSRBank
         //////////////////////////////////////////////////////////////////////////////
         if (!reset_n) begin
             mcountinhibit    <= '0;            
-            //medeleg        <= '0;
-            //mideleg        <= '0;
-            mie              <= '0;
             //mcounteren     <= '0;
-            //mstatush       <= '0;
             mscratch         <= '0;
             mepc_r           <= '0;
             mcause_interrupt <= '0;
@@ -363,11 +477,7 @@ module CSRBank
         end
         else if(sys_reset) begin
             mcountinhibit    <= '0;
-            //medeleg        <= '0;
-            //mideleg        <= '0;
-            mie              <= '0;
             //mcounteren     <= '0;
-            //mstatush       <= '0;
             mscratch         <= '0;
             mepc_r           <= '0;
             mcause_interrupt <= '0;
@@ -425,11 +535,7 @@ module CSRBank
         //////////////////////////////////////////////////////////////////////////////
             else if (write_enable_i) begin
                 case(CSR)
-                    // MEDELEG:     medeleg             <= wr_data;
-                    // MIDELEG:     mideleg             <= wr_data;
-                    MIE:            mie                 <= wr_data;
                     // MCOUNTEREN:  mcounteren          <= wr_data;
-                    // MSTATUSH:    mstatush            <= wr_data;
                     MSCRATCH:       mscratch            <= wr_data;
                     MEPC:           mepc_r              <= wr_data;
                     MTVAL:          mtval               <= wr_data;
@@ -458,21 +564,16 @@ module CSRBank
                 MISA:           out = misa;
                 MSTATUS:        out = mstatus;
                 MTVEC:          out = mtvec;
-                
+                MIP:            out = mip;
+                MIE:            out = mie;
+
                 //RO
                 MCONFIGPTR:     out = '0;
-                
-                // MEDELEG:     out = medeleg;
-                // MIDELEG:     out = mideleg;
-                MIE:            out = mie;
-                
                 // MCOUNTEREN:  out = mcounteren;
-                // MSTATUSH:    out = mstatush;
                 MSCRATCH:       out = mscratch;
                 MEPC:           out = mepc_r;
                 MCAUSE:         out = mcause;
                 MTVAL:          out = mtval;
-                MIP:            out = mip;
                 MCYCLE:         out = mcycle[31:0];
                 MCYCLEH:        out = mcycle[63:32];
                 MINSTRET:       out = minstret[31:0];
@@ -611,15 +712,6 @@ module CSRBank
     assign  MEIE = mie[11],
             MTIE = mie[ 7],
             MSIE = mie[ 3];
-
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            mip <= '0;
-        end
-        else begin
-            mip <= irq_i;
-        end
-    end
 
     always_ff @(posedge clk or negedge reset_n) begin
         if(!reset_n) begin

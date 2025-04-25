@@ -98,9 +98,6 @@ module testbench
     logic [31:0]            data_ram, data_plic, data_tb;
     logic                   enable_tb_r, enable_rtc_r, enable_plic_r;
     logic                   mti, mei;
-    logic [31:0]            irq;
-
-    assign irq = {20'h0, mei, 3'h0, mti, 7'h0};
 
 //////////////////////////////////////////////////////////////////////////////
 // Control
@@ -190,7 +187,8 @@ module testbench
         .instruction_i          (instruction),
         .mem_data_i             (mem_data_read),
         .mtime_i                (mtime),
-        .irq_i                  (irq),
+        .tip_i                  (mti),
+        .eip_i                  (mei),
         .instruction_address_o  (instruction_address),
         .mem_operation_enable_o (mem_operation_enable),
         .mem_write_enable_o     (mem_write_enable),
