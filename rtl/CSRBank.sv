@@ -1422,7 +1422,7 @@ module CSRBank
 
             /* V CSRs */
             VSTART:         current_val = '0;
-            VLENBYTES:      current_val = VLEN/8;
+            VLENBYTES:      current_val = VEnable ? VLEN/8 : '0;
             VTYPE:          current_val = vtype_i;
             VL:             current_val = vlen_i;
             
