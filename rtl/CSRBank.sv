@@ -1376,21 +1376,28 @@ module CSRBank
                 MHPMEVENT31H:   out = mhpmevent  [31][63:32];
                 MSCRATCH:       out = mscratch;
                 MEPC:           out = mepc;
-
-                //RO
-                MCONFIGPTR:     out = '0;
                 MCAUSE:         out = mcause;
                 MTVAL:          out = mtval;
+                MCONFIGPTR:     out = '0;
 
-                //RO
+                /* V CSRs */
+                VSTART:         out = '0;
+                VLENBYTES:      out = VLEN/8;
+                VTYPE:          out = vtype_i;
+                VL:             out = vlen_i;
+                
+                /* Zicntr */
                 CYCLE:          out = mcycle[31:0];
                 TIME:           out = mtime_i[31:0];
-                INSTRET:        out = minstret[31:0];                
-
+                INSTRET:        out = minstret[31:0];
                 CYCLEH:         out = mcycle[63:32];
                 TIMEH:          out = mtime_i[63:32];
                 INSTRETH:       out = minstret[63:32];
 
+                /* Zihpm */
+                /* @todo */
+
+                /* Xosvm */
                 MVMCTL:         out = {31'b0,mvmctl};
                 MVMDO:          out = mvmdo[31:0];
                 MVMDS:          out = mvmds[31:0];
@@ -1398,12 +1405,6 @@ module CSRBank
                 MVMIO:          out = mvmio[31:0];
                 MVMIS:          out = mvmis[31:0];
                 MVMIM:          out = mvmim[31:0];
-
-                // Vector Extension CSRs
-                VSTART:         out = '0;
-                VLENBYTES:      out = VLEN/8;
-                VTYPE:          out = vtype_i;
-                VL:             out = vlen_i;
 
                 default:        out = '0;
             endcase
