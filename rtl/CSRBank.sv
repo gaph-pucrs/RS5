@@ -105,6 +105,9 @@ module CSRBank
 
     privilegeLevel_e privilege;
 
+    logic [31:0] wr_data;
+    interruptionCode_e irq_code;
+
 ////////////////////////////////////////////////////////////////////////////////
 // misa
 ////////////////////////////////////////////////////////////////////////////////
@@ -1510,7 +1513,6 @@ module CSRBank
 // Operations
 ////////////////////////////////////////////////////////////////////////////////
 
-    logic [31:0] wr_data;
     always_comb begin
         case (operation_i)
             SET:     wr_data = (current_val |  data_i);
@@ -1536,7 +1538,6 @@ module CSRBank
         end
     end
 
-    interruptionCode_e irq_code;
     always_ff @(posedge clk or negedge reset_n) begin
         if(!reset_n) 
             irq_code <= NO_INT;

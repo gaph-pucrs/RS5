@@ -432,7 +432,7 @@ module RS5
         .read_enable_i              (csr_read_enable),
         .write_enable_i             (csr_write_enable),
         .operation_i                (csr_operation),
-        .address_i                  (csr_addr),
+        .address_i                  (CSRs'(csr_addr)),
         .data_i                     (csr_data_to_write),
         .killed                     (killed),
         .data_o                     (csr_data_read),
