@@ -1147,68 +1147,108 @@ module CSRBank
          1'b0  // FIOM
     };
 
-//////////////////////////////////////////////////////////////////////////////
-// XOSVM Extension
-//////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+// Xosvm Extension
+////////////////////////////////////////////////////////////////////////////////
 
-    /* Signals enabled with XOSVM */
-    /* verilator lint_off UNUSEDSIGNAL */
-    logic [31:0] mvmdo, mvmio, mvmds, mvmis, mvmdm, mvmim;
-    logic        mvmctl;
-    /* verilator lint_on UNUSEDSIGNAL */
+    logic [31:0] mvmio;
+    logic [31:0] mvmis;
+    logic [31:0] mvmim;
+    logic [31:0] mvmdo;
+    logic [31:0] mvmds;
+    logic [31:0] mvmdm;
 
-    if (XOSVMEnable == 1'b1) begin : gen_xosvm_csr_on
+    logic mvmctl_en;
+
+    logic [31:0] mvmctl;
+    assign mvmctl = {
+        31'b0,
+        mvmctl_en
+    };
+    
+    if (XOSVMEnable) begin : gen_xosvm_on
+
         always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n) begin
-                mvmctl      <= '0;
-                mvmdo       <= '0;
-                mvmds       <= '0;
-                mvmdm       <= '0;
-                mvmio       <= '0;
-                mvmis       <= '0;
-                mvmim       <= '0;
-            end
-            else if (sys_reset) begin
-                mvmctl      <= '0;
-                mvmdo       <= '0;
-                mvmds       <= '0;
-                mvmdm       <= '0;
-                mvmio       <= '0;
-                mvmis       <= '0;
-                mvmim       <= '0;
-            end
-            else if (write_enable_i) begin
-                case (address_i)
-                    MVMCTL:     mvmctl  <= wr_data[0];
-                    MVMDO:      mvmdo   <= wr_data;
-                    MVMDS:      mvmds   <= wr_data;
-                    MVMDM:      mvmdm   <= wr_data;
-                    MVMIO:      mvmio   <= wr_data;
-                    MVMIS:      mvmis   <= wr_data;
-                    MVMIM:      mvmim   <= wr_data;
-                    default: ;
-                endcase
+            if (!reset_n)
+                mvmio <= '0;
+            else begin
+                if (write_enable_i && address_i == MVMIO)
+                    mvmio <= wr_data;
             end
         end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                mvmis <= '0;
+            else begin
+                if (write_enable_i && address_i == MVMIS)
+                    mvmis <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                mvmim <= '0;
+            else begin
+                if (write_enable_i && address_i == MVMIM)
+                    mvmim <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                mvmdo <= '0;
+            else begin
+                if (write_enable_i && address_i == MVMDO)
+                    mvmdo <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                mvmds <= '0;
+            else begin
+                if (write_enable_i && address_i == MVMDS)
+                    mvmds <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                mvmdm <= '0;
+            else begin
+                if (write_enable_i && address_i == MVMDM)
+                    mvmdm <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                mvmctl_en <= 1'b0;
+            else begin
+                if (write_enable_i && address_i == MVMCTL)
+                    mvmctl_en <= wr_data[0];
+            end
+        end
+
     end
-    else begin : gen_xosvm_csr_off
-        assign mvmctl   = '0;
-        assign mvmdo    = '0;
-        assign mvmds    = '0;
-        assign mvmdm    = '0;
-        assign mvmio    = '0;
-        assign mvmis    = '0;
-        assign mvmim    = '0;
+    else begin : gen_xosvm_off
+        assign mvmio     = '0;
+        assign mvmis     = '0;
+        assign mvmim     = '0;
+        assign mvmdo     = '0;
+        assign mvmds     = '0;
+        assign mvmdm     = '0;
+        assign mvmctl_en = 1'b0;
     end
 
-    assign mvmctl_o = mvmctl;
+    assign mvmctl_o = mvmctl_en;
     assign mvmdo_o  = mvmdo;
     assign mvmds_o  = mvmds;
     assign mvmdm_o  = mvmdm;
     assign mvmio_o  = mvmio;
     assign mvmis_o  = mvmis;
     assign mvmim_o  = mvmim;
-
 
 ////////////////////////////////////////////////////////////////////////////////
 // Privilege control
@@ -1395,13 +1435,13 @@ module CSRBank
             /* @todo */
 
             /* Xosvm */
-            MVMCTL:         current_val = {31'b0,mvmctl};
-            MVMDO:          current_val = mvmdo[31:0];
-            MVMDS:          current_val = mvmds[31:0];
-            MVMDM:          current_val = mvmdm[31:0];
-            MVMIO:          current_val = mvmio[31:0];
-            MVMIS:          current_val = mvmis[31:0];
-            MVMIM:          current_val = mvmim[31:0];
+            MVMCTL:         current_val = mvmctl;
+            MVMDO:          current_val = mvmdo;
+            MVMDS:          current_val = mvmds;
+            MVMDM:          current_val = mvmdm;
+            MVMIO:          current_val = mvmio;
+            MVMIS:          current_val = mvmis;
+            MVMIM:          current_val = mvmim;
 
             default:        current_val = '0;
         endcase
