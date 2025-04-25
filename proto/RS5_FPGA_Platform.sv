@@ -3,18 +3,18 @@
 module RS5_FPGA_Platform
     import RS5_pkg::*;
 #(
-    parameter int           i_cnt        = 2,
-    parameter environment_e Environment  = FPGA,
-    parameter mul_e         MULEXT       = MUL_M,
-    parameter atomic_e      AMOEXT       = AMO_A,
-    parameter bit           COMPRESSED   = 1'b1,
-    parameter bit           XOSVMEnable  = 1'b0,
-    parameter bit           ZIHPMEnable  = 1'b0,
-    parameter bit           ZKNEEnable   = 1'b0,
-    parameter bit           ZICONDEnable = 1'b1,
-    parameter bit           VEnable      = 1'b0,
-    parameter bit           BRANCHPRED   = 1'b1,
-    parameter int           VLEN         = 64,
+    parameter int           i_cnt             = 2,
+    parameter environment_e Environment       = FPGA,
+    parameter mul_e         MULEXT            = MUL_M,
+    parameter atomic_e      AMOEXT            = AMO_A,
+    parameter bit           COMPRESSED        = 1'b1,
+    parameter bit           XOSVMEnable       = 1'b0,
+    parameter bit           HPMCOUNTEREnable  = 1'b0,
+    parameter bit           ZKNEEnable        = 1'b0,
+    parameter bit           ZICONDEnable      = 1'b1,
+    parameter bit           VEnable           = 1'b0,
+    parameter bit           BRANCHPRED        = 1'b1,
+    parameter int           VLEN              = 64,
     parameter int           CLKS_PER_BIT_UART = 868
 )
 (
@@ -105,17 +105,17 @@ module RS5_FPGA_Platform
 //////////////////////////////////////////////////////////////////////////////
 
     RS5 #(
-        .Environment    (Environment),
-        .MULEXT         (MULEXT),
-        .AMOEXT         (AMOEXT),
-        .XOSVMEnable    (XOSVMEnable),
-        .ZIHPMEnable    (ZIHPMEnable),
-        .ZKNEEnable     (ZKNEEnable),
-        .ZICONDEnable   (ZICONDEnable),
-        .COMPRESSED     (COMPRESSED),
-        .VEnable        (VEnable),
-        .VLEN           (VLEN),
-        .BRANCHPRED     (BRANCHPRED)
+        .Environment     (Environment     ),
+        .MULEXT          (MULEXT          ),
+        .AMOEXT          (AMOEXT          ),
+        .XOSVMEnable     (XOSVMEnable     ),
+        .HPMCOUNTEREnable(HPMCOUNTEREnable),
+        .ZKNEEnable      (ZKNEEnable      ),
+        .ZICONDEnable    (ZICONDEnable    ),
+        .COMPRESSED      (COMPRESSED      ),
+        .VEnable         (VEnable         ),
+        .VLEN            (VLEN            ),
+        .BRANCHPRED      (BRANCHPRED      )
     ) dut (
         .clk                    (clk),
         .reset_n                (reset_n),
@@ -124,7 +124,8 @@ module RS5_FPGA_Platform
         .instruction_i          (cpu_instruction),
         .mem_data_i             (cpu_data_in),
         .mtime_i                (mtime),
-        .irq_i                  (irq),
+        .tip_i                  (mti),
+        .eip_i                  (mei),
         .instruction_address_o  (cpu_instruction_address),
         .mem_operation_enable_o (cpu_operation_enable),
         .mem_write_enable_o     (cpu_write_enable),
