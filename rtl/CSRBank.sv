@@ -1159,6 +1159,10 @@ module CSRBank
         if (read_enable_i) begin
             case(CSR)
                 MISA:           out = misa;
+                MVENDORID:      out = '0;
+                MARCHID:        out = '0;
+                MIMPID:         out = '0;
+                MHARTID:        out = '0;
                 MSTATUS:        out = mstatus;
                 MTVEC:          out = mtvec;
                 MIP:            out = mip;
