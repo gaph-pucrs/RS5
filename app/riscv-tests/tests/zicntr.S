@@ -39,6 +39,7 @@ RVTEST_CODE_BEGIN
 2:
   TEST_PASSFAIL
 
+.align 4
 mtvec_handler:
   j fail
 
