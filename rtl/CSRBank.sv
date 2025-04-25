@@ -979,6 +979,15 @@ module CSRBank
         end
     end
 
+////////////////////////////////////////////////////////////////////////////////
+// mcounteren
+////////////////////////////////////////////////////////////////////////////////
+
+    logic [31:0] mcounteren;
+
+    /* Allows all reads to shadow performance registers */
+    /* @todo Cause illegal instruction on Zicntr/Zihpm when a bit is 0 */
+    assign mcounteren = '1;
 
 //////////////////////////////////////////////////////////////////////////////
 // CSRs definition
@@ -1031,9 +1040,9 @@ module CSRBank
             MCYCLEH:       begin current_val = mcycle[63:32];   wmask = 32'hFFFFFFFF; end
             MINSTRET:      begin current_val = minstret[31:0];  wmask = 32'hFFFFFFFF; end
             MINSTRETH:     begin current_val = minstret[63:32]; wmask = 32'hFFFFFFFF; end
-            /* @todo ALL MHPMCOUNTERN as RW */
+            /* @todo All mphmpcounter as RW */
+            /* @todo mcounteren as RW */
 
-            // MCOUNTEREN: begin current_val = mcounteren;      wmask = '1; end
             MSCRATCH:      begin current_val = mscratch;        wmask = 32'hFFFFFFFF; end
             MEPC:          begin current_val = mepc_r;          wmask = COMPRESSED ? 32'hFFFFFFFE : 32'hFFFFFFFC; end
             MCAUSE:        begin current_val = mcause;          wmask = 32'hFFFFFFFF; end
@@ -1074,7 +1083,6 @@ module CSRBank
         //////////////////////////////////////////////////////////////////////////////
         if (!reset_n) begin
             mcountinhibit    <= '0;            
-            //mcounteren     <= '0;
             mscratch         <= '0;
             mepc_r           <= '0;
             mcause_interrupt <= '0;
@@ -1084,7 +1092,6 @@ module CSRBank
         end
         else if(sys_reset) begin
             mcountinhibit    <= '0;
-            //mcounteren     <= '0;
             mscratch         <= '0;
             mepc_r           <= '0;
             mcause_interrupt <= '0;
@@ -1136,7 +1143,6 @@ module CSRBank
         //////////////////////////////////////////////////////////////////////////////
             else if (write_enable_i) begin
                 case(CSR)
-                    // MCOUNTEREN:  mcounteren          <= wr_data;
                     MSCRATCH:       mscratch            <= wr_data;
                     MEPC:           mepc_r              <= wr_data;
                     MTVAL:          mtval               <= wr_data;
@@ -1287,10 +1293,10 @@ module CSRBank
                 MHPMEVENT29H:   out = mhpmevent  [29][63:32];
                 MHPMEVENT30H:   out = mhpmevent  [30][63:32];
                 MHPMEVENT31H:   out = mhpmevent  [31][63:32];
+                MCOUNTEREN:     out = mcounteren;
 
                 //RO
                 MCONFIGPTR:     out = '0;
-                // MCOUNTEREN:  out = mcounteren;
                 MSCRATCH:       out = mscratch;
                 MEPC:           out = mepc_r;
                 MCAUSE:         out = mcause;
