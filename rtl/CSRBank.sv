@@ -356,6 +356,34 @@ module CSRBank
     };
 
 ////////////////////////////////////////////////////////////////////////////////
+// mcounteren
+////////////////////////////////////////////////////////////////////////////////
+
+    logic [31:0] mcounteren;
+
+    /* Allows all reads to shadow performance registers */
+    /* @todo Cause illegal instruction on Zicntr/Zihpm when a bit is 0 */
+    assign mcounteren = '1;
+
+////////////////////////////////////////////////////////////////////////////////
+// mcountinhibit
+////////////////////////////////////////////////////////////////////////////////
+
+    logic [31:0] mcountinhibit;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mcountinhibit <= '0;
+        else if (sys_reset)
+            mcountinhibit <= '0;
+        else begin
+            if (write_enable_i && CSR == MCOUNTINHIBIT) begin
+                mcountinhibit[30:2] <= wr_data[30:2];
+                mcountinhibit[0]    <= wr_data[0];
+            end
+        end
+    end
+
+////////////////////////////////////////////////////////////////////////////////
 // mcycle and minstret
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -366,7 +394,9 @@ module CSRBank
         else if (sys_reset)
             mcycle <= '0;
         else begin
-            mcycle <= mcycle + 1'b1;
+            if (!mcountinhibit[0])
+                mcycle <= mcycle + 1'b1;
+
             if (write_enable_i) begin
                 unique case(CSR)
                     MCYCLE:  mcycle[31:0] <= wr_data;
@@ -384,7 +414,7 @@ module CSRBank
         else if (sys_reset)
             minstret <= '0;
         else begin
-            if (!(hold || instruction_operation_i == NOP))
+            if (!mcountinhibit[2] && !(hold || instruction_operation_i == NOP))
                 minstret <= minstret + 1'b1;
 
             if (write_enable_i) begin
@@ -439,7 +469,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_killed <= '0;
             else begin
-                if (killed)
+                if (!mcountinhibit[3] && killed)
                     cntr_killed <= cntr_killed + 1'b1;
 
                 if (write_enable_i && CSR == MHPMCOUNTER3)
@@ -453,7 +483,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_context <= '0;
             else begin
-                if ((jump_i || raise_exception_i || machine_return_i || interrupt_ack_i))
+                if (!mcountinhibit[4] && (jump_i || raise_exception_i || machine_return_i || interrupt_ack_i))
                     cntr_context <= cntr_context + 1'b1;
 
                 if (write_enable_i && CSR == MHPMCOUNTER4)
@@ -467,7 +497,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_exception <= '0;
             else begin
-                if (raise_exception_i)
+                if (!mcountinhibit[5] && raise_exception_i)
                     cntr_exception <= cntr_exception + 1'b1;
 
                 if (write_enable_i && CSR == MHPMCOUNTER5)
@@ -481,7 +511,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_irq <= '0;
             else begin
-                if (interrupt_ack_i)
+                if (!mcountinhibit[6] && interrupt_ack_i)
                     cntr_irq <= cntr_irq + 1'b1;
 
                 if (write_enable_i && CSR == MHPMCOUNTER6)
@@ -495,7 +525,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_hazard <= '0;
             else begin
-                if (hazard && !hold)
+                if (!mcountinhibit[7] && hazard && !hold)
                     cntr_hazard <= cntr_hazard + 1'b1;
 
                 if (write_enable_i && CSR == MHPMCOUNTER7)
@@ -509,7 +539,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_stall <= '0;
             else begin
-                if (stall)
+                if (!mcountinhibit[8] && stall)
                     cntr_stall <= cntr_stall + 1'b1;
 
                 if (write_enable_i && CSR == MHPMCOUNTER8)
@@ -523,7 +553,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_nop <= '0;
             else begin
-                if ((!hold && instruction_operation_i inside {NOP}))
+                if (!mcountinhibit[9] && (!hold && instruction_operation_i inside {NOP}))
                     cntr_nop <= cntr_nop + 1'b1;
 
                 if (write_enable_i && CSR == MHPMCOUNTER9)
@@ -537,7 +567,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_logic <= '0;
             else begin
-                if ((!hold && instruction_operation_i inside {XOR, OR, AND}))
+                if (!mcountinhibit[10] && (!hold && instruction_operation_i inside {XOR, OR, AND}))
                     cntr_logic <= cntr_logic + 1'b1;
 
                 if (write_enable_i && CSR == MHPMCOUNTER10)
@@ -551,7 +581,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_addsub <= '0;
             else begin
-                if ((!hold && instruction_operation_i inside {ADD, SUB}))
+                if (!mcountinhibit[11] && (!hold && instruction_operation_i inside {ADD, SUB}))
                     cntr_addsub <= cntr_addsub + 1'b1;
 
                 if (write_enable_i && CSR == MHPMCOUNTER11)
@@ -565,7 +595,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_shift <= '0;
             else begin
-                if ((!hold && instruction_operation_i inside {SLL, SRL, SRA}))
+                if (!mcountinhibit[12] && (!hold && instruction_operation_i inside {SLL, SRL, SRA}))
                     cntr_shift <= cntr_shift + 1'b1;
 
                 if (write_enable_i && CSR == MHPMCOUNTER12)
@@ -579,7 +609,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_branch <= '0;
             else begin
-                if ((!hold && instruction_operation_i inside {BEQ, BNE, BLT, BLTU, BGE, BGEU}))
+                if (!mcountinhibit[13] && (!hold && instruction_operation_i inside {BEQ, BNE, BLT, BLTU, BGE, BGEU}))
                     cntr_branch <= cntr_branch + 1'b1;
 
                 if (write_enable_i && CSR == MHPMCOUNTER13)
@@ -593,7 +623,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_jump <= '0;
             else begin
-                if ((!hold && instruction_operation_i inside {JAL, JALR}))
+                if (!mcountinhibit[14] && (!hold && instruction_operation_i inside {JAL, JALR}))
                     cntr_jump <= cntr_jump + 1'b1;
 
                 if (write_enable_i && CSR == MHPMCOUNTER14)
@@ -607,7 +637,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_load <= '0;
             else begin
-                if ((!hold && instruction_operation_i inside {LB, LBU, LH, LHU, LW}))
+                if (!mcountinhibit[15] && (!hold && instruction_operation_i inside {LB, LBU, LH, LHU, LW}))
                     cntr_load <= cntr_load + 1'b1;
 
                 if (write_enable_i && CSR == MHPMCOUNTER15)
@@ -621,7 +651,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_store <= '0;
             else begin
-                if ((!hold && instruction_operation_i inside {SB, SH, SW}))
+                if (!mcountinhibit[16] && (!hold && instruction_operation_i inside {SB, SH, SW}))
                     cntr_store <= cntr_store + 1'b1;
 
                 if (write_enable_i && CSR == MHPMCOUNTER16)
@@ -635,7 +665,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_sys <= '0;
             else begin
-                if ((!hold && instruction_operation_i inside {MRET, WFI, ECALL, EBREAK}))
+                if (!mcountinhibit[17] && (!hold && instruction_operation_i inside {MRET, WFI, ECALL, EBREAK}))
                     cntr_sys <= cntr_sys + 1'b1;
 
                 if (write_enable_i && CSR == MHPMCOUNTER17)
@@ -649,7 +679,12 @@ module CSRBank
             else if (sys_reset)
                 cntr_csr <= '0;
             else begin
-                if ((!hold && instruction_operation_i inside {CSRRW, CSRRWI, CSRRS, CSRRSI, CSRRC, CSRRCI}))
+                if (
+                        !mcountinhibit[18] && 
+                        (
+                            !hold && instruction_operation_i inside {CSRRW, CSRRWI, CSRRS, CSRRSI, CSRRC, CSRRCI}
+                        )
+                    )
                     cntr_csr <= cntr_csr + 1'b1;
 
                 if (write_enable_i && CSR == MHPMCOUNTER18)
@@ -663,7 +698,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_luislt <= '0;
             else begin
-                if ((!hold && instruction_operation_i inside {SLTU, SLT, LUI}))
+                if (!mcountinhibit[19] && (!hold && instruction_operation_i inside {SLTU, SLT, LUI}))
                     cntr_luislt <= cntr_luislt + 1'b1;
 
                 if (write_enable_i && CSR == MHPMCOUNTER19)
@@ -678,7 +713,7 @@ module CSRBank
                 else if (sys_reset)
                     cntr_compressed <= '0;
                 else begin
-                    if ((!hold && instruction_compressed_i))
+                    if (!mcountinhibit[20] && (!hold && instruction_compressed_i))
                         cntr_compressed <= cntr_compressed + 1'b1;
 
                     if (write_enable_i && CSR == MHPMCOUNTER20)
@@ -692,7 +727,7 @@ module CSRBank
                 else if (sys_reset)
                     cntr_misaligned <= '0;
                 else begin
-                    if ((!stall && !hold && !hazard && jump_misaligned_i))
+                    if (!mcountinhibit[21] && (!stall && !hold && !hazard && jump_misaligned_i))
                         cntr_misaligned <= cntr_misaligned + 1'b1;
 
                     if (write_enable_i && CSR == MHPMCOUNTER21)
@@ -712,7 +747,7 @@ module CSRBank
                 else if (sys_reset)
                     cntr_mul <= '0;
                 else begin
-                    if ((!hold && instruction_operation_i inside {MUL, MULH, MULHU, MULHSU}))
+                    if (!mcountinhibit[22] && (!hold && instruction_operation_i inside {MUL, MULH, MULHU, MULHSU}))
                         cntr_mul <= cntr_mul + 1'b1;
 
                     if (write_enable_i && CSR == MHPMCOUNTER22)
@@ -731,7 +766,7 @@ module CSRBank
                 else if (sys_reset)
                     cntr_div <= '0;
                 else begin
-                    if ((!hold && instruction_operation_i inside {DIV, DIVU, REM, REMU}))
+                    if (!mcountinhibit[23] && (!hold && instruction_operation_i inside {DIV, DIVU, REM, REMU}))
                         cntr_div <= cntr_div + 1'b1;
 
                     if (write_enable_i && CSR == MHPMCOUNTER23)
@@ -751,6 +786,7 @@ module CSRBank
                     cntr_vaddsub <= '0;
                 else begin
                     if (
+                            !mcountinhibit[24] && 
                             (
                                 !hold && 
                                 instruction_operation_i inside {VECTOR} && 
@@ -771,6 +807,7 @@ module CSRBank
                     cntr_vmul <= '0;
                 else begin
                     if (
+                            !mcountinhibit[25] && 
                             (
                                 !hold && 
                                 instruction_operation_i inside {VECTOR} && 
@@ -791,6 +828,7 @@ module CSRBank
                     cntr_vdiv <= '0;
                 else begin
                     if (
+                            !mcountinhibit[26] && 
                             (
                                 !hold && 
                                 instruction_operation_i inside {VECTOR} && 
@@ -811,6 +849,7 @@ module CSRBank
                     cntr_vmac <= '0;
                 else begin
                     if (
+                            !mcountinhibit[27] && 
                             (
                                 !hold && 
                                 instruction_operation_i inside {VECTOR} && 
@@ -831,6 +870,7 @@ module CSRBank
                     cntr_vred <= '0;
                 else begin
                     if (
+                            !mcountinhibit[28] && 
                             (
                                 !hold && 
                                 instruction_operation_i inside {VECTOR} && 
@@ -850,7 +890,7 @@ module CSRBank
                 else if (sys_reset)
                     cntr_vloadstore <= '0;
                 else begin
-                    if ((!hold && instruction_operation_i inside {VLOAD, VSTORE}))
+                    if (!mcountinhibit[29] && (!hold && instruction_operation_i inside {VLOAD, VSTORE}))
                         cntr_vloadstore <= cntr_vloadstore + 1'b1;
 
                     if (write_enable_i && CSR == MHPMCOUNTER29)
@@ -865,6 +905,7 @@ module CSRBank
                     cntr_vothers <= '0;
                 else begin
                     if (
+                            !mcountinhibit[30] && 
                             (
                                 !hold && 
                                 instruction_operation_i inside {VECTOR} && 
@@ -979,16 +1020,6 @@ module CSRBank
         end
     end
 
-////////////////////////////////////////////////////////////////////////////////
-// mcounteren
-////////////////////////////////////////////////////////////////////////////////
-
-    logic [31:0] mcounteren;
-
-    /* Allows all reads to shadow performance registers */
-    /* @todo Cause illegal instruction on Zicntr/Zihpm when a bit is 0 */
-    assign mcounteren = '1;
-
 //////////////////////////////////////////////////////////////////////////////
 // CSRs definition
 //////////////////////////////////////////////////////////////////////////////
@@ -1003,7 +1034,6 @@ module CSRBank
 
     logic [31:0] wr_data, wmask, current_val;
 
-    logic [31:0] mcountinhibit;
     interruptionCode_e Interruption_Code;
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1036,18 +1066,18 @@ module CSRBank
             MTVEC:         begin current_val = mtvec;           wmask = 32'hFFFFFFFC; end
             MIP:           begin current_val = mip;             wmask = 32'h00000888; end
             MIE:           begin current_val = mie;             wmask = 32'h00000888; end
+            /* @todo mcounteren as RW */
+            MCOUNTINHIBIT: begin current_val = mcountinhibit;   wmask = 32'h7FFFFFFD; end
             MCYCLE:        begin current_val = mcycle[31:0];    wmask = 32'hFFFFFFFF; end
             MCYCLEH:       begin current_val = mcycle[63:32];   wmask = 32'hFFFFFFFF; end
             MINSTRET:      begin current_val = minstret[31:0];  wmask = 32'hFFFFFFFF; end
             MINSTRETH:     begin current_val = minstret[63:32]; wmask = 32'hFFFFFFFF; end
             /* @todo All mphmpcounter as RW */
-            /* @todo mcounteren as RW */
 
             MSCRATCH:      begin current_val = mscratch;        wmask = 32'hFFFFFFFF; end
             MEPC:          begin current_val = mepc_r;          wmask = COMPRESSED ? 32'hFFFFFFFE : 32'hFFFFFFFC; end
             MCAUSE:        begin current_val = mcause;          wmask = 32'hFFFFFFFF; end
             MTVAL:         begin current_val = mtval;           wmask = 32'hFFFFFFFF; end
-            MCOUNTINHIBIT: begin current_val = mcountinhibit;   wmask = 32'hFFFFFFFF; end
 
             MVMDO:         begin current_val = mvmdo;           wmask = 32'hFFFFFFFC; end
             MVMDS:         begin current_val = mvmds;           wmask = 32'hFFFFFFFC; end
@@ -1082,7 +1112,6 @@ module CSRBank
         // Reset
         //////////////////////////////////////////////////////////////////////////////
         if (!reset_n) begin
-            mcountinhibit    <= '0;            
             mscratch         <= '0;
             mepc_r           <= '0;
             mcause_interrupt <= '0;
@@ -1091,7 +1120,6 @@ module CSRBank
             privilege        <= privilegeLevel_e'(2'b11);
         end
         else if(sys_reset) begin
-            mcountinhibit    <= '0;
             mscratch         <= '0;
             mepc_r           <= '0;
             mcause_interrupt <= '0;
@@ -1146,7 +1174,6 @@ module CSRBank
                     MSCRATCH:       mscratch            <= wr_data;
                     MEPC:           mepc_r              <= wr_data;
                     MTVAL:          mtval               <= wr_data;
-                    MCOUNTINHIBIT:  mcountinhibit       <= wr_data;
                     MCAUSE: begin
                                     mcause_interrupt    <= wr_data[31];
                                     mcause_exc_code     <= wr_data[30:0];
@@ -1164,6 +1191,7 @@ module CSRBank
     always_comb begin
         if (read_enable_i) begin
             case(CSR)
+                /* Machine-Level CSRs */
                 MISA:           out = misa;
                 MVENDORID:      out = '0;
                 MARCHID:        out = '0;
@@ -1173,6 +1201,8 @@ module CSRBank
                 MTVEC:          out = mtvec;
                 MIP:            out = mip;
                 MIE:            out = mie;
+                MCOUNTEREN:     out = mcounteren;
+                MCOUNTINHIBIT:  out = mcountinhibit;
                 MCYCLE:         out = mcycle[31:0];
                 MCYCLEH:        out = mcycle[63:32];
                 MINSTRET:       out = minstret[31:0];
@@ -1293,7 +1323,6 @@ module CSRBank
                 MHPMEVENT29H:   out = mhpmevent  [29][63:32];
                 MHPMEVENT30H:   out = mhpmevent  [30][63:32];
                 MHPMEVENT31H:   out = mhpmevent  [31][63:32];
-                MCOUNTEREN:     out = mcounteren;
 
                 //RO
                 MCONFIGPTR:     out = '0;
@@ -1305,18 +1334,11 @@ module CSRBank
                 //RO
                 CYCLE:          out = mcycle[31:0];
                 TIME:           out = mtime_i[31:0];
-                INSTRET:        out = minstret[31:0];
-
-                
-
-                // Vector Extension counters
-                
+                INSTRET:        out = minstret[31:0];                
 
                 CYCLEH:         out = mcycle[63:32];
                 TIMEH:          out = mtime_i[63:32];
                 INSTRETH:       out = minstret[63:32];
-
-                MCOUNTINHIBIT:  out = mcountinhibit;
 
                 MVMCTL:         out = {31'b0,mvmctl};
                 MVMDO:          out = mvmdo[31:0];
