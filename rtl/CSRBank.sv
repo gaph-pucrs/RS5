@@ -1096,11 +1096,41 @@ module CSRBank
         mcause_exception_code
     };
 
+////////////////////////////////////////////////////////////////////////////////
+// mtval
+////////////////////////////////////////////////////////////////////////////////
+
+    logic [31:0] mtval;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mtval <= '0;
+        else begin
+            if (raise_exception_i) begin
+                unique case (exception_code_i)
+                    BREAKPOINT, 
+                    LOAD_PAGE_FAULT,
+                    LOAD_ACCESS_FAULT,
+                    STORE_AMO_PAGE_FAULT,
+                    STORE_AMO_ACCESS_FAULT,
+                    INSTRUCTION_PAGE_FAULT,
+                    LOAD_ADDRESS_MISALIGNED,
+                    INSTRUCTION_ACCESS_FAULT,
+                    STORE_AMO_ADDRESS_MISALIGNED,
+                    INSTRUCTION_ADDRESS_MISALIGNED: mtval <= pc_i;
+                    ILLEGAL_INSTRUCTION:            mtval <= instruction_i;
+                    default:                        mtval <= '0;
+                endcase
+            end
+            else if (interrupt_ack_i)
+                mtval <= '0;
+            else if (write_enable_i && CSR == MTVAL)
+                mtval <= wr_data;
+        end
+    end
+
 //////////////////////////////////////////////////////////////////////////////
 // CSRs definition
 //////////////////////////////////////////////////////////////////////////////
-
-    logic [31:0] mtval;
 
     /* Signals enabled with XOSVM */
     /* verilator lint_off UNUSEDSIGNAL */
@@ -1140,7 +1170,6 @@ module CSRBank
             MSCRATCH:      begin current_val = mscratch;        wmask = 32'hFFFFFFFF; end
             MEPC:          begin current_val = mepc;            wmask = COMPRESSED ? 32'hFFFFFFFE : 32'hFFFFFFFC; end
             MCAUSE:        begin current_val = mcause;          wmask = 32'hFFFFFFFF; end
-
             MTVAL:         begin current_val = mtval;           wmask = 32'hFFFFFFFF; end
 
             MVMDO:         begin current_val = mvmdo;           wmask = 32'hFFFFFFFC; end
@@ -1176,11 +1205,9 @@ module CSRBank
         // Reset
         //////////////////////////////////////////////////////////////////////////////
         if (!reset_n) begin
-            mtval            <= '0;
             privilege        <= privilegeLevel_e'(2'b11);
         end
         else if(sys_reset) begin
-            mtval            <= '0;
             privilege        <= privilegeLevel_e'(2'b11);
         end
         //////////////////////////////////////////////////////////////////////////////
@@ -1198,24 +1225,12 @@ module CSRBank
         //////////////////////////////////////////////////////////////////////////////
             else if (raise_exception_i == 1'b1) begin
                 privilege       <= privilegeLevel_e'(2'b11);
-                mtval           <= (exception_code_i == ILLEGAL_INSTRUCTION)
-                                    ? instruction_i
-                                    : pc_i;
             end
         //////////////////////////////////////////////////////////////////////////////
         // Interrupt
         //////////////////////////////////////////////////////////////////////////////
             else if (interrupt_ack_i == 1'b1) begin
                 privilege       <= privilegeLevel_e'(2'b11);
-            end
-        //////////////////////////////////////////////////////////////////////////////
-        // CSR Write
-        //////////////////////////////////////////////////////////////////////////////
-            else if (write_enable_i) begin
-                case(CSR)
-                    MTVAL:          mtval               <= wr_data;
-                    default:    ; // no op
-                endcase
             end
         end
     end
