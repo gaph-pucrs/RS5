@@ -398,8 +398,570 @@ module CSRBank
     end
 
 ////////////////////////////////////////////////////////////////////////////////
+// Performance counters
+////////////////////////////////////////////////////////////////////////////////
+
+    /* @todo Add (A)tomic, Zkne, and Zicond */
+
+    logic [31:0] cntr_killed;     // mhpmcounter3
+    logic [31:0] cntr_context;    // mhpmcounter4
+    logic [31:0] cntr_exception;  // mhpmcounter5
+    logic [31:0] cntr_irq;        // mhpmcounter6
+    logic [31:0] cntr_hazard;     // mhpmcounter7
+    logic [31:0] cntr_stall;      // mhpmcounter8
+    logic [31:0] cntr_nop;        // mhpmcounter9
+    logic [31:0] cntr_logic;      // mhpmcounter10
+    logic [31:0] cntr_addsub;     // mhpmcounter11
+    logic [31:0] cntr_shift;      // mhpmcounter12
+    logic [31:0] cntr_branch;     // mhpmcounter13
+    logic [31:0] cntr_jump;       // mhpmcounter14
+    logic [31:0] cntr_load;       // mhpmcounter15
+    logic [31:0] cntr_store;      // mhpmcounter16
+    logic [31:0] cntr_sys;        // mhpmcounter17
+    logic [31:0] cntr_csr;        // mhpmcounter18
+    logic [31:0] cntr_luislt;     // mhpmcounter19
+    logic [31:0] cntr_compressed; // mhpmcounter20
+    logic [31:0] cntr_misaligned; // mhpmcounter21
+    logic [31:0] cntr_mul;        // mhpmcounter22
+    logic [31:0] cntr_div;        // mhpmcounter23
+    logic [31:0] cntr_vaddsub;    // mhpmcounter24
+    logic [31:0] cntr_vmul;       // mhpmcounter25
+    logic [31:0] cntr_vdiv;       // mhpmcounter26
+    logic [31:0] cntr_vmac;       // mhpmcounter27
+    logic [31:0] cntr_vred;       // mhpmcounter28
+    logic [31:0] cntr_vloadstore; // mhpmcounter29
+    logic [31:0] cntr_vothers;    // mhpmcounter30
+
+    if (ZIHPMEnable) begin : gen_hpmcounter_on
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_killed <= '0;
+            else if (sys_reset)
+                cntr_killed <= '0;
+            else begin
+                if (killed)
+                    cntr_killed <= cntr_killed + 1'b1;
+
+                if (write_enable_i && CSR == MHPMCOUNTER3)
+                    cntr_killed <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_context <= '0;
+            else if (sys_reset)
+                cntr_context <= '0;
+            else begin
+                if ((jump_i || raise_exception_i || machine_return_i || interrupt_ack_i))
+                    cntr_context <= cntr_context + 1'b1;
+
+                if (write_enable_i && CSR == MHPMCOUNTER4)
+                    cntr_context <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_exception <= '0;
+            else if (sys_reset)
+                cntr_exception <= '0;
+            else begin
+                if (raise_exception_i)
+                    cntr_exception <= cntr_exception + 1'b1;
+
+                if (write_enable_i && CSR == MHPMCOUNTER5)
+                    cntr_exception <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_irq <= '0;
+            else if (sys_reset)
+                cntr_irq <= '0;
+            else begin
+                if (interrupt_ack_i)
+                    cntr_irq <= cntr_irq + 1'b1;
+
+                if (write_enable_i && CSR == MHPMCOUNTER6)
+                    cntr_irq <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_hazard <= '0;
+            else if (sys_reset)
+                cntr_hazard <= '0;
+            else begin
+                if (hazard && !hold)
+                    cntr_hazard <= cntr_hazard + 1'b1;
+
+                if (write_enable_i && CSR == MHPMCOUNTER7)
+                    cntr_hazard <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_stall <= '0;
+            else if (sys_reset)
+                cntr_stall <= '0;
+            else begin
+                if (stall)
+                    cntr_stall <= cntr_stall + 1'b1;
+
+                if (write_enable_i && CSR == MHPMCOUNTER8)
+                    cntr_stall <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_nop <= '0;
+            else if (sys_reset)
+                cntr_nop <= '0;
+            else begin
+                if ((!hold && instruction_operation_i inside {NOP}))
+                    cntr_nop <= cntr_nop + 1'b1;
+
+                if (write_enable_i && CSR == MHPMCOUNTER9)
+                    cntr_nop <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_logic <= '0;
+            else if (sys_reset)
+                cntr_logic <= '0;
+            else begin
+                if ((!hold && instruction_operation_i inside {XOR, OR, AND}))
+                    cntr_logic <= cntr_logic + 1'b1;
+
+                if (write_enable_i && CSR == MHPMCOUNTER10)
+                    cntr_logic <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_addsub <= '0;
+            else if (sys_reset)
+                cntr_addsub <= '0;
+            else begin
+                if ((!hold && instruction_operation_i inside {ADD, SUB}))
+                    cntr_addsub <= cntr_addsub + 1'b1;
+
+                if (write_enable_i && CSR == MHPMCOUNTER11)
+                    cntr_addsub <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_shift <= '0;
+            else if (sys_reset)
+                cntr_shift <= '0;
+            else begin
+                if ((!hold && instruction_operation_i inside {SLL, SRL, SRA}))
+                    cntr_shift <= cntr_shift + 1'b1;
+
+                if (write_enable_i && CSR == MHPMCOUNTER12)
+                    cntr_shift <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_branch <= '0;
+            else if (sys_reset)
+                cntr_branch <= '0;
+            else begin
+                if ((!hold && instruction_operation_i inside {BEQ, BNE, BLT, BLTU, BGE, BGEU}))
+                    cntr_branch <= cntr_branch + 1'b1;
+
+                if (write_enable_i && CSR == MHPMCOUNTER13)
+                    cntr_branch <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_jump <= '0;
+            else if (sys_reset)
+                cntr_jump <= '0;
+            else begin
+                if ((!hold && instruction_operation_i inside {JAL, JALR}))
+                    cntr_jump <= cntr_jump + 1'b1;
+
+                if (write_enable_i && CSR == MHPMCOUNTER14)
+                    cntr_jump <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_load <= '0;
+            else if (sys_reset)
+                cntr_load <= '0;
+            else begin
+                if ((!hold && instruction_operation_i inside {LB, LBU, LH, LHU, LW}))
+                    cntr_load <= cntr_load + 1'b1;
+
+                if (write_enable_i && CSR == MHPMCOUNTER15)
+                    cntr_load <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_store <= '0;
+            else if (sys_reset)
+                cntr_store <= '0;
+            else begin
+                if ((!hold && instruction_operation_i inside {SB, SH, SW}))
+                    cntr_store <= cntr_store + 1'b1;
+
+                if (write_enable_i && CSR == MHPMCOUNTER16)
+                    cntr_store <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_sys <= '0;
+            else if (sys_reset)
+                cntr_sys <= '0;
+            else begin
+                if ((!hold && instruction_operation_i inside {MRET, WFI, ECALL, EBREAK}))
+                    cntr_sys <= cntr_sys + 1'b1;
+
+                if (write_enable_i && CSR == MHPMCOUNTER17)
+                    cntr_sys <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_csr <= '0;
+            else if (sys_reset)
+                cntr_csr <= '0;
+            else begin
+                if ((!hold && instruction_operation_i inside {CSRRW, CSRRWI, CSRRS, CSRRSI, CSRRC, CSRRCI}))
+                    cntr_csr <= cntr_csr + 1'b1;
+
+                if (write_enable_i && CSR == MHPMCOUNTER18)
+                    cntr_csr <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_luislt <= '0;
+            else if (sys_reset)
+                cntr_luislt <= '0;
+            else begin
+                if ((!hold && instruction_operation_i inside {SLTU, SLT, LUI}))
+                    cntr_luislt <= cntr_luislt + 1'b1;
+
+                if (write_enable_i && CSR == MHPMCOUNTER19)
+                    cntr_luislt <= wr_data;
+            end
+        end
+
+        if (COMPRESSED) begin :gen_hpmcounter_compressed_on
+            always_ff @(posedge clk or negedge reset_n) begin
+                if (!reset_n)
+                    cntr_compressed <= '0;
+                else if (sys_reset)
+                    cntr_compressed <= '0;
+                else begin
+                    if ((!hold && instruction_compressed_i))
+                        cntr_compressed <= cntr_compressed + 1'b1;
+
+                    if (write_enable_i && CSR == MHPMCOUNTER20)
+                        cntr_compressed <= wr_data;
+                end
+            end
+            
+            always_ff @(posedge clk or negedge reset_n) begin
+                if (!reset_n)
+                    cntr_misaligned <= '0;
+                else if (sys_reset)
+                    cntr_misaligned <= '0;
+                else begin
+                    if ((!stall && !hold && !hazard && jump_misaligned_i))
+                        cntr_misaligned <= cntr_misaligned + 1'b1;
+
+                    if (write_enable_i && CSR == MHPMCOUNTER21)
+                        cntr_misaligned <= wr_data;
+                end
+            end
+        end
+        else begin : gen_hpmcounter_compressed_off
+            assign cntr_compressed = '0;
+            assign cntr_misaligned = '0;
+        end
+
+        if (MULEXT inside {MUL_ZMMUL, MUL_M}) begin : gen_hpmcounter_mul_on
+            always_ff @(posedge clk or negedge reset_n) begin
+                if (!reset_n)
+                    cntr_mul <= '0;
+                else if (sys_reset)
+                    cntr_mul <= '0;
+                else begin
+                    if ((!hold && instruction_operation_i inside {MUL, MULH, MULHU, MULHSU}))
+                        cntr_mul <= cntr_mul + 1'b1;
+
+                    if (write_enable_i && CSR == MHPMCOUNTER22)
+                        cntr_mul <= wr_data;
+                end
+            end
+        end
+        else begin : gen_hpmcounter_mul_off
+            assign cntr_mul = '0;
+        end
+
+        if (MULEXT inside {MUL_M}) begin : gen_hpmcounter_div_on
+            always_ff @(posedge clk or negedge reset_n) begin
+                if (!reset_n)
+                    cntr_div <= '0;
+                else if (sys_reset)
+                    cntr_div <= '0;
+                else begin
+                    if ((!hold && instruction_operation_i inside {DIV, DIVU, REM, REMU}))
+                        cntr_div <= cntr_div + 1'b1;
+
+                    if (write_enable_i && CSR == MHPMCOUNTER23)
+                        cntr_div <= wr_data;
+                end
+            end
+        end
+        else begin : gen_hpmcounter_div_off
+            assign cntr_div = '0;
+        end
+
+        if (VEnable) begin : gen_hpmcounter_v_on
+            always_ff @(posedge clk or negedge reset_n) begin
+                if (!reset_n)
+                    cntr_vaddsub <= '0;
+                else if (sys_reset)
+                    cntr_vaddsub <= '0;
+                else begin
+                    if (
+                            (
+                                !hold && 
+                                instruction_operation_i inside {VECTOR} && 
+                                vector_operation_i inside {VADD, VSUB, VRSUB}
+                            )
+                        )
+                        cntr_vaddsub <= cntr_vaddsub + 1'b1;
+
+                    if (write_enable_i && CSR == MHPMCOUNTER24)
+                        cntr_vaddsub <= wr_data;
+                end
+            end
+
+            always_ff @(posedge clk or negedge reset_n) begin
+                if (!reset_n)
+                    cntr_vmul <= '0;
+                else if (sys_reset)
+                    cntr_vmul <= '0;
+                else begin
+                    if (
+                            (
+                                !hold && 
+                                instruction_operation_i inside {VECTOR} && 
+                                vector_operation_i inside {VMUL, VMULH, VMULHU, VMULHSU, VWMUL, VWMULU, VWMULSU}
+                            )
+                        )
+                        cntr_vmul <= cntr_vmul + 1'b1;
+
+                    if (write_enable_i && CSR == MHPMCOUNTER25)
+                        cntr_vmul <= wr_data;
+                end
+            end
+
+            always_ff @(posedge clk or negedge reset_n) begin
+                if (!reset_n)
+                    cntr_vdiv <= '0;
+                else if (sys_reset)
+                    cntr_vdiv <= '0;
+                else begin
+                    if (
+                            (
+                                !hold && 
+                                instruction_operation_i inside {VECTOR} && 
+                                vector_operation_i inside {VDIV, VDIVU, VREM, VREMU}
+                            )
+                        )
+                        cntr_vdiv <= cntr_vdiv + 1'b1;
+
+                    if (write_enable_i && CSR == MHPMCOUNTER26)
+                        cntr_vdiv <= wr_data;
+                end
+            end
+
+            always_ff @(posedge clk or negedge reset_n) begin
+                if (!reset_n)
+                    cntr_vmac <= '0;
+                else if (sys_reset)
+                    cntr_vmac <= '0;
+                else begin
+                    if (
+                            (
+                                !hold && 
+                                instruction_operation_i inside {VECTOR} && 
+                                vector_operation_i inside {VMACC, VNMSAC, VMADD, VNMSUB}
+                            )
+                        )
+                        cntr_vmac <= cntr_vmac + 1'b1;
+
+                    if (write_enable_i && CSR == MHPMCOUNTER27)
+                        cntr_vmac <= wr_data;
+                end
+            end
+
+            always_ff @(posedge clk or negedge reset_n) begin
+                if (!reset_n)
+                    cntr_vred <= '0;
+                else if (sys_reset)
+                    cntr_vred <= '0;
+                else begin
+                    if (
+                            (
+                                !hold && 
+                                instruction_operation_i inside {VECTOR} && 
+                                vector_operation_i inside {VREDMIN, VREDMINU, VREDMAX, VREDMAXU}
+                            )
+                        )
+                        cntr_vred <= cntr_vred + 1'b1;
+
+                    if (write_enable_i && CSR == MHPMCOUNTER28)
+                        cntr_vred <= wr_data;
+                end
+            end
+
+            always_ff @(posedge clk or negedge reset_n) begin
+                if (!reset_n)
+                    cntr_vloadstore <= '0;
+                else if (sys_reset)
+                    cntr_vloadstore <= '0;
+                else begin
+                    if ((!hold && instruction_operation_i inside {VLOAD, VSTORE}))
+                        cntr_vloadstore <= cntr_vloadstore + 1'b1;
+
+                    if (write_enable_i && CSR == MHPMCOUNTER29)
+                        cntr_vloadstore <= wr_data;
+                end
+            end
+
+            always_ff @(posedge clk or negedge reset_n) begin
+                if (!reset_n)
+                    cntr_vothers <= '0;
+                else if (sys_reset)
+                    cntr_vothers <= '0;
+                else begin
+                    if (
+                            (
+                                !hold && 
+                                instruction_operation_i inside {VECTOR} && 
+                                vector_operation_i inside {
+                                    VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT,  // mask compares
+                                    VREDAND, VREDOR, VREDXOR,                                   // logic reduction
+                                    VMV, VMVR, VMVSX, VMVXS,                                    // register moves
+                                    VSLL, VSRL, VSRA,                                           // shifts
+                                    VAND, VOR, VXOR,                                            // logic
+                                    VMERGE
+                                }
+                            )
+                        )
+                        cntr_vothers <= cntr_vothers + 1'b1;
+
+                    if (write_enable_i && CSR == MHPMCOUNTER30)
+                        cntr_vothers <= wr_data;
+                end
+            end
+        end
+        else begin : gen_hpmcounter_v_off
+            assign cntr_vaddsub    = '0;
+            assign cntr_vmul       = '0;
+            assign cntr_vdiv       = '0;
+            assign cntr_vmac       = '0;
+            assign cntr_vred       = '0;
+            assign cntr_vloadstore = '0;
+            assign cntr_vothers    = '0;
+        end
+    end
+    else begin : gen_hpmcounter_off
+        assign cntr_killed     = '0;
+        assign cntr_context    = '0;
+        assign cntr_exception  = '0;
+        assign cntr_irq        = '0;
+        assign cntr_hazard     = '0;
+        assign cntr_stall      = '0;
+        assign cntr_nop        = '0;
+        assign cntr_logic      = '0;
+        assign cntr_addsub     = '0;
+        assign cntr_shift      = '0;
+        assign cntr_branch     = '0;
+        assign cntr_jump       = '0;
+        assign cntr_load       = '0;
+        assign cntr_store      = '0;
+        assign cntr_sys        = '0;
+        assign cntr_csr        = '0;
+        assign cntr_luislt     = '0;
+        assign cntr_compressed = '0;
+        assign cntr_misaligned = '0;
+        assign cntr_mul        = '0;
+        assign cntr_div        = '0;
+        assign cntr_vaddsub    = '0;
+        assign cntr_vmul       = '0;
+        assign cntr_vdiv       = '0;
+        assign cntr_vmac       = '0;
+        assign cntr_vred       = '0;
+        assign cntr_vloadstore = '0;
+        assign cntr_vothers    = '0;
+    end
+
+////////////////////////////////////////////////////////////////////////////////
 // mhpmcounter and mhpmevent
 ////////////////////////////////////////////////////////////////////////////////
+
+    logic [63:0] mhpmcounter [3:31];
+    assign mhpmcounter = {
+        {32'h0, cntr_killed    }, // mhpmcounter3
+        {32'h0, cntr_context   }, // mhpmcounter4
+        {32'h0, cntr_exception }, // mhpmcounter5
+        {32'h0, cntr_irq       }, // mhpmcounter6
+        {32'h0, cntr_hazard    }, // mhpmcounter7
+        {32'h0, cntr_stall     }, // mhpmcounter8
+        {32'h0, cntr_nop       }, // mhpmcounter9
+        {32'h0, cntr_logic     }, // mhpmcounter10
+        {32'h0, cntr_addsub    }, // mhpmcounter11
+        {32'h0, cntr_shift     }, // mhpmcounter12
+        {32'h0, cntr_branch    }, // mhpmcounter13
+        {32'h0, cntr_jump      }, // mhpmcounter14
+        {32'h0, cntr_load      }, // mhpmcounter15
+        {32'h0, cntr_store     }, // mhpmcounter16
+        {32'h0, cntr_sys       }, // mhpmcounter17
+        {32'h0, cntr_csr       }, // mhpmcounter18
+        {32'h0, cntr_luislt    }, // mhpmcounter19
+        {32'h0, cntr_compressed}, // mhpmcounter20
+        {32'h0, cntr_misaligned}, // mhpmcounter21
+        {32'h0, cntr_mul       }, // mhpmcounter22
+        {32'h0, cntr_div       }, // mhpmcounter23
+        {32'h0, cntr_vaddsub   }, // mhpmcounter24
+        {32'h0, cntr_vmul      }, // mhpmcounter25
+        {32'h0, cntr_vdiv      }, // mhpmcounter26
+        {32'h0, cntr_vmac      }, // mhpmcounter27
+        {32'h0, cntr_vred      }, // mhpmcounter28
+        {32'h0, cntr_vloadstore}, // mhpmcounter29
+        {32'h0, cntr_vothers   }, // mhpmcounter30
+        {64'h0                 }  // mhpmcounter31
+    };
 
 //////////////////////////////////////////////////////////////////////////////
 // CSRs definition
@@ -415,24 +977,8 @@ module CSRBank
 
     logic [31:0] wr_data, wmask, current_val;
 
-    logic [31:0] instructions_killed_counter, hazard_counter, stall_counter, nop_counter;
-    logic [31:0] interrupt_ack_counter, raise_exception_counter, context_switch_counter;
-    logic [31:0] logic_counter, addsub_counter, lui_slt_counter, shift_counter;
-    logic [31:0] branch_counter, jump_counter;
-    logic [31:0] load_counter, store_counter;
-    logic [31:0] sys_counter, csr_counter;
-    logic [31:0] compressed_counter, jump_misaligned_counter;
     logic [31:0] mcountinhibit;
     interruptionCode_e Interruption_Code;
-
-    /* Signals enabled with ZIHPM */
-    /* verilator lint_off UNUSEDSIGNAL */
-    logic [31:0] mul_counter, div_counter;
-    /* verilator lint_on UNUSEDSIGNAL */
-
-    /* vector extension profiling signals */
-    logic [31:0] vaddsub_counter, vmul_counter, vdiv_counter, vmac_counter, vred_counter, 
-                 vloadstore_counter, vothers_counter;
 
 //////////////////////////////////////////////////////////////////////////////
 // MCAUSE and MSTATUS CSRs
@@ -468,6 +1014,7 @@ module CSRBank
             MCYCLEH:       begin current_val = mcycle[63:32];   wmask = 32'hFFFFFFFF; end
             MINSTRET:      begin current_val = minstret[31:0];  wmask = 32'hFFFFFFFF; end
             MINSTRETH:     begin current_val = minstret[63:32]; wmask = 32'hFFFFFFFF; end
+            /* @todo ALL MHPMCOUNTERN as RW */
 
             // MCOUNTEREN: begin current_val = mcounteren;      wmask = '1; end
             MSCRATCH:      begin current_val = mscratch;        wmask = 32'hFFFFFFFF; end
@@ -603,6 +1150,64 @@ module CSRBank
                 MCYCLEH:        out = mcycle[63:32];
                 MINSTRET:       out = minstret[31:0];
                 MINSTRETH:      out = minstret[63:32];
+                MHPMCOUNTER3:   out = mhpmcounter[ 3][31: 0];
+                MHPMCOUNTER4:   out = mhpmcounter[ 4][31: 0];
+                MHPMCOUNTER5:   out = mhpmcounter[ 5][31: 0];
+                MHPMCOUNTER6:   out = mhpmcounter[ 6][31: 0];
+                MHPMCOUNTER7:   out = mhpmcounter[ 7][31: 0];
+                MHPMCOUNTER8:   out = mhpmcounter[ 8][31: 0];
+                MHPMCOUNTER9:   out = mhpmcounter[ 9][31: 0];
+                MHPMCOUNTER10:  out = mhpmcounter[10][31: 0];
+                MHPMCOUNTER11:  out = mhpmcounter[11][31: 0];
+                MHPMCOUNTER12:  out = mhpmcounter[12][31: 0];
+                MHPMCOUNTER13:  out = mhpmcounter[13][31: 0];
+                MHPMCOUNTER14:  out = mhpmcounter[14][31: 0];
+                MHPMCOUNTER15:  out = mhpmcounter[15][31: 0];
+                MHPMCOUNTER16:  out = mhpmcounter[16][31: 0];
+                MHPMCOUNTER17:  out = mhpmcounter[17][31: 0];
+                MHPMCOUNTER18:  out = mhpmcounter[18][31: 0];
+                MHPMCOUNTER19:  out = mhpmcounter[19][31: 0];
+                MHPMCOUNTER20:  out = mhpmcounter[20][31: 0];
+                MHPMCOUNTER21:  out = mhpmcounter[21][31: 0];
+                MHPMCOUNTER22:  out = mhpmcounter[22][31: 0];
+                MHPMCOUNTER23:  out = mhpmcounter[23][31: 0];
+                MHPMCOUNTER24:  out = mhpmcounter[24][31: 0];
+                MHPMCOUNTER25:  out = mhpmcounter[25][31: 0];
+                MHPMCOUNTER26:  out = mhpmcounter[26][31: 0];
+                MHPMCOUNTER27:  out = mhpmcounter[27][31: 0];
+                MHPMCOUNTER28:  out = mhpmcounter[28][31: 0];
+                MHPMCOUNTER29:  out = mhpmcounter[29][31: 0];
+                MHPMCOUNTER30:  out = mhpmcounter[30][31: 0];
+                MHPMCOUNTER31:  out = mhpmcounter[31][31: 0];
+                MHPMCOUNTER3H:  out = mhpmcounter[ 3][63:32];
+                MHPMCOUNTER4H:  out = mhpmcounter[ 4][63:32];
+                MHPMCOUNTER5H:  out = mhpmcounter[ 5][63:32];
+                MHPMCOUNTER6H:  out = mhpmcounter[ 6][63:32];
+                MHPMCOUNTER7H:  out = mhpmcounter[ 7][63:32];
+                MHPMCOUNTER8H:  out = mhpmcounter[ 8][63:32];
+                MHPMCOUNTER9H:  out = mhpmcounter[ 9][63:32];
+                MHPMCOUNTER10H: out = mhpmcounter[10][63:32];
+                MHPMCOUNTER11H: out = mhpmcounter[11][63:32];
+                MHPMCOUNTER12H: out = mhpmcounter[12][63:32];
+                MHPMCOUNTER13H: out = mhpmcounter[13][63:32];
+                MHPMCOUNTER14H: out = mhpmcounter[14][63:32];
+                MHPMCOUNTER15H: out = mhpmcounter[15][63:32];
+                MHPMCOUNTER16H: out = mhpmcounter[16][63:32];
+                MHPMCOUNTER17H: out = mhpmcounter[17][63:32];
+                MHPMCOUNTER18H: out = mhpmcounter[18][63:32];
+                MHPMCOUNTER19H: out = mhpmcounter[19][63:32];
+                MHPMCOUNTER20H: out = mhpmcounter[20][63:32];
+                MHPMCOUNTER21H: out = mhpmcounter[21][63:32];
+                MHPMCOUNTER22H: out = mhpmcounter[22][63:32];
+                MHPMCOUNTER23H: out = mhpmcounter[23][63:32];
+                MHPMCOUNTER24H: out = mhpmcounter[24][63:32];
+                MHPMCOUNTER25H: out = mhpmcounter[25][63:32];
+                MHPMCOUNTER26H: out = mhpmcounter[26][63:32];
+                MHPMCOUNTER27H: out = mhpmcounter[27][63:32];
+                MHPMCOUNTER28H: out = mhpmcounter[28][63:32];
+                MHPMCOUNTER29H: out = mhpmcounter[29][63:32];
+                MHPMCOUNTER30H: out = mhpmcounter[30][63:32];
+                MHPMCOUNTER31H: out = mhpmcounter[31][63:32];
 
                 //RO
                 MCONFIGPTR:     out = '0;
@@ -617,36 +1222,10 @@ module CSRBank
                 TIME:           out = mtime_i[31:0];
                 INSTRET:        out = minstret[31:0];
 
-                MHPMCOUNTER3:   out = instructions_killed_counter;
-                MHPMCOUNTER4:   out = context_switch_counter;
-                MHPMCOUNTER5:   out = raise_exception_counter;
-                MHPMCOUNTER6:   out = interrupt_ack_counter;
-                MHPMCOUNTER7:   out = hazard_counter;
-                MHPMCOUNTER8:   out = stall_counter;
-                MHPMCOUNTER9:   out = nop_counter;
-                MHPMCOUNTER10:  out = logic_counter;
-                MHPMCOUNTER11:  out = addsub_counter;
-                MHPMCOUNTER12:  out = shift_counter;
-                MHPMCOUNTER13:  out = branch_counter;
-                MHPMCOUNTER14:  out = jump_counter;
-                MHPMCOUNTER15:  out = load_counter;
-                MHPMCOUNTER16:  out = store_counter;
-                MHPMCOUNTER17:  out = sys_counter;
-                MHPMCOUNTER18:  out = csr_counter;
-                MHPMCOUNTER19:  out = lui_slt_counter;
-                MHPMCOUNTER20:  out = compressed_counter;
-                MHPMCOUNTER21:  out = jump_misaligned_counter;
-                MHPMCOUNTER22:  out = mul_counter;
-                MHPMCOUNTER23:  out = div_counter;
+                
 
                 // Vector Extension counters
-                MHPMCOUNTER24:  out = vaddsub_counter;
-                MHPMCOUNTER25:  out = vmul_counter;
-                MHPMCOUNTER26:  out = vdiv_counter;
-                MHPMCOUNTER27:  out = vmac_counter;
-                MHPMCOUNTER28:  out = vred_counter;
-                MHPMCOUNTER29:  out = vloadstore_counter;
-                MHPMCOUNTER30:  out = vothers_counter;
+                
 
                 CYCLEH:         out = mcycle[63:32];
                 TIMEH:          out = mtime_i[63:32];
@@ -767,233 +1346,66 @@ module CSRBank
         end
     end
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ZIHPM
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+// Profiling
+////////////////////////////////////////////////////////////////////////////////
 
-    if (ZIHPMEnable == 1'b1) begin : gen_zihpm_csr_on
-        always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n) begin
-                instructions_killed_counter <= '0;
-                nop_counter                 <= '0;
-                logic_counter               <= '0;
-                addsub_counter              <= '0;
-                shift_counter               <= '0;
-                branch_counter              <= '0;
-                jump_counter                <= '0;
-                load_counter                <= '0;
-                store_counter               <= '0;
-                sys_counter                 <= '0;
-                lui_slt_counter             <= '0;
-                csr_counter                 <= '0;
-                mul_counter                 <= '0;
-                div_counter                 <= '0;
+`ifndef SYNTH
+    if (PROFILING) begin : gen_profiling
+        int fd;
 
-                vaddsub_counter             <= '0;
-                vmul_counter                <= '0;
-                vdiv_counter                <= '0;
-                vmac_counter                <= '0;
-                vred_counter                <= '0;
-                vloadstore_counter          <= '0;
-                vothers_counter             <= '0;
-
-                if (COMPRESSED == 1'b1) begin
-                    jump_misaligned_counter     <= '0;
-                    compressed_counter          <= '0;
-                end
-
-                hazard_counter              <= '0;
-                stall_counter               <= '0;
-                interrupt_ack_counter       <= '0;
-                raise_exception_counter     <= '0;
-                context_switch_counter      <= '0;
-            end
-            else if (sys_reset) begin
-                instructions_killed_counter <= '0;
-                nop_counter                 <= '0;
-                logic_counter               <= '0;
-                addsub_counter              <= '0;
-                shift_counter               <= '0;
-                branch_counter              <= '0;
-                jump_counter                <= '0;
-                load_counter                <= '0;
-                store_counter               <= '0;
-                sys_counter                 <= '0;
-                lui_slt_counter             <= '0;
-                csr_counter                 <= '0;
-                mul_counter                 <= '0;
-                div_counter                 <= '0;
-
-                vaddsub_counter             <= '0;
-                vmul_counter                <= '0;
-                vdiv_counter                <= '0;
-                vmac_counter                <= '0;
-                vred_counter                <= '0;
-                vloadstore_counter          <= '0;
-                vothers_counter             <= '0;
-
-                if (COMPRESSED == 1'b1) begin
-                    jump_misaligned_counter     <= '0;
-                    compressed_counter          <= '0;
-                end
-
-                hazard_counter              <= '0;
-                stall_counter               <= '0;
-                interrupt_ack_counter       <= '0;
-                raise_exception_counter     <= '0;
-                context_switch_counter      <= '0;
-            end
-            else begin
-                instructions_killed_counter <= (killed                                                               && !mcountinhibit[ 3]) ? instructions_killed_counter  + 1 : instructions_killed_counter;
-
-                hazard_counter              <= (hazard && !hold                                                      && !mcountinhibit[ 7]) ? hazard_counter + 1 : hazard_counter;
-                stall_counter               <= (stall                                                                && !mcountinhibit[ 8]) ? stall_counter  + 1 : stall_counter;
-
-                interrupt_ack_counter       <= (interrupt_ack_i                                                      && !mcountinhibit[ 6]) ? interrupt_ack_counter   + 1 : interrupt_ack_counter;
-                raise_exception_counter     <= (raise_exception_i                                                    && !mcountinhibit[ 5]) ? raise_exception_counter + 1 : raise_exception_counter;
-                context_switch_counter      <= ((jump_i || raise_exception_i || machine_return_i || interrupt_ack_i) && !mcountinhibit[ 4]) ? context_switch_counter  + 1 : context_switch_counter;
-                nop_counter                 <= (instruction_operation_i == NOP && !hold                              && !mcountinhibit[ 9]) ? nop_counter             + 1 : nop_counter;
-
-                if (COMPRESSED == 1'b1) begin
-                    jump_misaligned_counter <= jump_misaligned_counter + ((jump_misaligned_i && !hold && !mcountinhibit[21]) ? 1 : 0);
-                end
-
-                if (!hold) begin
-                    logic_counter           <= (instruction_operation_i inside {XOR, OR, AND})                                && !mcountinhibit[10] ? logic_counter   + 1 : logic_counter;
-                    addsub_counter          <= (instruction_operation_i inside {ADD, SUB})                                    && !mcountinhibit[11] ? addsub_counter  + 1 : addsub_counter;
-                    lui_slt_counter         <= (instruction_operation_i inside {SLTU, SLT, LUI})                              && !mcountinhibit[19] ? lui_slt_counter + 1 : lui_slt_counter;
-                    shift_counter           <= (instruction_operation_i inside {SLL, SRL, SRA})                               && !mcountinhibit[12] ? shift_counter   + 1 : shift_counter;
-                    branch_counter          <= (instruction_operation_i inside {BEQ, BNE, BLT, BLTU, BGE, BGEU})              && !mcountinhibit[13] ? branch_counter  + 1 : branch_counter;
-                    jump_counter            <= (instruction_operation_i inside {JAL, JALR})                                   && !mcountinhibit[14] ? jump_counter    + 1 : jump_counter;
-                    load_counter            <= (instruction_operation_i inside {LB, LBU, LH, LHU, LW})                        && !mcountinhibit[15] ? load_counter    + 1 : load_counter;
-                    store_counter           <= (instruction_operation_i inside {SB, SH, SW})                                  && !mcountinhibit[16] ? store_counter   + 1 : store_counter;
-                    sys_counter             <= (instruction_operation_i inside {SRET, MRET, WFI, ECALL, EBREAK})              && !mcountinhibit[17] ? sys_counter     + 1 : sys_counter;
-                    csr_counter             <= (instruction_operation_i inside {CSRRW, CSRRWI, CSRRS, CSRRSI, CSRRC, CSRRCI}) && !mcountinhibit[18] ? csr_counter     + 1 : csr_counter;
-                    mul_counter             <= (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU})                    && !mcountinhibit[22] ? mul_counter     + 1 : mul_counter;
-                    div_counter             <= (instruction_operation_i inside {DIV, DIVU, REM, REMU})                        && !mcountinhibit[23] ? div_counter     + 1 : div_counter;
-
-                if(VEnable) begin
-                        vloadstore_counter      <= (instruction_operation_i inside {VLOAD, VSTORE})                           && !mcountinhibit[29] ? vloadstore_counter + 1 : vloadstore_counter;
-        
-                        if(instruction_operation_i == VECTOR) begin
-
-                            vaddsub_counter     <= (vector_operation_i      inside {VADD, VSUB, VRSUB})                       && !mcountinhibit[24] ? vaddsub_counter    + 1 : vaddsub_counter;
-                            
-                            vmul_counter        <= (vector_operation_i      inside {
-                                                                                    VMUL, VMULH, VMULHU, VMULHSU,                               // non-widening multiplication
-                                                                                    VWMUL, VWMULU, VWMULSU                                      // widening multiplication
-                                                                                   })   && !mcountinhibit[25] ?  vmul_counter    + 1 : vmul_counter;
-
-                            vdiv_counter        <= (vector_operation_i      inside {VDIV, VDIVU, VREM, VREMU})                    && !mcountinhibit[26] ? vdiv_counter   + 1 : vdiv_counter;
-                            vmac_counter        <= (vector_operation_i      inside {VMACC, VNMSAC, VMADD, VNMSUB})                && !mcountinhibit[27] ? vmac_counter   + 1 : vmac_counter;          
-                            vred_counter        <= (vector_operation_i      inside {VREDMIN, VREDMINU, VREDMAX, VREDMAXU})        && !mcountinhibit[28] ? vred_counter   + 1 : vred_counter;
-
-                            vothers_counter     <= (vector_operation_i      inside {
-                                                                                    VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT,  // mask compares
-                                                                                    VREDAND, VREDOR, VREDXOR,                                   // logic reduction
-                                                                                    VMV, VMVR, VMVSX, VMVXS,                                    // register moves
-                                                                                    VSLL, VSRL, VSRA,                                           // shifts
-                                                                                    VAND, VOR, VXOR,                                            // logic
-                                                                                    VMERGE                                                      // merge
-                                                                                   })   && !mcountinhibit[30] ?  vothers_counter + 1 : vothers_counter;
-                        end
-                    end                    
-
-                    if (COMPRESSED == 1'b1) begin
-                        compressed_counter  <= compressed_counter + (instruction_compressed_i && !mcountinhibit[20] ? 1 : 0);
-                    end
-                end
+        initial begin
+            fd = $fopen(PROFILING_FILE, "w");
+            if (fd == 0) begin
+                $display("Error\ opening profiling file");
             end
         end
-        
-    `ifndef SYNTH
-        if (PROFILING) begin : gen_csr_dbg
-            int fd;
 
-            initial begin
-                fd = $fopen(PROFILING_FILE, "w");
-                if (fd == 0) begin
-                    $display("Error\ opening profiling file");
-                end
+        final begin
+            $fwrite(fd,"Clock Cycles:            %0d\n", mcycle);
+            $fwrite(fd,"Instructions Retired:    %0d\n", minstret);
+            if (COMPRESSED == 1'b1) begin
+                $fwrite(fd,"Instructions Compressed: %0d\n", cntr_compressed);
+            end
+            $fwrite(fd,"Instructions Killed:     %0d\n", cntr_killed);
+            $fwrite(fd,"Context Switches:        %0d\n", cntr_context);
+            $fwrite(fd,"Exceptions Raised:       %0d\n", cntr_exception);
+            $fwrite(fd,"Interrupts Acked:        %0d\n", cntr_irq);
+            if (COMPRESSED == 1'b1) begin
+                $fwrite(fd,"Misaligned Jumps:        %0d\n", cntr_misaligned);
             end
 
-            final begin
-                $fwrite(fd,"Clock Cycles:            %0d\n", mcycle);
-                $fwrite(fd,"Instructions Retired:    %0d\n", minstret);
-                if (COMPRESSED == 1'b1) begin
-                    $fwrite(fd,"Instructions Compressed: %0d\n", compressed_counter);
-                end
-                $fwrite(fd,"Instructions Killed:     %0d\n", instructions_killed_counter);
-                $fwrite(fd,"Context Switches:        %0d\n", context_switch_counter);
-                $fwrite(fd,"Exceptions Raised:       %0d\n", raise_exception_counter);
-                $fwrite(fd,"Interrupts Acked:        %0d\n", interrupt_ack_counter);
-                if (COMPRESSED == 1'b1) begin
-                    $fwrite(fd,"Misaligned Jumps:        %0d\n", jump_misaligned_counter);
-                end
+            $fwrite(fd,"\nCYCLES WITH::\n");
+            $fwrite(fd,"HAZARDS:                 %0d\n", cntr_hazard);
+            $fwrite(fd,"STALL:                   %0d\n", cntr_stall);
+            $fwrite(fd,"BUBBLES (INC. HAZARDS):  %0d\n", cntr_nop);
 
-                $fwrite(fd,"\nCYCLES WITH::\n");
-                $fwrite(fd,"HAZARDS:                 %0d\n", hazard_counter);
-                $fwrite(fd,"STALL:                   %0d\n", stall_counter);
-                $fwrite(fd,"BUBBLES (INC. HAZARDS):  %0d\n", nop_counter);
-
-                $fwrite(fd,"\nINSTRUCTION COUNTERS:\n");
-                $fwrite(fd,"LUI_SLT:                 %0d\n", lui_slt_counter);
-                $fwrite(fd,"LOGIC:                   %0d\n", logic_counter);
-                $fwrite(fd,"ADDSUB:                  %0d\n", addsub_counter);
-                $fwrite(fd,"SHIFT:                   %0d\n", shift_counter);
-                $fwrite(fd,"BRANCH:                  %0d\n", branch_counter);
-                $fwrite(fd,"JUMP:                    %0d\n", jump_counter);
-                $fwrite(fd,"LOAD:                    %0d\n", load_counter);
-                $fwrite(fd,"STORE:                   %0d\n", store_counter);
-                $fwrite(fd,"SYS:                     %0d\n", sys_counter);
-                $fwrite(fd,"CSR:                     %0d\n", csr_counter);
-                $fwrite(fd,"MUL:                     %0d\n", mul_counter);
-                $fwrite(fd,"DIV:                     %0d\n", div_counter);
-            
+            $fwrite(fd,"\nINSTRUCTION COUNTERS:\n");
+            $fwrite(fd,"LUI_SLT:                 %0d\n", cntr_luislt);
+            $fwrite(fd,"LOGIC:                   %0d\n", cntr_logic);
+            $fwrite(fd,"ADDSUB:                  %0d\n", cntr_addsub);
+            $fwrite(fd,"SHIFT:                   %0d\n", cntr_shift);
+            $fwrite(fd,"BRANCH:                  %0d\n", cntr_branch);
+            $fwrite(fd,"JUMP:                    %0d\n", cntr_jump);
+            $fwrite(fd,"LOAD:                    %0d\n", cntr_load);
+            $fwrite(fd,"STORE:                   %0d\n", cntr_store);
+            $fwrite(fd,"SYS:                     %0d\n", cntr_sys);
+            $fwrite(fd,"CSR:                     %0d\n", cntr_csr);
+            $fwrite(fd,"MUL:                     %0d\n", cntr_mul);
+            $fwrite(fd,"DIV:                     %0d\n", cntr_div);
+        
             if(VEnable) begin
-                    $fwrite(fd, "\nVECTOR EXTENSION:\n");
-                    $fwrite(fd, "VADDSUB:                 %0d\n", vaddsub_counter);
-                    $fwrite(fd, "VMUL:                    %0d\n", vmul_counter);
-                    $fwrite(fd, "VDIV:                    %0d\n", vdiv_counter);
-                    $fwrite(fd, "VMAC:                    %0d\n", vmac_counter);
-                    $fwrite(fd, "VRED:                    %0d\n", vred_counter);
-                    $fwrite(fd, "VLOAD/VSTORE:            %0d\n", vloadstore_counter);
-                    $fwrite(fd, "VOTHERS:                 %0d\n", vothers_counter);
-                end
+                $fwrite(fd, "\nVECTOR EXTENSION:\n");
+                $fwrite(fd, "VADDSUB:                 %0d\n", cntr_vaddsub);
+                $fwrite(fd, "VMUL:                    %0d\n", cntr_vmul);
+                $fwrite(fd, "VDIV:                    %0d\n", cntr_vdiv);
+                $fwrite(fd, "VMAC:                    %0d\n", cntr_vmac);
+                $fwrite(fd, "VRED:                    %0d\n", cntr_vred);
+                $fwrite(fd, "VLOAD/VSTORE:            %0d\n", cntr_vloadstore);
+                $fwrite(fd, "VOTHERS:                 %0d\n", cntr_vothers);
             end
         end
-    `endif
     end
-    else begin : gen_zihpm_csr_off
-        assign instructions_killed_counter = '0;
-        assign nop_counter                 = '0;
-        assign logic_counter               = '0;
-        assign lui_slt_counter             = '0;
-        assign addsub_counter              = '0;
-        assign shift_counter               = '0;
-        assign branch_counter              = '0;
-        assign jump_counter                = '0;
-        assign load_counter                = '0;
-        assign store_counter               = '0;
-        assign sys_counter                 = '0;
-        assign csr_counter                 = '0;
-        assign mul_counter                 = '0;
-        assign div_counter                 = '0;
-        assign hazard_counter              = '0;
-        assign stall_counter               = '0;
-        assign interrupt_ack_counter       = '0;
-        assign raise_exception_counter     = '0;
-        assign context_switch_counter      = '0;
-        assign compressed_counter          = '0;
-        assign jump_misaligned_counter     = '0;
-
-        assign vaddsub_counter             = '0; 
-        assign vmul_counter                = '0;
-        assign vdiv_counter                = '0;
-        assign vmac_counter                = '0;
-        assign vred_counter                = '0;
-        assign vloadstore_counter          = '0;
-        assign vothers_counter             = '0;
-    end
+`endif
 
 endmodule
