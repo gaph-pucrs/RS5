@@ -91,7 +91,7 @@ module CSRBank
 
     output  privilegeLevel_e    privilege_o,
 
-    output  logic [31:0]        mepc,
+    output  logic [31:0]        mepc_o,
     output  logic [31:0]        mtvec_o,
 
     output  logic               mvmctl_o,
@@ -1034,11 +1034,35 @@ module CSRBank
         end
     end
 
+////////////////////////////////////////////////////////////////////////////////
+// mepc
+////////////////////////////////////////////////////////////////////////////////
+
+    logic [31:0] mepc;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mepc <= '0;
+        else begin
+            if (raise_exception_i)
+                mepc <= pc_i;
+            else if (interrupt_ack_i)
+                mepc <= jump_i ? jump_target_i : next_pc_i;
+            else if (write_enable_i && CSR == MEPC)
+                mepc <= wr_data;
+
+            mepc[0] <= 1'b0;
+            if (!COMPRESSED)
+                mepc[1] <= 1'b0;
+        end
+    end
+
+    assign mepc_o = mepc;
+
 //////////////////////////////////////////////////////////////////////////////
 // CSRs definition
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [31:0] mepc_r, mcause, mtval;
+    logic [31:0] mcause, mtval;
 
     /* Signals enabled with XOSVM */
     /* verilator lint_off UNUSEDSIGNAL */
@@ -1064,9 +1088,6 @@ module CSRBank
 //////////////////////////////////////////////////////////////////////////////
 
     assign privilege_o = privilege;
-    
-    assign mepc        = mepc_r;
-
     assign CSR = CSRs'(address_i);
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1088,8 +1109,8 @@ module CSRBank
             MINSTRETH:     begin current_val = minstret[63:32]; wmask = 32'hFFFFFFFF; end
             /* @todo All mphmpcounter as RW */
             MSCRATCH:      begin current_val = mscratch;        wmask = 32'hFFFFFFFF; end
+            MEPC:          begin current_val = mepc;            wmask = COMPRESSED ? 32'hFFFFFFFE : 32'hFFFFFFFC; end
 
-            MEPC:          begin current_val = mepc_r;          wmask = COMPRESSED ? 32'hFFFFFFFE : 32'hFFFFFFFC; end
             MCAUSE:        begin current_val = mcause;          wmask = 32'hFFFFFFFF; end
             MTVAL:         begin current_val = mtval;           wmask = 32'hFFFFFFFF; end
 
@@ -1126,14 +1147,12 @@ module CSRBank
         // Reset
         //////////////////////////////////////////////////////////////////////////////
         if (!reset_n) begin
-            mepc_r           <= '0;
             mcause_interrupt <= '0;
             mcause_exc_code  <= '0;
             mtval            <= '0;
             privilege        <= privilegeLevel_e'(2'b11);
         end
         else if(sys_reset) begin
-            mepc_r           <= '0;
             mcause_interrupt <= '0;
             mcause_exc_code  <= '0;
             mtval            <= '0;
@@ -1156,7 +1175,6 @@ module CSRBank
                 mcause_interrupt<= '0;
                 mcause_exc_code <= {26'b0, exception_code_i};
                 privilege       <= privilegeLevel_e'(2'b11);
-                mepc_r          <= pc_i;
                 mtval           <= (exception_code_i == ILLEGAL_INSTRUCTION)
                                     ? instruction_i
                                     : pc_i;
@@ -1168,22 +1186,12 @@ module CSRBank
                 mcause_interrupt<= '1;
                 mcause_exc_code <= {26'b0, Interruption_Code};
                 privilege       <= privilegeLevel_e'(2'b11);
-
-                /* Interrupted instruction is in fact the next instruction,
-                 * because this one will be retired completely before taking
-                 * the trap
-                 */
-                if (jump_i)
-                    mepc_r      <= jump_target_i;
-                else
-                    mepc_r      <= next_pc_i;
             end
         //////////////////////////////////////////////////////////////////////////////
         // CSR Write
         //////////////////////////////////////////////////////////////////////////////
             else if (write_enable_i) begin
                 case(CSR)
-                    MEPC:           mepc_r              <= wr_data;
                     MTVAL:          mtval               <= wr_data;
                     MCAUSE: begin
                                     mcause_interrupt    <= wr_data[31];
@@ -1335,10 +1343,10 @@ module CSRBank
                 MHPMEVENT30H:   out = mhpmevent  [30][63:32];
                 MHPMEVENT31H:   out = mhpmevent  [31][63:32];
                 MSCRATCH:       out = mscratch;
+                MEPC:           out = mepc;
 
                 //RO
                 MCONFIGPTR:     out = '0;
-                MEPC:           out = mepc_r;
                 MCAUSE:         out = mcause;
                 MTVAL:          out = mtval;
 

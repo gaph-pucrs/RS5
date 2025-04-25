@@ -459,7 +459,7 @@ module RS5
         .interrupt_ack_i            (interrupt_ack_o),
         .interrupt_pending_o        (interrupt_pending),
         .privilege_o                (privilege),
-        .mepc                       (mepc),
+        .mepc_o                     (mepc),
         .mtvec_o                    (mtvec),
     // XOSVM Signals
         .mvmctl_o                   (mvmctl),
