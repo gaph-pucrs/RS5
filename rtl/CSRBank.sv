@@ -1058,11 +1058,49 @@ module CSRBank
 
     assign mepc_o = mepc;
 
+////////////////////////////////////////////////////////////////////////////////
+// mcause
+////////////////////////////////////////////////////////////////////////////////
+
+    logic mcause_interrupt;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mcause_interrupt <= 1'b0;
+        else begin
+            if (raise_exception_i)
+                mcause_interrupt <= 1'b0;
+            else if (interrupt_ack_i)
+                mcause_interrupt <= 1'b1;
+            else if (write_enable_i && CSR == MCAUSE)
+                mcause_interrupt <= wr_data[31];
+        end
+    end
+
+    logic [30:0] mcause_exception_code;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mcause_exception_code <= '0;
+        else begin
+            if (raise_exception_i)
+                mcause_exception_code <= {26'b0, exception_code_i};
+            else if (interrupt_ack_i)
+                mcause_exception_code <= {26'b0, Interruption_Code};
+            else if (write_enable_i && CSR == MCAUSE)
+                mcause_exception_code <= wr_data[30:0];
+        end
+    end
+
+    logic [31:0] mcause;
+    assign mcause = {
+        mcause_interrupt,
+        mcause_exception_code
+    };
+
 //////////////////////////////////////////////////////////////////////////////
 // CSRs definition
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [31:0] mcause, mtval;
+    logic [31:0] mtval;
 
     /* Signals enabled with XOSVM */
     /* verilator lint_off UNUSEDSIGNAL */
@@ -1073,15 +1111,6 @@ module CSRBank
     logic [31:0] wr_data, wmask, current_val;
 
     interruptionCode_e Interruption_Code;
-
-//////////////////////////////////////////////////////////////////////////////
-// MCAUSE and MSTATUS CSRs
-//////////////////////////////////////////////////////////////////////////////
-
-    logic        mcause_interrupt;
-    logic [30:0] mcause_exc_code;
-
-    assign mcause = {mcause_interrupt, mcause_exc_code};
 
 //////////////////////////////////////////////////////////////////////////////
 // Assigns
@@ -1110,8 +1139,8 @@ module CSRBank
             /* @todo All mphmpcounter as RW */
             MSCRATCH:      begin current_val = mscratch;        wmask = 32'hFFFFFFFF; end
             MEPC:          begin current_val = mepc;            wmask = COMPRESSED ? 32'hFFFFFFFE : 32'hFFFFFFFC; end
-
             MCAUSE:        begin current_val = mcause;          wmask = 32'hFFFFFFFF; end
+
             MTVAL:         begin current_val = mtval;           wmask = 32'hFFFFFFFF; end
 
             MVMDO:         begin current_val = mvmdo;           wmask = 32'hFFFFFFFC; end
@@ -1147,14 +1176,10 @@ module CSRBank
         // Reset
         //////////////////////////////////////////////////////////////////////////////
         if (!reset_n) begin
-            mcause_interrupt <= '0;
-            mcause_exc_code  <= '0;
             mtval            <= '0;
             privilege        <= privilegeLevel_e'(2'b11);
         end
         else if(sys_reset) begin
-            mcause_interrupt <= '0;
-            mcause_exc_code  <= '0;
             mtval            <= '0;
             privilege        <= privilegeLevel_e'(2'b11);
         end
@@ -1172,8 +1197,6 @@ module CSRBank
         // Exception
         //////////////////////////////////////////////////////////////////////////////
             else if (raise_exception_i == 1'b1) begin
-                mcause_interrupt<= '0;
-                mcause_exc_code <= {26'b0, exception_code_i};
                 privilege       <= privilegeLevel_e'(2'b11);
                 mtval           <= (exception_code_i == ILLEGAL_INSTRUCTION)
                                     ? instruction_i
@@ -1183,8 +1206,6 @@ module CSRBank
         // Interrupt
         //////////////////////////////////////////////////////////////////////////////
             else if (interrupt_ack_i == 1'b1) begin
-                mcause_interrupt<= '1;
-                mcause_exc_code <= {26'b0, Interruption_Code};
                 privilege       <= privilegeLevel_e'(2'b11);
             end
         //////////////////////////////////////////////////////////////////////////////
@@ -1193,10 +1214,6 @@ module CSRBank
             else if (write_enable_i) begin
                 case(CSR)
                     MTVAL:          mtval               <= wr_data;
-                    MCAUSE: begin
-                                    mcause_interrupt    <= wr_data[31];
-                                    mcause_exc_code     <= wr_data[30:0];
-                            end
                     default:    ; // no op
                 endcase
             end
