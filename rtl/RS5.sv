@@ -435,7 +435,7 @@ module RS5
         .address_i                  (csr_addr),
         .data_i                     (csr_data_to_write),
         .killed                     (killed),
-        .out                        (csr_data_read),
+        .data_o                     (csr_data_read),
         .instruction_operation_i    (instruction_operation_execute),
         .vector_operation_i         (vector_operation_execute),
         .hazard                     (hazard),

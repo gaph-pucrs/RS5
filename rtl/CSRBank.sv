@@ -50,7 +50,7 @@ module CSRBank
     input   csrOperation_e      operation_i,
     input   CSRs                address_i,
     input   logic [31:0]        data_i,
-    output  logic [31:0]        out,
+    output  logic [31:0]        data_o,
 
     /* Signals enabled with ZIHPM */
     /* verilator lint_off UNUSEDSIGNAL */
@@ -1083,7 +1083,7 @@ module CSRBank
             if (raise_exception_i)
                 mcause_exception_code <= {26'b0, exception_code_i};
             else if (interrupt_ack_i)
-                mcause_exception_code <= {26'b0, Interruption_Code};
+                mcause_exception_code <= {26'b0, irq_code};
             else if (write_enable_i && address_i == MCAUSE)
                 mcause_exception_code <= wr_data[30:0];
         end
@@ -1147,27 +1147,8 @@ module CSRBank
          1'b0  // FIOM
     };
 
-////////////////////////////////////////////////////////////////////////////////
-// Privilege control
-////////////////////////////////////////////////////////////////////////////////
-
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            privilege <= privilegeLevel_e'(2'b11);
-        else if(sys_reset)
-            privilege <= privilegeLevel_e'(2'b11);
-        else begin
-            if (machine_return_i) 
-                privilege <= privilegeLevel_e'(mstatus_mpp);
-            else if (raise_exception_i || interrupt_ack_i)
-                privilege <= privilegeLevel_e'(2'b11);
-        end
-    end
-
-    assign privilege_o = privilege;
-
 //////////////////////////////////////////////////////////////////////////////
-// CSRs definition
+// XOSVM Extension
 //////////////////////////////////////////////////////////////////////////////
 
     /* Signals enabled with XOSVM */
@@ -1175,242 +1156,6 @@ module CSRBank
     logic [31:0] mvmdo, mvmio, mvmds, mvmis, mvmdm, mvmim;
     logic        mvmctl;
     /* verilator lint_on UNUSEDSIGNAL */
-
-    logic [31:0] wr_data, wmask, current_val;
-
-    interruptionCode_e Interruption_Code;
-
-//////////////////////////////////////////////////////////////////////////////
-// Masks and Current Value
-//////////////////////////////////////////////////////////////////////////////
-
-    always_comb begin
-        wmask = '1;
-        case (address_i)
-            MSTATUS:       begin current_val = mstatus;         wmask = 32'h00001888; end
-            MTVEC:         begin current_val = mtvec;           wmask = 32'hFFFFFFFC; end
-            MIP:           begin current_val = mip;             wmask = 32'h00000888; end
-            MIE:           begin current_val = mie;             wmask = 32'h00000888; end
-            /* @todo mcounteren as RW */
-            MCOUNTINHIBIT: begin current_val = mcountinhibit;   wmask = 32'h7FFFFFFD; end
-            MCYCLE:        begin current_val = mcycle[31:0];    wmask = 32'hFFFFFFFF; end
-            MCYCLEH:       begin current_val = mcycle[63:32];   wmask = 32'hFFFFFFFF; end
-            MINSTRET:      begin current_val = minstret[31:0];  wmask = 32'hFFFFFFFF; end
-            MINSTRETH:     begin current_val = minstret[63:32]; wmask = 32'hFFFFFFFF; end
-            /* @todo All mphmpcounter as RW */
-            MSCRATCH:      begin current_val = mscratch;        wmask = 32'hFFFFFFFF; end
-            MEPC:          begin current_val = mepc;            wmask = COMPRESSED ? 32'hFFFFFFFE : 32'hFFFFFFFC; end
-            MCAUSE:        begin current_val = mcause;          wmask = 32'hFFFFFFFF; end
-            MTVAL:         begin current_val = mtval;           wmask = 32'hFFFFFFFF; end
-
-            MVMDO:         begin current_val = mvmdo;           wmask = 32'hFFFFFFFC; end
-            MVMDS:         begin current_val = mvmds;           wmask = 32'hFFFFFFFC; end
-            MVMDM:         begin current_val = mvmdm;           wmask = 32'hFFFFFFFC; end
-            MVMIO:         begin current_val = mvmio;           wmask = 32'hFFFFFFFC; end
-            MVMIS:         begin current_val = mvmis;           wmask = 32'hFFFFFFFC; end
-            MVMIM:         begin current_val = mvmim;           wmask = 32'hFFFFFFFC; end
-            MVMCTL:        begin current_val = {31'b0, mvmctl}; wmask = 32'h00000001; end
-
-            default:       begin current_val = '0;              wmask = 32'h00000000; end
-        endcase
-    end
-
-//////////////////////////////////////////////////////////////////////////////
-// Operation
-//////////////////////////////////////////////////////////////////////////////
-
-    always_comb begin
-        case (operation_i)
-            SET:     wr_data = (current_val | (data_i & wmask));
-            CLEAR:   wr_data = (current_val & ~(data_i & wmask));
-            default: wr_data = (current_val & ~wmask) | (data_i & wmask); // WRITE
-        endcase
-    end
-
-//////////////////////////////////////////////////////////////////////////////
-// CSR Reading
-//////////////////////////////////////////////////////////////////////////////
-
-    always_comb begin
-        if (read_enable_i) begin
-            case(address_i)
-                /* Machine-Level CSRs */
-                MISA:           out = misa;
-                MVENDORID:      out = '0;
-                MARCHID:        out = '0;
-                MIMPID:         out = '0;
-                MHARTID:        out = '0;
-                MSTATUS:        out = mstatus;
-                MTVEC:          out = mtvec;
-                MIP:            out = mip;
-                MIE:            out = mie;
-                MCOUNTEREN:     out = mcounteren;
-                MCOUNTINHIBIT:  out = mcountinhibit;
-                MCYCLE:         out = mcycle[31:0];
-                MCYCLEH:        out = mcycle[63:32];
-                MINSTRET:       out = minstret[31:0];
-                MINSTRETH:      out = minstret[63:32];
-                MHPMCOUNTER3:   out = mhpmcounter[ 3][31: 0];
-                MHPMCOUNTER4:   out = mhpmcounter[ 4][31: 0];
-                MHPMCOUNTER5:   out = mhpmcounter[ 5][31: 0];
-                MHPMCOUNTER6:   out = mhpmcounter[ 6][31: 0];
-                MHPMCOUNTER7:   out = mhpmcounter[ 7][31: 0];
-                MHPMCOUNTER8:   out = mhpmcounter[ 8][31: 0];
-                MHPMCOUNTER9:   out = mhpmcounter[ 9][31: 0];
-                MHPMCOUNTER10:  out = mhpmcounter[10][31: 0];
-                MHPMCOUNTER11:  out = mhpmcounter[11][31: 0];
-                MHPMCOUNTER12:  out = mhpmcounter[12][31: 0];
-                MHPMCOUNTER13:  out = mhpmcounter[13][31: 0];
-                MHPMCOUNTER14:  out = mhpmcounter[14][31: 0];
-                MHPMCOUNTER15:  out = mhpmcounter[15][31: 0];
-                MHPMCOUNTER16:  out = mhpmcounter[16][31: 0];
-                MHPMCOUNTER17:  out = mhpmcounter[17][31: 0];
-                MHPMCOUNTER18:  out = mhpmcounter[18][31: 0];
-                MHPMCOUNTER19:  out = mhpmcounter[19][31: 0];
-                MHPMCOUNTER20:  out = mhpmcounter[20][31: 0];
-                MHPMCOUNTER21:  out = mhpmcounter[21][31: 0];
-                MHPMCOUNTER22:  out = mhpmcounter[22][31: 0];
-                MHPMCOUNTER23:  out = mhpmcounter[23][31: 0];
-                MHPMCOUNTER24:  out = mhpmcounter[24][31: 0];
-                MHPMCOUNTER25:  out = mhpmcounter[25][31: 0];
-                MHPMCOUNTER26:  out = mhpmcounter[26][31: 0];
-                MHPMCOUNTER27:  out = mhpmcounter[27][31: 0];
-                MHPMCOUNTER28:  out = mhpmcounter[28][31: 0];
-                MHPMCOUNTER29:  out = mhpmcounter[29][31: 0];
-                MHPMCOUNTER30:  out = mhpmcounter[30][31: 0];
-                MHPMCOUNTER31:  out = mhpmcounter[31][31: 0];
-                MHPMCOUNTER3H:  out = mhpmcounter[ 3][63:32];
-                MHPMCOUNTER4H:  out = mhpmcounter[ 4][63:32];
-                MHPMCOUNTER5H:  out = mhpmcounter[ 5][63:32];
-                MHPMCOUNTER6H:  out = mhpmcounter[ 6][63:32];
-                MHPMCOUNTER7H:  out = mhpmcounter[ 7][63:32];
-                MHPMCOUNTER8H:  out = mhpmcounter[ 8][63:32];
-                MHPMCOUNTER9H:  out = mhpmcounter[ 9][63:32];
-                MHPMCOUNTER10H: out = mhpmcounter[10][63:32];
-                MHPMCOUNTER11H: out = mhpmcounter[11][63:32];
-                MHPMCOUNTER12H: out = mhpmcounter[12][63:32];
-                MHPMCOUNTER13H: out = mhpmcounter[13][63:32];
-                MHPMCOUNTER14H: out = mhpmcounter[14][63:32];
-                MHPMCOUNTER15H: out = mhpmcounter[15][63:32];
-                MHPMCOUNTER16H: out = mhpmcounter[16][63:32];
-                MHPMCOUNTER17H: out = mhpmcounter[17][63:32];
-                MHPMCOUNTER18H: out = mhpmcounter[18][63:32];
-                MHPMCOUNTER19H: out = mhpmcounter[19][63:32];
-                MHPMCOUNTER20H: out = mhpmcounter[20][63:32];
-                MHPMCOUNTER21H: out = mhpmcounter[21][63:32];
-                MHPMCOUNTER22H: out = mhpmcounter[22][63:32];
-                MHPMCOUNTER23H: out = mhpmcounter[23][63:32];
-                MHPMCOUNTER24H: out = mhpmcounter[24][63:32];
-                MHPMCOUNTER25H: out = mhpmcounter[25][63:32];
-                MHPMCOUNTER26H: out = mhpmcounter[26][63:32];
-                MHPMCOUNTER27H: out = mhpmcounter[27][63:32];
-                MHPMCOUNTER28H: out = mhpmcounter[28][63:32];
-                MHPMCOUNTER29H: out = mhpmcounter[29][63:32];
-                MHPMCOUNTER30H: out = mhpmcounter[30][63:32];
-                MHPMCOUNTER31H: out = mhpmcounter[31][63:32];
-                MHPMEVENT3:     out = mhpmevent  [ 3][31: 0];
-                MHPMEVENT4:     out = mhpmevent  [ 4][31: 0];
-                MHPMEVENT5:     out = mhpmevent  [ 5][31: 0];
-                MHPMEVENT6:     out = mhpmevent  [ 6][31: 0];
-                MHPMEVENT7:     out = mhpmevent  [ 7][31: 0];
-                MHPMEVENT8:     out = mhpmevent  [ 8][31: 0];
-                MHPMEVENT9:     out = mhpmevent  [ 9][31: 0];
-                MHPMEVENT10:    out = mhpmevent  [10][31: 0];
-                MHPMEVENT11:    out = mhpmevent  [11][31: 0];
-                MHPMEVENT12:    out = mhpmevent  [12][31: 0];
-                MHPMEVENT13:    out = mhpmevent  [13][31: 0];
-                MHPMEVENT14:    out = mhpmevent  [14][31: 0];
-                MHPMEVENT15:    out = mhpmevent  [15][31: 0];
-                MHPMEVENT16:    out = mhpmevent  [16][31: 0];
-                MHPMEVENT17:    out = mhpmevent  [17][31: 0];
-                MHPMEVENT18:    out = mhpmevent  [18][31: 0];
-                MHPMEVENT19:    out = mhpmevent  [19][31: 0];
-                MHPMEVENT20:    out = mhpmevent  [20][31: 0];
-                MHPMEVENT21:    out = mhpmevent  [21][31: 0];
-                MHPMEVENT22:    out = mhpmevent  [22][31: 0];
-                MHPMEVENT23:    out = mhpmevent  [23][31: 0];
-                MHPMEVENT24:    out = mhpmevent  [24][31: 0];
-                MHPMEVENT25:    out = mhpmevent  [25][31: 0];
-                MHPMEVENT26:    out = mhpmevent  [26][31: 0];
-                MHPMEVENT27:    out = mhpmevent  [27][31: 0];
-                MHPMEVENT28:    out = mhpmevent  [28][31: 0];
-                MHPMEVENT29:    out = mhpmevent  [29][31: 0];
-                MHPMEVENT30:    out = mhpmevent  [30][31: 0];
-                MHPMEVENT31:    out = mhpmevent  [31][31: 0];
-                MHPMEVENT3H:    out = mhpmevent  [ 3][63:32];
-                MHPMEVENT4H:    out = mhpmevent  [ 4][63:32];
-                MHPMEVENT5H:    out = mhpmevent  [ 5][63:32];
-                MHPMEVENT6H:    out = mhpmevent  [ 6][63:32];
-                MHPMEVENT7H:    out = mhpmevent  [ 7][63:32];
-                MHPMEVENT8H:    out = mhpmevent  [ 8][63:32];
-                MHPMEVENT9H:    out = mhpmevent  [ 9][63:32];
-                MHPMEVENT10H:   out = mhpmevent  [10][63:32];
-                MHPMEVENT11H:   out = mhpmevent  [11][63:32];
-                MHPMEVENT12H:   out = mhpmevent  [12][63:32];
-                MHPMEVENT13H:   out = mhpmevent  [13][63:32];
-                MHPMEVENT14H:   out = mhpmevent  [14][63:32];
-                MHPMEVENT15H:   out = mhpmevent  [15][63:32];
-                MHPMEVENT16H:   out = mhpmevent  [16][63:32];
-                MHPMEVENT17H:   out = mhpmevent  [17][63:32];
-                MHPMEVENT18H:   out = mhpmevent  [18][63:32];
-                MHPMEVENT19H:   out = mhpmevent  [19][63:32];
-                MHPMEVENT20H:   out = mhpmevent  [20][63:32];
-                MHPMEVENT21H:   out = mhpmevent  [21][63:32];
-                MHPMEVENT22H:   out = mhpmevent  [22][63:32];
-                MHPMEVENT23H:   out = mhpmevent  [23][63:32];
-                MHPMEVENT24H:   out = mhpmevent  [24][63:32];
-                MHPMEVENT25H:   out = mhpmevent  [25][63:32];
-                MHPMEVENT26H:   out = mhpmevent  [26][63:32];
-                MHPMEVENT27H:   out = mhpmevent  [27][63:32];
-                MHPMEVENT28H:   out = mhpmevent  [28][63:32];
-                MHPMEVENT29H:   out = mhpmevent  [29][63:32];
-                MHPMEVENT30H:   out = mhpmevent  [30][63:32];
-                MHPMEVENT31H:   out = mhpmevent  [31][63:32];
-                MSCRATCH:       out = mscratch;
-                MEPC:           out = mepc;
-                MCAUSE:         out = mcause;
-                MTVAL:          out = mtval;
-                MCONFIGPTR:     out = '0;
-                MENVCFG:        out = menvcfg[31:0];
-                MENVCFGH:       out = menvcfg[63:32];
-
-                /* V CSRs */
-                VSTART:         out = '0;
-                VLENBYTES:      out = VLEN/8;
-                VTYPE:          out = vtype_i;
-                VL:             out = vlen_i;
-                
-                /* Zicntr */
-                CYCLE:          out = mcycle[31:0];
-                TIME:           out = mtime_i[31:0];
-                INSTRET:        out = minstret[31:0];
-                CYCLEH:         out = mcycle[63:32];
-                TIMEH:          out = mtime_i[63:32];
-                INSTRETH:       out = minstret[63:32];
-
-                /* Zihpm */
-                /* @todo */
-
-                /* Xosvm */
-                MVMCTL:         out = {31'b0,mvmctl};
-                MVMDO:          out = mvmdo[31:0];
-                MVMDS:          out = mvmds[31:0];
-                MVMDM:          out = mvmdm[31:0];
-                MVMIO:          out = mvmio[31:0];
-                MVMIS:          out = mvmis[31:0];
-                MVMIM:          out = mvmim[31:0];
-
-                default:        out = '0;
-            endcase
-        end
-        else begin
-            out = '0;
-        end
-    end
-
-//////////////////////////////////////////////////////////////////////////////
-// XOSVM Extension
-//////////////////////////////////////////////////////////////////////////////
 
     if (XOSVMEnable == 1'b1) begin : gen_xosvm_csr_on
         always_ff @(posedge clk or negedge reset_n) begin
@@ -1464,37 +1209,248 @@ module CSRBank
     assign mvmis_o  = mvmis;
     assign mvmim_o  = mvmim;
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Interrupt Control
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    logic MEIP, MTIP, MSIP;
-    assign  MEIP = mip[11],
-            MTIP = mip[ 7],
-            MSIP = mip[ 3];
-
-    logic MEIE, MTIE, MSIE;
-    assign  MEIE = mie[11],
-            MTIE = mie[ 7],
-            MSIE = mie[ 3];
+////////////////////////////////////////////////////////////////////////////////
+// Privilege control
+////////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk or negedge reset_n) begin
-        if(!reset_n) begin
-            Interruption_Code   <= NO_INT;
-            interrupt_pending_o <= 1'b0;
-        end
+        if (!reset_n)
+            privilege <= privilegeLevel_e'(2'b11);
+        else if(sys_reset)
+            privilege <= privilegeLevel_e'(2'b11);
         else begin
-            if (mstatus_mie && (mie & mip) != '0 && !interrupt_ack_i) begin
+            if (machine_return_i) 
+                privilege <= privilegeLevel_e'(mstatus_mpp);
+            else if (raise_exception_i || interrupt_ack_i)
+                privilege <= privilegeLevel_e'(2'b11);
+        end
+    end
+
+    assign privilege_o = privilege;
+
+//////////////////////////////////////////////////////////////////////////////
+// Read
+//////////////////////////////////////////////////////////////////////////////
+
+    logic [31:0] current_val;
+
+    always_comb begin
+        unique case(address_i)
+            /* Machine-Level CSRs */
+            MISA:           current_val = misa;
+            MVENDORID:      current_val = '0;
+            MARCHID:        current_val = '0;
+            MIMPID:         current_val = '0;
+            MHARTID:        current_val = '0;
+            MSTATUS:        current_val = mstatus;
+            MTVEC:          current_val = mtvec;
+            MIP:            current_val = mip;
+            MIE:            current_val = mie;
+            MCOUNTEREN:     current_val = mcounteren;
+            MCOUNTINHIBIT:  current_val = mcountinhibit;
+            MCYCLE:         current_val = mcycle[31:0];
+            MCYCLEH:        current_val = mcycle[63:32];
+            MINSTRET:       current_val = minstret[31:0];
+            MINSTRETH:      current_val = minstret[63:32];
+            MHPMCOUNTER3:   current_val = mhpmcounter[ 3][31: 0];
+            MHPMCOUNTER4:   current_val = mhpmcounter[ 4][31: 0];
+            MHPMCOUNTER5:   current_val = mhpmcounter[ 5][31: 0];
+            MHPMCOUNTER6:   current_val = mhpmcounter[ 6][31: 0];
+            MHPMCOUNTER7:   current_val = mhpmcounter[ 7][31: 0];
+            MHPMCOUNTER8:   current_val = mhpmcounter[ 8][31: 0];
+            MHPMCOUNTER9:   current_val = mhpmcounter[ 9][31: 0];
+            MHPMCOUNTER10:  current_val = mhpmcounter[10][31: 0];
+            MHPMCOUNTER11:  current_val = mhpmcounter[11][31: 0];
+            MHPMCOUNTER12:  current_val = mhpmcounter[12][31: 0];
+            MHPMCOUNTER13:  current_val = mhpmcounter[13][31: 0];
+            MHPMCOUNTER14:  current_val = mhpmcounter[14][31: 0];
+            MHPMCOUNTER15:  current_val = mhpmcounter[15][31: 0];
+            MHPMCOUNTER16:  current_val = mhpmcounter[16][31: 0];
+            MHPMCOUNTER17:  current_val = mhpmcounter[17][31: 0];
+            MHPMCOUNTER18:  current_val = mhpmcounter[18][31: 0];
+            MHPMCOUNTER19:  current_val = mhpmcounter[19][31: 0];
+            MHPMCOUNTER20:  current_val = mhpmcounter[20][31: 0];
+            MHPMCOUNTER21:  current_val = mhpmcounter[21][31: 0];
+            MHPMCOUNTER22:  current_val = mhpmcounter[22][31: 0];
+            MHPMCOUNTER23:  current_val = mhpmcounter[23][31: 0];
+            MHPMCOUNTER24:  current_val = mhpmcounter[24][31: 0];
+            MHPMCOUNTER25:  current_val = mhpmcounter[25][31: 0];
+            MHPMCOUNTER26:  current_val = mhpmcounter[26][31: 0];
+            MHPMCOUNTER27:  current_val = mhpmcounter[27][31: 0];
+            MHPMCOUNTER28:  current_val = mhpmcounter[28][31: 0];
+            MHPMCOUNTER29:  current_val = mhpmcounter[29][31: 0];
+            MHPMCOUNTER30:  current_val = mhpmcounter[30][31: 0];
+            MHPMCOUNTER31:  current_val = mhpmcounter[31][31: 0];
+            MHPMCOUNTER3H:  current_val = mhpmcounter[ 3][63:32];
+            MHPMCOUNTER4H:  current_val = mhpmcounter[ 4][63:32];
+            MHPMCOUNTER5H:  current_val = mhpmcounter[ 5][63:32];
+            MHPMCOUNTER6H:  current_val = mhpmcounter[ 6][63:32];
+            MHPMCOUNTER7H:  current_val = mhpmcounter[ 7][63:32];
+            MHPMCOUNTER8H:  current_val = mhpmcounter[ 8][63:32];
+            MHPMCOUNTER9H:  current_val = mhpmcounter[ 9][63:32];
+            MHPMCOUNTER10H: current_val = mhpmcounter[10][63:32];
+            MHPMCOUNTER11H: current_val = mhpmcounter[11][63:32];
+            MHPMCOUNTER12H: current_val = mhpmcounter[12][63:32];
+            MHPMCOUNTER13H: current_val = mhpmcounter[13][63:32];
+            MHPMCOUNTER14H: current_val = mhpmcounter[14][63:32];
+            MHPMCOUNTER15H: current_val = mhpmcounter[15][63:32];
+            MHPMCOUNTER16H: current_val = mhpmcounter[16][63:32];
+            MHPMCOUNTER17H: current_val = mhpmcounter[17][63:32];
+            MHPMCOUNTER18H: current_val = mhpmcounter[18][63:32];
+            MHPMCOUNTER19H: current_val = mhpmcounter[19][63:32];
+            MHPMCOUNTER20H: current_val = mhpmcounter[20][63:32];
+            MHPMCOUNTER21H: current_val = mhpmcounter[21][63:32];
+            MHPMCOUNTER22H: current_val = mhpmcounter[22][63:32];
+            MHPMCOUNTER23H: current_val = mhpmcounter[23][63:32];
+            MHPMCOUNTER24H: current_val = mhpmcounter[24][63:32];
+            MHPMCOUNTER25H: current_val = mhpmcounter[25][63:32];
+            MHPMCOUNTER26H: current_val = mhpmcounter[26][63:32];
+            MHPMCOUNTER27H: current_val = mhpmcounter[27][63:32];
+            MHPMCOUNTER28H: current_val = mhpmcounter[28][63:32];
+            MHPMCOUNTER29H: current_val = mhpmcounter[29][63:32];
+            MHPMCOUNTER30H: current_val = mhpmcounter[30][63:32];
+            MHPMCOUNTER31H: current_val = mhpmcounter[31][63:32];
+            MHPMEVENT3:     current_val = mhpmevent  [ 3][31: 0];
+            MHPMEVENT4:     current_val = mhpmevent  [ 4][31: 0];
+            MHPMEVENT5:     current_val = mhpmevent  [ 5][31: 0];
+            MHPMEVENT6:     current_val = mhpmevent  [ 6][31: 0];
+            MHPMEVENT7:     current_val = mhpmevent  [ 7][31: 0];
+            MHPMEVENT8:     current_val = mhpmevent  [ 8][31: 0];
+            MHPMEVENT9:     current_val = mhpmevent  [ 9][31: 0];
+            MHPMEVENT10:    current_val = mhpmevent  [10][31: 0];
+            MHPMEVENT11:    current_val = mhpmevent  [11][31: 0];
+            MHPMEVENT12:    current_val = mhpmevent  [12][31: 0];
+            MHPMEVENT13:    current_val = mhpmevent  [13][31: 0];
+            MHPMEVENT14:    current_val = mhpmevent  [14][31: 0];
+            MHPMEVENT15:    current_val = mhpmevent  [15][31: 0];
+            MHPMEVENT16:    current_val = mhpmevent  [16][31: 0];
+            MHPMEVENT17:    current_val = mhpmevent  [17][31: 0];
+            MHPMEVENT18:    current_val = mhpmevent  [18][31: 0];
+            MHPMEVENT19:    current_val = mhpmevent  [19][31: 0];
+            MHPMEVENT20:    current_val = mhpmevent  [20][31: 0];
+            MHPMEVENT21:    current_val = mhpmevent  [21][31: 0];
+            MHPMEVENT22:    current_val = mhpmevent  [22][31: 0];
+            MHPMEVENT23:    current_val = mhpmevent  [23][31: 0];
+            MHPMEVENT24:    current_val = mhpmevent  [24][31: 0];
+            MHPMEVENT25:    current_val = mhpmevent  [25][31: 0];
+            MHPMEVENT26:    current_val = mhpmevent  [26][31: 0];
+            MHPMEVENT27:    current_val = mhpmevent  [27][31: 0];
+            MHPMEVENT28:    current_val = mhpmevent  [28][31: 0];
+            MHPMEVENT29:    current_val = mhpmevent  [29][31: 0];
+            MHPMEVENT30:    current_val = mhpmevent  [30][31: 0];
+            MHPMEVENT31:    current_val = mhpmevent  [31][31: 0];
+            MHPMEVENT3H:    current_val = mhpmevent  [ 3][63:32];
+            MHPMEVENT4H:    current_val = mhpmevent  [ 4][63:32];
+            MHPMEVENT5H:    current_val = mhpmevent  [ 5][63:32];
+            MHPMEVENT6H:    current_val = mhpmevent  [ 6][63:32];
+            MHPMEVENT7H:    current_val = mhpmevent  [ 7][63:32];
+            MHPMEVENT8H:    current_val = mhpmevent  [ 8][63:32];
+            MHPMEVENT9H:    current_val = mhpmevent  [ 9][63:32];
+            MHPMEVENT10H:   current_val = mhpmevent  [10][63:32];
+            MHPMEVENT11H:   current_val = mhpmevent  [11][63:32];
+            MHPMEVENT12H:   current_val = mhpmevent  [12][63:32];
+            MHPMEVENT13H:   current_val = mhpmevent  [13][63:32];
+            MHPMEVENT14H:   current_val = mhpmevent  [14][63:32];
+            MHPMEVENT15H:   current_val = mhpmevent  [15][63:32];
+            MHPMEVENT16H:   current_val = mhpmevent  [16][63:32];
+            MHPMEVENT17H:   current_val = mhpmevent  [17][63:32];
+            MHPMEVENT18H:   current_val = mhpmevent  [18][63:32];
+            MHPMEVENT19H:   current_val = mhpmevent  [19][63:32];
+            MHPMEVENT20H:   current_val = mhpmevent  [20][63:32];
+            MHPMEVENT21H:   current_val = mhpmevent  [21][63:32];
+            MHPMEVENT22H:   current_val = mhpmevent  [22][63:32];
+            MHPMEVENT23H:   current_val = mhpmevent  [23][63:32];
+            MHPMEVENT24H:   current_val = mhpmevent  [24][63:32];
+            MHPMEVENT25H:   current_val = mhpmevent  [25][63:32];
+            MHPMEVENT26H:   current_val = mhpmevent  [26][63:32];
+            MHPMEVENT27H:   current_val = mhpmevent  [27][63:32];
+            MHPMEVENT28H:   current_val = mhpmevent  [28][63:32];
+            MHPMEVENT29H:   current_val = mhpmevent  [29][63:32];
+            MHPMEVENT30H:   current_val = mhpmevent  [30][63:32];
+            MHPMEVENT31H:   current_val = mhpmevent  [31][63:32];
+            MSCRATCH:       current_val = mscratch;
+            MEPC:           current_val = mepc;
+            MCAUSE:         current_val = mcause;
+            MTVAL:          current_val = mtval;
+            MCONFIGPTR:     current_val = '0;
+            MENVCFG:        current_val = menvcfg[31:0];
+            MENVCFGH:       current_val = menvcfg[63:32];
+
+            /* V CSRs */
+            VSTART:         current_val = '0;
+            VLENBYTES:      current_val = VLEN/8;
+            VTYPE:          current_val = vtype_i;
+            VL:             current_val = vlen_i;
+            
+            /* Zicntr */
+            CYCLE:          current_val = mcycle[31:0];
+            TIME:           current_val = mtime_i[31:0];
+            INSTRET:        current_val = minstret[31:0];
+            CYCLEH:         current_val = mcycle[63:32];
+            TIMEH:          current_val = mtime_i[63:32];
+            INSTRETH:       current_val = minstret[63:32];
+
+            /* Zihpm */
+            /* @todo */
+
+            /* Xosvm */
+            MVMCTL:         current_val = {31'b0,mvmctl};
+            MVMDO:          current_val = mvmdo[31:0];
+            MVMDS:          current_val = mvmds[31:0];
+            MVMDM:          current_val = mvmdm[31:0];
+            MVMIO:          current_val = mvmio[31:0];
+            MVMIS:          current_val = mvmis[31:0];
+            MVMIM:          current_val = mvmim[31:0];
+
+            default:        current_val = '0;
+        endcase
+    end
+
+    assign data_o = read_enable_i ? current_val : '0;
+
+////////////////////////////////////////////////////////////////////////////////
+// Operations
+////////////////////////////////////////////////////////////////////////////////
+
+    logic [31:0] wr_data;
+    always_comb begin
+        case (operation_i)
+            SET:     wr_data = (current_val |  data_i);
+            CLEAR:   wr_data = (current_val & ~data_i);
+            default: wr_data = data_i; // WRITE
+        endcase
+    end
+
+////////////////////////////////////////////////////////////////////////////////
+// Interrupt Control
+////////////////////////////////////////////////////////////////////////////////
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if(!reset_n)
+            interrupt_pending_o <= 1'b0;
+        else if (sys_reset)
+            interrupt_pending_o <= 1'b0;
+        else begin
+            if (!interrupt_ack_i && mstatus_mie && ((mie & mip) != '0))
                 interrupt_pending_o <= 1;
-                if ((MEIP & MEIE) == 1'b1)          // Machine External
-                    Interruption_Code <= M_EXT_INT;
-                else if ((MSIP & MSIE) == 1'b1)     // Machine Software
-                    Interruption_Code <= M_SW_INT;
-                else if ((MTIP & MTIE) == 1'b1)     // Machine Timer
-                    Interruption_Code <= M_TIM_INT;
-            end
-            else begin
+            else
                 interrupt_pending_o <= 0;
+        end
+    end
+
+    interruptionCode_e irq_code;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if(!reset_n) 
+            irq_code <= NO_INT;
+        else begin
+            if (!interrupt_ack_i && mstatus_mie && ((mie & mip) != '0)) begin
+                if (mie_meie && mip_meip)
+                    irq_code <= M_EXT_INT;
+                else if (mie_msie && mip_msip)
+                    irq_code <= M_SW_INT;
+                else if (mie_mtie && mip_mtip)
+                    irq_code <= M_TIM_INT;
             end
         end
     end
