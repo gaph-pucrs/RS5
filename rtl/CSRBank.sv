@@ -1128,6 +1128,26 @@ module CSRBank
         end
     end
 
+////////////////////////////////////////////////////////////////////////////////
+// menvcfg
+////////////////////////////////////////////////////////////////////////////////
+
+    logic [63:0] menvcfg;
+    assign menvcfg = {
+         1'b0, // STCE
+         1'b0, // PBMTE
+         1'b0, // ADUE
+         1'b0, // CDE
+        26'b0, // WPRI
+         2'b0, // PMM
+        24'b0, // WPRI
+         1'b0, // CBZE
+         1'b0, // CBCFE
+         2'b0, // CBIE
+         3'b0, // WPRI
+         1'b0  // FIOM
+    };
+
 //////////////////////////////////////////////////////////////////////////////
 // CSRs definition
 //////////////////////////////////////////////////////////////////////////////
@@ -1379,6 +1399,8 @@ module CSRBank
                 MCAUSE:         out = mcause;
                 MTVAL:          out = mtval;
                 MCONFIGPTR:     out = '0;
+                MENVCFG:        out = menvcfg[31:0];
+                MENVCFGH:       out = menvcfg[63:32];
 
                 /* V CSRs */
                 VSTART:         out = '0;
