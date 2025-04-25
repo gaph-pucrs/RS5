@@ -35,11 +35,11 @@ module testbench
     localparam atomic_e      AMOEXT          = AMO_A;
     localparam bit           COMPRESSED      = 1'b1;
     localparam bit           USE_XOSVM       = 1'b0;
-    localparam bit           USE_ZIHPM       = 1'b1;
     localparam bit           USE_ZKNE        = 1'b1;
     localparam bit           USE_ZICOND      = 1'b1;
     localparam bit           VEnable         = 1'b0;
     localparam int           VLEN            = 256;
+    localparam bit           USE_HPMCOUNTER  = 1'b1;
     localparam bit           BRANCHPRED      = 1'b1;
 
 `ifndef SYNTH
@@ -168,17 +168,17 @@ module testbench
 	    .DEBUG      (DEBUG          ),
 	    .PROFILING  (PROFILING      ),
     `endif
-        .Environment  (ASIC           ),
-        .MULEXT       (MULEXT         ),
-        .AMOEXT       (AMOEXT         ),
-        .COMPRESSED   (COMPRESSED     ),
-        .VEnable      (VEnable        ),
-        .VLEN         (VLEN           ),
-        .XOSVMEnable  (USE_XOSVM      ),
-        .ZIHPMEnable  (USE_ZIHPM      ),
-        .ZKNEEnable   (USE_ZKNE       ),
-        .ZICONDEnable (USE_ZICOND     ),
-        .BRANCHPRED   (BRANCHPRED     )
+        .Environment     (ASIC          ),
+        .MULEXT          (MULEXT        ),
+        .AMOEXT          (AMOEXT        ),
+        .COMPRESSED      (COMPRESSED    ),
+        .VEnable         (VEnable       ),
+        .VLEN            (VLEN          ),
+        .XOSVMEnable     (USE_XOSVM     ),
+        .ZKNEEnable      (USE_ZKNE      ),
+        .ZICONDEnable    (USE_ZICOND    ),
+        .HPMCOUNTEREnable(USE_HPMCOUNTER),
+        .BRANCHPRED      (BRANCHPRED    )
     ) dut (
         .clk                    (clk),
         .reset_n                (reset_n),

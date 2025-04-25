@@ -32,13 +32,13 @@ module CSRBank
     parameter bit       PROFILING      = 1'b0,
     parameter string    PROFILING_FILE = "./debug/Report.txt",
 `endif
-    parameter bit       XOSVMEnable    = 1'b0,
-    parameter bit       ZIHPMEnable    = 1'b0,
-    parameter bit       COMPRESSED     = 1'b0,
-    parameter mul_e     MULEXT         = MUL_M,
-    parameter atomic_e  AMOEXT         = AMO_A,
-    parameter bit       VEnable        = 1'b0,
-    parameter int       VLEN           = 64
+    parameter bit       HPMCOUNTEREnable = 1'b0,
+    parameter bit       XOSVMEnable      = 1'b0,
+    parameter bit       COMPRESSED       = 1'b0,
+    parameter mul_e     MULEXT           = MUL_M,
+    parameter atomic_e  AMOEXT           = AMO_A,
+    parameter bit       VEnable          = 1'b0,
+    parameter int       VLEN             = 64
 )
 (
     input   logic               clk,
@@ -461,7 +461,7 @@ module CSRBank
     logic [31:0] cntr_vloadstore; // mhpmcounter29
     logic [31:0] cntr_vothers;    // mhpmcounter30
 
-    if (ZIHPMEnable) begin : gen_hpmcounter_on
+    if (HPMCOUNTEREnable) begin : gen_hpmcounter_on
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
                 cntr_killed <= '0;
@@ -1004,7 +1004,7 @@ module CSRBank
     };
 
     logic [63:0] mhpmevent [3:31];
-    if (ZIHPMEnable) begin : gen_hpmevent_on
+    if (HPMCOUNTEREnable) begin : gen_hpmevent_on
         always_comb begin
             for (int i = 3; i < 31; i++)
                 mhpmevent[i] = 64'(i);   /* Non-zero event to indicate counter is present */

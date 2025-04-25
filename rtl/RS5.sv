@@ -29,17 +29,17 @@ module RS5
     parameter bit           PROFILING      = 1'b0,
     parameter string        PROFILING_FILE = "./debug/Report.txt",
 `endif
-    parameter environment_e Environment    = ASIC,
-    parameter mul_e         MULEXT         = MUL_M,
-    parameter atomic_e      AMOEXT         = AMO_A,
-    parameter bit           COMPRESSED     = 1'b0,
-    parameter bit           VEnable        = 1'b0,
-    parameter int           VLEN           = 256,
-    parameter bit           XOSVMEnable    = 1'b0,
-    parameter bit           ZIHPMEnable    = 1'b0,
-    parameter bit           ZKNEEnable     = 1'b0,
-    parameter bit           ZICONDEnable   = 1'b0,
-    parameter bit           BRANCHPRED     = 1'b1
+    parameter environment_e Environment      = ASIC,
+    parameter mul_e         MULEXT           = MUL_M,
+    parameter atomic_e      AMOEXT           = AMO_A,
+    parameter bit           COMPRESSED       = 1'b0,
+    parameter bit           VEnable          = 1'b0,
+    parameter int           VLEN             = 256,
+    parameter bit           XOSVMEnable      = 1'b0,
+    parameter bit           ZKNEEnable       = 1'b0,
+    parameter bit           ZICONDEnable     = 1'b0,
+    parameter bit           HPMCOUNTEREnable = 1'b0,
+    parameter bit           BRANCHPRED       = 1'b1
 )
 (
     input  logic                    clk,
@@ -419,12 +419,12 @@ module RS5
         .PROFILING     (PROFILING     ),
         .PROFILING_FILE(PROFILING_FILE),
     `endif
-        .XOSVMEnable   (XOSVMEnable   ),
-        .ZIHPMEnable   (ZIHPMEnable   ),
-        .COMPRESSED    (COMPRESSED    ),
-        .MULEXT        (MULEXT        ),
-        .VEnable       (VEnable       ),
-        .VLEN          (VLEN          )
+        .HPMCOUNTEREnable(HPMCOUNTEREnable),
+        .XOSVMEnable     (XOSVMEnable     ),
+        .COMPRESSED      (COMPRESSED      ),
+        .MULEXT          (MULEXT          ),
+        .VEnable         (VEnable         ),
+        .VLEN            (VLEN            )
     ) CSRBank1 (
         .clk                        (clk),
         .reset_n                    (reset_n),
