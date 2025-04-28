@@ -80,22 +80,23 @@ void pad (
 
 // mobilenet functions
 void batch_normalization (
+    const int HEIGHT,
+    const int WIDTH,
+    const int CHANNELS,
     type input[],
-    const int filters,
-    const int size,
     const type mean[],
     const type var[],
     const type gamma[],
     const type beta[],
     const double eps
 ) {
-    for (int i=0; i<CONV1_FEATUREMAP_HEIGHT; i++) 
+    for (int i=0; i<HEIGHT; i++) 
     {
-        for (int j=0; j<CONV1_FEATUREMAP_WIDTH; j++) 
+        for (int j=0; j<WIDTH; j++) 
         {
-            for (int n=0; n<CONV1_FILTERS; n++) 
+            for (int n=0; n<CHANNELS; n++) 
             {
-                int id = n + j*CONV1_FILTERS + i*CONV1_FILTERS*CONV1_FEATUREMAP_WIDTH;
+                int id = (n) + (j*CHANNELS) + (i*CHANNELS*WIDTH);
                 input[id] -= mean[n];
                 input[id] /= sqrt(var[n] + eps);
                 input[id] *= gamma[n];
@@ -165,9 +166,10 @@ void _conv_block (
 
     #ifdef BATCHNORMALIZATION
     batch_normalization (
+        CONV1_FEATUREMAP_HEIGHT,
+        CONV1_FEATUREMAP_WIDTH,
+        filters,
         output, 
-        filters, 
-        CONV1_FEATUREMAP_HEIGHT*CONV1_FEATUREMAP_WIDTH, 
         mean, 
         var, 
         gamma, 
@@ -230,9 +232,10 @@ void _depthwise_conv_block (
 
     #ifdef BATCHNORMALIZATION
     batch_normalization (
+        OUTPUT_HEIGHT,
+        OUTPUT_WIDTH,
+        OUTPUT_CHANNELS,
         output, 
-        OUTPUT_CHANNELS, 
-        OUTPUT_HEIGHT*OUTPUT_WIDTH, 
         mean, 
         var, 
         gamma, 
