@@ -24,11 +24,10 @@ np.set_printoptions(threshold=np.inf)
 out = x
 
 layers = [
-    # "conv1", "conv1_bn", "conv1_relu",
-    "conv1", "conv1_bn"
+    "conv1", "conv1_bn", "conv1_relu",
     # "conv_dw_1"
     # "conv_dw_1", "conv_dw_1_bn"
-    # "conv_dw_1", "conv_dw_1_bn", "conv_dw_1_relu"
+    "conv_dw_1", "conv_dw_1_bn", "conv_dw_1_relu"
 ]
 
 y = 0
