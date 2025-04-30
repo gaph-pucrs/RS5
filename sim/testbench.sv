@@ -37,6 +37,7 @@ module testbench
     localparam bit           USE_XOSVM       = 1'b0;
     localparam bit           USE_ZKNE        = 1'b1;
     localparam bit           USE_ZICOND      = 1'b1;
+    localparam bit           USE_ZCB         = 1'b1;
     localparam bit           VEnable         = 1'b0;
     localparam int           VLEN            = 256;
     localparam bit           USE_HPMCOUNTER  = 1'b1;
@@ -177,6 +178,7 @@ module testbench
         .XOSVMEnable     (USE_XOSVM     ),
         .ZKNEEnable      (USE_ZKNE      ),
         .ZICONDEnable    (USE_ZICOND    ),
+        .ZCBEnable       (USE_ZCB       ),
         .HPMCOUNTEREnable(USE_HPMCOUNTER),
         .BRANCHPRED      (BRANCHPRED    )
     ) dut (
