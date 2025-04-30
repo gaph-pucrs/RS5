@@ -9,6 +9,7 @@
 // LAYER1
 #include "params/conv1.h"
 #include "params/conv_dw_1.h"
+#include "params/conv_pw_1.h"
 
 #ifdef BATCHNORMALIZATION
     #include "params/conv1_bn_mean.h"
@@ -22,6 +23,12 @@
     #include "params/conv_dw_1_bn_gamma.h"
     #include "params/conv_dw_1_bn_beta.h"
     #include "params/conv_dw_1_bn_eps.h"
+    
+    #include "params/conv_pw_1_bn_mean.h"
+    #include "params/conv_pw_1_bn_var.h"
+    #include "params/conv_pw_1_bn_gamma.h"
+    #include "params/conv_pw_1_bn_beta.h"
+    #include "params/conv_pw_1_bn_eps.h"
 #endif
 
 #define IMAGE_HEIGHT    225 // 224 + 1
@@ -34,6 +41,10 @@
 #define CONV_DW_1_HEIGHT        112
 #define CONV_DW_1_WIDTH         112
 #define CONV_DW_1_CHANNELS       32
+
+#define CONV_PW_1_HEIGHT        112
+#define CONV_PW_1_WIDTH         112
+#define CONV_PW_1_CHANNELS       64
 
 #define type    double
 
@@ -247,6 +258,66 @@ void _depthwise_conv_block (
     relu(6.0, output, OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS);
 }
 
+void _pointwise_conv_block (
+    const int INPUT_HEIGHT,
+    const int INPUT_WIDTH,
+    const int INPUT_CHANNELS,
+    const type input[],
+    const type weights[],
+    const int OUTPUT_HEIGHT,
+    const int OUTPUT_WIDTH,
+    const int OUTPUT_CHANNELS,
+    type output[],
+    const double alpha,
+    const int kernel_size,
+    const int stride
+#ifdef BATCHNORMALIZATION
+    ,
+    const type mean[],
+    const type var[],
+    const type gamma[],
+    const type beta[],
+    const double eps
+#endif
+) {
+    int base_y = 0, base_x = 0;
+    for (int k=0; k<OUTPUT_HEIGHT; k++)
+    {
+        base_x = 0;
+        for (int l=0; l<OUTPUT_WIDTH; l++)
+        {
+            for (int m=0; m<INPUT_CHANNELS; m++)
+            {
+                int idx_in = (m)+(base_x)+(base_y);
+                for (int n=0; n<OUTPUT_CHANNELS; n++)
+                {
+                    int idx_w = (n)+(m*OUTPUT_CHANNELS);
+                    int idx_out = (n)+(l*OUTPUT_CHANNELS)+(k*OUTPUT_CHANNELS*OUTPUT_WIDTH);
+                    output[idx_out] += input[idx_in]*weights[idx_w];
+                }
+            }
+            base_x += (stride)*(INPUT_CHANNELS);
+        }
+        base_y += (stride)*(INPUT_CHANNELS)*(INPUT_WIDTH);
+    }
+
+    #ifdef BATCHNORMALIZATION
+    batch_normalization (
+        OUTPUT_HEIGHT,
+        OUTPUT_WIDTH,
+        OUTPUT_CHANNELS,
+        output, 
+        mean, 
+        var, 
+        gamma, 
+        beta, 
+        eps
+    );
+    #endif
+
+    relu(6.0, output, OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS);
+}
+
 int main()
 {
     type *conv1_out = calloc(
@@ -270,7 +341,7 @@ int main()
        conv1_bn_eps
     #endif
     );
-
+    
     type *conv_dw_1_out = calloc((CONV_DW_1_CHANNELS)*(CONV_DW_1_HEIGHT)*(CONV_DW_1_WIDTH), sizeof(type));
     type *conv1_out_pad = calloc((CONV_DW_1_CHANNELS)*(CONV_DW_1_HEIGHT+2)*(CONV_DW_1_WIDTH+2), sizeof(type));
 
@@ -281,6 +352,8 @@ int main()
         conv1_out,
         conv1_out_pad
     );
+
+    free(conv1_out);
 
     _depthwise_conv_block (
         CONV1_FEATUREMAP_HEIGHT,
@@ -305,11 +378,40 @@ int main()
      #endif
     );
 
-    print(conv_dw_1_out, 112, 112, 32);
-
-    free(conv1_out);
     free(conv1_out_pad);
+
+    // print(conv_dw_1_out, 112, 112, 32);
+
+    type *conv_pw_1_out = calloc(CONV_PW_1_CHANNELS*CONV_PW_1_WIDTH*CONV_PW_1_HEIGHT, sizeof(type));
+
+    _pointwise_conv_block (
+        CONV_DW_1_HEIGHT,
+        CONV_DW_1_WIDTH,
+        CONV_DW_1_CHANNELS,
+        conv_dw_1_out,
+        conv_pw_1,
+        CONV_PW_1_HEIGHT,
+        CONV_PW_1_WIDTH,
+        CONV_PW_1_CHANNELS,
+        conv_pw_1_out,
+        1.0,
+        1,
+        1
+    #ifdef BATCHNORMALIZATION
+        ,
+        conv_pw_1_bn_mean,
+        conv_pw_1_bn_var,
+        conv_pw_1_bn_gamma,
+        conv_pw_1_bn_beta,
+        conv_pw_1_bn_eps
+    #endif
+    ); 
+
     free(conv_dw_1_out);
+    
+    print(conv_pw_1_out, 112, 112, 64);
+
+    free(conv_pw_1_out);
 
     return 0;
 }
