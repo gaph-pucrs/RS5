@@ -149,7 +149,7 @@ void softmax (
     }
 }
 
-void _conv_block2 (
+void _conv_block (
     const int INPUT_HEIGHT,
     const int INPUT_WIDTH,
     const int INPUT_CHANNELS,
@@ -170,8 +170,6 @@ void _conv_block2 (
     // "(0,0)" of the 3x3 image
     int base_y=0, base_x=0;
 
-    int cnt = 0;
-
     for (int k=0; k<OUTPUT_HEIGHT; k++)
     {
         base_x = 0;
@@ -188,7 +186,6 @@ void _conv_block2 (
                         {
                             int idx_w = (n)+(m*OUTPUT_CHANNELS)+(j*OUTPUT_CHANNELS*INPUT_CHANNELS)+(i*OUTPUT_CHANNELS*INPUT_CHANNELS*kernel_size);
                             int idx_out = (n)+(l*OUTPUT_CHANNELS)+(k*OUTPUT_CHANNELS*OUTPUT_WIDTH);
-
                             output[idx_out] += input[idx_i]*weights[idx_w];
                         }
                     }
@@ -213,66 +210,7 @@ void _conv_block2 (
     );
     #endif
 
-    relu(6.0, output, OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_WIDTH);
-}
-
-void _conv_block (
-    const type input[],
-    const type weights[],
-    type output[], 
-    int filters,
-    const int kernel_size,
-    const int stride,
-    const type mean[],
-    const type var[],
-    const type gamma[],
-    const type beta[],
-    const double eps
-) {
-    // "(0,0)" of the 3x3 image
-    int base_y=0, base_x=0;
-
-    for (int k=0; k<CONV1_FEATUREMAP_HEIGHT; k++)
-    {
-        base_x = 0;
-        for (int l=0; l<CONV1_FEATUREMAP_WIDTH; l++)
-        {
-            for (int i=0; i<kernel_size; i++)
-            {
-                for (int j=0; j<kernel_size; j++)
-                {
-                    for (int m=0; m<IMAGE_CHANNELS; m++)
-                    {
-                        int idx_i = (m)+(base_x)+(base_y)+(j*IMAGE_CHANNELS)+(i*IMAGE_CHANNELS*IMAGE_WIDTH);
-                        for (int n=0; n<filters; n++)
-                        {
-                            int idx_w = (n)+(m*filters)+(j*filters*IMAGE_CHANNELS)+(i*filters*IMAGE_CHANNELS*kernel_size);
-                            int idx_out = (n)+(l*filters)+(k*filters*CONV1_FEATUREMAP_WIDTH);
-                            output[idx_out] += input[idx_i]*weights[idx_w];
-                        }
-                    }
-                }
-            }
-            base_x += stride*IMAGE_CHANNELS;
-        }
-        base_y += stride*IMAGE_CHANNELS*IMAGE_WIDTH;
-    }
-
-    #ifdef BATCHNORMALIZATION
-    batch_normalization (
-        CONV1_FEATUREMAP_HEIGHT,
-        CONV1_FEATUREMAP_WIDTH,
-        filters,
-        output, 
-        mean, 
-        var, 
-        gamma, 
-        beta, 
-        eps
-    );
-    #endif
-
-    relu(6.0, output, CONV1_FEATUREMAP_HEIGHT*CONV1_FEATUREMAP_WIDTH*filters);
+    relu(6.0, output, OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS);
 }
 
 void _depthwise_conv_block (
@@ -458,11 +396,16 @@ int main()
     //     img_padded
     // );
 
-    _conv_block (
+    _conv_block3 (
+        IMAGE_HEIGHT,
+        IMAGE_WIDTH,
+        IMAGE_CHANNELS,
         img,
         conv1,
-        conv1_out, 
+        CONV1_FEATUREMAP_HEIGHT,
+        CONV1_FEATUREMAP_WIDTH,
         CONV1_FILTERS,
+        conv1_out, 
         3,   // kernel_size
         2,   // stride
         conv1_bn_mean,
@@ -471,7 +414,6 @@ int main()
         conv1_bn_beta,
         conv1_bn_eps
     );
-
     // free(img_padded);
 
 //------------------------------
