@@ -51,7 +51,7 @@ wfi:
     wfi
 	j   wfi
 
-
+.align 4
 trap_handler:
     csrrw a0, mscratch, a0
     csrr  a1, mcause

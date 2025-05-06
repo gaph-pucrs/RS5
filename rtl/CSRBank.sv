@@ -32,12 +32,13 @@ module CSRBank
     parameter bit       PROFILING      = 1'b0,
     parameter string    PROFILING_FILE = "./debug/Report.txt",
 `endif
-    parameter bit       XOSVMEnable    = 1'b0,
-    parameter bit       ZIHPMEnable    = 1'b0,
-    parameter bit       COMPRESSED     = 1'b0,
-    parameter mul_e     MULEXT         = MUL_M,
-    parameter bit       VEnable        = 1'b0,
-    parameter int       VLEN           = 64
+    parameter bit       HPMCOUNTEREnable = 1'b0,
+    parameter bit       XOSVMEnable      = 1'b0,
+    parameter bit       COMPRESSED       = 1'b0,
+    parameter mul_e     MULEXT           = MUL_M,
+    parameter atomic_e  AMOEXT           = AMO_A,
+    parameter bit       VEnable          = 1'b0,
+    parameter int       VLEN             = 64
 )
 (
     input   logic               clk,
@@ -47,9 +48,9 @@ module CSRBank
     input   logic               read_enable_i,
     input   logic               write_enable_i,
     input   csrOperation_e      operation_i,
-    input   logic [11:0]        address_i,
+    input   CSRs                address_i,
     input   logic [31:0]        data_i,
-    output  logic [31:0]        out,
+    output  logic [31:0]        data_o,
 
     /* Signals enabled with ZIHPM */
     /* verilator lint_off UNUSEDSIGNAL */
@@ -83,14 +84,15 @@ module CSRBank
 
     input   logic [63:0]        mtime_i,
 
-    input   logic [31:0]        irq_i,
+    input   logic               tip_i,
+    input   logic               eip_i,
     input   logic               interrupt_ack_i,
     output  logic               interrupt_pending_o,
 
     output  privilegeLevel_e    privilege_o,
 
-    output  logic [31:0]        mepc,
-    output  logic [31:0]        mtvec,
+    output  logic [31:0]        mepc_o,
+    output  logic [31:0]        mtvec_o,
 
     output  logic               mvmctl_o,
     output  logic [31:0]        mvmdo_o,
@@ -101,448 +103,1149 @@ module CSRBank
     output  logic [31:0]        mvmdm_o
 );
 
-    CSRs CSR;
     privilegeLevel_e privilege;
 
-//////////////////////////////////////////////////////////////////////////////
-// CSRs definition
-//////////////////////////////////////////////////////////////////////////////
+    logic [31:0] wr_data;
+    interruptionCode_e irq_code;
 
-    localparam logic [31:0] MISA_VALUE = {
-        1'b0,
-        1'b1,           // M-XLEN
-        6'b0,
+////////////////////////////////////////////////////////////////////////////////
+// misa
+////////////////////////////////////////////////////////////////////////////////
+
+    logic [31:0] misa;
+    assign misa = {
+        2'b1,           // MXL
+        4'b0,           // 0
+        2'b0,           // YZ - Reserved
         XOSVMEnable,    // X - Non-standard extensions present
-        1'b0,
+        1'b0,           // W - Reserved
         VEnable,        // V - Vector extension
         1'b1,           // U - User mode implemented
-        1'b0,
+        1'b0,           // T - Reserved
         1'b0,           // S - Supervisor mode implemented
-        2'b0,
+        1'b0,           // R - Reserved
+        1'b0,           // Q - Quad-precision floating-point extension
         1'b0,           // P - Packed-SIMD extension
-        1'b0,
+        1'b0,           // O - Reserved
         1'b0,           // N - User level interrupts supported
         (MULEXT==MUL_M),// M - Integer Multiply/Divide extension
-        3'b0,
+        3'b0,           // JKL - Reserved
         1'b1,           // I - RV32I/64I/128I base ISA
-        1'b0,           // F - Hypervisor extension
-        1'b0,           // F - Reserved
+        1'b0,           // H - Hypervisor extension
+        1'b0,           // G - Reserved
         1'b0,           // F - Single precision floating-point extension
         1'b0,           // E - RV32E base ISA
         1'b0,           // D - Double precision floating-point extension
         (COMPRESSED),   // C - Compressed extension
         1'b0,           // B - Bit-Manipulation extension
-        1'b0            // A - Atomic Extension
+        (AMOEXT==AMO_A) // A - Atomic Extension
     };
 
-    logic [31:0] misa, mstatus, mtvec_r, mip, mie, mscratch, mepc_r, mcause, mtval;
-    logic [63:0] mcycle, minstret;
+////////////////////////////////////////////////////////////////////////////////
+// mstatus
+////////////////////////////////////////////////////////////////////////////////
 
-    /* Signals enabled with XOSVM */
-    /* verilator lint_off UNUSEDSIGNAL */
-    logic [31:0] mvmdo, mvmio, mvmds, mvmis, mvmdm, mvmim;
-    logic        mvmctl;
-    /* verilator lint_on UNUSEDSIGNAL */
+    /* @todo What if an interrupt occurs during mstatus write? */
 
-    logic [31:0] wr_data, wmask, current_val;
-
-    logic [31:0] instructions_killed_counter, hazard_counter, stall_counter, nop_counter;
-    logic [31:0] interrupt_ack_counter, raise_exception_counter, context_switch_counter;
-    logic [31:0] logic_counter, addsub_counter, lui_slt_counter, shift_counter;
-    logic [31:0] branch_counter, jump_counter;
-    logic [31:0] load_counter, store_counter;
-    logic [31:0] sys_counter, csr_counter;
-    logic [31:0] compressed_counter, jump_misaligned_counter;
-    logic [31:0] mcountinhibit;
-    interruptionCode_e Interruption_Code;
-
-    /* Signals enabled with ZIHPM */
-    /* verilator lint_off UNUSEDSIGNAL */
-    logic [31:0] mul_counter, div_counter;
-    /* verilator lint_on UNUSEDSIGNAL */
-
-    /* vector extension profiling signals */
-    logic [31:0] vaddsub_counter, vmul_counter, vdiv_counter, vmac_counter, vred_counter, 
-                 vloadstore_counter, vothers_counter;
-
-//////////////////////////////////////////////////////////////////////////////
-// MCAUSE and MSTATUS CSRs
-//////////////////////////////////////////////////////////////////////////////
-
-    logic        mcause_interrupt;
-    logic [30:0] mcause_exc_code;
-
-    assign mcause = {mcause_interrupt, mcause_exc_code};
-
-    logic mstatus_mpie;
     logic mstatus_mie;
-    logic [1:0] mstatus_mpp;
-
-    assign mstatus = {
-                        1'b0,
-                        8'b0,
-                        1'b0,
-                        1'b0,
-                        1'b0,
-                        1'b0, // mstatus_mxr
-                        1'b0,
-                        1'b0, // mstatus_mprv
-                        2'b0,
-                        2'b0,
-                        mstatus_mpp,
-                        2'b0,
-                        1'b0, // mstatus_spp
-                        mstatus_mpie,
-                        1'b0,
-                        1'b0,
-                        1'b0,
-                        mstatus_mie,
-                        1'b0,
-                        1'b0,
-                        1'b0
-                    };
-
-//////////////////////////////////////////////////////////////////////////////
-// Assigns
-//////////////////////////////////////////////////////////////////////////////
-
-    assign privilege_o = privilege;
-    assign mtvec       = mtvec_r;
-    assign mepc        = mepc_r;
-
-    assign CSR = CSRs'(address_i);
-
-//////////////////////////////////////////////////////////////////////////////
-// Masks and Current Value
-//////////////////////////////////////////////////////////////////////////////
-
-    always_comb begin
-        wmask = '1;
-        case (CSR)
-            MSTATUS:       begin current_val = mstatus;         wmask = 32'h007E19AA; end
-            MISA:          begin current_val = misa;            wmask = 32'h00301000; end
-            // MEDELEG:    begin current_val = medeleg;         wmask = '1; end
-            // MIDELEG:    begin current_val = mideleg;         wmask = '1; end
-            MIE:           begin current_val = mie;             wmask = 32'h00000888; end
-            MTVEC:         begin current_val = mtvec_r;         wmask = COMPRESSED ? 32'hFFFFFFFE : 32'hFFFFFFFC; end
-            // MCOUNTEREN: begin current_val = mcounteren;      wmask = '1; end
-            // MSTATUSH:   begin current_val = mstatush;        wmask = '1; end
-            MSCRATCH:      begin current_val = mscratch;        wmask = 32'hFFFFFFFF; end
-            MEPC:          begin current_val = mepc_r;          wmask = COMPRESSED ? 32'hFFFFFFFE : 32'hFFFFFFFC; end
-            MCAUSE:        begin current_val = mcause;          wmask = 32'hFFFFFFFF; end
-            MTVAL:         begin current_val = mtval;           wmask = 32'hFFFFFFFF; end
-            MCYCLE:        begin current_val = mcycle[31:0];    wmask = 32'hFFFFFFFF; end
-            MCYCLEH:       begin current_val = mcycle[63:32];   wmask = 32'hFFFFFFFF; end
-            MINSTRET:      begin current_val = minstret[31:0];  wmask = 32'hFFFFFFFF; end
-            MINSTRETH:     begin current_val = minstret[63:32]; wmask = 32'hFFFFFFFF; end
-            MCOUNTINHIBIT: begin current_val = mcountinhibit;   wmask = 32'hFFFFFFFF; end
-
-            MVMDO:         begin current_val = mvmdo;           wmask = 32'hFFFFFFFC; end
-            MVMDS:         begin current_val = mvmds;           wmask = 32'hFFFFFFFC; end
-            MVMDM:         begin current_val = mvmdm;           wmask = 32'hFFFFFFFC; end
-            MVMIO:         begin current_val = mvmio;           wmask = 32'hFFFFFFFC; end
-            MVMIS:         begin current_val = mvmis;           wmask = 32'hFFFFFFFC; end
-            MVMIM:         begin current_val = mvmim;           wmask = 32'hFFFFFFFC; end
-            MVMCTL:        begin current_val = {31'b0, mvmctl}; wmask = 32'h00000001; end
-
-            default:       begin current_val = '0;              wmask = 32'h00000000; end
-        endcase
-    end
-
-//////////////////////////////////////////////////////////////////////////////
-// Operation
-//////////////////////////////////////////////////////////////////////////////
-
-    always_comb begin
-        case (operation_i)
-            SET:     wr_data = (current_val | (data_i & wmask));
-            CLEAR:   wr_data = (current_val & ~(data_i & wmask));
-            default: wr_data = (current_val & ~wmask) | (data_i & wmask); // WRITE
-        endcase
-    end
-
-//////////////////////////////////////////////////////////////////////////////
-// CSR Writing
-//////////////////////////////////////////////////////////////////////////////
+    logic mstatus_mpie;
 
     always_ff @(posedge clk or negedge reset_n) begin
-        //////////////////////////////////////////////////////////////////////////////
-        // Reset
-        //////////////////////////////////////////////////////////////////////////////
-        if (!reset_n) begin
-            mcountinhibit    <= '0;
-            mstatus_mie      <= '0;
-            misa             <= MISA_VALUE;
-            //medeleg        <= '0;
-            //mideleg        <= '0;
-            mie              <= '0;
-            mtvec_r          <= '0;
-            //mcounteren     <= '0;
-            //mstatush       <= '0;
-            mscratch         <= '0;
-            mepc_r           <= '0;
-            mcause_interrupt <= '0;
-            mcause_exc_code  <= '0;
-            mtval            <= '0;
-            mcycle           <= '0;
-            minstret         <= '0;
-            privilege        <= privilegeLevel_e'(2'b11);
-            mstatus_mpp      <= '1;
-            mstatus_mpie     <= '0;
+        if (!reset_n)
+            mstatus_mpie <= 1'b0;
+        else if (sys_reset)
+            mstatus_mpie <= 1'b0;
+        else begin 
+            if (raise_exception_i || interrupt_ack_i)
+                mstatus_mpie <= mstatus_mie;
+            else if (write_enable_i && address_i == MSTATUS)
+                mstatus_mpie <= wr_data[7];
         end
-        else if(sys_reset) begin
-            mcountinhibit    <= '0;
-            mstatus_mie      <= '0;
-            misa             <= MISA_VALUE;
-            //medeleg        <= '0;
-            //mideleg        <= '0;
-            mie              <= '0;
-            mtvec_r          <= '0;
-            //mcounteren     <= '0;
-            //mstatush       <= '0;
-            mscratch         <= '0;
-            mepc_r           <= '0;
-            mcause_interrupt <= '0;
-            mcause_exc_code  <= '0;
-            mtval            <= '0;
-            mcycle           <= '0;
-            minstret         <= '0;
-            privilege        <= privilegeLevel_e'(2'b11);
-            mstatus_mpp      <= '1;
-            mstatus_mpie     <= '0;
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mstatus_mie <= 1'b0;
+        else if (sys_reset)
+            mstatus_mie <= 1'b0;
+        else begin 
+            if (machine_return_i)
+                mstatus_mie <= mstatus_mpie;
+            else if (raise_exception_i || interrupt_ack_i)
+                mstatus_mie <= 1'b0;
+            else if (write_enable_i && address_i == MSTATUS)
+                mstatus_mie <= wr_data[3];
         end
-        //////////////////////////////////////////////////////////////////////////////
-        // Cycle Updates
-        //////////////////////////////////////////////////////////////////////////////
+    end
+
+    logic [1:0] mstatus_mpp;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mstatus_mpp <= 2'b11;
+        else if (sys_reset)
+            mstatus_mpp <= 2'b11;
+        else begin 
+            if (raise_exception_i || interrupt_ack_i)
+                mstatus_mpp <= privilege;
+            else if (write_enable_i && address_i == MSTATUS)
+                mstatus_mpp <= wr_data[12:11];
+        end
+    end
+
+    logic [31:0] mstatus;
+    assign mstatus = {
+        1'b0,        // SD
+        8'b0,        // WPRI
+        1'b0,        // TSR
+        1'b0,        // TW
+        1'b0,        // TVM
+        1'b0,        // MXR
+        1'b0,        // SUM
+        1'b0,        // MPRV
+        2'b0,        // XS
+        2'b0,        // FS
+        mstatus_mpp, // MPP
+        2'b0,        // VS
+        1'b0,        // SPP
+        mstatus_mpie,// MPIE
+        1'b0,        // UBE
+        1'b0,        // SPIE
+        1'b0,        // WPRI
+        mstatus_mie, // MIE
+        1'b0,        // WPRI
+        1'b0,        // SIE
+        1'b0         // WPRI
+    };
+
+////////////////////////////////////////////////////////////////////////////////
+// mtvec
+////////////////////////////////////////////////////////////////////////////////
+
+    logic [31:2] mtvec_base;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mtvec_base <= '0;
+        else begin 
+            if (write_enable_i && address_i == MTVEC)
+                mtvec_base <= wr_data[31:2];
+        end
+    end
+
+    logic [31:0] mtvec;
+    assign mtvec = {
+        mtvec_base, // BASE
+        2'b0        // MODE
+    };
+
+    assign mtvec_o = mtvec;
+
+////////////////////////////////////////////////////////////////////////////////
+// mip and mie
+////////////////////////////////////////////////////////////////////////////////
+
+    logic mip_msip;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mip_msip <= 1'b0;
+        else if (sys_reset)
+            mip_msip <= 1'b0;
         else begin
-            mcycle      <= !mcountinhibit[0] ? mcycle + 1'b1 : mcycle;
-            minstret    <= !(hold || instruction_operation_i == NOP) && !mcountinhibit[2]
-                            ? minstret + 1
-                            : minstret;
-        //////////////////////////////////////////////////////////////////////////////
-        // Machine Return
-        //////////////////////////////////////////////////////////////////////////////
-            if (machine_return_i == 1'b1) begin
-                mstatus_mie     <= mstatus_mpie;
-                privilege       <= privilegeLevel_e'(mstatus_mpp);
-            end
-        //////////////////////////////////////////////////////////////////////////////
-        // Exception
-        //////////////////////////////////////////////////////////////////////////////
-            else if (raise_exception_i == 1'b1) begin
-                mcause_interrupt<= '0;
-                mcause_exc_code <= {26'b0, exception_code_i};
-                mstatus_mpp     <= privilege;
-                privilege       <= privilegeLevel_e'(2'b11);
-                mstatus_mpie    <= mstatus_mie;
-                mstatus_mie     <= 0;
-                mepc_r          <= pc_i;
-                mtval           <= (exception_code_i == ILLEGAL_INSTRUCTION)
-                                    ? instruction_i
-                                    : pc_i;
-            end
-        //////////////////////////////////////////////////////////////////////////////
-        // Interrupt
-        //////////////////////////////////////////////////////////////////////////////
-            else if (interrupt_ack_i == 1'b1) begin
-                mcause_interrupt<= '1;
-                mcause_exc_code <= {26'b0, Interruption_Code};
-                mstatus_mpp     <= privilege;
-                privilege       <= privilegeLevel_e'(2'b11);
-                mstatus_mpie    <= mstatus_mie;
-                mstatus_mie     <= 0;
+            if (write_enable_i && address_i == MIP)
+                mip_msip <= wr_data[3];
+        end
+    end
 
-                /* Interrupted instruction is in fact the next instruction,
-                 * because this one will be retired completely before taking
-                 * the trap
-                 */
-                if (jump_i)
-                    mepc_r      <= jump_target_i;
-                else
-                    mepc_r      <= next_pc_i;
-            end
-        //////////////////////////////////////////////////////////////////////////////
-        // CSR Write
-        //////////////////////////////////////////////////////////////////////////////
-            else if (write_enable_i) begin
-                case(CSR)
-                    MISA:           misa                <= wr_data;
-                    // MEDELEG:     medeleg             <= wr_data;
-                    // MIDELEG:     mideleg             <= wr_data;
-                    MIE:            mie                 <= wr_data;
-                    MTVEC:          mtvec_r             <= wr_data;
-                    // MCOUNTEREN:  mcounteren          <= wr_data;
-                    // MSTATUSH:    mstatush            <= wr_data;
-                    MSCRATCH:       mscratch            <= wr_data;
-                    MEPC:           mepc_r              <= wr_data;
-                    MTVAL:          mtval               <= wr_data;
-                    MCYCLE:         mcycle[31:0]        <= wr_data;
-                    MCYCLEH:        mcycle[63:32]       <= wr_data;
-                    MINSTRET:       minstret[31:0]      <= wr_data;
-                    MINSTRETH:      minstret[63:32]     <= wr_data;
-                    MCOUNTINHIBIT:  mcountinhibit       <= wr_data;
-                    MCAUSE: begin
-                                    mcause_interrupt    <= wr_data[31];
-                                    mcause_exc_code     <= wr_data[30:0];
-                            end
-                    MSTATUS:begin
-                                    mstatus_mpp         <= wr_data[12:11];
-                                    mstatus_mpie        <= wr_data[7];
-                                    mstatus_mie         <= wr_data[3];
-                            end
+    logic mip_mtip;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mip_mtip <= 1'b0;
+        else if (sys_reset)
+            mip_mtip <= 1'b0;
+        else begin
+            mip_mtip <= tip_i;
+            if (write_enable_i && address_i == MIP)
+                mip_mtip <= wr_data[7];
+        end
+    end
 
-                    default:    ; // no op
-                endcase
+    logic mip_meip;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mip_meip <= 1'b0;
+        else if (sys_reset)
+            mip_meip <= 1'b0;
+        else begin
+            mip_meip <= eip_i;
+            if (write_enable_i && address_i == MIP)
+                mip_meip <= wr_data[11];
+        end
+    end
+
+    logic [31:0] mip;
+    assign mip = {
+        16'b0,    // Designated for platform use
+        2'b0,     // 0
+        1'b0,     // LCOFIP
+        1'b0,     // 0
+        mip_meip, // MEIP
+        1'b0,     // 0
+        1'b0,     // SEIP
+        1'b0,     // 0
+        mip_mtip, // MTIP
+        1'b0,     // 0
+        1'b0,     // STIP
+        1'b0,     // 0
+        mip_msip, // MSIP
+        1'b0,     // 0
+        1'b0,     // SSIP
+        1'b0      // 0
+    };
+
+    logic mie_msie;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mie_msie <= 1'b0;
+        else if (sys_reset)
+            mie_msie <= 1'b0;
+        else begin 
+            if (write_enable_i && address_i == MIE)
+                mie_msie <= wr_data[3];
+        end
+    end
+
+    logic mie_mtie;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mie_mtie <= 1'b0;
+        else if (sys_reset)
+            mie_mtie <= 1'b0;
+        else begin 
+            if (write_enable_i && address_i == MIE)
+                mie_mtie <= wr_data[7];
+        end
+    end
+
+    logic mie_meie;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mie_meie <= 1'b0;
+        else if (sys_reset)
+            mie_meie <= 1'b0;
+        else begin 
+            if (write_enable_i && address_i == MIE)
+                mie_meie <= wr_data[11];
+        end
+    end
+
+    logic [31:0] mie;
+    assign mie = {
+        16'b0,    // Designated for platform use
+        2'b0,     // 0
+        1'b0,     // LCOFIE
+        1'b0,     // 0
+        mie_meie, // MEIE
+        1'b0,     // 0
+        1'b0,     // SEIE
+        1'b0,     // 0
+        mie_mtie, // MTIE
+        1'b0,     // 0
+        1'b0,     // STIE
+        1'b0,     // 0
+        mie_msie, // MSIE
+        1'b0,     // 0
+        1'b0,     // SSIE
+        1'b0      // 0
+    };
+
+////////////////////////////////////////////////////////////////////////////////
+// mcounteren
+////////////////////////////////////////////////////////////////////////////////
+
+    logic [31:0] mcounteren;
+
+    /* Allows all reads to shadow performance registers */
+    /* @todo Cause illegal instruction on Zicntr/Zihpm when a bit is 0 */
+    assign mcounteren = '1;
+
+////////////////////////////////////////////////////////////////////////////////
+// mcountinhibit
+////////////////////////////////////////////////////////////////////////////////
+
+    logic [31:0] mcountinhibit;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mcountinhibit <= '0;
+        else if (sys_reset)
+            mcountinhibit <= '0;
+        else begin
+            if (write_enable_i && address_i == MCOUNTINHIBIT) begin
+                mcountinhibit[30:2] <= wr_data[30:2];
+                mcountinhibit[0]    <= wr_data[0];
             end
         end
     end
 
-//////////////////////////////////////////////////////////////////////////////
-// CSR Reading
-//////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+// mcycle and minstret
+////////////////////////////////////////////////////////////////////////////////
 
-    always_comb begin
-        if (read_enable_i) begin
-            case(CSR)
-                //RO
-                MVENDORID:      out = '0;
-                MARCHID:        out = '0;
-                MIMPID:         out = '0;
-                MHARTID:        out = '0;
-                MCONFIGPTR:     out = '0;
-
-                //RW
-                MSTATUS:        out = mstatus;
-                MISA:           out = misa;
-                // MEDELEG:     out = medeleg;
-                // MIDELEG:     out = mideleg;
-                MIE:            out = mie;
-                MTVEC:          out = mtvec_r;
-                // MCOUNTEREN:  out = mcounteren;
-                // MSTATUSH:    out = mstatush;
-                MSCRATCH:       out = mscratch;
-                MEPC:           out = mepc_r;
-                MCAUSE:         out = mcause;
-                MTVAL:          out = mtval;
-                MIP:            out = mip;
-                MCYCLE:         out = mcycle[31:0];
-                MCYCLEH:        out = mcycle[63:32];
-                MINSTRET:       out = minstret[31:0];
-                MINSTRETH:      out = minstret[63:32];
-
-                //RO
-                CYCLE:          out = mcycle[31:0];
-                TIME:           out = mtime_i[31:0];
-                INSTRET:        out = minstret[31:0];
-
-                MHPMCOUNTER3:   out = instructions_killed_counter;
-                MHPMCOUNTER4:   out = context_switch_counter;
-                MHPMCOUNTER5:   out = raise_exception_counter;
-                MHPMCOUNTER6:   out = interrupt_ack_counter;
-                MHPMCOUNTER7:   out = hazard_counter;
-                MHPMCOUNTER8:   out = stall_counter;
-                MHPMCOUNTER9:   out = nop_counter;
-                MHPMCOUNTER10:  out = logic_counter;
-                MHPMCOUNTER11:  out = addsub_counter;
-                MHPMCOUNTER12:  out = shift_counter;
-                MHPMCOUNTER13:  out = branch_counter;
-                MHPMCOUNTER14:  out = jump_counter;
-                MHPMCOUNTER15:  out = load_counter;
-                MHPMCOUNTER16:  out = store_counter;
-                MHPMCOUNTER17:  out = sys_counter;
-                MHPMCOUNTER18:  out = csr_counter;
-                MHPMCOUNTER19:  out = lui_slt_counter;
-                MHPMCOUNTER20:  out = compressed_counter;
-                MHPMCOUNTER21:  out = jump_misaligned_counter;
-                MHPMCOUNTER22:  out = mul_counter;
-                MHPMCOUNTER23:  out = div_counter;
-
-                // Vector Extension counters
-                MHPMCOUNTER24:  out = vaddsub_counter;
-                MHPMCOUNTER25:  out = vmul_counter;
-                MHPMCOUNTER26:  out = vdiv_counter;
-                MHPMCOUNTER27:  out = vmac_counter;
-                MHPMCOUNTER28:  out = vred_counter;
-                MHPMCOUNTER29:  out = vloadstore_counter;
-                MHPMCOUNTER30:  out = vothers_counter;
-
-                CYCLEH:         out = mcycle[63:32];
-                TIMEH:          out = mtime_i[63:32];
-                INSTRETH:       out = minstret[63:32];
-
-                MCOUNTINHIBIT:  out = mcountinhibit;
-
-                MVMCTL:         out = {31'b0,mvmctl};
-                MVMDO:          out = mvmdo[31:0];
-                MVMDS:          out = mvmds[31:0];
-                MVMDM:          out = mvmdm[31:0];
-                MVMIO:          out = mvmio[31:0];
-                MVMIS:          out = mvmis[31:0];
-                MVMIM:          out = mvmim[31:0];
-
-                // Vector Extension CSRs
-                VSTART:         out = '0;
-                VLENBYTES:      out = VLEN/8;
-                VTYPE:          out = vtype_i;
-                VL:             out = vlen_i;
-
-                default:        out = '0;
-            endcase
-        end
+    logic [63:0] mcycle;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mcycle <= '0;
+        else if (sys_reset)
+            mcycle <= '0;
         else begin
-            out = '0;
-        end
-    end
+            if (!mcountinhibit[0])
+                mcycle <= mcycle + 1'b1;
 
-//////////////////////////////////////////////////////////////////////////////
-// XOSVM Extension
-//////////////////////////////////////////////////////////////////////////////
-
-    if (XOSVMEnable == 1'b1) begin : gen_xosvm_csr_on
-        always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n) begin
-                mvmctl      <= '0;
-                mvmdo       <= '0;
-                mvmds       <= '0;
-                mvmdm       <= '0;
-                mvmio       <= '0;
-                mvmis       <= '0;
-                mvmim       <= '0;
-            end
-            else if (sys_reset) begin
-                mvmctl      <= '0;
-                mvmdo       <= '0;
-                mvmds       <= '0;
-                mvmdm       <= '0;
-                mvmio       <= '0;
-                mvmis       <= '0;
-                mvmim       <= '0;
-            end
-            else if (write_enable_i) begin
-                case (CSR)
-                    MVMCTL:     mvmctl  <= wr_data[0];
-                    MVMDO:      mvmdo   <= wr_data;
-                    MVMDS:      mvmds   <= wr_data;
-                    MVMDM:      mvmdm   <= wr_data;
-                    MVMIO:      mvmio   <= wr_data;
-                    MVMIS:      mvmis   <= wr_data;
-                    MVMIM:      mvmim   <= wr_data;
+            if (write_enable_i) begin
+                unique case(address_i)
+                    MCYCLE:  mcycle[31:0] <= wr_data;
+                    MCYCLEH: mcycle[63:32] <= wr_data;
                     default: ;
                 endcase
             end
         end
     end
-    else begin : gen_xosvm_csr_off
-        assign mvmctl   = '0;
-        assign mvmdo    = '0;
-        assign mvmds    = '0;
-        assign mvmdm    = '0;
-        assign mvmio    = '0;
-        assign mvmis    = '0;
-        assign mvmim    = '0;
+
+    logic [63:0] minstret;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            minstret <= '0;
+        else if (sys_reset)
+            minstret <= '0;
+        else begin
+            if (!mcountinhibit[2] && !(hold || instruction_operation_i == NOP))
+                minstret <= minstret + 1'b1;
+
+            if (write_enable_i) begin
+                unique case(address_i)
+                    MINSTRET:  minstret[31:0] <= wr_data;
+                    MINSTRETH: minstret[63:32] <= wr_data;
+                    default: ;
+                endcase
+            end
+        end
     end
 
-    assign mvmctl_o = mvmctl;
+////////////////////////////////////////////////////////////////////////////////
+// Performance counters
+////////////////////////////////////////////////////////////////////////////////
+
+    /* @todo Add (A)tomic, Zkne, and Zicond */
+
+    logic [31:0] cntr_killed;     // mhpmcounter3
+    logic [31:0] cntr_context;    // mhpmcounter4
+    logic [31:0] cntr_exception;  // mhpmcounter5
+    logic [31:0] cntr_irq;        // mhpmcounter6
+    logic [31:0] cntr_hazard;     // mhpmcounter7
+    logic [31:0] cntr_stall;      // mhpmcounter8
+    logic [31:0] cntr_nop;        // mhpmcounter9
+    logic [31:0] cntr_logic;      // mhpmcounter10
+    logic [31:0] cntr_addsub;     // mhpmcounter11
+    logic [31:0] cntr_shift;      // mhpmcounter12
+    logic [31:0] cntr_branch;     // mhpmcounter13
+    logic [31:0] cntr_jump;       // mhpmcounter14
+    logic [31:0] cntr_load;       // mhpmcounter15
+    logic [31:0] cntr_store;      // mhpmcounter16
+    logic [31:0] cntr_sys;        // mhpmcounter17
+    logic [31:0] cntr_csr;        // mhpmcounter18
+    logic [31:0] cntr_luislt;     // mhpmcounter19
+    logic [31:0] cntr_compressed; // mhpmcounter20
+    logic [31:0] cntr_misaligned; // mhpmcounter21
+    logic [31:0] cntr_mul;        // mhpmcounter22
+    logic [31:0] cntr_div;        // mhpmcounter23
+    logic [31:0] cntr_vaddsub;    // mhpmcounter24
+    logic [31:0] cntr_vmul;       // mhpmcounter25
+    logic [31:0] cntr_vdiv;       // mhpmcounter26
+    logic [31:0] cntr_vmac;       // mhpmcounter27
+    logic [31:0] cntr_vred;       // mhpmcounter28
+    logic [31:0] cntr_vloadstore; // mhpmcounter29
+    logic [31:0] cntr_vothers;    // mhpmcounter30
+
+    if (HPMCOUNTEREnable) begin : gen_hpmcounter_on
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_killed <= '0;
+            else if (sys_reset)
+                cntr_killed <= '0;
+            else begin
+                if (!mcountinhibit[3] && killed)
+                    cntr_killed <= cntr_killed + 1'b1;
+
+                if (write_enable_i && address_i == MHPMCOUNTER3)
+                    cntr_killed <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_context <= '0;
+            else if (sys_reset)
+                cntr_context <= '0;
+            else begin
+                if (!mcountinhibit[4] && (jump_i || raise_exception_i || machine_return_i || interrupt_ack_i))
+                    cntr_context <= cntr_context + 1'b1;
+
+                if (write_enable_i && address_i == MHPMCOUNTER4)
+                    cntr_context <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_exception <= '0;
+            else if (sys_reset)
+                cntr_exception <= '0;
+            else begin
+                if (!mcountinhibit[5] && raise_exception_i)
+                    cntr_exception <= cntr_exception + 1'b1;
+
+                if (write_enable_i && address_i == MHPMCOUNTER5)
+                    cntr_exception <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_irq <= '0;
+            else if (sys_reset)
+                cntr_irq <= '0;
+            else begin
+                if (!mcountinhibit[6] && interrupt_ack_i)
+                    cntr_irq <= cntr_irq + 1'b1;
+
+                if (write_enable_i && address_i == MHPMCOUNTER6)
+                    cntr_irq <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_hazard <= '0;
+            else if (sys_reset)
+                cntr_hazard <= '0;
+            else begin
+                if (!mcountinhibit[7] && hazard && !hold)
+                    cntr_hazard <= cntr_hazard + 1'b1;
+
+                if (write_enable_i && address_i == MHPMCOUNTER7)
+                    cntr_hazard <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_stall <= '0;
+            else if (sys_reset)
+                cntr_stall <= '0;
+            else begin
+                if (!mcountinhibit[8] && stall)
+                    cntr_stall <= cntr_stall + 1'b1;
+
+                if (write_enable_i && address_i == MHPMCOUNTER8)
+                    cntr_stall <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_nop <= '0;
+            else if (sys_reset)
+                cntr_nop <= '0;
+            else begin
+                if (!mcountinhibit[9] && (!hold && instruction_operation_i inside {NOP}))
+                    cntr_nop <= cntr_nop + 1'b1;
+
+                if (write_enable_i && address_i == MHPMCOUNTER9)
+                    cntr_nop <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_logic <= '0;
+            else if (sys_reset)
+                cntr_logic <= '0;
+            else begin
+                if (!mcountinhibit[10] && (!hold && instruction_operation_i inside {XOR, OR, AND}))
+                    cntr_logic <= cntr_logic + 1'b1;
+
+                if (write_enable_i && address_i == MHPMCOUNTER10)
+                    cntr_logic <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_addsub <= '0;
+            else if (sys_reset)
+                cntr_addsub <= '0;
+            else begin
+                if (!mcountinhibit[11] && (!hold && instruction_operation_i inside {ADD, SUB}))
+                    cntr_addsub <= cntr_addsub + 1'b1;
+
+                if (write_enable_i && address_i == MHPMCOUNTER11)
+                    cntr_addsub <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_shift <= '0;
+            else if (sys_reset)
+                cntr_shift <= '0;
+            else begin
+                if (!mcountinhibit[12] && (!hold && instruction_operation_i inside {SLL, SRL, SRA}))
+                    cntr_shift <= cntr_shift + 1'b1;
+
+                if (write_enable_i && address_i == MHPMCOUNTER12)
+                    cntr_shift <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_branch <= '0;
+            else if (sys_reset)
+                cntr_branch <= '0;
+            else begin
+                if (!mcountinhibit[13] && (!hold && instruction_operation_i inside {BEQ, BNE, BLT, BLTU, BGE, BGEU}))
+                    cntr_branch <= cntr_branch + 1'b1;
+
+                if (write_enable_i && address_i == MHPMCOUNTER13)
+                    cntr_branch <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_jump <= '0;
+            else if (sys_reset)
+                cntr_jump <= '0;
+            else begin
+                if (!mcountinhibit[14] && (!hold && instruction_operation_i inside {JAL, JALR}))
+                    cntr_jump <= cntr_jump + 1'b1;
+
+                if (write_enable_i && address_i == MHPMCOUNTER14)
+                    cntr_jump <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_load <= '0;
+            else if (sys_reset)
+                cntr_load <= '0;
+            else begin
+                if (!mcountinhibit[15] && (!hold && instruction_operation_i inside {LB, LBU, LH, LHU, LW}))
+                    cntr_load <= cntr_load + 1'b1;
+
+                if (write_enable_i && address_i == MHPMCOUNTER15)
+                    cntr_load <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_store <= '0;
+            else if (sys_reset)
+                cntr_store <= '0;
+            else begin
+                if (!mcountinhibit[16] && (!hold && instruction_operation_i inside {SB, SH, SW}))
+                    cntr_store <= cntr_store + 1'b1;
+
+                if (write_enable_i && address_i == MHPMCOUNTER16)
+                    cntr_store <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_sys <= '0;
+            else if (sys_reset)
+                cntr_sys <= '0;
+            else begin
+                if (!mcountinhibit[17] && (!hold && instruction_operation_i inside {MRET, WFI, ECALL, EBREAK}))
+                    cntr_sys <= cntr_sys + 1'b1;
+
+                if (write_enable_i && address_i == MHPMCOUNTER17)
+                    cntr_sys <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_csr <= '0;
+            else if (sys_reset)
+                cntr_csr <= '0;
+            else begin
+                if (
+                        !mcountinhibit[18] && 
+                        (
+                            !hold && instruction_operation_i inside {CSRRW, CSRRWI, CSRRS, CSRRSI, CSRRC, CSRRCI}
+                        )
+                    )
+                    cntr_csr <= cntr_csr + 1'b1;
+
+                if (write_enable_i && address_i == MHPMCOUNTER18)
+                    cntr_csr <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_luislt <= '0;
+            else if (sys_reset)
+                cntr_luislt <= '0;
+            else begin
+                if (!mcountinhibit[19] && (!hold && instruction_operation_i inside {SLTU, SLT, LUI}))
+                    cntr_luislt <= cntr_luislt + 1'b1;
+
+                if (write_enable_i && address_i == MHPMCOUNTER19)
+                    cntr_luislt <= wr_data;
+            end
+        end
+
+        if (COMPRESSED) begin :gen_hpmcounter_compressed_on
+            always_ff @(posedge clk or negedge reset_n) begin
+                if (!reset_n)
+                    cntr_compressed <= '0;
+                else if (sys_reset)
+                    cntr_compressed <= '0;
+                else begin
+                    if (!mcountinhibit[20] && (!hold && instruction_compressed_i))
+                        cntr_compressed <= cntr_compressed + 1'b1;
+
+                    if (write_enable_i && address_i == MHPMCOUNTER20)
+                        cntr_compressed <= wr_data;
+                end
+            end
+            
+            always_ff @(posedge clk or negedge reset_n) begin
+                if (!reset_n)
+                    cntr_misaligned <= '0;
+                else if (sys_reset)
+                    cntr_misaligned <= '0;
+                else begin
+                    if (!mcountinhibit[21] && (!stall && !hold && !hazard && jump_misaligned_i))
+                        cntr_misaligned <= cntr_misaligned + 1'b1;
+
+                    if (write_enable_i && address_i == MHPMCOUNTER21)
+                        cntr_misaligned <= wr_data;
+                end
+            end
+        end
+        else begin : gen_hpmcounter_compressed_off
+            assign cntr_compressed = '0;
+            assign cntr_misaligned = '0;
+        end
+
+        if (MULEXT inside {MUL_ZMMUL, MUL_M}) begin : gen_hpmcounter_mul_on
+            always_ff @(posedge clk or negedge reset_n) begin
+                if (!reset_n)
+                    cntr_mul <= '0;
+                else if (sys_reset)
+                    cntr_mul <= '0;
+                else begin
+                    if (!mcountinhibit[22] && (!hold && instruction_operation_i inside {MUL, MULH, MULHU, MULHSU}))
+                        cntr_mul <= cntr_mul + 1'b1;
+
+                    if (write_enable_i && address_i == MHPMCOUNTER22)
+                        cntr_mul <= wr_data;
+                end
+            end
+        end
+        else begin : gen_hpmcounter_mul_off
+            assign cntr_mul = '0;
+        end
+
+        if (MULEXT inside {MUL_M}) begin : gen_hpmcounter_div_on
+            always_ff @(posedge clk or negedge reset_n) begin
+                if (!reset_n)
+                    cntr_div <= '0;
+                else if (sys_reset)
+                    cntr_div <= '0;
+                else begin
+                    if (!mcountinhibit[23] && (!hold && instruction_operation_i inside {DIV, DIVU, REM, REMU}))
+                        cntr_div <= cntr_div + 1'b1;
+
+                    if (write_enable_i && address_i == MHPMCOUNTER23)
+                        cntr_div <= wr_data;
+                end
+            end
+        end
+        else begin : gen_hpmcounter_div_off
+            assign cntr_div = '0;
+        end
+
+        if (VEnable) begin : gen_hpmcounter_v_on
+            always_ff @(posedge clk or negedge reset_n) begin
+                if (!reset_n)
+                    cntr_vaddsub <= '0;
+                else if (sys_reset)
+                    cntr_vaddsub <= '0;
+                else begin
+                    if (
+                            !mcountinhibit[24] && 
+                            (
+                                !hold && 
+                                instruction_operation_i inside {VECTOR} && 
+                                vector_operation_i inside {VADD, VSUB, VRSUB}
+                            )
+                        )
+                        cntr_vaddsub <= cntr_vaddsub + 1'b1;
+
+                    if (write_enable_i && address_i == MHPMCOUNTER24)
+                        cntr_vaddsub <= wr_data;
+                end
+            end
+
+            always_ff @(posedge clk or negedge reset_n) begin
+                if (!reset_n)
+                    cntr_vmul <= '0;
+                else if (sys_reset)
+                    cntr_vmul <= '0;
+                else begin
+                    if (
+                            !mcountinhibit[25] && 
+                            (
+                                !hold && 
+                                instruction_operation_i inside {VECTOR} && 
+                                vector_operation_i inside {VMUL, VMULH, VMULHU, VMULHSU, VWMUL, VWMULU, VWMULSU}
+                            )
+                        )
+                        cntr_vmul <= cntr_vmul + 1'b1;
+
+                    if (write_enable_i && address_i == MHPMCOUNTER25)
+                        cntr_vmul <= wr_data;
+                end
+            end
+
+            always_ff @(posedge clk or negedge reset_n) begin
+                if (!reset_n)
+                    cntr_vdiv <= '0;
+                else if (sys_reset)
+                    cntr_vdiv <= '0;
+                else begin
+                    if (
+                            !mcountinhibit[26] && 
+                            (
+                                !hold && 
+                                instruction_operation_i inside {VECTOR} && 
+                                vector_operation_i inside {VDIV, VDIVU, VREM, VREMU}
+                            )
+                        )
+                        cntr_vdiv <= cntr_vdiv + 1'b1;
+
+                    if (write_enable_i && address_i == MHPMCOUNTER26)
+                        cntr_vdiv <= wr_data;
+                end
+            end
+
+            always_ff @(posedge clk or negedge reset_n) begin
+                if (!reset_n)
+                    cntr_vmac <= '0;
+                else if (sys_reset)
+                    cntr_vmac <= '0;
+                else begin
+                    if (
+                            !mcountinhibit[27] && 
+                            (
+                                !hold && 
+                                instruction_operation_i inside {VECTOR} && 
+                                vector_operation_i inside {VMACC, VNMSAC, VMADD, VNMSUB}
+                            )
+                        )
+                        cntr_vmac <= cntr_vmac + 1'b1;
+
+                    if (write_enable_i && address_i == MHPMCOUNTER27)
+                        cntr_vmac <= wr_data;
+                end
+            end
+
+            always_ff @(posedge clk or negedge reset_n) begin
+                if (!reset_n)
+                    cntr_vred <= '0;
+                else if (sys_reset)
+                    cntr_vred <= '0;
+                else begin
+                    if (
+                            !mcountinhibit[28] && 
+                            (
+                                !hold && 
+                                instruction_operation_i inside {VECTOR} && 
+                                vector_operation_i inside {VREDMIN, VREDMINU, VREDMAX, VREDMAXU}
+                            )
+                        )
+                        cntr_vred <= cntr_vred + 1'b1;
+
+                    if (write_enable_i && address_i == MHPMCOUNTER28)
+                        cntr_vred <= wr_data;
+                end
+            end
+
+            always_ff @(posedge clk or negedge reset_n) begin
+                if (!reset_n)
+                    cntr_vloadstore <= '0;
+                else if (sys_reset)
+                    cntr_vloadstore <= '0;
+                else begin
+                    if (!mcountinhibit[29] && (!hold && instruction_operation_i inside {VLOAD, VSTORE}))
+                        cntr_vloadstore <= cntr_vloadstore + 1'b1;
+
+                    if (write_enable_i && address_i == MHPMCOUNTER29)
+                        cntr_vloadstore <= wr_data;
+                end
+            end
+
+            always_ff @(posedge clk or negedge reset_n) begin
+                if (!reset_n)
+                    cntr_vothers <= '0;
+                else if (sys_reset)
+                    cntr_vothers <= '0;
+                else begin
+                    if (
+                            !mcountinhibit[30] && 
+                            (
+                                !hold && 
+                                instruction_operation_i inside {VECTOR} && 
+                                vector_operation_i inside {
+                                    VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT,  // mask compares
+                                    VREDAND, VREDOR, VREDXOR,                                   // logic reduction
+                                    VMV, VMVR, VMVSX, VMVXS,                                    // register moves
+                                    VSLL, VSRL, VSRA,                                           // shifts
+                                    VAND, VOR, VXOR,                                            // logic
+                                    VMERGE
+                                }
+                            )
+                        )
+                        cntr_vothers <= cntr_vothers + 1'b1;
+
+                    if (write_enable_i && address_i == MHPMCOUNTER30)
+                        cntr_vothers <= wr_data;
+                end
+            end
+        end
+        else begin : gen_hpmcounter_v_off
+            assign cntr_vaddsub    = '0;
+            assign cntr_vmul       = '0;
+            assign cntr_vdiv       = '0;
+            assign cntr_vmac       = '0;
+            assign cntr_vred       = '0;
+            assign cntr_vloadstore = '0;
+            assign cntr_vothers    = '0;
+        end
+    end
+    else begin : gen_hpmcounter_off
+        assign cntr_killed     = '0;
+        assign cntr_context    = '0;
+        assign cntr_exception  = '0;
+        assign cntr_irq        = '0;
+        assign cntr_hazard     = '0;
+        assign cntr_stall      = '0;
+        assign cntr_nop        = '0;
+        assign cntr_logic      = '0;
+        assign cntr_addsub     = '0;
+        assign cntr_shift      = '0;
+        assign cntr_branch     = '0;
+        assign cntr_jump       = '0;
+        assign cntr_load       = '0;
+        assign cntr_store      = '0;
+        assign cntr_sys        = '0;
+        assign cntr_csr        = '0;
+        assign cntr_luislt     = '0;
+        assign cntr_compressed = '0;
+        assign cntr_misaligned = '0;
+        assign cntr_mul        = '0;
+        assign cntr_div        = '0;
+        assign cntr_vaddsub    = '0;
+        assign cntr_vmul       = '0;
+        assign cntr_vdiv       = '0;
+        assign cntr_vmac       = '0;
+        assign cntr_vred       = '0;
+        assign cntr_vloadstore = '0;
+        assign cntr_vothers    = '0;
+    end
+
+////////////////////////////////////////////////////////////////////////////////
+// mhpmcounter and mhpmevent
+////////////////////////////////////////////////////////////////////////////////
+
+    logic [63:0] mhpmcounter [3:31];
+    assign mhpmcounter = {
+        {32'h0, cntr_killed    }, // mhpmcounter3
+        {32'h0, cntr_context   }, // mhpmcounter4
+        {32'h0, cntr_exception }, // mhpmcounter5
+        {32'h0, cntr_irq       }, // mhpmcounter6
+        {32'h0, cntr_hazard    }, // mhpmcounter7
+        {32'h0, cntr_stall     }, // mhpmcounter8
+        {32'h0, cntr_nop       }, // mhpmcounter9
+        {32'h0, cntr_logic     }, // mhpmcounter10
+        {32'h0, cntr_addsub    }, // mhpmcounter11
+        {32'h0, cntr_shift     }, // mhpmcounter12
+        {32'h0, cntr_branch    }, // mhpmcounter13
+        {32'h0, cntr_jump      }, // mhpmcounter14
+        {32'h0, cntr_load      }, // mhpmcounter15
+        {32'h0, cntr_store     }, // mhpmcounter16
+        {32'h0, cntr_sys       }, // mhpmcounter17
+        {32'h0, cntr_csr       }, // mhpmcounter18
+        {32'h0, cntr_luislt    }, // mhpmcounter19
+        {32'h0, cntr_compressed}, // mhpmcounter20
+        {32'h0, cntr_misaligned}, // mhpmcounter21
+        {32'h0, cntr_mul       }, // mhpmcounter22
+        {32'h0, cntr_div       }, // mhpmcounter23
+        {32'h0, cntr_vaddsub   }, // mhpmcounter24
+        {32'h0, cntr_vmul      }, // mhpmcounter25
+        {32'h0, cntr_vdiv      }, // mhpmcounter26
+        {32'h0, cntr_vmac      }, // mhpmcounter27
+        {32'h0, cntr_vred      }, // mhpmcounter28
+        {32'h0, cntr_vloadstore}, // mhpmcounter29
+        {32'h0, cntr_vothers   }, // mhpmcounter30
+        {64'h0                 }  // mhpmcounter31
+    };
+
+    logic [63:0] mhpmevent [3:31];
+    if (HPMCOUNTEREnable) begin : gen_hpmevent_on
+        always_comb begin
+            for (int i = 3; i < 31; i++)
+                mhpmevent[i] = 64'(i);   /* Non-zero event to indicate counter is present */
+            
+            mhpmevent[31] = '0; /* Currently disabled */
+        end
+    end
+    else begin : gen_hpmevent_off
+        always_comb begin
+            for (int i = 3; i < 32; i++)
+                mhpmevent[i] = '0;
+        end
+    end
+
+////////////////////////////////////////////////////////////////////////////////
+// mscratch
+////////////////////////////////////////////////////////////////////////////////
+
+    logic [31:0] mscratch;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mscratch <= '0;
+        else begin
+            if (write_enable_i && address_i == MSCRATCH)
+                mscratch <= wr_data;
+        end
+    end
+
+////////////////////////////////////////////////////////////////////////////////
+// mepc
+////////////////////////////////////////////////////////////////////////////////
+
+    logic [31:0] mepc;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mepc <= '0;
+        else begin
+            if (raise_exception_i)
+                mepc <= pc_i;
+            else if (interrupt_ack_i)
+                mepc <= jump_i ? jump_target_i : next_pc_i;
+            else if (write_enable_i && address_i == MEPC)
+                mepc <= wr_data;
+
+            mepc[0] <= 1'b0;
+            if (!COMPRESSED)
+                mepc[1] <= 1'b0;
+        end
+    end
+
+    assign mepc_o = mepc;
+
+////////////////////////////////////////////////////////////////////////////////
+// mcause
+////////////////////////////////////////////////////////////////////////////////
+
+    logic mcause_interrupt;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mcause_interrupt <= 1'b0;
+        else begin
+            if (raise_exception_i)
+                mcause_interrupt <= 1'b0;
+            else if (interrupt_ack_i)
+                mcause_interrupt <= 1'b1;
+            else if (write_enable_i && address_i == MCAUSE)
+                mcause_interrupt <= wr_data[31];
+        end
+    end
+
+    logic [30:0] mcause_exception_code;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mcause_exception_code <= '0;
+        else begin
+            if (raise_exception_i)
+                mcause_exception_code <= {26'b0, exception_code_i};
+            else if (interrupt_ack_i)
+                mcause_exception_code <= {26'b0, irq_code};
+            else if (write_enable_i && address_i == MCAUSE)
+                mcause_exception_code <= wr_data[30:0];
+        end
+    end
+
+    logic [31:0] mcause;
+    assign mcause = {
+        mcause_interrupt,
+        mcause_exception_code
+    };
+
+////////////////////////////////////////////////////////////////////////////////
+// mtval
+////////////////////////////////////////////////////////////////////////////////
+
+    logic [31:0] mtval;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mtval <= '0;
+        else begin
+            if (raise_exception_i) begin
+                unique case (exception_code_i)
+                    BREAKPOINT, 
+                    LOAD_PAGE_FAULT,
+                    LOAD_ACCESS_FAULT,
+                    STORE_AMO_PAGE_FAULT,
+                    STORE_AMO_ACCESS_FAULT,
+                    INSTRUCTION_PAGE_FAULT,
+                    LOAD_ADDRESS_MISALIGNED,
+                    INSTRUCTION_ACCESS_FAULT,
+                    STORE_AMO_ADDRESS_MISALIGNED,
+                    INSTRUCTION_ADDRESS_MISALIGNED: mtval <= pc_i;
+                    ILLEGAL_INSTRUCTION:            mtval <= instruction_i;
+                    default:                        mtval <= '0;
+                endcase
+            end
+            else if (interrupt_ack_i)
+                mtval <= '0;
+            else if (write_enable_i && address_i == MTVAL)
+                mtval <= wr_data;
+        end
+    end
+
+////////////////////////////////////////////////////////////////////////////////
+// menvcfg
+////////////////////////////////////////////////////////////////////////////////
+
+    logic [63:0] menvcfg;
+    assign menvcfg = {
+         1'b0, // STCE
+         1'b0, // PBMTE
+         1'b0, // ADUE
+         1'b0, // CDE
+        26'b0, // WPRI
+         2'b0, // PMM
+        24'b0, // WPRI
+         1'b0, // CBZE
+         1'b0, // CBCFE
+         2'b0, // CBIE
+         3'b0, // WPRI
+         1'b0  // FIOM
+    };
+
+////////////////////////////////////////////////////////////////////////////////
+// Xosvm Extension
+////////////////////////////////////////////////////////////////////////////////
+
+    logic [31:0] mvmio;
+    logic [31:0] mvmis;
+    logic [31:0] mvmim;
+    logic [31:0] mvmdo;
+    logic [31:0] mvmds;
+    logic [31:0] mvmdm;
+
+    logic mvmctl_en;
+
+    logic [31:0] mvmctl;
+    assign mvmctl = {
+        31'b0,
+        mvmctl_en
+    };
+    
+    if (XOSVMEnable) begin : gen_xosvm_on
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                mvmio <= '0;
+            else begin
+                if (write_enable_i && address_i == MVMIO)
+                    mvmio <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                mvmis <= '0;
+            else begin
+                if (write_enable_i && address_i == MVMIS)
+                    mvmis <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                mvmim <= '0;
+            else begin
+                if (write_enable_i && address_i == MVMIM)
+                    mvmim <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                mvmdo <= '0;
+            else begin
+                if (write_enable_i && address_i == MVMDO)
+                    mvmdo <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                mvmds <= '0;
+            else begin
+                if (write_enable_i && address_i == MVMDS)
+                    mvmds <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                mvmdm <= '0;
+            else begin
+                if (write_enable_i && address_i == MVMDM)
+                    mvmdm <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                mvmctl_en <= 1'b0;
+            else begin
+                if (write_enable_i && address_i == MVMCTL)
+                    mvmctl_en <= wr_data[0];
+            end
+        end
+
+    end
+    else begin : gen_xosvm_off
+        assign mvmio     = '0;
+        assign mvmis     = '0;
+        assign mvmim     = '0;
+        assign mvmdo     = '0;
+        assign mvmds     = '0;
+        assign mvmdm     = '0;
+        assign mvmctl_en = 1'b0;
+    end
+
+    assign mvmctl_o = mvmctl_en;
     assign mvmdo_o  = mvmdo;
     assign mvmds_o  = mvmds;
     assign mvmdm_o  = mvmdm;
@@ -550,277 +1253,366 @@ module CSRBank
     assign mvmis_o  = mvmis;
     assign mvmim_o  = mvmim;
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Interrupt Control
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-    logic MEIP, MTIP, MSIP;
-    assign  MEIP = mip[11],
-            MTIP = mip[ 7],
-            MSIP = mip[ 3];
-
-    logic MEIE, MTIE, MSIE;
-    assign  MEIE = mie[11],
-            MTIE = mie[ 7],
-            MSIE = mie[ 3];
+////////////////////////////////////////////////////////////////////////////////
+// Privilege control
+////////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            mip <= '0;
-        end
+        if (!reset_n)
+            privilege <= privilegeLevel_e'(2'b11);
+        else if(sys_reset)
+            privilege <= privilegeLevel_e'(2'b11);
         else begin
-            mip <= irq_i;
+            if (machine_return_i) 
+                privilege <= privilegeLevel_e'(mstatus_mpp);
+            else if (raise_exception_i || interrupt_ack_i)
+                privilege <= privilegeLevel_e'(2'b11);
         end
     end
 
-    always_ff @(posedge clk or negedge reset_n) begin
-        if(!reset_n) begin
-            Interruption_Code   <= NO_INT;
-            interrupt_pending_o <= 1'b0;
-        end
-        else begin
-            if (mstatus_mie && (mie & mip) != '0 && !interrupt_ack_i) begin
-                interrupt_pending_o <= 1;
-                if ((MEIP & MEIE) == 1'b1)          // Machine External
-                    Interruption_Code <= M_EXT_INT;
-                else if ((MSIP & MSIE) == 1'b1)     // Machine Software
-                    Interruption_Code <= M_SW_INT;
-                else if ((MTIP & MTIE) == 1'b1)     // Machine Timer
-                    Interruption_Code <= M_TIM_INT;
-            end
-            else begin
-                interrupt_pending_o <= 0;
-            end
-        end
-    end
+    assign privilege_o = privilege;
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ZIHPM
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+// Read
+//////////////////////////////////////////////////////////////////////////////
 
-    if (ZIHPMEnable == 1'b1) begin : gen_zihpm_csr_on
-        always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n) begin
-                instructions_killed_counter <= '0;
-                nop_counter                 <= '0;
-                logic_counter               <= '0;
-                addsub_counter              <= '0;
-                shift_counter               <= '0;
-                branch_counter              <= '0;
-                jump_counter                <= '0;
-                load_counter                <= '0;
-                store_counter               <= '0;
-                sys_counter                 <= '0;
-                lui_slt_counter             <= '0;
-                csr_counter                 <= '0;
-                mul_counter                 <= '0;
-                div_counter                 <= '0;
+    logic [31:0] current_val;
 
-                vaddsub_counter             <= '0;
-                vmul_counter                <= '0;
-                vdiv_counter                <= '0;
-                vmac_counter                <= '0;
-                vred_counter                <= '0;
-                vloadstore_counter          <= '0;
-                vothers_counter             <= '0;
+    always_comb begin
+        unique case(address_i)
+            /* Machine-Level CSRs */
+            MISA:           current_val = misa;
+            MVENDORID:      current_val = '0;
+            MARCHID:        current_val = '0;
+            MIMPID:         current_val = '0;
+            MHARTID:        current_val = '0;
+            MSTATUS:        current_val = mstatus;
+            MTVEC:          current_val = mtvec;
+            MIP:            current_val = mip;
+            MIE:            current_val = mie;
+            MCOUNTEREN:     current_val = mcounteren;
+            MCOUNTINHIBIT:  current_val = mcountinhibit;
+            MCYCLE:         current_val = mcycle[31:0];
+            MCYCLEH:        current_val = mcycle[63:32];
+            MINSTRET:       current_val = minstret[31:0];
+            MINSTRETH:      current_val = minstret[63:32];
+            MHPMCOUNTER3:   current_val = mhpmcounter[ 3][31: 0];
+            MHPMCOUNTER4:   current_val = mhpmcounter[ 4][31: 0];
+            MHPMCOUNTER5:   current_val = mhpmcounter[ 5][31: 0];
+            MHPMCOUNTER6:   current_val = mhpmcounter[ 6][31: 0];
+            MHPMCOUNTER7:   current_val = mhpmcounter[ 7][31: 0];
+            MHPMCOUNTER8:   current_val = mhpmcounter[ 8][31: 0];
+            MHPMCOUNTER9:   current_val = mhpmcounter[ 9][31: 0];
+            MHPMCOUNTER10:  current_val = mhpmcounter[10][31: 0];
+            MHPMCOUNTER11:  current_val = mhpmcounter[11][31: 0];
+            MHPMCOUNTER12:  current_val = mhpmcounter[12][31: 0];
+            MHPMCOUNTER13:  current_val = mhpmcounter[13][31: 0];
+            MHPMCOUNTER14:  current_val = mhpmcounter[14][31: 0];
+            MHPMCOUNTER15:  current_val = mhpmcounter[15][31: 0];
+            MHPMCOUNTER16:  current_val = mhpmcounter[16][31: 0];
+            MHPMCOUNTER17:  current_val = mhpmcounter[17][31: 0];
+            MHPMCOUNTER18:  current_val = mhpmcounter[18][31: 0];
+            MHPMCOUNTER19:  current_val = mhpmcounter[19][31: 0];
+            MHPMCOUNTER20:  current_val = mhpmcounter[20][31: 0];
+            MHPMCOUNTER21:  current_val = mhpmcounter[21][31: 0];
+            MHPMCOUNTER22:  current_val = mhpmcounter[22][31: 0];
+            MHPMCOUNTER23:  current_val = mhpmcounter[23][31: 0];
+            MHPMCOUNTER24:  current_val = mhpmcounter[24][31: 0];
+            MHPMCOUNTER25:  current_val = mhpmcounter[25][31: 0];
+            MHPMCOUNTER26:  current_val = mhpmcounter[26][31: 0];
+            MHPMCOUNTER27:  current_val = mhpmcounter[27][31: 0];
+            MHPMCOUNTER28:  current_val = mhpmcounter[28][31: 0];
+            MHPMCOUNTER29:  current_val = mhpmcounter[29][31: 0];
+            MHPMCOUNTER30:  current_val = mhpmcounter[30][31: 0];
+            MHPMCOUNTER31:  current_val = mhpmcounter[31][31: 0];
+            MHPMCOUNTER3H:  current_val = mhpmcounter[ 3][63:32];
+            MHPMCOUNTER4H:  current_val = mhpmcounter[ 4][63:32];
+            MHPMCOUNTER5H:  current_val = mhpmcounter[ 5][63:32];
+            MHPMCOUNTER6H:  current_val = mhpmcounter[ 6][63:32];
+            MHPMCOUNTER7H:  current_val = mhpmcounter[ 7][63:32];
+            MHPMCOUNTER8H:  current_val = mhpmcounter[ 8][63:32];
+            MHPMCOUNTER9H:  current_val = mhpmcounter[ 9][63:32];
+            MHPMCOUNTER10H: current_val = mhpmcounter[10][63:32];
+            MHPMCOUNTER11H: current_val = mhpmcounter[11][63:32];
+            MHPMCOUNTER12H: current_val = mhpmcounter[12][63:32];
+            MHPMCOUNTER13H: current_val = mhpmcounter[13][63:32];
+            MHPMCOUNTER14H: current_val = mhpmcounter[14][63:32];
+            MHPMCOUNTER15H: current_val = mhpmcounter[15][63:32];
+            MHPMCOUNTER16H: current_val = mhpmcounter[16][63:32];
+            MHPMCOUNTER17H: current_val = mhpmcounter[17][63:32];
+            MHPMCOUNTER18H: current_val = mhpmcounter[18][63:32];
+            MHPMCOUNTER19H: current_val = mhpmcounter[19][63:32];
+            MHPMCOUNTER20H: current_val = mhpmcounter[20][63:32];
+            MHPMCOUNTER21H: current_val = mhpmcounter[21][63:32];
+            MHPMCOUNTER22H: current_val = mhpmcounter[22][63:32];
+            MHPMCOUNTER23H: current_val = mhpmcounter[23][63:32];
+            MHPMCOUNTER24H: current_val = mhpmcounter[24][63:32];
+            MHPMCOUNTER25H: current_val = mhpmcounter[25][63:32];
+            MHPMCOUNTER26H: current_val = mhpmcounter[26][63:32];
+            MHPMCOUNTER27H: current_val = mhpmcounter[27][63:32];
+            MHPMCOUNTER28H: current_val = mhpmcounter[28][63:32];
+            MHPMCOUNTER29H: current_val = mhpmcounter[29][63:32];
+            MHPMCOUNTER30H: current_val = mhpmcounter[30][63:32];
+            MHPMCOUNTER31H: current_val = mhpmcounter[31][63:32];
+            MHPMEVENT3:     current_val = mhpmevent  [ 3][31: 0];
+            MHPMEVENT4:     current_val = mhpmevent  [ 4][31: 0];
+            MHPMEVENT5:     current_val = mhpmevent  [ 5][31: 0];
+            MHPMEVENT6:     current_val = mhpmevent  [ 6][31: 0];
+            MHPMEVENT7:     current_val = mhpmevent  [ 7][31: 0];
+            MHPMEVENT8:     current_val = mhpmevent  [ 8][31: 0];
+            MHPMEVENT9:     current_val = mhpmevent  [ 9][31: 0];
+            MHPMEVENT10:    current_val = mhpmevent  [10][31: 0];
+            MHPMEVENT11:    current_val = mhpmevent  [11][31: 0];
+            MHPMEVENT12:    current_val = mhpmevent  [12][31: 0];
+            MHPMEVENT13:    current_val = mhpmevent  [13][31: 0];
+            MHPMEVENT14:    current_val = mhpmevent  [14][31: 0];
+            MHPMEVENT15:    current_val = mhpmevent  [15][31: 0];
+            MHPMEVENT16:    current_val = mhpmevent  [16][31: 0];
+            MHPMEVENT17:    current_val = mhpmevent  [17][31: 0];
+            MHPMEVENT18:    current_val = mhpmevent  [18][31: 0];
+            MHPMEVENT19:    current_val = mhpmevent  [19][31: 0];
+            MHPMEVENT20:    current_val = mhpmevent  [20][31: 0];
+            MHPMEVENT21:    current_val = mhpmevent  [21][31: 0];
+            MHPMEVENT22:    current_val = mhpmevent  [22][31: 0];
+            MHPMEVENT23:    current_val = mhpmevent  [23][31: 0];
+            MHPMEVENT24:    current_val = mhpmevent  [24][31: 0];
+            MHPMEVENT25:    current_val = mhpmevent  [25][31: 0];
+            MHPMEVENT26:    current_val = mhpmevent  [26][31: 0];
+            MHPMEVENT27:    current_val = mhpmevent  [27][31: 0];
+            MHPMEVENT28:    current_val = mhpmevent  [28][31: 0];
+            MHPMEVENT29:    current_val = mhpmevent  [29][31: 0];
+            MHPMEVENT30:    current_val = mhpmevent  [30][31: 0];
+            MHPMEVENT31:    current_val = mhpmevent  [31][31: 0];
+            MHPMEVENT3H:    current_val = mhpmevent  [ 3][63:32];
+            MHPMEVENT4H:    current_val = mhpmevent  [ 4][63:32];
+            MHPMEVENT5H:    current_val = mhpmevent  [ 5][63:32];
+            MHPMEVENT6H:    current_val = mhpmevent  [ 6][63:32];
+            MHPMEVENT7H:    current_val = mhpmevent  [ 7][63:32];
+            MHPMEVENT8H:    current_val = mhpmevent  [ 8][63:32];
+            MHPMEVENT9H:    current_val = mhpmevent  [ 9][63:32];
+            MHPMEVENT10H:   current_val = mhpmevent  [10][63:32];
+            MHPMEVENT11H:   current_val = mhpmevent  [11][63:32];
+            MHPMEVENT12H:   current_val = mhpmevent  [12][63:32];
+            MHPMEVENT13H:   current_val = mhpmevent  [13][63:32];
+            MHPMEVENT14H:   current_val = mhpmevent  [14][63:32];
+            MHPMEVENT15H:   current_val = mhpmevent  [15][63:32];
+            MHPMEVENT16H:   current_val = mhpmevent  [16][63:32];
+            MHPMEVENT17H:   current_val = mhpmevent  [17][63:32];
+            MHPMEVENT18H:   current_val = mhpmevent  [18][63:32];
+            MHPMEVENT19H:   current_val = mhpmevent  [19][63:32];
+            MHPMEVENT20H:   current_val = mhpmevent  [20][63:32];
+            MHPMEVENT21H:   current_val = mhpmevent  [21][63:32];
+            MHPMEVENT22H:   current_val = mhpmevent  [22][63:32];
+            MHPMEVENT23H:   current_val = mhpmevent  [23][63:32];
+            MHPMEVENT24H:   current_val = mhpmevent  [24][63:32];
+            MHPMEVENT25H:   current_val = mhpmevent  [25][63:32];
+            MHPMEVENT26H:   current_val = mhpmevent  [26][63:32];
+            MHPMEVENT27H:   current_val = mhpmevent  [27][63:32];
+            MHPMEVENT28H:   current_val = mhpmevent  [28][63:32];
+            MHPMEVENT29H:   current_val = mhpmevent  [29][63:32];
+            MHPMEVENT30H:   current_val = mhpmevent  [30][63:32];
+            MHPMEVENT31H:   current_val = mhpmevent  [31][63:32];
+            MSCRATCH:       current_val = mscratch;
+            MEPC:           current_val = mepc;
+            MCAUSE:         current_val = mcause;
+            MTVAL:          current_val = mtval;
+            MCONFIGPTR:     current_val = '0;
+            MENVCFG:        current_val = menvcfg[31:0];
+            MENVCFGH:       current_val = menvcfg[63:32];
 
-                if (COMPRESSED == 1'b1) begin
-                    jump_misaligned_counter     <= '0;
-                    compressed_counter          <= '0;
-                end
-
-                hazard_counter              <= '0;
-                stall_counter               <= '0;
-                interrupt_ack_counter       <= '0;
-                raise_exception_counter     <= '0;
-                context_switch_counter      <= '0;
-            end
-            else if (sys_reset) begin
-                instructions_killed_counter <= '0;
-                nop_counter                 <= '0;
-                logic_counter               <= '0;
-                addsub_counter              <= '0;
-                shift_counter               <= '0;
-                branch_counter              <= '0;
-                jump_counter                <= '0;
-                load_counter                <= '0;
-                store_counter               <= '0;
-                sys_counter                 <= '0;
-                lui_slt_counter             <= '0;
-                csr_counter                 <= '0;
-                mul_counter                 <= '0;
-                div_counter                 <= '0;
-
-                vaddsub_counter             <= '0;
-                vmul_counter                <= '0;
-                vdiv_counter                <= '0;
-                vmac_counter                <= '0;
-                vred_counter                <= '0;
-                vloadstore_counter          <= '0;
-                vothers_counter             <= '0;
-
-                if (COMPRESSED == 1'b1) begin
-                    jump_misaligned_counter     <= '0;
-                    compressed_counter          <= '0;
-                end
-
-                hazard_counter              <= '0;
-                stall_counter               <= '0;
-                interrupt_ack_counter       <= '0;
-                raise_exception_counter     <= '0;
-                context_switch_counter      <= '0;
-            end
-            else begin
-                instructions_killed_counter <= (killed                                                               && !mcountinhibit[ 3]) ? instructions_killed_counter  + 1 : instructions_killed_counter;
-
-                hazard_counter              <= (hazard && !hold                                                      && !mcountinhibit[ 7]) ? hazard_counter + 1 : hazard_counter;
-                stall_counter               <= (stall                                                                && !mcountinhibit[ 8]) ? stall_counter  + 1 : stall_counter;
-
-                interrupt_ack_counter       <= (interrupt_ack_i                                                      && !mcountinhibit[ 6]) ? interrupt_ack_counter   + 1 : interrupt_ack_counter;
-                raise_exception_counter     <= (raise_exception_i                                                    && !mcountinhibit[ 5]) ? raise_exception_counter + 1 : raise_exception_counter;
-                context_switch_counter      <= ((jump_i || raise_exception_i || machine_return_i || interrupt_ack_i) && !mcountinhibit[ 4]) ? context_switch_counter  + 1 : context_switch_counter;
-                nop_counter                 <= (instruction_operation_i == NOP && !hold                              && !mcountinhibit[ 9]) ? nop_counter             + 1 : nop_counter;
-
-                if (COMPRESSED == 1'b1) begin
-                    jump_misaligned_counter <= jump_misaligned_counter + ((jump_misaligned_i && !hold && !mcountinhibit[21]) ? 1 : 0);
-                end
-
-                if (!hold) begin
-                    logic_counter           <= (instruction_operation_i inside {XOR, OR, AND})                                && !mcountinhibit[10] ? logic_counter   + 1 : logic_counter;
-                    addsub_counter          <= (instruction_operation_i inside {ADD, SUB})                                    && !mcountinhibit[11] ? addsub_counter  + 1 : addsub_counter;
-                    lui_slt_counter         <= (instruction_operation_i inside {SLTU, SLT, LUI})                              && !mcountinhibit[19] ? lui_slt_counter + 1 : lui_slt_counter;
-                    shift_counter           <= (instruction_operation_i inside {SLL, SRL, SRA})                               && !mcountinhibit[12] ? shift_counter   + 1 : shift_counter;
-                    branch_counter          <= (instruction_operation_i inside {BEQ, BNE, BLT, BLTU, BGE, BGEU})              && !mcountinhibit[13] ? branch_counter  + 1 : branch_counter;
-                    jump_counter            <= (instruction_operation_i inside {JAL, JALR})                                   && !mcountinhibit[14] ? jump_counter    + 1 : jump_counter;
-                    load_counter            <= (instruction_operation_i inside {LB, LBU, LH, LHU, LW})                        && !mcountinhibit[15] ? load_counter    + 1 : load_counter;
-                    store_counter           <= (instruction_operation_i inside {SB, SH, SW})                                  && !mcountinhibit[16] ? store_counter   + 1 : store_counter;
-                    sys_counter             <= (instruction_operation_i inside {SRET, MRET, WFI, ECALL, EBREAK})              && !mcountinhibit[17] ? sys_counter     + 1 : sys_counter;
-                    csr_counter             <= (instruction_operation_i inside {CSRRW, CSRRWI, CSRRS, CSRRSI, CSRRC, CSRRCI}) && !mcountinhibit[18] ? csr_counter     + 1 : csr_counter;
-                    mul_counter             <= (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU})                    && !mcountinhibit[22] ? mul_counter     + 1 : mul_counter;
-                    div_counter             <= (instruction_operation_i inside {DIV, DIVU, REM, REMU})                        && !mcountinhibit[23] ? div_counter     + 1 : div_counter;
-
-                if(VEnable) begin
-                        vloadstore_counter      <= (instruction_operation_i inside {VLOAD, VSTORE})                           && !mcountinhibit[29] ? vloadstore_counter + 1 : vloadstore_counter;
-        
-                        if(instruction_operation_i == VECTOR) begin
-
-                            vaddsub_counter     <= (vector_operation_i      inside {VADD, VSUB, VRSUB})                       && !mcountinhibit[24] ? vaddsub_counter    + 1 : vaddsub_counter;
-                            
-                            vmul_counter        <= (vector_operation_i      inside {
-                                                                                    VMUL, VMULH, VMULHU, VMULHSU,                               // non-widening multiplication
-                                                                                    VWMUL, VWMULU, VWMULSU                                      // widening multiplication
-                                                                                   })   && !mcountinhibit[25] ?  vmul_counter    + 1 : vmul_counter;
-
-                            vdiv_counter        <= (vector_operation_i      inside {VDIV, VDIVU, VREM, VREMU})                    && !mcountinhibit[26] ? vdiv_counter   + 1 : vdiv_counter;
-                            vmac_counter        <= (vector_operation_i      inside {VMACC, VNMSAC, VMADD, VNMSUB})                && !mcountinhibit[27] ? vmac_counter   + 1 : vmac_counter;          
-                            vred_counter        <= (vector_operation_i      inside {VREDMIN, VREDMINU, VREDMAX, VREDMAXU})        && !mcountinhibit[28] ? vred_counter   + 1 : vred_counter;
-
-                            vothers_counter     <= (vector_operation_i      inside {
-                                                                                    VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT,  // mask compares
-                                                                                    VREDAND, VREDOR, VREDXOR,                                   // logic reduction
-                                                                                    VMV, VMVR, VMVSX, VMVXS,                                    // register moves
-                                                                                    VSLL, VSRL, VSRA,                                           // shifts
-                                                                                    VAND, VOR, VXOR,                                            // logic
-                                                                                    VMERGE                                                      // merge
-                                                                                   })   && !mcountinhibit[30] ?  vothers_counter + 1 : vothers_counter;
-                        end
-                    end                    
-
-                    if (COMPRESSED == 1'b1) begin
-                        compressed_counter  <= compressed_counter + (instruction_compressed_i && !mcountinhibit[20] ? 1 : 0);
-                    end
-                end
-            end
-        end
-        
-    `ifndef SYNTH
-        if (PROFILING) begin : gen_csr_dbg
-            int fd;
-
-            initial begin
-                fd = $fopen(PROFILING_FILE, "w");
-                if (fd == 0) begin
-                    $display("Error\ opening profiling file");
-                end
-            end
-
-            final begin
-                $fwrite(fd,"Clock Cycles:            %0d\n", mcycle);
-                $fwrite(fd,"Instructions Retired:    %0d\n", minstret);
-                if (COMPRESSED == 1'b1) begin
-                    $fwrite(fd,"Instructions Compressed: %0d\n", compressed_counter);
-                end
-                $fwrite(fd,"Instructions Killed:     %0d\n", instructions_killed_counter);
-                $fwrite(fd,"Context Switches:        %0d\n", context_switch_counter);
-                $fwrite(fd,"Exceptions Raised:       %0d\n", raise_exception_counter);
-                $fwrite(fd,"Interrupts Acked:        %0d\n", interrupt_ack_counter);
-                if (COMPRESSED == 1'b1) begin
-                    $fwrite(fd,"Misaligned Jumps:        %0d\n", jump_misaligned_counter);
-                end
-
-                $fwrite(fd,"\nCYCLES WITH::\n");
-                $fwrite(fd,"HAZARDS:                 %0d\n", hazard_counter);
-                $fwrite(fd,"STALL:                   %0d\n", stall_counter);
-                $fwrite(fd,"BUBBLES (INC. HAZARDS):  %0d\n", nop_counter);
-
-                $fwrite(fd,"\nINSTRUCTION COUNTERS:\n");
-                $fwrite(fd,"LUI_SLT:                 %0d\n", lui_slt_counter);
-                $fwrite(fd,"LOGIC:                   %0d\n", logic_counter);
-                $fwrite(fd,"ADDSUB:                  %0d\n", addsub_counter);
-                $fwrite(fd,"SHIFT:                   %0d\n", shift_counter);
-                $fwrite(fd,"BRANCH:                  %0d\n", branch_counter);
-                $fwrite(fd,"JUMP:                    %0d\n", jump_counter);
-                $fwrite(fd,"LOAD:                    %0d\n", load_counter);
-                $fwrite(fd,"STORE:                   %0d\n", store_counter);
-                $fwrite(fd,"SYS:                     %0d\n", sys_counter);
-                $fwrite(fd,"CSR:                     %0d\n", csr_counter);
-                $fwrite(fd,"MUL:                     %0d\n", mul_counter);
-                $fwrite(fd,"DIV:                     %0d\n", div_counter);
+            /* V CSRs */
+            VSTART:         current_val = '0;
+            VLENBYTES:      current_val = VEnable ? VLEN/8 : '0;
+            VTYPE:          current_val = vtype_i;
+            VL:             current_val = vlen_i;
             
-            if(VEnable) begin
-                    $fwrite(fd, "\nVECTOR EXTENSION:\n");
-                    $fwrite(fd, "VADDSUB:                 %0d\n", vaddsub_counter);
-                    $fwrite(fd, "VMUL:                    %0d\n", vmul_counter);
-                    $fwrite(fd, "VDIV:                    %0d\n", vdiv_counter);
-                    $fwrite(fd, "VMAC:                    %0d\n", vmac_counter);
-                    $fwrite(fd, "VRED:                    %0d\n", vred_counter);
-                    $fwrite(fd, "VLOAD/VSTORE:            %0d\n", vloadstore_counter);
-                    $fwrite(fd, "VOTHERS:                 %0d\n", vothers_counter);
-                end
+            /* Zicntr */
+            CYCLE:          current_val = mcycle[31:0];
+            TIME:           current_val = mtime_i[31:0];
+            INSTRET:        current_val = minstret[31:0];
+            CYCLEH:         current_val = mcycle[63:32];
+            TIMEH:          current_val = mtime_i[63:32];
+            INSTRETH:       current_val = minstret[63:32];
+
+            /* Zihpm */
+            HPMCOUNTER3:   current_val = mhpmcounter[ 3][31: 0];
+            HPMCOUNTER4:   current_val = mhpmcounter[ 4][31: 0];
+            HPMCOUNTER5:   current_val = mhpmcounter[ 5][31: 0];
+            HPMCOUNTER6:   current_val = mhpmcounter[ 6][31: 0];
+            HPMCOUNTER7:   current_val = mhpmcounter[ 7][31: 0];
+            HPMCOUNTER8:   current_val = mhpmcounter[ 8][31: 0];
+            HPMCOUNTER9:   current_val = mhpmcounter[ 9][31: 0];
+            HPMCOUNTER10:  current_val = mhpmcounter[10][31: 0];
+            HPMCOUNTER11:  current_val = mhpmcounter[11][31: 0];
+            HPMCOUNTER12:  current_val = mhpmcounter[12][31: 0];
+            HPMCOUNTER13:  current_val = mhpmcounter[13][31: 0];
+            HPMCOUNTER14:  current_val = mhpmcounter[14][31: 0];
+            HPMCOUNTER15:  current_val = mhpmcounter[15][31: 0];
+            HPMCOUNTER16:  current_val = mhpmcounter[16][31: 0];
+            HPMCOUNTER17:  current_val = mhpmcounter[17][31: 0];
+            HPMCOUNTER18:  current_val = mhpmcounter[18][31: 0];
+            HPMCOUNTER19:  current_val = mhpmcounter[19][31: 0];
+            HPMCOUNTER20:  current_val = mhpmcounter[20][31: 0];
+            HPMCOUNTER21:  current_val = mhpmcounter[21][31: 0];
+            HPMCOUNTER22:  current_val = mhpmcounter[22][31: 0];
+            HPMCOUNTER23:  current_val = mhpmcounter[23][31: 0];
+            HPMCOUNTER24:  current_val = mhpmcounter[24][31: 0];
+            HPMCOUNTER25:  current_val = mhpmcounter[25][31: 0];
+            HPMCOUNTER26:  current_val = mhpmcounter[26][31: 0];
+            HPMCOUNTER27:  current_val = mhpmcounter[27][31: 0];
+            HPMCOUNTER28:  current_val = mhpmcounter[28][31: 0];
+            HPMCOUNTER29:  current_val = mhpmcounter[29][31: 0];
+            HPMCOUNTER30:  current_val = mhpmcounter[30][31: 0];
+            HPMCOUNTER31:  current_val = mhpmcounter[31][31: 0];
+            HPMCOUNTER3H:  current_val = mhpmcounter[ 3][63:32];
+            HPMCOUNTER4H:  current_val = mhpmcounter[ 4][63:32];
+            HPMCOUNTER5H:  current_val = mhpmcounter[ 5][63:32];
+            HPMCOUNTER6H:  current_val = mhpmcounter[ 6][63:32];
+            HPMCOUNTER7H:  current_val = mhpmcounter[ 7][63:32];
+            HPMCOUNTER8H:  current_val = mhpmcounter[ 8][63:32];
+            HPMCOUNTER9H:  current_val = mhpmcounter[ 9][63:32];
+            HPMCOUNTER10H: current_val = mhpmcounter[10][63:32];
+            HPMCOUNTER11H: current_val = mhpmcounter[11][63:32];
+            HPMCOUNTER12H: current_val = mhpmcounter[12][63:32];
+            HPMCOUNTER13H: current_val = mhpmcounter[13][63:32];
+            HPMCOUNTER14H: current_val = mhpmcounter[14][63:32];
+            HPMCOUNTER15H: current_val = mhpmcounter[15][63:32];
+            HPMCOUNTER16H: current_val = mhpmcounter[16][63:32];
+            HPMCOUNTER17H: current_val = mhpmcounter[17][63:32];
+            HPMCOUNTER18H: current_val = mhpmcounter[18][63:32];
+            HPMCOUNTER19H: current_val = mhpmcounter[19][63:32];
+            HPMCOUNTER20H: current_val = mhpmcounter[20][63:32];
+            HPMCOUNTER21H: current_val = mhpmcounter[21][63:32];
+            HPMCOUNTER22H: current_val = mhpmcounter[22][63:32];
+            HPMCOUNTER23H: current_val = mhpmcounter[23][63:32];
+            HPMCOUNTER24H: current_val = mhpmcounter[24][63:32];
+            HPMCOUNTER25H: current_val = mhpmcounter[25][63:32];
+            HPMCOUNTER26H: current_val = mhpmcounter[26][63:32];
+            HPMCOUNTER27H: current_val = mhpmcounter[27][63:32];
+            HPMCOUNTER28H: current_val = mhpmcounter[28][63:32];
+            HPMCOUNTER29H: current_val = mhpmcounter[29][63:32];
+            HPMCOUNTER30H: current_val = mhpmcounter[30][63:32];
+            HPMCOUNTER31H: current_val = mhpmcounter[31][63:32];
+
+            /* Xosvm */
+            MVMCTL:         current_val = mvmctl;
+            MVMDO:          current_val = mvmdo;
+            MVMDS:          current_val = mvmds;
+            MVMDM:          current_val = mvmdm;
+            MVMIO:          current_val = mvmio;
+            MVMIS:          current_val = mvmis;
+            MVMIM:          current_val = mvmim;
+
+            default:        current_val = '0;
+        endcase
+    end
+
+    assign data_o = read_enable_i ? current_val : '0;
+
+////////////////////////////////////////////////////////////////////////////////
+// Operations
+////////////////////////////////////////////////////////////////////////////////
+
+    always_comb begin
+        case (operation_i)
+            SET:     wr_data = (current_val |  data_i);
+            CLEAR:   wr_data = (current_val & ~data_i);
+            default: wr_data = data_i; // WRITE
+        endcase
+    end
+
+////////////////////////////////////////////////////////////////////////////////
+// Interrupt Control
+////////////////////////////////////////////////////////////////////////////////
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if(!reset_n)
+            interrupt_pending_o <= 1'b0;
+        else if (sys_reset)
+            interrupt_pending_o <= 1'b0;
+        else begin
+            if (!interrupt_ack_i && mstatus_mie && ((mie & mip) != '0))
+                interrupt_pending_o <= 1;
+            else
+                interrupt_pending_o <= 0;
+        end
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if(!reset_n) 
+            irq_code <= NO_INT;
+        else begin
+            if (!interrupt_ack_i && mstatus_mie && ((mie & mip) != '0)) begin
+                if (mie_meie && mip_meip)
+                    irq_code <= M_EXT_INT;
+                else if (mie_msie && mip_msip)
+                    irq_code <= M_SW_INT;
+                else if (mie_mtie && mip_mtip)
+                    irq_code <= M_TIM_INT;
             end
         end
-    `endif
     end
-    else begin : gen_zihpm_csr_off
-        assign instructions_killed_counter = '0;
-        assign nop_counter                 = '0;
-        assign logic_counter               = '0;
-        assign lui_slt_counter             = '0;
-        assign addsub_counter              = '0;
-        assign shift_counter               = '0;
-        assign branch_counter              = '0;
-        assign jump_counter                = '0;
-        assign load_counter                = '0;
-        assign store_counter               = '0;
-        assign sys_counter                 = '0;
-        assign csr_counter                 = '0;
-        assign mul_counter                 = '0;
-        assign div_counter                 = '0;
-        assign hazard_counter              = '0;
-        assign stall_counter               = '0;
-        assign interrupt_ack_counter       = '0;
-        assign raise_exception_counter     = '0;
-        assign context_switch_counter      = '0;
-        assign compressed_counter          = '0;
-        assign jump_misaligned_counter     = '0;
 
-        assign vaddsub_counter             = '0; 
-        assign vmul_counter                = '0;
-        assign vdiv_counter                = '0;
-        assign vmac_counter                = '0;
-        assign vred_counter                = '0;
-        assign vloadstore_counter          = '0;
-        assign vothers_counter             = '0;
+////////////////////////////////////////////////////////////////////////////////
+// Profiling
+////////////////////////////////////////////////////////////////////////////////
+
+`ifndef SYNTH
+    if (PROFILING) begin : gen_profiling
+        int fd;
+
+        initial begin
+            fd = $fopen(PROFILING_FILE, "w");
+            if (fd == 0) begin
+                $display("Error\ opening profiling file");
+            end
+        end
+
+        final begin
+            $fwrite(fd,"Clock Cycles:            %0d\n", mcycle);
+            $fwrite(fd,"Instructions Retired:    %0d\n", minstret);
+            if (COMPRESSED == 1'b1) begin
+                $fwrite(fd,"Instructions Compressed: %0d\n", cntr_compressed);
+            end
+            $fwrite(fd,"Instructions Killed:     %0d\n", cntr_killed);
+            $fwrite(fd,"Context Switches:        %0d\n", cntr_context);
+            $fwrite(fd,"Exceptions Raised:       %0d\n", cntr_exception);
+            $fwrite(fd,"Interrupts Acked:        %0d\n", cntr_irq);
+            if (COMPRESSED == 1'b1) begin
+                $fwrite(fd,"Misaligned Jumps:        %0d\n", cntr_misaligned);
+            end
+
+            $fwrite(fd,"\nCYCLES WITH::\n");
+            $fwrite(fd,"HAZARDS:                 %0d\n", cntr_hazard);
+            $fwrite(fd,"STALL:                   %0d\n", cntr_stall);
+            $fwrite(fd,"BUBBLES (INC. HAZARDS):  %0d\n", cntr_nop);
+
+            $fwrite(fd,"\nINSTRUCTION COUNTERS:\n");
+            $fwrite(fd,"LUI_SLT:                 %0d\n", cntr_luislt);
+            $fwrite(fd,"LOGIC:                   %0d\n", cntr_logic);
+            $fwrite(fd,"ADDSUB:                  %0d\n", cntr_addsub);
+            $fwrite(fd,"SHIFT:                   %0d\n", cntr_shift);
+            $fwrite(fd,"BRANCH:                  %0d\n", cntr_branch);
+            $fwrite(fd,"JUMP:                    %0d\n", cntr_jump);
+            $fwrite(fd,"LOAD:                    %0d\n", cntr_load);
+            $fwrite(fd,"STORE:                   %0d\n", cntr_store);
+            $fwrite(fd,"SYS:                     %0d\n", cntr_sys);
+            $fwrite(fd,"CSR:                     %0d\n", cntr_csr);
+            $fwrite(fd,"MUL:                     %0d\n", cntr_mul);
+            $fwrite(fd,"DIV:                     %0d\n", cntr_div);
+        
+            if(VEnable) begin
+                $fwrite(fd, "\nVECTOR EXTENSION:\n");
+                $fwrite(fd, "VADDSUB:                 %0d\n", cntr_vaddsub);
+                $fwrite(fd, "VMUL:                    %0d\n", cntr_vmul);
+                $fwrite(fd, "VDIV:                    %0d\n", cntr_vdiv);
+                $fwrite(fd, "VMAC:                    %0d\n", cntr_vmac);
+                $fwrite(fd, "VRED:                    %0d\n", cntr_vred);
+                $fwrite(fd, "VLOAD/VSTORE:            %0d\n", cntr_vloadstore);
+                $fwrite(fd, "VOTHERS:                 %0d\n", cntr_vothers);
+            end
+        end
     end
+`endif
 
 endmodule

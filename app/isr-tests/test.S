@@ -46,6 +46,7 @@ idle:
     wfi
     j idle
 
+.align 4
 trap_handler:
     csrrw a0, mscratch, a0
 

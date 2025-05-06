@@ -35,11 +35,11 @@ module testbench
     localparam atomic_e      AMOEXT          = AMO_A;
     localparam bit           COMPRESSED      = 1'b1;
     localparam bit           USE_XOSVM       = 1'b0;
-    localparam bit           USE_ZIHPM       = 1'b1;
     localparam bit           USE_ZKNE        = 1'b1;
     localparam bit           USE_ZICOND      = 1'b1;
     localparam bit           VEnable         = 1'b0;
     localparam int           VLEN            = 256;
+    localparam bit           USE_HPMCOUNTER  = 1'b1;
     localparam bit           BRANCHPRED      = 1'b1;
 
 `ifndef SYNTH
@@ -98,9 +98,6 @@ module testbench
     logic [31:0]            data_ram, data_plic, data_tb;
     logic                   enable_tb_r, enable_rtc_r, enable_plic_r;
     logic                   mti, mei;
-    logic [31:0]            irq;
-
-    assign irq = {20'h0, mei, 3'h0, mti, 7'h0};
 
 //////////////////////////////////////////////////////////////////////////////
 // Control
@@ -171,17 +168,17 @@ module testbench
 	    .DEBUG      (DEBUG          ),
 	    .PROFILING  (PROFILING      ),
     `endif
-        .Environment  (ASIC           ),
-        .MULEXT       (MULEXT         ),
-        .AMOEXT       (AMOEXT         ),
-        .COMPRESSED   (COMPRESSED     ),
-        .VEnable      (VEnable        ),
-        .VLEN         (VLEN           ),
-        .XOSVMEnable  (USE_XOSVM      ),
-        .ZIHPMEnable  (USE_ZIHPM      ),
-        .ZKNEEnable   (USE_ZKNE       ),
-        .ZICONDEnable (USE_ZICOND     ),
-        .BRANCHPRED   (BRANCHPRED     )
+        .Environment     (ASIC          ),
+        .MULEXT          (MULEXT        ),
+        .AMOEXT          (AMOEXT        ),
+        .COMPRESSED      (COMPRESSED    ),
+        .VEnable         (VEnable       ),
+        .VLEN            (VLEN          ),
+        .XOSVMEnable     (USE_XOSVM     ),
+        .ZKNEEnable      (USE_ZKNE      ),
+        .ZICONDEnable    (USE_ZICOND    ),
+        .HPMCOUNTEREnable(USE_HPMCOUNTER),
+        .BRANCHPRED      (BRANCHPRED    )
     ) dut (
         .clk                    (clk),
         .reset_n                (reset_n),
@@ -190,7 +187,8 @@ module testbench
         .instruction_i          (instruction),
         .mem_data_i             (mem_data_read),
         .mtime_i                (mtime),
-        .irq_i                  (irq),
+        .tip_i                  (mti),
+        .eip_i                  (mei),
         .instruction_address_o  (instruction_address),
         .mem_operation_enable_o (mem_operation_enable),
         .mem_write_enable_o     (mem_write_enable),
