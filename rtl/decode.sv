@@ -495,11 +495,9 @@ module decode
 
     logic is_load;
     logic is_store;
-    logic forwardingless;
 
     assign is_load  = (opcode == 5'b00000) || (instruction_operation == LR_W);
     assign is_store = (opcode == 5'b01000) || (instruction_operation inside {SC_W, AMO_W});
-    assign forwardingless = (instruction_operation inside {SC_W});
     
     logic           locked_memory;
     logic  [4:0]    locked_register;
@@ -515,7 +513,7 @@ module decode
             if (hazard_o || killed)
                 locked_register <= '0;
             else    // Read-after-write on LOAD
-                locked_register <= (is_load || forwardingless) ? rd : '0;
+                locked_register <= is_load ? rd : '0;
         end
     end
 

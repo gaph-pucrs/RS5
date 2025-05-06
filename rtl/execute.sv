@@ -641,6 +641,7 @@ end
             AES32ESI, AES32ESMI:    result = aes_result;
             VECTOR, VLOAD, VSTORE:  result = vector_scalar_result;
             CZERO_EQZ, CZERO_NEZ:   result = result_zicond;
+            SC_W:                   result = {31'h0, lrsc_result};
             default:                result = sum_result;
         endcase
     end
@@ -648,11 +649,11 @@ end
     always_comb begin
         unique case (instruction_operation_i)
             NOP,
-            SC_W,AMO_W,
             SB,SH,SW, 
             BEQ,BNE,
             BLT,BLTU,
             BGE,BGEU:   write_enable = 1'b0;
+            SC_W,AMO_W: write_enable = (rd_i != '0 && atomic_write_enable && !raise_exception_o);
             VECTOR,
             VLOAD,
             VSTORE:     write_enable =  rd_i != '0 && vector_wr_en;
@@ -669,17 +670,10 @@ end
     assign hold_o = hold_div || hold_mul || hold_vector || atomic_hold;
 
     always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
+        if (!reset_n)
             write_enable_o <= 1'b0;
-        end
-        else if (!stall) begin
-            /* Non-default cases have no forwarding */
-            unique case (instruction_operation_i)
-                SC_W,
-                AMO_W:   write_enable_o <= (rd_i != '0 && atomic_write_enable && !raise_exception_o);
-                default: write_enable_o <= write_enable;
-            endcase
-        end
+        else if (!stall)
+            write_enable_o <= write_enable;
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
@@ -696,17 +690,10 @@ end
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
+        if (!reset_n) 
             result_o <= '0;
-        end
-        else if (!stall) begin
-            /* Non-default cases have no forwarding */
-            unique case (instruction_operation_i)
-                SC_W:    result_o <= {31'h0, lrsc_result};
-                // AMO_W has no result
-                default: result_o <= result;
-            endcase
-        end
+        else if (!stall) 
+            result_o <= result;
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
