@@ -32,7 +32,8 @@ module decode
     parameter bit           ZKNEEnable   = 1'b0,
     parameter bit           ZICONDEnable = 1'b0,
     parameter bit           VEnable      = 1'b0,
-    parameter bit           BRANCHPRED   = 1'b1
+    parameter bit           BRANCHPRED   = 1'b1,
+    parameter bit           FORWARDING   = 1'b0
 )
 (
     input   logic           clk,
@@ -45,12 +46,16 @@ module decode
     input   logic [31:0]    rs1_data_read_i,
     input   logic [31:0]    rs2_data_read_i,
     input   logic [31:0]    writeback_i,
-    input   logic [31:0]    result_i,
     input   logic [ 4:0]    rd_retire_i,
     input   logic           regbank_we_i,
-    input   logic           execute_we_i,
     input   logic           rollback_i,
     input   logic           compressed_i,
+
+    /* Not used without forwarding */
+    /* verilator lint_off UNUSEDSIGNAL */
+    input   logic [31:0]    result_i,
+    input   logic           execute_we_i,
+    /* verilator lint_on UNUSEDSIGNAL */
 
     output  logic  [4:0]    rs1_o,
     output  logic  [4:0]    rs2_o,
@@ -513,7 +518,7 @@ module decode
             if (hazard_o || killed)
                 locked_register <= '0;
             else    // Read-after-write on LOAD
-                locked_register <= is_load ? rd : '0;
+                locked_register <= (is_load || !FORWARDING) ? rd : '0;
         end
     end
 
@@ -669,22 +674,39 @@ module decode
     logic [31:0] rs1_data;
     logic [31:0] rs2_data;
 
-    always_comb begin
-        if (rs1_o == rd_o && execute_we_i)  // Forwarding from execute
-            rs1_data = result_i;
-        else if (rs1_o == rd_retire_i && regbank_we_i)  // Forwarding from retire on LOAD
-            rs1_data = writeback_i;
-        else
-            rs1_data = rs1_data_read_i;
-    end
+    if (FORWARDING) begin : gen_forwarding_on
+        always_comb begin
+            if (rs1_o == rd_o && execute_we_i)  // Forwarding from execute
+                rs1_data = result_i;
+            else if (rs1_o == rd_retire_i && regbank_we_i)  // Forwarding from retire on LOAD
+                rs1_data = writeback_i;
+            else
+                rs1_data = rs1_data_read_i;
+        end
 
-    always_comb begin
-        if (rs2_o == rd_o && execute_we_i)  // Forwarding from execute
-            rs2_data = result_i;
-        else if (rs2_o == rd_retire_i && regbank_we_i)  // Forwarding from retire on LOAD
-            rs2_data = writeback_i;
-        else
-            rs2_data = rs2_data_read_i;
+        always_comb begin
+            if (rs2_o == rd_o && execute_we_i)  // Forwarding from execute
+                rs2_data = result_i;
+            else if (rs2_o == rd_retire_i && regbank_we_i)  // Forwarding from retire on LOAD
+                rs2_data = writeback_i;
+            else
+                rs2_data = rs2_data_read_i;
+        end
+    end
+    else begin : gen_forwarding_off
+        always_comb begin
+            if (rs1_o == rd_retire_i && regbank_we_i)  // Forwarding from retire on LOAD
+                rs1_data = writeback_i;
+            else
+                rs1_data = rs1_data_read_i;
+        end
+
+        always_comb begin
+            if (rs2_o == rd_retire_i && regbank_we_i)  // Forwarding from retire on LOAD
+                rs2_data = writeback_i;
+            else
+                rs2_data = rs2_data_read_i;
+        end
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
