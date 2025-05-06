@@ -5,3 +5,5 @@ logs
 scripts/*.txt
 scripts/error
 cnn_functions.c
+summary.py
+draft.c

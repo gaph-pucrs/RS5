@@ -14,7 +14,6 @@ def create_c_array_bn(layer):
 
     for suffix in params_bn:
         name = layer.name + suffix
-        # filename = "/sim/RS5/app/tiny-ml/mobilenet/py/v2/params/" + name + ".h"
         filename = "../params/" + name + ".h"
         with open(filename, "w") as f:
             f.write(f"#ifndef   __{name}_h\n")
@@ -29,7 +28,6 @@ def create_c_array_bn(layer):
         print(f"(+) BatchNormalization {name} data generated in {filename} file") 
 
 def create_c_array_w(layer):
-    # filename = "/sim/RS5/app/tiny-ml/mobilenet/py/v2/params/" + layer.name + ".h"
     filename = "../params/" + layer.name + ".h"
     ww = layer.get_weights()[0]
     weights = ww.flatten()
@@ -42,14 +40,28 @@ def create_c_array_w(layer):
         f.write(f"\n}};")
         f.write(f"\n\n#endif")
     print(f"(+) Weights generated in {filename} file")
-    
+
+    if layer.use_bias:
+        filename = "../params/" + layer.name + "_bias.h"
+        bb = layer.get_weights()[1]
+        bias = bb.flatten()
+        with open(filename, "w") as fb:
+            fb.write(f"#ifndef   __{layer.name}_bias_h__\n")
+            fb.write(f"#define   __{layer.name}_bias_h__\n\n")
+            fb.write(f"//{layer.name}_bias: {bb.shape}\n")
+            fb.write(f"const double {layer.name}_bias[{len(bias)}] = {{\n")
+            fb.write(f",\n".join(map(str, bias)))
+            fb.write(f"\n}};")
+            fb.write(f"\n\n#endif")
+        print(f"(+) Weights generated in {filename} file")
+
+
 model = MobileNet()
 
 for layer in model.layers:
     if layer.weights:
         if isinstance(layer, tf.keras.layers.BatchNormalization):
             create_c_array_bn(layer)
-            # continue
         else:
             create_c_array_w(layer)
     

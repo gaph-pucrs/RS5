@@ -5,56 +5,8 @@
 #include <math.h>
 
 #include "params/data.h"
-
-#include "params/conv1.h"
-#include "params/conv_dw_1.h"
-#include "params/conv_pw_1.h"
-#include "params/conv_dw_2.h"
-
-#ifdef BATCHNORMALIZATION
-    #include "params/conv1_bn_mean.h"
-    #include "params/conv1_bn_var.h"
-    #include "params/conv1_bn_gamma.h"
-    #include "params/conv1_bn_beta.h"
-    #include "params/conv1_bn_eps.h"
-
-    #include "params/conv_dw_1_bn_mean.h"
-    #include "params/conv_dw_1_bn_var.h"
-    #include "params/conv_dw_1_bn_gamma.h"
-    #include "params/conv_dw_1_bn_beta.h"
-    #include "params/conv_dw_1_bn_eps.h"
-    
-    #include "params/conv_pw_1_bn_mean.h"
-    #include "params/conv_pw_1_bn_var.h"
-    #include "params/conv_pw_1_bn_gamma.h"
-    #include "params/conv_pw_1_bn_beta.h"
-    #include "params/conv_pw_1_bn_eps.h"
-
-    #include "params/conv_dw_2_bn_mean.h"
-    #include "params/conv_dw_2_bn_var.h"
-    #include "params/conv_dw_2_bn_gamma.h"
-    #include "params/conv_dw_2_bn_beta.h"
-    #include "params/conv_dw_2_bn_eps.h"
-#endif
-
-#define IMAGE_HEIGHT    225 // 224 + 1
-#define IMAGE_WIDTH     225 // 224 + 1
-#define IMAGE_CHANNELS    3
-#define CONV1_FEATUREMAP_HEIGHT 112
-#define CONV1_FEATUREMAP_WIDTH  112
-#define CONV1_FILTERS       32
-
-#define CONV_DW_1_HEIGHT        112
-#define CONV_DW_1_WIDTH         112
-#define CONV_DW_1_CHANNELS       32
-
-#define CONV_PW_1_HEIGHT        112
-#define CONV_PW_1_WIDTH         112
-#define CONV_PW_1_CHANNELS       64
-
-#define CONV_DW_2_HEIGHT         56 
-#define CONV_DW_2_WIDTH          56 
-#define CONV_DW_2_CHANNELS       64
+#include "layers.h"
+#include "weights.h"
 
 #define type    double
 
@@ -72,7 +24,7 @@ void print(const type in[], const int h, const int w, const int c) {
             for (int k=0; k<c; k++)
             {
                 int idx= (k)+((j)*(c))+((i)*(c)*(w));
-                printf("%.6lf\n", in[idx]);
+                printf("%.10lf\n", in[idx]);
             }
         }
     }
@@ -82,7 +34,7 @@ void pad (
     const int HEIGHT,
     const int WIDTH,
     const int CHANNELS,
-    type in[],
+    const type in[],
     type out[]
 ) {
     for (int i=0; i<HEIGHT; i++)
@@ -104,7 +56,7 @@ void half_pad (
     const int HEIGHT,
     const int WIDTH,
     const int CHANNELS,
-    type in[],
+    const type in[],
     type out[]
 ) {
     for (int i=0; i<HEIGHT; i++)
@@ -159,25 +111,124 @@ void relu (
     }
 }
 
-void _conv_block (
+void avg_pooling (
+    const int HEIGHT,
+    const int WIDTH,
+    const int CHANNELS,
+    const type *input,
+    type *output
+) {
+    for (int h=0; h<HEIGHT; h++) 
+    {
+        for (int w=0; w<WIDTH; w++)
+        {
+            for (int c=0; c<CHANNELS; c++)
+            {
+                output[c] += input[(c)+(w*CHANNELS)+(h*CHANNELS*WIDTH)];
+            }
+        }
+    }
+
+    for (int c=0; c<CHANNELS; c++) {
+        output[c] /= HEIGHT*WIDTH;
+    }
+}
+
+void softmax (
+    const int len,
+    const type input[],
+    type output[]
+) {
+    type sum = 0;
+    for (int i=0; i<len; i++) {
+        sum += exp(input[i]);
+    }
+
+    for (int i=0; i<len; i++) {
+        output[i] = exp(input[i])/sum;
+    }
+}
+
+void _conv_block2 (
+    const int INPUT_HEIGHT,
+    const int INPUT_WIDTH,
+    const int INPUT_CHANNELS,
     const type input[],
     const type weights[],
+    const int OUTPUT_HEIGHT,
+    const int OUTPUT_WIDTH,
+    const int OUTPUT_CHANNELS,
     type output[], 
-    int filters,
-    const double alpha,
     const int kernel_size,
-    const int stride
-#ifdef BATCHNORMALIZATION
-    ,
+    const int stride,
     const type mean[],
     const type var[],
     const type gamma[],
     const type beta[],
     const double eps
-#endif
 ) {
-    filters = (int)(filters*alpha);
+    // "(0,0)" of the 3x3 image
+    int base_y=0, base_x=0;
 
+    int cnt = 0;
+
+    for (int k=0; k<OUTPUT_HEIGHT; k++)
+    {
+        base_x = 0;
+        for (int l=0; l<OUTPUT_WIDTH; l++)
+        {
+            for (int i=0; i<kernel_size; i++)
+            {
+                for (int j=0; j<kernel_size; j++)
+                {
+                    for (int m=0; m<INPUT_CHANNELS; m++)
+                    {
+                        int idx_i = (m)+(base_x)+(base_y)+(j*INPUT_CHANNELS)+(i*INPUT_CHANNELS*INPUT_WIDTH);
+                        for (int n=0; n<OUTPUT_CHANNELS; n++)
+                        {
+                            int idx_w = (n)+(m*OUTPUT_CHANNELS)+(j*OUTPUT_CHANNELS*INPUT_CHANNELS)+(i*OUTPUT_CHANNELS*INPUT_CHANNELS*kernel_size);
+                            int idx_out = (n)+(l*OUTPUT_CHANNELS)+(k*OUTPUT_CHANNELS*OUTPUT_WIDTH);
+
+                            output[idx_out] += input[idx_i]*weights[idx_w];
+                        }
+                    }
+                }
+            }
+            base_x += stride*INPUT_CHANNELS;
+        }
+        base_y += stride*INPUT_CHANNELS*INPUT_WIDTH;
+    }
+
+    #ifdef BATCHNORMALIZATION
+    batch_normalization (
+        OUTPUT_HEIGHT,
+        OUTPUT_WIDTH,
+        OUTPUT_CHANNELS,
+        output, 
+        mean, 
+        var, 
+        gamma, 
+        beta, 
+        eps
+    );
+    #endif
+
+    relu(6.0, output, OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_WIDTH);
+}
+
+void _conv_block (
+    const type input[],
+    const type weights[],
+    type output[], 
+    int filters,
+    const int kernel_size,
+    const int stride,
+    const type mean[],
+    const type var[],
+    const type gamma[],
+    const type beta[],
+    const double eps
+) {
     // "(0,0)" of the 3x3 image
     int base_y=0, base_x=0;
 
@@ -228,27 +279,30 @@ void _depthwise_conv_block (
     const int INPUT_HEIGHT,
     const int INPUT_WIDTH,
     const int INPUT_CHANNELS,
-    const type input[],
+    type input[],
     const type weights[],
     const int OUTPUT_HEIGHT,
     const int OUTPUT_WIDTH,
     const int OUTPUT_CHANNELS,
     type output[],
-    const double alpha,
     const int kernel_size,
-    const int p,
-    const int stride
-#ifdef BATCHNORMALIZATION
-    ,
+    const int stride,
     const type mean[],
     const type var[],
     const type gamma[],
     const type beta[],
     const double eps
-#endif
 ) {
-    // int base_y = (INPUT_CHANNELS)*(INPUT_WIDTH+2), base_x = (INPUT_CHANNELS);
-    // int base_y = (INPUT_CHANNELS)*(INPUT_WIDTH+p), base_x = (INPUT_CHANNELS);
+    const int p = (OUTPUT_WIDTH) - (int)((INPUT_WIDTH-kernel_size)/stride) - 1;
+    type *input_pd = calloc((INPUT_CHANNELS)*(INPUT_WIDTH+p)*(INPUT_HEIGHT+p), sizeof(type));
+    
+    if (p == 1) {
+        half_pad(INPUT_HEIGHT, INPUT_WIDTH, INPUT_CHANNELS, input, input_pd);
+    }
+    else if (p == 2) {
+        pad(INPUT_HEIGHT, INPUT_WIDTH, INPUT_CHANNELS, input, input_pd);
+    }
+    
     int base_y = 0, base_x = 0;
     for (int k=0; k<OUTPUT_HEIGHT; k++)
     {
@@ -262,11 +316,10 @@ void _depthwise_conv_block (
                 {
                     for (int m=0; m<OUTPUT_CHANNELS; m++)
                     {
-                        // int idx_i = (m)+(j*32)+(i*32*114)+(l*stride*32)+(k*stride*32*114);
                         int idx_i = (m)+(base_y)+(base_x)+(j*INPUT_CHANNELS)+(i*INPUT_CHANNELS*(INPUT_WIDTH+p));
                         int idx_w = (m)+(j*OUTPUT_CHANNELS)+(i*OUTPUT_CHANNELS*kernel_size);
                         int idx_out = (m)+(l*OUTPUT_CHANNELS)+(k*OUTPUT_CHANNELS*OUTPUT_WIDTH);
-                        double partial_sum = input[idx_i]*weights[idx_w];
+                        type partial_sum = input_pd[idx_i]*weights[idx_w];
                         output[idx_out] += partial_sum;
                     }
                 }
@@ -291,30 +344,44 @@ void _depthwise_conv_block (
     #endif
 
     relu(6.0, output, OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS);
+    free(input_pd);
 }
 
 void _pointwise_conv_block (
     const int INPUT_HEIGHT,
     const int INPUT_WIDTH,
     const int INPUT_CHANNELS,
-    const type input[],
+    type input[],
     const type weights[],
     const int OUTPUT_HEIGHT,
     const int OUTPUT_WIDTH,
     const int OUTPUT_CHANNELS,
     type output[],
-    const double alpha,
-    const int kernel_size,
-    const int stride
-#ifdef BATCHNORMALIZATION
-    ,
     const type mean[],
     const type var[],
     const type gamma[],
     const type beta[],
     const double eps
-#endif
 ) {
+    // _conv_block (
+    //     INPUT_HEIGHT,
+    //     INPUT_WIDTH,
+    //     INPUT_CHANNELS,
+    //     input,
+    //     weights,
+    //     OUTPUT_HEIGHT,
+    //     OUTPUT_WIDTH,
+    //     OUTPUT_CHANNELS,
+    //     output,
+    //     1,
+    //     1,
+    //     mean,
+    //     var,
+    //     gamma,
+    //     beta,
+    //     eps
+    // );
+
     int base_y = 0, base_x = 0;
     for (int k=0; k<OUTPUT_HEIGHT; k++)
     {
@@ -331,9 +398,9 @@ void _pointwise_conv_block (
                     output[idx_out] += input[idx_in]*weights[idx_w];
                 }
             }
-            base_x += (stride)*(INPUT_CHANNELS);
+            base_x += (INPUT_CHANNELS);
         }
-        base_y += (stride)*(INPUT_CHANNELS)*(INPUT_WIDTH);
+        base_y += (INPUT_CHANNELS)*(INPUT_WIDTH);
     }
 
     #ifdef BATCHNORMALIZATION
@@ -353,69 +420,85 @@ void _pointwise_conv_block (
     relu(6.0, output, OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS);
 }
 
+void _fc (
+    const int INPUT_CHANNELS,
+    const type input[],
+    const type weights[],
+    const type bias[],
+    const int NEURONS,
+    type output[]
+) {
+    for (int ch=0; ch<INPUT_CHANNELS; ch++)
+    {
+        for (int n=0; n<NEURONS; n++)
+        {
+            output[n] += input[ch]*weights[(n)+((ch)*NEURONS)];
+        }
+    }
+
+    for (int n=0; n<NEURONS; n++) 
+    {
+        output[n] += bias[n];
+    }
+};
+
 int main()
 {
-    type *conv1_out = calloc(
-            CONV1_FEATUREMAP_HEIGHT*CONV1_FEATUREMAP_WIDTH*CONV1_FILTERS,
-            sizeof(type));
+//------------------------------
+//          CONV 1
+//------------------------------
+    // type *img_padded = calloc((IMAGE_CHANNELS)*(IMAGE_WIDTH+1)*(IMAGE_HEIGHT+1), sizeof(type));
+    type *conv1_out = calloc(CONV1_FEATUREMAP_HEIGHT*CONV1_FEATUREMAP_WIDTH*CONV1_FILTERS, sizeof(type));
+
+    // half_pad (
+    //     IMAGE_HEIGHT,
+    //     IMAGE_WIDTH,
+    //     IMAGE_CHANNELS,
+    //     img,
+    //     img_padded
+    // );
 
     _conv_block (
-       img,
-       conv1,
-       conv1_out, 
-       CONV1_FILTERS,
-       1,   // alpha
-       3,   // kernel_size
-       2    // stride
-    #ifdef BATCHNORMALIZATION
-       ,
-       conv1_bn_mean,
-       conv1_bn_var,
-       conv1_bn_gamma,
-       conv1_bn_beta,
-       conv1_bn_eps
-    #endif
+        img,
+        conv1,
+        conv1_out, 
+        CONV1_FILTERS,
+        3,   // kernel_size
+        2,   // stride
+        conv1_bn_mean,
+        conv1_bn_var,
+        conv1_bn_gamma,
+        conv1_bn_beta,
+        conv1_bn_eps
     );
-    
-    type *conv1_out_pad = calloc((CONV_DW_1_CHANNELS)*(CONV_DW_1_HEIGHT+2)*(CONV_DW_1_WIDTH+2), sizeof(type));
-    pad (
-        CONV_DW_1_HEIGHT,
-        CONV_DW_1_WIDTH,
-        CONV_DW_1_CHANNELS,
-        conv1_out,
-        conv1_out_pad
-    );
-    free(conv1_out);
 
-    type *conv_dw_1_out = calloc((CONV_DW_1_CHANNELS)*(CONV_DW_1_HEIGHT)*(CONV_DW_1_WIDTH), sizeof(type));
+    // free(img_padded);
+
+//------------------------------
+//          BLOCK 1
+//------------------------------
+    type *conv_dw_1_out = calloc(CONV_DW_1_CHANNELS*CONV_DW_1_WIDTH*CONV_DW_1_HEIGHT, sizeof(type));    
+    type *conv_pw_1_out = calloc(CONV_PW_1_CHANNELS*CONV_PW_1_WIDTH*CONV_PW_1_HEIGHT, sizeof(type));
+    
     _depthwise_conv_block (
         CONV1_FEATUREMAP_HEIGHT,
         CONV1_FEATUREMAP_WIDTH,
         CONV1_FILTERS,
-        conv1_out_pad,
+        conv1_out,
         conv_dw_1,
         CONV_DW_1_HEIGHT,
         CONV_DW_1_WIDTH,
         CONV_DW_1_CHANNELS,
         conv_dw_1_out,
-        1.0,    // alpha
         3,      // kernel_size,
-        2,      // pad
-        1       // stride
-    #ifdef BATCHNORMALIZATION
-        ,
+        1,      // stride
         conv_dw_1_bn_mean,
         conv_dw_1_bn_var,
         conv_dw_1_bn_gamma,
         conv_dw_1_bn_beta,
         conv_dw_1_bn_eps
-     #endif
     );
-    free(conv1_out_pad);
 
-    // print(conv_dw_1_out, 112, 112, 32);
-
-    type *conv_pw_1_out = calloc(CONV_PW_1_CHANNELS*CONV_PW_1_WIDTH*CONV_PW_1_HEIGHT, sizeof(type));
     _pointwise_conv_block (
         CONV_DW_1_HEIGHT,
         CONV_DW_1_WIDTH,
@@ -426,62 +509,606 @@ int main()
         CONV_PW_1_WIDTH,
         CONV_PW_1_CHANNELS,
         conv_pw_1_out,
-        1.0,
-        1,
-        1
-    #ifdef BATCHNORMALIZATION
-        ,
         conv_pw_1_bn_mean,
         conv_pw_1_bn_var,
         conv_pw_1_bn_gamma,
         conv_pw_1_bn_beta,
         conv_pw_1_bn_eps
-    #endif
     ); 
+
+    free(conv1_out);
     free(conv_dw_1_out);
 
-    // print(conv_pw_1_out, 112, 112, 64);
-    // return 0;
-
-    type *conv_pad_2 = calloc((CONV_PW_1_CHANNELS)*(CONV_PW_1_HEIGHT+1)*(CONV_PW_1_WIDTH+1), sizeof(type));
-    half_pad (
-        CONV_PW_1_HEIGHT,
-        CONV_PW_1_WIDTH,
-        CONV_PW_1_CHANNELS,
-        conv_pw_1_out,
-        conv_pad_2
-    );
-    free(conv_pw_1_out);
-
+//------------------------------
+//          BLOCK 2
+//------------------------------
     type *conv_dw_2_out = calloc((CONV_DW_2_CHANNELS)*(CONV_DW_2_HEIGHT)*(CONV_DW_2_WIDTH), sizeof(type));
+    type *conv_pw_2_out = calloc(CONV_PW_2_CHANNELS*CONV_PW_2_WIDTH*CONV_PW_2_HEIGHT, sizeof(type));
+
     _depthwise_conv_block (
         CONV_PW_1_HEIGHT,
         CONV_PW_1_WIDTH,
         CONV_PW_1_CHANNELS,
-        conv_pad_2,
+        conv_pw_1_out,
         conv_dw_2,
         CONV_DW_2_HEIGHT,
         CONV_DW_2_WIDTH,
         CONV_DW_2_CHANNELS,
         conv_dw_2_out,
-        1.0,    // alpha
         3,      // kernel_size
-        1,      // pad
-        2       // stride
-    #ifdef BATCHNORMALIZATION
-        ,
+        CONV_DW_2_STRIDE,
         conv_dw_2_bn_mean,
         conv_dw_2_bn_var,
         conv_dw_2_bn_gamma,
         conv_dw_2_bn_beta,
         conv_dw_2_bn_eps
-     #endif
     );
-    free(conv_pad_2);
 
-    print(conv_dw_2_out, CONV_DW_2_HEIGHT, CONV_DW_2_WIDTH, CONV_DW_2_CHANNELS);
+    _pointwise_conv_block (
+        CONV_DW_2_HEIGHT,
+        CONV_DW_2_WIDTH,
+        CONV_DW_2_CHANNELS,
+        conv_dw_2_out,
+        conv_pw_2,
+        CONV_PW_2_HEIGHT,
+        CONV_PW_2_WIDTH,
+        CONV_PW_2_CHANNELS,
+        conv_pw_2_out,
+        conv_pw_2_bn_mean,
+        conv_pw_2_bn_var,
+        conv_pw_2_bn_gamma,
+        conv_pw_2_bn_beta,
+        conv_pw_2_bn_eps
+    ); 
 
+    free(conv_pw_1_out);
     free(conv_dw_2_out);
 
+//------------------------------
+//          BLOCK 3
+//------------------------------
+    type *conv_dw_3_out = calloc((CONV_DW_3_CHANNELS)*(CONV_DW_3_HEIGHT)*(CONV_DW_3_WIDTH), sizeof(type));
+    type *conv_pw_3_out = calloc(CONV_PW_3_CHANNELS*CONV_PW_3_WIDTH*CONV_PW_3_HEIGHT, sizeof(type));
+    
+    _depthwise_conv_block (
+        CONV_PW_2_HEIGHT,
+        CONV_PW_2_WIDTH,
+        CONV_PW_2_CHANNELS,
+        conv_pw_2_out,
+        conv_dw_3,
+        CONV_DW_3_HEIGHT,
+        CONV_DW_3_WIDTH,
+        CONV_DW_3_CHANNELS,
+        conv_dw_3_out,
+        3,      // kernel_size
+        CONV_DW_3_STRIDE, 
+        conv_dw_3_bn_mean,
+        conv_dw_3_bn_var,
+        conv_dw_3_bn_gamma,
+        conv_dw_3_bn_beta,
+        conv_dw_3_bn_eps
+    );
+    
+    _pointwise_conv_block (
+        CONV_DW_3_HEIGHT,
+        CONV_DW_3_WIDTH,
+        CONV_DW_3_CHANNELS,
+        conv_dw_3_out,
+        conv_pw_3,
+        CONV_PW_3_HEIGHT,
+        CONV_PW_3_WIDTH,
+        CONV_PW_3_CHANNELS,
+        conv_pw_3_out,
+        conv_pw_3_bn_mean,
+        conv_pw_3_bn_var,
+        conv_pw_3_bn_gamma,
+        conv_pw_3_bn_beta,
+        conv_pw_3_bn_eps
+    ); 
+
+    free(conv_pw_2_out);
+    free(conv_dw_3_out);
+
+//------------------------------
+//          BLOCK 4
+//------------------------------
+    type *conv_dw_4_out = calloc((CONV_DW_4_CHANNELS)*(CONV_DW_4_HEIGHT)*(CONV_DW_4_WIDTH), sizeof(type));
+    type *conv_pw_4_out = calloc(CONV_PW_4_CHANNELS*CONV_PW_4_WIDTH*CONV_PW_4_HEIGHT, sizeof(type));
+    
+    _depthwise_conv_block (
+        CONV_PW_3_HEIGHT,
+        CONV_PW_3_WIDTH,
+        CONV_PW_3_CHANNELS,
+        conv_pw_3_out,
+        conv_dw_4,
+        CONV_DW_4_HEIGHT,
+        CONV_DW_4_WIDTH,
+        CONV_DW_4_CHANNELS,
+        conv_dw_4_out,
+        3,      // kernel_size
+        CONV_DW_4_STRIDE,   
+        conv_dw_4_bn_mean,
+        conv_dw_4_bn_var,
+        conv_dw_4_bn_gamma,
+        conv_dw_4_bn_beta,
+        conv_dw_4_bn_eps
+    );
+    
+    _pointwise_conv_block (
+        CONV_DW_4_HEIGHT,
+        CONV_DW_4_WIDTH,
+        CONV_DW_4_CHANNELS,
+        conv_dw_4_out,
+        conv_pw_4,
+        CONV_PW_4_HEIGHT,
+        CONV_PW_4_WIDTH,
+        CONV_PW_4_CHANNELS,
+        conv_pw_4_out,
+        conv_pw_4_bn_mean,
+        conv_pw_4_bn_var,
+        conv_pw_4_bn_gamma,
+        conv_pw_4_bn_beta,
+        conv_pw_4_bn_eps
+    ); 
+
+    free(conv_pw_3_out);
+    free(conv_dw_4_out);
+
+
+//------------------------------
+//          BLOCK 5
+//------------------------------
+    type *conv_dw_5_out = calloc((CONV_DW_5_CHANNELS)*(CONV_DW_5_HEIGHT)*(CONV_DW_5_WIDTH), sizeof(type));
+    type *conv_pw_5_out = calloc(CONV_PW_5_CHANNELS*CONV_PW_5_WIDTH*CONV_PW_5_HEIGHT, sizeof(type));
+
+    _depthwise_conv_block (
+        CONV_PW_4_HEIGHT,
+        CONV_PW_4_WIDTH,
+        CONV_PW_4_CHANNELS,
+        conv_pw_4_out,
+        conv_dw_5,
+        CONV_DW_5_HEIGHT,
+        CONV_DW_5_WIDTH,
+        CONV_DW_5_CHANNELS,
+        conv_dw_5_out,
+        3,      // kernel_size
+        CONV_DW_5_STRIDE,   
+        conv_dw_5_bn_mean,
+        conv_dw_5_bn_var,
+        conv_dw_5_bn_gamma,
+        conv_dw_5_bn_beta,
+        conv_dw_5_bn_eps
+    );
+
+    _pointwise_conv_block (
+        CONV_DW_5_HEIGHT,
+        CONV_DW_5_WIDTH,
+        CONV_DW_5_CHANNELS,
+        conv_dw_5_out,
+        conv_pw_5,
+        CONV_PW_5_HEIGHT,
+        CONV_PW_5_WIDTH,
+        CONV_PW_5_CHANNELS,
+        conv_pw_5_out,
+        conv_pw_5_bn_mean,
+        conv_pw_5_bn_var,
+        conv_pw_5_bn_gamma,
+        conv_pw_5_bn_beta,
+        conv_pw_5_bn_eps
+    ); 
+
+    free(conv_pw_4_out);
+    free(conv_dw_5_out);
+
+
+//------------------------------
+//          BLOCK 6
+//------------------------------
+    type *conv_dw_6_out = calloc((CONV_DW_6_CHANNELS)*(CONV_DW_6_HEIGHT)*(CONV_DW_6_WIDTH), sizeof(type));
+    type *conv_pw_6_out = calloc(CONV_PW_6_CHANNELS*CONV_PW_6_WIDTH*CONV_PW_6_HEIGHT, sizeof(type));
+
+    _depthwise_conv_block (
+        CONV_PW_5_HEIGHT,
+        CONV_PW_5_WIDTH,
+        CONV_PW_5_CHANNELS,
+        conv_pw_5_out,
+        conv_dw_6,
+        CONV_DW_6_HEIGHT,
+        CONV_DW_6_WIDTH,
+        CONV_DW_6_CHANNELS,
+        conv_dw_6_out,
+        3,      // kernel_size
+        CONV_DW_6_STRIDE,   
+        conv_dw_6_bn_mean,
+        conv_dw_6_bn_var,
+        conv_dw_6_bn_gamma,
+        conv_dw_6_bn_beta,
+        conv_dw_6_bn_eps
+    );
+
+    _pointwise_conv_block (
+        CONV_DW_6_HEIGHT,
+        CONV_DW_6_WIDTH,
+        CONV_DW_6_CHANNELS,
+        conv_dw_6_out,
+        conv_pw_6,
+        CONV_PW_6_HEIGHT,
+        CONV_PW_6_WIDTH,
+        CONV_PW_6_CHANNELS,
+        conv_pw_6_out,
+        conv_pw_6_bn_mean,
+        conv_pw_6_bn_var,
+        conv_pw_6_bn_gamma,
+        conv_pw_6_bn_beta,
+        conv_pw_6_bn_eps
+    ); 
+
+    free(conv_pw_5_out);
+    free(conv_dw_6_out);
+
+//------------------------------
+//          BLOCK 7
+//------------------------------
+    type *conv_dw_7_out = calloc((CONV_DW_7_CHANNELS)*(CONV_DW_7_HEIGHT)*(CONV_DW_7_WIDTH), sizeof(type));
+    type *conv_pw_7_out = calloc(CONV_PW_7_CHANNELS*CONV_PW_7_WIDTH*CONV_PW_7_HEIGHT, sizeof(type));
+
+    _depthwise_conv_block (
+        CONV_PW_6_HEIGHT,
+        CONV_PW_6_WIDTH,
+        CONV_PW_6_CHANNELS,
+        conv_pw_6_out,
+        conv_dw_7,
+        CONV_DW_7_HEIGHT,
+        CONV_DW_7_WIDTH,
+        CONV_DW_7_CHANNELS,
+        conv_dw_7_out,
+        3,      // kernel_size
+        CONV_DW_7_STRIDE,   
+        conv_dw_7_bn_mean,
+        conv_dw_7_bn_var,
+        conv_dw_7_bn_gamma,
+        conv_dw_7_bn_beta,
+        conv_dw_7_bn_eps
+    );
+
+    _pointwise_conv_block (
+        CONV_DW_7_HEIGHT,
+        CONV_DW_7_WIDTH,
+        CONV_DW_7_CHANNELS,
+        conv_dw_7_out,
+        conv_pw_7,
+        CONV_PW_7_HEIGHT,
+        CONV_PW_7_WIDTH,
+        CONV_PW_7_CHANNELS,
+        conv_pw_7_out,
+        conv_pw_7_bn_mean,
+        conv_pw_7_bn_var,
+        conv_pw_7_bn_gamma,
+        conv_pw_7_bn_beta,
+        conv_pw_7_bn_eps
+    ); 
+
+    free(conv_pw_6_out);
+    free(conv_dw_7_out);
+    
+//------------------------------
+//          BLOCK 8
+//------------------------------
+    type *conv_dw_8_out = calloc((CONV_DW_8_CHANNELS)*(CONV_DW_8_HEIGHT)*(CONV_DW_8_WIDTH), sizeof(type));
+    type *conv_pw_8_out = calloc(CONV_PW_8_CHANNELS*CONV_PW_8_WIDTH*CONV_PW_8_HEIGHT, sizeof(type));
+
+    _depthwise_conv_block (
+        CONV_PW_7_HEIGHT,
+        CONV_PW_7_WIDTH,
+        CONV_PW_7_CHANNELS,
+        conv_pw_7_out,
+        conv_dw_8,
+        CONV_DW_8_HEIGHT,
+        CONV_DW_8_WIDTH,
+        CONV_DW_8_CHANNELS,
+        conv_dw_8_out,
+        3,      // kernel_size
+        CONV_DW_8_STRIDE,   
+        conv_dw_8_bn_mean,
+        conv_dw_8_bn_var,
+        conv_dw_8_bn_gamma,
+        conv_dw_8_bn_beta,
+        conv_dw_8_bn_eps
+    );
+
+    _pointwise_conv_block (
+        CONV_DW_8_HEIGHT,
+        CONV_DW_8_WIDTH,
+        CONV_DW_8_CHANNELS,
+        conv_dw_8_out,
+        conv_pw_8,
+        CONV_PW_8_HEIGHT,
+        CONV_PW_8_WIDTH,
+        CONV_PW_8_CHANNELS,
+        conv_pw_8_out,
+        conv_pw_8_bn_mean,
+        conv_pw_8_bn_var,
+        conv_pw_8_bn_gamma,
+        conv_pw_8_bn_beta,
+        conv_pw_8_bn_eps
+    ); 
+
+    free(conv_pw_7_out);
+    free(conv_dw_8_out);
+
+//------------------------------
+//          BLOCK 9
+//------------------------------
+    type *conv_dw_9_out = calloc((CONV_DW_9_CHANNELS)*(CONV_DW_9_HEIGHT)*(CONV_DW_9_WIDTH), sizeof(type));
+    type *conv_pw_9_out = calloc(CONV_PW_9_CHANNELS*CONV_PW_9_WIDTH*CONV_PW_9_HEIGHT, sizeof(type));
+
+    _depthwise_conv_block (
+        CONV_PW_8_HEIGHT,
+        CONV_PW_8_WIDTH,
+        CONV_PW_8_CHANNELS,
+        conv_pw_8_out,
+        conv_dw_9,
+        CONV_DW_9_HEIGHT,
+        CONV_DW_9_WIDTH,
+        CONV_DW_9_CHANNELS,
+        conv_dw_9_out,
+        3,      // kernel_size
+        CONV_DW_9_STRIDE,   
+        conv_dw_9_bn_mean,
+        conv_dw_9_bn_var,
+        conv_dw_9_bn_gamma,
+        conv_dw_9_bn_beta,
+        conv_dw_9_bn_eps
+    );
+
+    _pointwise_conv_block (
+        CONV_DW_9_HEIGHT,
+        CONV_DW_9_WIDTH,
+        CONV_DW_9_CHANNELS,
+        conv_dw_9_out,
+        conv_pw_9,
+        CONV_PW_9_HEIGHT,
+        CONV_PW_9_WIDTH,
+        CONV_PW_9_CHANNELS,
+        conv_pw_9_out,
+        conv_pw_9_bn_mean,
+        conv_pw_9_bn_var,
+        conv_pw_9_bn_gamma,
+        conv_pw_9_bn_beta,
+        conv_pw_9_bn_eps
+    ); 
+
+    free(conv_pw_8_out);
+    free(conv_dw_9_out);
+
+//------------------------------
+//          BLOCK 10
+//------------------------------
+    type *conv_dw_10_out = calloc((CONV_DW_10_CHANNELS)*(CONV_DW_10_HEIGHT)*(CONV_DW_10_WIDTH), sizeof(type));
+    type *conv_pw_10_out = calloc(CONV_PW_10_CHANNELS*CONV_PW_10_WIDTH*CONV_PW_10_HEIGHT, sizeof(type));
+
+    _depthwise_conv_block (
+        CONV_PW_9_HEIGHT,
+        CONV_PW_9_WIDTH,
+        CONV_PW_9_CHANNELS,
+        conv_pw_9_out,
+        conv_dw_10,
+        CONV_DW_10_HEIGHT,
+        CONV_DW_10_WIDTH,
+        CONV_DW_10_CHANNELS,
+        conv_dw_10_out,
+        3,      // kernel_size
+        CONV_DW_10_STRIDE,   
+        conv_dw_10_bn_mean,
+        conv_dw_10_bn_var,
+        conv_dw_10_bn_gamma,
+        conv_dw_10_bn_beta,
+        conv_dw_10_bn_eps
+    );
+
+    _pointwise_conv_block (
+        CONV_DW_10_HEIGHT,
+        CONV_DW_10_WIDTH,
+        CONV_DW_10_CHANNELS,
+        conv_dw_10_out,
+        conv_pw_10,
+        CONV_PW_10_HEIGHT,
+        CONV_PW_10_WIDTH,
+        CONV_PW_10_CHANNELS,
+        conv_pw_10_out,
+        conv_pw_10_bn_mean,
+        conv_pw_10_bn_var,
+        conv_pw_10_bn_gamma,
+        conv_pw_10_bn_beta,
+        conv_pw_10_bn_eps
+    ); 
+
+    free(conv_pw_9_out);
+    free(conv_dw_10_out);
+
+//------------------------------
+//          BLOCK 11
+//------------------------------
+    type *conv_dw_11_out = calloc((CONV_DW_11_CHANNELS)*(CONV_DW_11_HEIGHT)*(CONV_DW_11_WIDTH), sizeof(type));
+    type *conv_pw_11_out = calloc(CONV_PW_11_CHANNELS*CONV_PW_11_WIDTH*CONV_PW_11_HEIGHT, sizeof(type));
+
+    _depthwise_conv_block (
+        CONV_PW_10_HEIGHT,
+        CONV_PW_10_WIDTH,
+        CONV_PW_10_CHANNELS,
+        conv_pw_10_out,
+        conv_dw_11,
+        CONV_DW_11_HEIGHT,
+        CONV_DW_11_WIDTH,
+        CONV_DW_11_CHANNELS,
+        conv_dw_11_out,
+        3,      // kernel_size
+        CONV_DW_11_STRIDE,   
+        conv_dw_11_bn_mean,
+        conv_dw_11_bn_var,
+        conv_dw_11_bn_gamma,
+        conv_dw_11_bn_beta,
+        conv_dw_11_bn_eps
+    );
+
+    _pointwise_conv_block (
+        CONV_DW_11_HEIGHT,
+        CONV_DW_11_WIDTH,
+        CONV_DW_11_CHANNELS,
+        conv_dw_11_out,
+        conv_pw_11,
+        CONV_PW_11_HEIGHT,
+        CONV_PW_11_WIDTH,
+        CONV_PW_11_CHANNELS,
+        conv_pw_11_out,
+        conv_pw_11_bn_mean,
+        conv_pw_11_bn_var,
+        conv_pw_11_bn_gamma,
+        conv_pw_11_bn_beta,
+        conv_pw_11_bn_eps
+    ); 
+
+    free(conv_pw_10_out);
+    free(conv_dw_11_out);
+
+//------------------------------
+//          BLOCK 12
+//------------------------------
+    type *conv_dw_12_out = calloc((CONV_DW_12_CHANNELS)*(CONV_DW_12_HEIGHT)*(CONV_DW_12_WIDTH), sizeof(type));
+    type *conv_pw_12_out = calloc(CONV_PW_12_CHANNELS*CONV_PW_12_WIDTH*CONV_PW_12_HEIGHT, sizeof(type));
+
+    _depthwise_conv_block (
+        CONV_PW_11_HEIGHT,
+        CONV_PW_11_WIDTH,
+        CONV_PW_11_CHANNELS,
+        conv_pw_11_out,
+        conv_dw_12,
+        CONV_DW_12_HEIGHT,
+        CONV_DW_12_WIDTH,
+        CONV_DW_12_CHANNELS,
+        conv_dw_12_out,
+        3,      // kernel_size
+        CONV_DW_12_STRIDE,   
+        conv_dw_12_bn_mean,
+        conv_dw_12_bn_var,
+        conv_dw_12_bn_gamma,
+        conv_dw_12_bn_beta,
+        conv_dw_12_bn_eps
+    );
+
+    _pointwise_conv_block (
+        CONV_DW_12_HEIGHT,
+        CONV_DW_12_WIDTH,
+        CONV_DW_12_CHANNELS,
+        conv_dw_12_out,
+        conv_pw_12,
+        CONV_PW_12_HEIGHT,
+        CONV_PW_12_WIDTH,
+        CONV_PW_12_CHANNELS,
+        conv_pw_12_out,
+        conv_pw_12_bn_mean,
+        conv_pw_12_bn_var,
+        conv_pw_12_bn_gamma,
+        conv_pw_12_bn_beta,
+        conv_pw_12_bn_eps
+    ); 
+
+    free(conv_pw_11_out);
+    free(conv_dw_12_out);
+
+//------------------------------
+//          BLOCK 13
+//------------------------------
+    type *conv_dw_13_out = calloc((CONV_DW_13_CHANNELS)*(CONV_DW_13_HEIGHT)*(CONV_DW_13_WIDTH), sizeof(type));
+    type *conv_pw_13_out = calloc(CONV_PW_13_CHANNELS*CONV_PW_13_WIDTH*CONV_PW_13_HEIGHT, sizeof(type));
+
+    _depthwise_conv_block (
+        CONV_PW_12_HEIGHT,
+        CONV_PW_12_WIDTH,
+        CONV_PW_12_CHANNELS,
+        conv_pw_12_out,
+        conv_dw_13,
+        CONV_DW_13_HEIGHT,
+        CONV_DW_13_WIDTH,
+        CONV_DW_13_CHANNELS,
+        conv_dw_13_out,
+        3,      // kernel_size
+        CONV_DW_13_STRIDE,   
+        conv_dw_13_bn_mean,
+        conv_dw_13_bn_var,
+        conv_dw_13_bn_gamma,
+        conv_dw_13_bn_beta,
+        conv_dw_13_bn_eps
+    );
+
+    _pointwise_conv_block (
+        CONV_DW_13_HEIGHT,
+        CONV_DW_13_WIDTH,
+        CONV_DW_13_CHANNELS,
+        conv_dw_13_out,
+        conv_pw_13,
+        CONV_PW_13_HEIGHT,
+        CONV_PW_13_WIDTH,
+        CONV_PW_13_CHANNELS,
+        conv_pw_13_out,
+        conv_pw_13_bn_mean,
+        conv_pw_13_bn_var,
+        conv_pw_13_bn_gamma,
+        conv_pw_13_bn_beta,
+        conv_pw_13_bn_eps
+    ); 
+
+    free(conv_pw_12_out);
+    free(conv_dw_13_out);
+    
+
+//------------------------------
+//      Average Pooling
+//------------------------------
+    type *pool = calloc(CONV_PW_13_CHANNELS, sizeof(type));
+    avg_pooling (
+        CONV_PW_13_HEIGHT,
+        CONV_PW_13_WIDTH,
+        CONV_PW_13_CHANNELS,
+        conv_pw_13_out,
+        pool
+    ); 
+    free(conv_pw_13_out);
+
+//------------------------------
+//    Fully Connnected Layer
+//------------------------------  
+    type *preds = calloc(CLASSES, sizeof(type));
+
+    _fc (
+        CONV_PW_13_CHANNELS,
+        pool,
+        conv_preds,
+        conv_preds_bias,
+        CLASSES,
+        preds
+    );
+    
+    free(pool);
+
+//------------------------------
+//         Predictions
+//------------------------------
+    type *probs = calloc(CLASSES, sizeof(type));
+    softmax (
+        CLASSES,
+        preds,
+        probs
+    );
+
+    free(preds);
+//------------------------------
+//          ~ END ~
+//------------------------------
+
+    // print(conv_pw_13_out, CONV_PW_13_HEIGHT, CONV_PW_13_WIDTH, CONV_PW_13_CHANNELS);
+    print(probs, 1, 1, CLASSES);
+
+    free(probs);
     return 0;
 }

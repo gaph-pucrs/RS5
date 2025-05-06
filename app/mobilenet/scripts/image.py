@@ -14,7 +14,6 @@ x = np.expand_dims(x, axis=0)
 
 img_input = x.flatten()
 
-# filename = "/sim/RS5/app/tiny-ml/mobilenet/py/v2/params/data.h"
 filename = "../params/data.h"
 
 with open(filename, "w") as f:
