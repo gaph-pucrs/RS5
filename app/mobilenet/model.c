@@ -30,6 +30,7 @@ void print(const type in[], const int h, const int w, const int c) {
     }
 }
 
+// full pad (border of 0's)
 void pad (
     const int HEIGHT,
     const int WIDTH,
@@ -51,7 +52,7 @@ void pad (
     }
 }
 
-// adds 1 to the right and 1 to the bottom (in the end it just copy data to a bigger tensor)
+// adds 1 dimension to the right and bottom
 void half_pad (
     const int HEIGHT,
     const int WIDTH,
@@ -78,7 +79,7 @@ void batch_normalization (
     const int HEIGHT,
     const int WIDTH,
     const int CHANNELS,
-    type input[],
+    type in[],
     const type mean[],
     const type var[],
     const type gamma[],
@@ -92,10 +93,10 @@ void batch_normalization (
             for (int n=0; n<CHANNELS; n++) 
             {
                 int id = (n) + (j*CHANNELS) + (i*CHANNELS*WIDTH);
-                input[id] -= mean[n];
-                input[id] /= sqrt(var[n] + eps);
-                input[id] *= gamma[n];
-                input[id] += beta[n];
+                in[id] -= mean[n];
+                in[id] /= sqrt(var[n] + eps);
+                in[id] *= gamma[n];
+                in[id] += beta[n];
             }
         }
     }
@@ -103,11 +104,11 @@ void batch_normalization (
 
 void relu (
     const type max,
-    type input[],
+    type in[],
     const int size
 ) {
     for (int i=0; i<size; i++) {
-        input[i] = clamp(input[i], max, 0);
+        in[i] = clamp(in[i], max, 0);
     }
 }
 
@@ -115,8 +116,8 @@ void avg_pooling (
     const int HEIGHT,
     const int WIDTH,
     const int CHANNELS,
-    const type *input,
-    type *output
+    const type *in,
+    type *out
 ) {
     for (int h=0; h<HEIGHT; h++) 
     {
@@ -124,28 +125,28 @@ void avg_pooling (
         {
             for (int c=0; c<CHANNELS; c++)
             {
-                output[c] += input[(c)+(w*CHANNELS)+(h*CHANNELS*WIDTH)];
+                out[c] += in[(c)+(w*CHANNELS)+(h*CHANNELS*WIDTH)];
             }
         }
     }
 
     for (int c=0; c<CHANNELS; c++) {
-        output[c] /= HEIGHT*WIDTH;
+        out[c] /= HEIGHT*WIDTH;
     }
 }
 
 void softmax (
     const int len,
-    const type input[],
-    type output[]
+    const type in[],
+    type out[]
 ) {
     type sum = 0;
     for (int i=0; i<len; i++) {
-        sum += exp(input[i]);
+        sum += exp(in[i]);
     }
 
     for (int i=0; i<len; i++) {
-        output[i] = exp(input[i])/sum;
+        out[i] = exp(in[i])/sum;
     }
 }
 
@@ -153,12 +154,12 @@ void _conv_block (
     const int INPUT_HEIGHT,
     const int INPUT_WIDTH,
     const int INPUT_CHANNELS,
-    const type input[],
+    const type in[],
     const type weights[],
     const int OUTPUT_HEIGHT,
     const int OUTPUT_WIDTH,
     const int OUTPUT_CHANNELS,
-    type output[], 
+    type out[], 
     const int kernel_size,
     const int stride,
     const type mean[],
@@ -186,7 +187,7 @@ void _conv_block (
                         {
                             int idx_w = (n)+(m*OUTPUT_CHANNELS)+(j*OUTPUT_CHANNELS*INPUT_CHANNELS)+(i*OUTPUT_CHANNELS*INPUT_CHANNELS*kernel_size);
                             int idx_out = (n)+(l*OUTPUT_CHANNELS)+(k*OUTPUT_CHANNELS*OUTPUT_WIDTH);
-                            output[idx_out] += input[idx_i]*weights[idx_w];
+                            out[idx_out] += in[idx_i]*weights[idx_w];
                         }
                     }
                 }
@@ -201,7 +202,7 @@ void _conv_block (
         OUTPUT_HEIGHT,
         OUTPUT_WIDTH,
         OUTPUT_CHANNELS,
-        output, 
+        out, 
         mean, 
         var, 
         gamma, 
@@ -210,19 +211,19 @@ void _conv_block (
     );
     #endif
 
-    relu(6.0, output, OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS);
+    relu(6.0, out, OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS);
 }
 
 void _depthwise_conv_block (
     const int INPUT_HEIGHT,
     const int INPUT_WIDTH,
     const int INPUT_CHANNELS,
-    type input[],
+    const type in[],
     const type weights[],
     const int OUTPUT_HEIGHT,
     const int OUTPUT_WIDTH,
     const int OUTPUT_CHANNELS,
-    type output[],
+    type out[],
     const int kernel_size,
     const int stride,
     const type mean[],
@@ -232,19 +233,18 @@ void _depthwise_conv_block (
     const double eps
 ) {
     const int p = (OUTPUT_WIDTH) - (int)((INPUT_WIDTH-kernel_size)/stride) - 1;
-    type *input_pd = calloc((INPUT_CHANNELS)*(INPUT_WIDTH+p)*(INPUT_HEIGHT+p), sizeof(type));
+    type *in_pd = calloc((INPUT_CHANNELS)*(INPUT_WIDTH+p)*(INPUT_HEIGHT+p), sizeof(type));
     
     if (p == 1) {
-        half_pad(INPUT_HEIGHT, INPUT_WIDTH, INPUT_CHANNELS, input, input_pd);
+        half_pad(INPUT_HEIGHT, INPUT_WIDTH, INPUT_CHANNELS, in, in_pd);
     }
     else if (p == 2) {
-        pad(INPUT_HEIGHT, INPUT_WIDTH, INPUT_CHANNELS, input, input_pd);
+        pad(INPUT_HEIGHT, INPUT_WIDTH, INPUT_CHANNELS, in, in_pd);
     }
     
     int base_y = 0, base_x = 0;
     for (int k=0; k<OUTPUT_HEIGHT; k++)
     {
-        // base_x = (INPUT_CHANNELS);
         base_x = 0;
         for (int l=0; l<OUTPUT_WIDTH; l++)
         {
@@ -257,8 +257,7 @@ void _depthwise_conv_block (
                         int idx_i = (m)+(base_y)+(base_x)+(j*INPUT_CHANNELS)+(i*INPUT_CHANNELS*(INPUT_WIDTH+p));
                         int idx_w = (m)+(j*OUTPUT_CHANNELS)+(i*OUTPUT_CHANNELS*kernel_size);
                         int idx_out = (m)+(l*OUTPUT_CHANNELS)+(k*OUTPUT_CHANNELS*OUTPUT_WIDTH);
-                        type partial_sum = input_pd[idx_i]*weights[idx_w];
-                        output[idx_out] += partial_sum;
+                        out[idx_out] += in_pd[idx_i]*weights[idx_w];
                     }
                 }
             }
@@ -272,7 +271,7 @@ void _depthwise_conv_block (
         OUTPUT_HEIGHT,
         OUTPUT_WIDTH,
         OUTPUT_CHANNELS,
-        output, 
+        out, 
         mean, 
         var, 
         gamma, 
@@ -281,20 +280,20 @@ void _depthwise_conv_block (
     );
     #endif
 
-    relu(6.0, output, OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS);
-    free(input_pd);
+    relu(6.0, out, OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS);
+    free(in_pd);
 }
 
 void _pointwise_conv_block (
     const int INPUT_HEIGHT,
     const int INPUT_WIDTH,
     const int INPUT_CHANNELS,
-    const type input[],
+    const type in[],
     const type weights[],
     const int OUTPUT_HEIGHT,
     const int OUTPUT_WIDTH,
     const int OUTPUT_CHANNELS,
-    type output[],
+    type out[],
     const type mean[],
     const type var[],
     const type gamma[],
@@ -305,12 +304,12 @@ void _pointwise_conv_block (
         INPUT_HEIGHT,
         INPUT_WIDTH,
         INPUT_CHANNELS,
-        input,
+        in,
         weights,
         OUTPUT_HEIGHT,
         OUTPUT_WIDTH,
         OUTPUT_CHANNELS,
-        output,
+        out,
         1,
         1,
         mean,
@@ -323,23 +322,23 @@ void _pointwise_conv_block (
 
 void _fc (
     const int INPUT_CHANNELS,
-    const type input[],
+    const type in[],
     const type weights[],
     const type bias[],
     const int NEURONS,
-    type output[]
+    type out[]
 ) {
     for (int ch=0; ch<INPUT_CHANNELS; ch++)
     {
         for (int n=0; n<NEURONS; n++)
         {
-            output[n] += input[ch]*weights[(n)+((ch)*NEURONS)];
+            out[n] += in[ch]*weights[(n)+((ch)*NEURONS)];
         }
     }
 
     for (int n=0; n<NEURONS; n++) 
     {
-        output[n] += bias[n];
+        out[n] += bias[n];
     }
 };
 
@@ -348,36 +347,36 @@ int main()
 //------------------------------
 //          CONV 1
 //------------------------------
-    // type *img_padded = calloc((IMAGE_CHANNELS)*(IMAGE_WIDTH+1)*(IMAGE_HEIGHT+1), sizeof(type));
+    type *img_padded = calloc((IMAGE_CHANNELS)*(IMAGE_WIDTH+1)*(IMAGE_HEIGHT+1), sizeof(type));
     type *conv1_out = calloc(CONV1_FEATUREMAP_HEIGHT*CONV1_FEATUREMAP_WIDTH*CONV1_FILTERS, sizeof(type));
 
-    // half_pad (
-    //     IMAGE_HEIGHT,
-    //     IMAGE_WIDTH,
-    //     IMAGE_CHANNELS,
-    //     img,
-    //     img_padded
-    // );
-
-    _conv_block (
+    half_pad (
         IMAGE_HEIGHT,
         IMAGE_WIDTH,
         IMAGE_CHANNELS,
         img,
+        img_padded
+    );
+
+    _conv_block (
+        IMAGE_HEIGHT+1,
+        IMAGE_WIDTH+1,
+        IMAGE_CHANNELS,
+        img_padded,
         conv1,
         CONV1_FEATUREMAP_HEIGHT,
         CONV1_FEATUREMAP_WIDTH,
         CONV1_FILTERS,
         conv1_out, 
         3,   // kernel_size
-        2,   // stride
+        CONV1_STRIDE,
         conv1_bn_mean,
         conv1_bn_var,
         conv1_bn_gamma,
         conv1_bn_beta,
         conv1_bn_eps
     );
-    // free(img_padded);
+    free(img_padded);
 
 //------------------------------
 //          BLOCK 1
@@ -396,7 +395,7 @@ int main()
         CONV_DW_1_CHANNELS,
         conv_dw_1_out,
         3,      // kernel_size,
-        1,      // stride
+        CONV_DW_1_STRIDE,      
         conv_dw_1_bn_mean,
         conv_dw_1_bn_var,
         conv_dw_1_bn_gamma,

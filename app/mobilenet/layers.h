@@ -3,9 +3,10 @@
 //------------------------------
 //          CONV 1
 //------------------------------  
-    #define IMAGE_HEIGHT                225 // 224 + 1
-    #define IMAGE_WIDTH                 225 // 224 + 1
+    #define IMAGE_HEIGHT                224 // 224 + 1
+    #define IMAGE_WIDTH                 224 // 224 + 1
     #define IMAGE_CHANNELS                3
+    #define CONV1_STRIDE                  2
     #define CONV1_FEATUREMAP_HEIGHT     112
     #define CONV1_FEATUREMAP_WIDTH      112
     #define CONV1_FILTERS                32
@@ -15,6 +16,7 @@
     #define CONV_DW_1_HEIGHT            112
     #define CONV_DW_1_WIDTH             112
     #define CONV_DW_1_CHANNELS           32
+    #define CONV_DW_1_STRIDE              1
     #define CONV_PW_1_HEIGHT            112 
     #define CONV_PW_1_WIDTH             112
     #define CONV_PW_1_CHANNELS           64
