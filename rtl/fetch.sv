@@ -35,12 +35,9 @@ module fetch  #(
     input   logic [31:0]    ctx_switch_target_i,
     output  logic           jumping_o,
     
-    /* Signals not used without BP */
-    /* verilator lint_off UNUSEDSIGNAL */
     input   logic           bp_take_i,
     input   logic           jump_rollback_i,
     input   logic [31:0]    bp_target_i,
-    /* verilator lint_on UNUSEDSIGNAL */
     output  logic           bp_rollback_o,
 
     output  logic           jump_misaligned_o,
