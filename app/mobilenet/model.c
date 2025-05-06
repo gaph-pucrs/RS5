@@ -1,5 +1,3 @@
-// http://arxiv.org/pdf/1603.07285v1
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -376,6 +374,7 @@ int main()
         conv1_bn_beta,
         conv1_bn_eps
     );
+
     free(img_padded);
 
 //------------------------------
@@ -965,7 +964,6 @@ int main()
     free(conv_pw_12_out);
     free(conv_dw_13_out);
     
-
 //------------------------------
 //      Average Pooling
 //------------------------------
@@ -977,6 +975,7 @@ int main()
         conv_pw_13_out,
         pool
     ); 
+
     free(conv_pw_13_out);
 
 //------------------------------
@@ -1006,11 +1005,11 @@ int main()
     );
 
     free(preds);
+
 //------------------------------
 //          ~ END ~
 //------------------------------
 
-    // print(conv_pw_13_out, CONV_PW_13_HEIGHT, CONV_PW_13_WIDTH, CONV_PW_13_CHANNELS);
     print(probs, 1, 1, CLASSES);
 
     free(probs);

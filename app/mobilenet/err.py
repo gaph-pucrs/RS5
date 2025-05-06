@@ -16,11 +16,6 @@ def cmp(file1, file2, output_file):
         for x, y in zip(x_values, y_values):
             out.write(f"{x - y:.8f}\n")
 
-
-# cfile = 'logs/c/cout_conv1_relu.txt'
-# pyfile = 'logs/py/cout_conv1_relu.txt'
-# outfile = 'logs/cmp/cout_conv1_relu.txt'
-
 if len(sys.argv) > 1:
     f = sys.argv[1]
     cfile = base + 'c/' + f + '.txt'

@@ -1,5 +1,6 @@
 #ifndef __MOBILENET_WEIGHTS__
 #define __MOBILENET_WEIGHTS__
+
 //------------------------------
 //          CONV 1
 //------------------------------   
@@ -9,6 +10,7 @@
     #include "params/conv1_bn_gamma.h"
     #include "params/conv1_bn_beta.h"
     #include "params/conv1_bn_eps.h"
+
 //------------------------------
 //          BLOCK 1
 //------------------------------    
@@ -24,6 +26,7 @@
     #include "params/conv_pw_1_bn_gamma.h"
     #include "params/conv_pw_1_bn_beta.h"
     #include "params/conv_pw_1_bn_eps.h"
+
 //------------------------------
 //          BLOCK 2
 //------------------------------       
@@ -39,6 +42,7 @@
     #include "params/conv_pw_2_bn_gamma.h"
     #include "params/conv_pw_2_bn_beta.h"
     #include "params/conv_pw_2_bn_eps.h"
+
 //------------------------------
 //          BLOCK 3
 //------------------------------    
@@ -54,6 +58,7 @@
     #include "params/conv_pw_3_bn_gamma.h"
     #include "params/conv_pw_3_bn_beta.h"
     #include "params/conv_pw_3_bn_eps.h"
+
 //------------------------------
 //          BLOCK 4
 //------------------------------    
@@ -69,6 +74,7 @@
     #include "params/conv_pw_4_bn_gamma.h"
     #include "params/conv_pw_4_bn_beta.h"
     #include "params/conv_pw_4_bn_eps.h"
+
 //------------------------------
 //          BLOCK 5
 //------------------------------    
@@ -84,6 +90,7 @@
     #include "params/conv_pw_5_bn_gamma.h"
     #include "params/conv_pw_5_bn_beta.h"
     #include "params/conv_pw_5_bn_eps.h"
+
 //------------------------------
 //          BLOCK 6
 //------------------------------    
@@ -99,6 +106,7 @@
     #include "params/conv_pw_6_bn_gamma.h"
     #include "params/conv_pw_6_bn_beta.h"
     #include "params/conv_pw_6_bn_eps.h"
+    
 //------------------------------
 //          BLOCK 7
 //------------------------------    
@@ -114,6 +122,7 @@
     #include "params/conv_pw_7_bn_gamma.h"
     #include "params/conv_pw_7_bn_beta.h"
     #include "params/conv_pw_7_bn_eps.h"
+
 //------------------------------
 //          BLOCK 8
 //------------------------------    
@@ -129,6 +138,7 @@
     #include "params/conv_pw_8_bn_gamma.h"
     #include "params/conv_pw_8_bn_beta.h"
     #include "params/conv_pw_8_bn_eps.h"
+
 //------------------------------
 //          BLOCK 9
 //------------------------------    
@@ -144,6 +154,7 @@
     #include "params/conv_pw_9_bn_gamma.h"
     #include "params/conv_pw_9_bn_beta.h"
     #include "params/conv_pw_9_bn_eps.h"
+
 //------------------------------
 //          BLOCK 10
 //------------------------------    
@@ -159,6 +170,7 @@
     #include "params/conv_pw_10_bn_gamma.h"
     #include "params/conv_pw_10_bn_beta.h"
     #include "params/conv_pw_10_bn_eps.h"
+
 //------------------------------
 //          BLOCK 11
 //------------------------------    
@@ -174,6 +186,7 @@
     #include "params/conv_pw_11_bn_gamma.h"
     #include "params/conv_pw_11_bn_beta.h"
     #include "params/conv_pw_11_bn_eps.h"
+
 //------------------------------
 //          BLOCK 12
 //------------------------------    
@@ -189,6 +202,7 @@
     #include "params/conv_pw_12_bn_gamma.h"
     #include "params/conv_pw_12_bn_beta.h"
     #include "params/conv_pw_12_bn_eps.h"
+
 //------------------------------
 //          BLOCK 13
 //------------------------------    
@@ -204,9 +218,11 @@
     #include "params/conv_pw_13_bn_gamma.h"
     #include "params/conv_pw_13_bn_beta.h"
     #include "params/conv_pw_13_bn_eps.h"
+
 //------------------------------
 //    Fully Connnected Layer
 //------------------------------  
     #include "params/conv_preds.h"
     #include "params/conv_preds_bias.h"
+    
 #endif
