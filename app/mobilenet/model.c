@@ -289,7 +289,7 @@ void _pointwise_conv_block (
     const int INPUT_HEIGHT,
     const int INPUT_WIDTH,
     const int INPUT_CHANNELS,
-    type input[],
+    const type input[],
     const type weights[],
     const int OUTPUT_HEIGHT,
     const int OUTPUT_WIDTH,
@@ -301,61 +301,24 @@ void _pointwise_conv_block (
     const type beta[],
     const double eps
 ) {
-    // _conv_block (
-    //     INPUT_HEIGHT,
-    //     INPUT_WIDTH,
-    //     INPUT_CHANNELS,
-    //     input,
-    //     weights,
-    //     OUTPUT_HEIGHT,
-    //     OUTPUT_WIDTH,
-    //     OUTPUT_CHANNELS,
-    //     output,
-    //     1,
-    //     1,
-    //     mean,
-    //     var,
-    //     gamma,
-    //     beta,
-    //     eps
-    // );
-
-    int base_y = 0, base_x = 0;
-    for (int k=0; k<OUTPUT_HEIGHT; k++)
-    {
-        base_x = 0;
-        for (int l=0; l<OUTPUT_WIDTH; l++)
-        {
-            for (int m=0; m<INPUT_CHANNELS; m++)
-            {
-                int idx_in = (m)+(base_x)+(base_y);
-                for (int n=0; n<OUTPUT_CHANNELS; n++)
-                {
-                    int idx_w = (n)+(m*OUTPUT_CHANNELS);
-                    int idx_out = (n)+(l*OUTPUT_CHANNELS)+(k*OUTPUT_CHANNELS*OUTPUT_WIDTH);
-                    output[idx_out] += input[idx_in]*weights[idx_w];
-                }
-            }
-            base_x += (INPUT_CHANNELS);
-        }
-        base_y += (INPUT_CHANNELS)*(INPUT_WIDTH);
-    }
-
-    #ifdef BATCHNORMALIZATION
-    batch_normalization (
+    _conv_block (
+        INPUT_HEIGHT,
+        INPUT_WIDTH,
+        INPUT_CHANNELS,
+        input,
+        weights,
         OUTPUT_HEIGHT,
         OUTPUT_WIDTH,
         OUTPUT_CHANNELS,
-        output, 
-        mean, 
-        var, 
-        gamma, 
-        beta, 
+        output,
+        1,
+        1,
+        mean,
+        var,
+        gamma,
+        beta,
         eps
     );
-    #endif
-
-    relu(6.0, output, OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS);
 }
 
 void _fc (
@@ -396,7 +359,7 @@ int main()
     //     img_padded
     // );
 
-    _conv_block3 (
+    _conv_block (
         IMAGE_HEIGHT,
         IMAGE_WIDTH,
         IMAGE_CHANNELS,
