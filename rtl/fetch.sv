@@ -29,7 +29,9 @@ module fetch  #(
     input   logic           sys_reset,
     input   logic           enable_i,
 
+    input   logic           jump_i,
     input   logic           ctx_switch_i,
+    input   logic [31:0]    jump_target_i,
     input   logic [31:0]    ctx_switch_target_i,
     output  logic           jumping_o,
     
@@ -57,20 +59,33 @@ module fetch  #(
     logic [31:0] iaddr_next;
 
     logic        jumped;
-    logic [31:0] jump_target;
+    logic [31:0] pc_target;
+
+    always_comb begin
+        if (ctx_switch_i)
+            pc_target = ctx_switch_target_i;
+        else if (jump_i)
+            pc_target = jump_target_i;
+        else if (bp_take_i)
+            pc_target = bp_target_i;
+        else
+            pc_target = iaddr_next;
+    end
 
     logic [31:0] iaddr_advance;
     assign iaddr_advance = instruction_address_o + 32'd4;
 
     always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
+        if (!reset_n) begin
             instruction_address_o <= start_address;
-        else if (sys_reset)
+        end
+        else if (sys_reset) begin
             instruction_address_o <= start_address;
-        else if (jumped)
-            instruction_address_o <= {jump_target[31:2], 2'b00};
-        else if (iaddr_continue)
-            instruction_address_o <= iaddr_next;
+        end
+        else begin
+            if (jumped || iaddr_continue)
+                instruction_address_o <= {pc_target[31:2], 2'b00};
+        end
     end
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -79,14 +94,18 @@ module fetch  #(
 
     logic jumped_r;
     always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
+        if (!reset_n) begin
             jumped_r <= 1'b1;
-        else if (sys_reset)
+        end
+        else if (sys_reset) begin
             jumped_r <= 1'b1;
-        else if (jumped)
-            jumped_r <= 1'b1;
-        else if (enable_i || jump_rollback_i)
-            jumped_r <= 1'b0;
+        end
+        else begin
+            if (jumped)
+                jumped_r <= 1'b1;
+            else if (enable_i || jump_rollback_i)
+                jumped_r <= 1'b0;
+        end
     end
 
     logic jumped_r2;
@@ -100,14 +119,18 @@ module fetch  #(
     end
     
     always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
+        if (!reset_n) begin
             jumping_o <= 1'b1;
-        else if (sys_reset)
+        end
+        else if (sys_reset) begin
             jumping_o <= 1'b1;
-        else if (jumped || (jumped_r && !jump_rollback_i))
-            jumping_o <= 1'b1;
-        else if (enable_i || jump_rollback_i)
-            jumping_o <= 1'b0;
+        end
+        else begin 
+            if (jumped || (jumped_r && !jump_rollback_i))
+                jumping_o <= 1'b1;
+            else if (enable_i || jump_rollback_i)
+                jumping_o <= 1'b0;
+        end
     end
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -127,7 +150,7 @@ module fetch  #(
         else if (sys_reset)
             pc_jumped <= start_address;
         else if (jumped)
-            pc_jumped <= jump_target;
+            pc_jumped <= pc_target;
     end
 
     logic [31:0] pc_jumped_r;
@@ -235,17 +258,15 @@ module fetch  #(
                 bp_rollback_o <= jump_rollback_r;
         end
 
-        assign pc = bp_rollback_o ? pc_rollbacked : pc_o;
-        assign jumped = ctx_switch_i || (enable_i && bp_take_i);
-        assign jump_target = ctx_switch_i ? ctx_switch_target_i : bp_target_i;
+        assign pc         = bp_rollback_o ? pc_rollbacked : pc_o;
+        assign jumped     = ctx_switch_i || jump_i || (enable_i && bp_take_i);
         assign iaddr_next = jump_rollback_i ? iaddr_rollbacked : iaddr_advance;
     end
     else begin : gen_bp_off
-        assign bp_rollback_o   = 1'b0;
-        assign pc              = pc_o;
-        assign jumped          = ctx_switch_i;
-        assign jump_target     = ctx_switch_target_i;
-        assign iaddr_next      = iaddr_advance;
+        assign bp_rollback_o = 1'b0;
+        assign pc            = pc_o;
+        assign jumped        = ctx_switch_i || jump_i;
+        assign iaddr_next    = iaddr_advance;
     end
 
 ////////////////////////////////////////////////////////////////////////////////

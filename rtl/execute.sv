@@ -733,13 +733,11 @@ end
     always_comb begin
         if (machine_return_o)
             ctx_switch_target_o = mepc_i;
-        else if (raise_exception_o || interrupt_ack_o)
-            ctx_switch_target_o = mtvec_i;
         else
-            ctx_switch_target_o = jump_target_o;
+            ctx_switch_target_o = mtvec_i;
     end
 
-    assign ctx_switch_o = machine_return_o || raise_exception_o || interrupt_ack_o || jump_o;
+    assign ctx_switch_o = machine_return_o || raise_exception_o || interrupt_ack_o;
 
     if (BRANCHPRED) begin : gen_bp_on
         assign jump_o          = ( should_jump && (!bp_taken_i ||  interrupt_ack_o));
