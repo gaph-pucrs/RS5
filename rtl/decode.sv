@@ -33,7 +33,7 @@ module decode
     parameter bit           ZICONDEnable = 1'b0,
     parameter bit           VEnable      = 1'b0,
     parameter bit           BRANCHPRED   = 1'b1,
-    parameter bit           FORWARDING   = 1'b0
+    parameter bit           FORWARDING   = 1'b1
 )
 (
     input   logic           clk,
