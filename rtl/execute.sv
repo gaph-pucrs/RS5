@@ -204,36 +204,26 @@ module execute
 
     always_comb begin
         unique case (instruction_operation_i)
-            VLOAD,
-            VSTORE:  mem_address_o = {mem_address_vector[31:2], 2'b00};
             AMO_W,
             LR_W,
-            SC_W:    mem_address_o = rs1_data_i;
+            SC_W:    mem_address_o = (AMOEXT != AMO_OFF) ? rs1_data_i : mem_address;
+            VLOAD,
+            VSTORE:  mem_address_o = VEnable ? {mem_address_vector[31:2], 2'b00} : mem_address;
             default: mem_address_o = mem_address;
         endcase
     end
 
-    always_comb begin
-        unique case (instruction_operation_i)
-            VLOAD,
-            VSTORE:  mem_read_enable_o = mem_read_enable_vector;
-            default: mem_read_enable_o = mem_read_enable || atomic_mem_read_enable;
-        endcase
-    end
+    logic mem_read_enable_vector_inst;
+    assign mem_read_enable_vector_inst = mem_read_enable_vector && (instruction_operation_i inside {VLOAD, VSTORE});
+
+    assign mem_read_enable_o  = (mem_read_enable || atomic_mem_read_enable || mem_read_enable_vector_inst);
+    assign mem_write_enable_o = (mem_write_enable | {4{atomic_mem_write_enable}} | mem_write_enable_vector);
 
     always_comb begin
         unique case (instruction_operation_i)
             VLOAD,
-            VSTORE:  mem_write_enable_o = mem_write_enable_vector;
-            default: mem_write_enable_o = mem_write_enable | {4{atomic_mem_write_enable}};
-        endcase
-    end
-
-    always_comb begin
-        unique case (instruction_operation_i)
-            VLOAD,
-            VSTORE:  mem_write_data_o = mem_write_data_vector;
-            AMO_W:   mem_write_data_o = amo_operand;
+            VSTORE:  mem_write_data_o = VEnable ? mem_write_data_vector : mem_write_data;
+            AMO_W:   mem_write_data_o = (AMOEXT inside {AMO_ZAAMO, AMO_A}) ? amo_operand : mem_write_data;
             default: mem_write_data_o = mem_write_data;
         endcase
     end
@@ -331,7 +321,6 @@ end
     logic        hold_div;
 
     if (MULEXT != MUL_OFF) begin : gen_zmmul_on
-
         logic [1:0] signed_mode_mul;
         logic       enable_mul;
         logic       mul_low;
@@ -635,16 +624,22 @@ end
             SRA:                    result = sra_result;
             LUI:                    result = second_operand_i;
             AUIPC:                  result = jump_imm_target_i;
-            DIV,DIVU:               result = div_result;
-            REM,REMU:               result = rem_result;
-            MUL,MULH,MULHU,MULHSU:  result = mul_result;
-            AES32ESI, AES32ESMI:    result = aes_result;
-            VECTOR, VLOAD, VSTORE:  result = vector_scalar_result;
-            CZERO_EQZ, CZERO_NEZ:   result = result_zicond;
-            SC_W:                   result = {31'h0, lrsc_result};
+            DIV,DIVU:               result = (MULEXT == MUL_M)   ? div_result                           : sum_result;
+            REM,REMU:               result = (MULEXT == MUL_M)   ? rem_result                           : sum_result;
+            MUL,MULH,MULHU,MULHSU:  result = (MULEXT != MUL_OFF) ? mul_result                           : sum_result;
+            AES32ESI, AES32ESMI:    result = ZKNEEnable          ? aes_result                           : sum_result;
+            VECTOR, VLOAD, VSTORE:  result = VEnable             ? vector_scalar_result                 : sum_result;
+            CZERO_EQZ, CZERO_NEZ:   result = ZICONDEnable        ? result_zicond                        : sum_result;
+            SC_W:                   result = (AMOEXT inside {AMO_ZALRSC, AMO_A}) ? {31'h0, lrsc_result} : sum_result;
             default:                result = sum_result;
         endcase
     end
+
+    logic we_atomic;
+    assign we_atomic = (rd_i != '0 && atomic_write_enable && !raise_exception_o);  
+
+    logic we_default;
+    assign we_default = (rd_i != '0 && !hold_o && !raise_exception_o);
 
     always_comb begin
         unique case (instruction_operation_i)
@@ -653,11 +648,12 @@ end
             BEQ,BNE,
             BLT,BLTU,
             BGE,BGEU:   write_enable = 1'b0;
-            SC_W,AMO_W: write_enable = (rd_i != '0 && atomic_write_enable && !raise_exception_o);
             VECTOR,
             VLOAD,
-            VSTORE:     write_enable =  rd_i != '0 && vector_wr_en;
-            default:    write_enable = (rd_i != '0 && !hold_o && !raise_exception_o);
+            VSTORE:     write_enable = VEnable ? (rd_i != '0 && vector_wr_en)          : we_default;
+            SC_W:       write_enable = (AMOEXT inside {AMO_ZALRSC, AMO_A}) ? we_atomic : we_default ;
+            AMO_W:      write_enable = (AMOEXT inside {AMO_ZAAMO,  AMO_A}) ? we_atomic : we_default ;
+            default:    write_enable = we_default;
         endcase
     end
 
@@ -676,14 +672,20 @@ end
             write_enable_o <= write_enable;
     end
 
+    iType_e sc_instruction;
+    assign sc_instruction = atomic_write_enable ? instruction_operation_i : LW;
+
+    iType_e amo_instruction;
+    assign amo_instruction = !atomic_write_enable ? instruction_operation_i : LW;
+
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             instruction_operation_o <= NOP;
         end
         else if (!stall) begin
             unique case (instruction_operation_i)
-                SC_W:    instruction_operation_o <=  atomic_write_enable ? instruction_operation_i : LW;
-                AMO_W:   instruction_operation_o <= !atomic_write_enable ? instruction_operation_i : LW;
+                SC_W:    instruction_operation_o <= (AMOEXT inside {AMO_ZALRSC, AMO_A}) ? sc_instruction  : instruction_operation_i;
+                AMO_W:   instruction_operation_o <= (AMOEXT inside {AMO_ZAAMO,  AMO_A}) ? amo_instruction : instruction_operation_i;
                 default: instruction_operation_o <= instruction_operation_i;
             endcase
         end
