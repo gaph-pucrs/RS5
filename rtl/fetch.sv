@@ -48,29 +48,33 @@ module fetch  #(
     output  logic [31:0]    pc_o
 );
 
-//////////////////////////////////////////////////////////////////////////////
-// Instruction address control
-//////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+// Flow control
+////////////////////////////////////////////////////////////////////////////////
 
-    logic        iaddr_continue;
-    logic [31:0] iaddr_next;
+    logic [31:0] rollback_target;
 
-    logic        jumped;
+    logic [31:0] iaddr_advance;
+    assign iaddr_advance = {instruction_address_o[31:2] + 1'b1, 2'b00};
+
     logic [31:0] pc_target;
-
     always_comb begin
         if (ctx_switch_i)
             pc_target = ctx_switch_target_i;
         else if (jump_i)
             pc_target = jump_target_i;
-        else if (bp_take_i)
-            pc_target = bp_target_i;
+        else if (BRANCHPRED && (bp_take_i || jump_rollback_i))
+            pc_target = jump_rollback_i ? rollback_target : bp_target_i;
         else
-            pc_target = iaddr_next;
+            pc_target = iaddr_advance;
     end
 
-    logic [31:0] iaddr_advance;
-    assign iaddr_advance = {instruction_address_o[31:2] + 1'b1, 2'b00};
+////////////////////////////////////////////////////////////////////////////////
+// Instruction address control
+////////////////////////////////////////////////////////////////////////////////
+
+    logic jumped;
+    logic iaddr_continue;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
@@ -80,7 +84,7 @@ module fetch  #(
             instruction_address_o <= start_address;
         end
         else begin
-            if (jumped || iaddr_continue)
+            if (jumped || jump_rollback_i || iaddr_continue)
                 instruction_address_o <= {pc_target[31:2], 2'b00};
         end
     end
@@ -214,28 +218,31 @@ module fetch  #(
 
     /* Only used with BP, but needed for BP + C */
     /* verilator lint_off UNUSEDSIGNAL */
-    logic jump_rollback_r;
-    logic [31:0] iaddr_not_jumped;
+    logic        jump_rollback_r;
+    logic [31:0] iaddr_rollbacked;
     /* verilator lint_on UNUSEDSIGNAL*/
 
     if (BRANCHPRED) begin : gen_bp_on
-        logic [31:0] iaddr_rollbacked;
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
                 iaddr_rollbacked <= '0;
             else if (enable_i && bp_take_i)
-                iaddr_rollbacked <= iaddr_not_jumped;
+                iaddr_rollbacked <= instruction_address_o;
         end
 
         always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n)
+            if (!reset_n) begin
                 jump_rollback_r <= 1'b0;
-            else if (sys_reset)
+            end
+            else if (sys_reset) begin
                 jump_rollback_r <= 1'b0;
-            else if (jump_rollback_i)
-                jump_rollback_r <= 1'b1;
-            else if (enable_i)
-                jump_rollback_r <= 1'b0;
+            end
+            else begin 
+                if (jump_rollback_i)
+                    jump_rollback_r <= 1'b1;
+                else if (enable_i)
+                    jump_rollback_r <= 1'b0;
+            end
         end
 
         logic [31:0] pc_rollbacked;
@@ -255,15 +262,14 @@ module fetch  #(
                 bp_rollback_o <= jump_rollback_r;
         end
 
-        assign pc         = bp_rollback_o ? pc_rollbacked : pc_o;
-        assign jumped     = ctx_switch_i || jump_i || (enable_i && bp_take_i);
-        assign iaddr_next = jump_rollback_i ? iaddr_rollbacked : iaddr_advance;
+        assign pc     = bp_rollback_o ? pc_rollbacked : pc_o;
+        assign jumped = ctx_switch_i || jump_i || (enable_i && bp_take_i);
     end
     else begin : gen_bp_off
-        assign bp_rollback_o = 1'b0;
-        assign pc            = pc_o;
-        assign jumped        = ctx_switch_i || jump_i;
-        assign iaddr_next    = iaddr_advance;
+        assign bp_rollback_o    = 1'b0;
+        assign pc               = pc_o;
+        assign jumped           = ctx_switch_i || jump_i;
+        assign iaddr_rollbacked = '0;
     end
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -362,6 +368,8 @@ module fetch  #(
                 compressed_o <= next_compressed;
         end
 
+        assign iaddr_continue = enable_i && !iaddr_hold;
+
         if (BRANCHPRED) begin : gen_compressed_bp
             logic [31:0] idata_rollbacked;
             always_ff @(posedge clk or negedge reset_n) begin
@@ -371,28 +379,34 @@ module fetch  #(
                     idata_rollbacked <= instruction_word;
             end
 
-            assign iaddr_hold = ((!(jumping_o && !jump_rollback_i) && unaligned && (compressed && !jump_misaligned_o)) || (iaddr_hold_r && jump_rollback_r)) && !(iaddr_hold_r && bp_rollback_o);
-            assign iaddr_continue = (enable_i && !iaddr_hold) || jump_rollback_i;
-            assign instruction = bp_rollback_o ? idata_rollbacked : instruction_word;
-            assign iaddr_not_jumped = iaddr_hold ? instruction_address_o : iaddr_advance;
-            assign update_inst_r = jump_misaligned_o || unaligned_jump || ((unaligned || (compressed && !iaddr_hold_r)) && !jump_rollback_r);
+            logic [31:0] iaddr_rollbacked_adv;
+            always_ff @(posedge clk or negedge reset_n) begin
+                if (!reset_n)
+                    iaddr_rollbacked_adv <= '0;
+                else if (enable_i && bp_take_i)
+                    iaddr_rollbacked_adv <= iaddr_advance;
+            end
+
+            assign iaddr_hold      = ((!(jumping_o && !jump_rollback_i) && unaligned && (compressed && !jump_misaligned_o)) || (iaddr_hold_r && jump_rollback_r)) && !(iaddr_hold_r && bp_rollback_o);
+            assign instruction     = bp_rollback_o ? idata_rollbacked : instruction_word;
+            assign rollback_target = iaddr_hold_r ? iaddr_rollbacked : iaddr_rollbacked_adv;
+            assign update_inst_r   = jump_misaligned_o || unaligned_jump || ((unaligned || (compressed && !iaddr_hold_r)) && !jump_rollback_r);
         end
         else begin : gen_compressed_wo_bp
-            assign iaddr_hold = !jumping_o && unaligned && (compressed && !jump_misaligned_o);
-            assign iaddr_continue = enable_i && !iaddr_hold;
-            assign instruction = instruction_word;
-            assign iaddr_not_jumped = '0;
-            assign update_inst_r = jump_misaligned_o || unaligned_jump || (unaligned || (compressed && !iaddr_hold_r));
+            assign iaddr_hold      = !jumping_o && unaligned && (compressed && !jump_misaligned_o);
+            assign instruction     = instruction_word;
+            assign rollback_target = '0;
+            assign update_inst_r   = jump_misaligned_o || unaligned_jump || (unaligned || (compressed && !iaddr_hold_r));
         end
     end
     else begin : gen_compressed_off
-        assign compressed_o = 1'b0;
+        assign compressed_o      = 1'b0;
         assign jump_misaligned_o = 1'b0;
-        assign iaddr_continue = enable_i;
-        assign pc_add = 3'd4;
-        assign pc_update = jumped_r2 ? pc_jumped_r : pc_next;
-        assign instruction_next = instruction_fetched;
-        assign iaddr_not_jumped = iaddr_advance;
+        assign iaddr_continue    = enable_i;
+        assign pc_add            = 3'd4;
+        assign pc_update         = jumped_r2 ? pc_jumped_r : pc_next;
+        assign instruction_next  = instruction_fetched;
+        assign rollback_target   = iaddr_rollbacked;
     end
 
 endmodule
