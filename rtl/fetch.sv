@@ -70,7 +70,7 @@ module fetch  #(
     end
 
     logic [31:0] iaddr_advance;
-    assign iaddr_advance = instruction_address_o + 32'd4;
+    assign iaddr_advance = {instruction_address_o[31:2] + 1'b1, 2'b00};
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin

@@ -754,22 +754,24 @@ end
 
     assign raise_exception_o = (
         (
-            exc_inst_access_fault_i 
-            || exc_ilegal_inst_i 
-            || exc_ilegal_csr_inst 
-            || exc_misaligned_fetch_i
-            || (instruction_operation_i inside {ECALL, EBREAK})
-            || (exc_load_access_fault_i && (mem_read_enable_o || (mem_write_enable_o != '0)))
-        )
-        && (instruction_operation_i != NOP)
+            exc_inst_access_fault_i ||
+            exc_ilegal_inst_i ||
+            exc_ilegal_csr_inst ||
+            exc_misaligned_fetch_i ||
+            (instruction_operation_i inside {ECALL, EBREAK}) ||
+            (exc_load_access_fault_i && (mem_read_enable_o || (mem_write_enable_o != '0)))
+        ) &&
+        (instruction_operation_i != NOP)
     );
 
-    assign machine_return_o = !raise_exception_o && (instruction_operation_i == MRET);
+    assign machine_return_o = (instruction_operation_i == MRET) && !raise_exception_o;
 
     assign interrupt_ack_o = (
-           !machine_return_o 
-        && !raise_exception_o 
-        && (interrupt_pending_i && instruction_operation_i != NOP && !hold_o)
+        interrupt_pending_i &&
+        !machine_return_o &&
+        !raise_exception_o &&
+        !hold_o &&
+        (instruction_operation_i != NOP)
     );
 
     always_comb begin
