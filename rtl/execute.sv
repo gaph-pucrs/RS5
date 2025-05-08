@@ -159,25 +159,35 @@ module execute
     // Can be assigned by atomic instructions or rs1_data_i
     logic [31:0] first_operand;
 
-    always_comb begin
-        /* "Unmuxable" operators */
-        sum_result              = rs1_data_i +  second_operand_i;
-        equal                   = rs1_data_i == second_operand_i;
-        less_than_unsigned      = rs1_data_i <  second_operand_i;
-        greater_equal_unsigned  = rs1_data_i >= second_operand_i;
-        less_than               = $signed(rs1_data_i) <  $signed(second_operand_i);
-        greater_equal           = $signed(rs1_data_i) >= $signed(second_operand_i);
+    /* "Unmuxable" operators */
+    /* verilator lint_off UNUSEDSIGNAL */
+    logic carry_out;
+    /* verilator lint_on UNUSEDSIGNAL */
+    CarryBypassAdder #(
+        .NBITS(32)
+    ) adder32 (
+        .c_i   (1'b0            ),
+        .op_a_i(rs1_data_i      ),
+        .op_b_i(second_operand_i),
+        .c_o   (carry_out       ),
+        .sum_o (sum_result      )
+    );
 
-        sll_result              = rs1_data_i << second_operand_i[4:0];
-        srl_result              = rs1_data_i >> second_operand_i[4:0];
-        sra_result              = $signed(rs1_data_i) >>> second_operand_i[4:0];
+    assign equal                   = rs1_data_i == second_operand_i;
+    assign less_than_unsigned      = rs1_data_i <  second_operand_i;
+    assign greater_equal_unsigned  = rs1_data_i >= second_operand_i;
+    assign less_than               = $signed(rs1_data_i) <  $signed(second_operand_i);
+    assign greater_equal           = $signed(rs1_data_i) >= $signed(second_operand_i);
 
-        /* "Muxable" operators */
-        sum2_result             = first_operand + sum2_opB;
-        and_result              = first_operand & second_operand_i;
-        or_result               = first_operand | second_operand_i;
-        xor_result              = first_operand ^ second_operand_i;
-    end
+    assign sll_result              = rs1_data_i << second_operand_i[4:0];
+    assign srl_result              = rs1_data_i >> second_operand_i[4:0];
+    assign sra_result              = $signed(rs1_data_i) >>> second_operand_i[4:0];
+
+    /* "Muxable" operators */
+    assign sum2_result             = first_operand + sum2_opB;
+    assign and_result              = first_operand & second_operand_i;
+    assign or_result               = first_operand | second_operand_i;
+    assign xor_result              = first_operand ^ second_operand_i;
 
 //////////////////////////////////////////////////////////////////////////////
 // Load/Store signals
