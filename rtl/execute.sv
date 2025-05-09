@@ -159,25 +159,23 @@ module execute
     // Can be assigned by atomic instructions or rs1_data_i
     logic [31:0] first_operand;
 
-    always_comb begin
-        /* "Unmuxable" operators */
-        sum_result              = rs1_data_i +  second_operand_i;
-        equal                   = rs1_data_i == second_operand_i;
-        less_than_unsigned      = rs1_data_i <  second_operand_i;
-        greater_equal_unsigned  = rs1_data_i >= second_operand_i;
-        less_than               = $signed(rs1_data_i) <  $signed(second_operand_i);
-        greater_equal           = $signed(rs1_data_i) >= $signed(second_operand_i);
+    /* "Unmuxable" operators */
+    assign sum_result              = rs1_data_i +  second_operand_i;
+    assign equal                   = rs1_data_i == second_operand_i;
+    assign less_than_unsigned      = rs1_data_i <  second_operand_i;
+    assign greater_equal_unsigned  = rs1_data_i >= second_operand_i;
+    assign less_than               = $signed(rs1_data_i) <  $signed(second_operand_i);
+    assign greater_equal           = $signed(rs1_data_i) >= $signed(second_operand_i);
 
-        sll_result              = rs1_data_i << second_operand_i[4:0];
-        srl_result              = rs1_data_i >> second_operand_i[4:0];
-        sra_result              = $signed(rs1_data_i) >>> second_operand_i[4:0];
+    assign sll_result              = rs1_data_i << second_operand_i[4:0];
+    assign srl_result              = rs1_data_i >> second_operand_i[4:0];
+    assign sra_result              = $signed(rs1_data_i) >>> second_operand_i[4:0];
 
-        /* "Muxable" operators */
-        sum2_result             = first_operand + sum2_opB;
-        and_result              = first_operand & second_operand_i;
-        or_result               = first_operand | second_operand_i;
-        xor_result              = first_operand ^ second_operand_i;
-    end
+    /* "Muxable" operators */
+    assign sum2_result             = first_operand + sum2_opB;
+    assign and_result              = first_operand & second_operand_i;
+    assign or_result               = first_operand | second_operand_i;
+    assign xor_result              = first_operand ^ second_operand_i;
 
 //////////////////////////////////////////////////////////////////////////////
 // Load/Store signals
@@ -240,20 +238,13 @@ module execute
     end
 
     always_comb begin
+        mem_write_enable = '0;
         unique case (instruction_operation_i)
-            SB: unique case (sum_result[1:0])
-                    2'b11:   mem_write_enable = 4'b1000;
-                    2'b10:   mem_write_enable = 4'b0100;
-                    2'b01:   mem_write_enable = 4'b0010;
-                    default: mem_write_enable = 4'b0001;
-                endcase
-            SH:              mem_write_enable = (sum_result[1])
-                                                ? 4'b1100
-                                                : 4'b0011;
-            SW:              mem_write_enable = 4'b1111;
-            default:         mem_write_enable = 4'b0000;
+            SB: mem_write_enable[sum_result[1:0]]      = '1;
+            SH: mem_write_enable[sum_result[1:0]+1-:2] = '1;
+            SW: mem_write_enable                       = '1;
         endcase
-end
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 // CSR access signals
@@ -266,18 +257,25 @@ end
 
     always_comb begin
         unique case (instruction_operation_i)
-            CSRRW, CSRRWI: begin
-                csr_read_enable  = (rd_i != '0);
-                csr_write_enable = 1'b1;
-            end
-            CSRRS, CSRRC, CSRRSI, CSRRCI: begin
-                csr_read_enable  = 1'b1;
-                csr_write_enable = (rs1_i != '0);
-            end
-            default: begin
-                csr_read_enable  = 1'b0;
-                csr_write_enable = 1'b0;
-            end
+            CSRRW, 
+            CSRRWI:  csr_read_enable = (rd_i != '0);
+            CSRRS, 
+            CSRRC, 
+            CSRRSI, 
+            CSRRCI:  csr_read_enable = 1'b1;
+            default: csr_read_enable  = 1'b0;
+        endcase
+    end
+
+    always_comb begin
+        unique case (instruction_operation_i)
+            CSRRW, 
+            CSRRWI:  csr_write_enable = 1'b1;
+            CSRRS, 
+            CSRRC, 
+            CSRRSI, 
+            CSRRCI:  csr_write_enable = (rs1_i != '0);
+            default: csr_write_enable = 1'b0;
         endcase
     end
 
