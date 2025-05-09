@@ -21,9 +21,11 @@
  */
 
 `include "RS5_pkg.sv"
+`include "AdderPkg.sv"
 
 module execute
     import RS5_pkg::*;
+    import AdderPkg::*;
 #(
     parameter environment_e Environment  = ASIC,
     parameter mul_e         MULEXT       = MUL_M,

@@ -17,9 +17,11 @@ module CarryIncrementAdder (
     output logic [3:0] sum_o
 );
 
+    /* Full adder without carry in */
     logic [4:0] s0;
     assign s0 = op_a_i + op_b_i;
 
+    /* Half adder to increment on full adder result */
     logic [4:0] si;
     assign si = s0[3:0] + 1'b1;
 

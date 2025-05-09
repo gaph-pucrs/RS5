@@ -9,16 +9,15 @@
  * Generic adder using 4-bit blocks
  */
 
-typedef enum { 
-    CARRY_BYPASS,
-    CARRY_SELECT,
-    CARRY_INCREMENT
-} add_type_t;
+`include "AdderPkg.sv"
 
-module Adder #(
+module Adder
+    import AdderPkg::*;
+#(
     parameter add_type_t TYPE  = CARRY_BYPASS,
     parameter int        NBITS = 32
-)(
+)
+(
     input  logic             c_i,
     input  logic [NBITS-1:0] op_a_i,
     input  logic [NBITS-1:0] op_b_i,

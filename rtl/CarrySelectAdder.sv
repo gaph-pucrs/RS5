@@ -17,9 +17,11 @@ module CarrySelectAdder (
     output logic [3:0] sum_o
 );
 
+    /* Full adder without carry in */
     logic [4:0] s0;
     assign s0 = op_a_i + op_b_i;
 
+    /* Full adder with carry in */
     logic [4:0] s1;
     assign s1 = op_a_i + op_b_i + 1'b1;
 
