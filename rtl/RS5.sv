@@ -39,7 +39,8 @@ module RS5
     parameter bit           ZKNEEnable       = 1'b0,
     parameter bit           ZICONDEnable     = 1'b0,
     parameter bit           HPMCOUNTEREnable = 1'b0,
-    parameter bit           BRANCHPRED       = 1'b1
+    parameter bit           BRANCHPRED       = 1'b1,
+    parameter bit           FORWARDING       = 1'b1
 )
 (
     input  logic                    clk,
@@ -183,23 +184,25 @@ module RS5
         .COMPRESSED(COMPRESSED),
         .BRANCHPRED(BRANCHPRED)
     ) fetch1 (
-        .clk                    (clk),
-        .reset_n                (reset_n),
-        .sys_reset              (sys_reset_i),
-        .enable_i               (enable_fetch),
-        .ctx_switch_i           (ctx_switch),
-        .jump_rollback_i        (jump_rollback),
-        .ctx_switch_target_i    (ctx_switch_target),
-        .bp_take_i              (bp_take_fetch),
-        .bp_target_i            (bp_target),
-        .jumping_o              (jumping),
-        .bp_rollback_o          (bp_rollback),
-        .jump_misaligned_o      (jump_misaligned),
-        .compressed_o           (compressed_decode),
-        .instruction_address_o  (instruction_address), 
-        .instruction_data_i     (instruction_i),
-        .instruction_o          (instruction_decode),
-        .pc_o                   (pc_decode)
+        .clk                  (clk                ),
+        .reset_n              (reset_n            ),
+        .sys_reset            (sys_reset_i        ),
+        .enable_i             (enable_fetch       ),
+        .jump_i               (jump               ),
+        .jump_rollback_i      (jump_rollback      ),
+        .jump_target_i        (jump_target        ),
+        .ctx_switch_i         (ctx_switch         ),
+        .ctx_switch_target_i  (ctx_switch_target  ),
+        .bp_take_i            (bp_take_fetch      ),
+        .bp_target_i          (bp_target          ),
+        .jumping_o            (jumping            ),
+        .bp_rollback_o        (bp_rollback        ),
+        .jump_misaligned_o    (jump_misaligned    ),
+        .compressed_o         (compressed_decode  ),
+        .instruction_address_o(instruction_address), 
+        .instruction_data_i   (instruction_i      ),
+        .instruction_o        (instruction_decode ),
+        .pc_o                 (pc_decode          )
     );
 
     if (XOSVMEnable == 1'b1) begin : gen_xosvm_i_mmu_on
@@ -235,7 +238,8 @@ module RS5
         .ZKNEEnable   (ZKNEEnable  ),
         .ZICONDEnable (ZICONDEnable),
         .VEnable      (VEnable     ),
-        .BRANCHPRED   (BRANCHPRED  )
+        .BRANCHPRED   (BRANCHPRED  ),
+        .FORWARDING   (FORWARDING  )
     ) decoder1 (
         .clk                        (clk),
         .reset_n                    (reset_n),
@@ -269,6 +273,7 @@ module RS5
         .hazard_o                   (hazard),
         .killed_o                   (killed),
         .ctx_switch_i               (ctx_switch),
+        .jump_i                     (jump),
         .jumping_i                  (jumping),
         .jump_rollback_i            (jump_rollback),
         .rollback_i                 (bp_rollback),

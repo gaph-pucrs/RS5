@@ -36,11 +36,12 @@ module testbench
     localparam bit           COMPRESSED      = 1'b1;
     localparam bit           USE_XOSVM       = 1'b0;
     localparam bit           USE_ZKNE        = 1'b1;
-    localparam bit           USE_ZICOND      = 1'b1;
+    localparam bit           USE_ZICOND      = 1'b0;
     localparam bit           VEnable         = 1'b0;
     localparam int           VLEN            = 256;
     localparam bit           USE_HPMCOUNTER  = 1'b1;
     localparam bit           BRANCHPRED      = 1'b1;
+    localparam bit           FORWARDING      = 1'b1;
 
 `ifndef SYNTH
     localparam bit           PROFILING       = 1'b1;
@@ -178,7 +179,8 @@ module testbench
         .ZKNEEnable      (USE_ZKNE      ),
         .ZICONDEnable    (USE_ZICOND    ),
         .HPMCOUNTEREnable(USE_HPMCOUNTER),
-        .BRANCHPRED      (BRANCHPRED    )
+        .BRANCHPRED      (BRANCHPRED    ),
+        .FORWARDING      (FORWARDING    )
     ) dut (
         .clk                    (clk),
         .reset_n                (reset_n),

@@ -14,6 +14,7 @@ module RS5_FPGA_Platform
     parameter bit           ZICONDEnable      = 1'b1,
     parameter bit           VEnable           = 1'b0,
     parameter bit           BRANCHPRED        = 1'b1,
+    parameter bit           FORWARDING        = 1'b1,
     parameter int           VLEN              = 64,
     parameter int           CLKS_PER_BIT_UART = 868
 )
@@ -115,7 +116,8 @@ module RS5_FPGA_Platform
         .COMPRESSED      (COMPRESSED      ),
         .VEnable         (VEnable         ),
         .VLEN            (VLEN            ),
-        .BRANCHPRED      (BRANCHPRED      )
+        .BRANCHPRED      (BRANCHPRED      ),
+        .FORWARDING      (FORWARDING      )
     ) dut (
         .clk                    (clk),
         .reset_n                (reset_n),
