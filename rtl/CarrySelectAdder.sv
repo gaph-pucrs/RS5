@@ -17,34 +17,14 @@ module CarrySelectAdder (
     output logic [3:0] sum_o
 );
 
-    logic [3:0] p;
-    assign p = op_a_i ^ op_b_i;
-    /* p and g are parallel */
-    logic [3:0] g;
-    assign g = op_a_i & op_b_i;
+    logic [4:0] s0;
+    assign s0 = op_a_i + op_b_i;
 
-    logic [4:0] c0;
-    assign c0[0] = 1'b0;
-    assign c0[1] = g[0];
-    assign c0[2] = g[1] | (p[1] & g[0]);
-    assign c0[3] = g[2] | (p[2] & (g[1] | (p[1] & g[0])));
-    assign c0[4] = g[3] | (p[3] & (g[2] | (p[2] & (g[1] | (p[1] & g[0])))));
-    /* carry in 0 and in 1 are parallel */
-    logic [4:0] c1;
-    assign c1[0] = 1'b1;
-    assign c1[1] = g[0] | p[0];
-    assign c1[2] = g[1] | (p[1] & (g[0] | p[0]));
-    assign c1[3] = g[2] | (p[2] & (g[1] | (p[1] & (g[0] | p[0]))));
-    assign c1[4] = g[3] | (p[3] & (g[2] | (p[2] & (g[1] | (p[1] & (g[0] | p[0]))))));
-
-    logic [3:0] s0;
-    assign s0 = p ^ c0[3:0];
-    /* sum with carry in 0 and 1 are parallel */
-    logic [3:0] s1;
-    assign s1 = p[3:0] ^ c1[3:0];
+    logic [4:0] s1;
+    assign s1 = op_a_i + op_b_i + 1'b1;
 
     /* Mux between the two full adders based on the carry input */
-    assign c_o   = c_i ? c1[4] : c0[4];
-    assign sum_o = c_i ? s1    : s0;
+    assign c_o   = c_i ? s1[4]   : s0[4];
+    assign sum_o = c_i ? s1[3:0] : s0[3:0];
 
 endmodule

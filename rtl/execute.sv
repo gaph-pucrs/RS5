@@ -165,7 +165,7 @@ module execute
     /* verilator lint_on UNUSEDSIGNAL */
     if (Environment == ASIC) begin : gen_adder_asic
         Adder #(
-            .TYPE (CARRY_BYPASS),
+            .TYPE (CARRY_SELECT),
             .NBITS(32          )
         ) adder32 (
             .c_i   (1'b0            ),
