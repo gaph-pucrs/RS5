@@ -163,15 +163,21 @@ module execute
     /* verilator lint_off UNUSEDSIGNAL */
     logic carry_out;
     /* verilator lint_on UNUSEDSIGNAL */
-    CarryBypassAdder #(
-        .NBITS(32)
-    ) adder32 (
-        .c_i   (1'b0            ),
-        .op_a_i(rs1_data_i      ),
-        .op_b_i(second_operand_i),
-        .c_o   (carry_out       ),
-        .sum_o (sum_result      )
-    );
+    if (Environment == ASIC) begin : gen_adder_asic
+        Adder #(
+            .TYPE (CARRY_BYPASS),
+            .NBITS(32          )
+        ) adder32 (
+            .c_i   (1'b0            ),
+            .op_a_i(rs1_data_i      ),
+            .op_b_i(second_operand_i),
+            .c_o   (carry_out       ),
+            .sum_o (sum_result      )
+        );
+    end
+    else begin : gen_adder_fpga
+        assign sum_result = rs1_data_i + second_operand_i;
+    end
 
     assign equal                   = rs1_data_i == second_operand_i;
     assign less_than_unsigned      = rs1_data_i <  second_operand_i;
