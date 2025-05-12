@@ -94,8 +94,7 @@ module decode
 
     input   logic           exc_inst_access_fault_i,
     output  logic           exc_inst_access_fault_o,
-    output  logic           exc_ilegal_inst_o,
-    output  logic           exc_misaligned_fetch_o
+    output  logic           exc_ilegal_inst_o
 );
 
 //////////////////////////////////////////////////////////////////////////////
@@ -631,34 +630,19 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     logic invalid_inst;
-    logic misaligned_fetch;
     logic exc_inst_access_fault;
 
     assign invalid_inst = ((instruction_i[1:0] != '1) || instruction_operation == INVALID || amo_invalid);
 
-    if (COMPRESSED) begin : gen_compressed_on
-        assign misaligned_fetch = (pc_i[0] != 1'b0);
-    end
-    else begin : gen_compressed_off
-        assign misaligned_fetch = (pc_i[1:0] != 2'b00);
-    end
-
     assign exc_inst_access_fault = exc_inst_access_fault_i;
 
-    assign exception = exc_inst_access_fault || invalid_inst || misaligned_fetch;
+    assign exception = exc_inst_access_fault || invalid_inst;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             exc_ilegal_inst_o <= 1'b0;
         else if (enable)
             exc_ilegal_inst_o <= invalid_inst;
-    end
-
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            exc_misaligned_fetch_o <= 1'b0;
-        else if (enable)
-            exc_misaligned_fetch_o <= misaligned_fetch;
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
@@ -787,7 +771,7 @@ module decode
         end
         else begin
             // To link register. Maybe we can remove this by using the PC in decode stage
-            pc_next_o <= pc_i + (compressed_i ? 32'd2 : 32'd4);
+            pc_next_o <= pc_i + ((COMPRESSED && compressed_i) ? 32'd2 : 32'd4);
         end
     end
 

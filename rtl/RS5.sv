@@ -118,7 +118,6 @@ module RS5
     logic    [4:0]  rd_execute;
     logic    [4:0]  rs1_execute;
     logic           exc_ilegal_inst_execute;
-    logic           exc_misaligned_fetch_execute;
     logic           exc_inst_access_fault_execute;
     logic           instruction_compressed_execute;
     logic   [31:0]  vtype, vlen;
@@ -284,8 +283,7 @@ module RS5
         .bp_target_o                (bp_target),
         .exc_inst_access_fault_i    (mmu_inst_fault),
         .exc_inst_access_fault_o    (exc_inst_access_fault_execute),
-        .exc_ilegal_inst_o          (exc_ilegal_inst_execute),
-        .exc_misaligned_fetch_o     (exc_misaligned_fetch_execute)
+        .exc_ilegal_inst_o          (exc_ilegal_inst_execute)
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -340,6 +338,7 @@ module RS5
         .Environment  (Environment ),
         .MULEXT       (MULEXT      ),
         .AMOEXT       (AMOEXT      ),
+        .COMPRESSED   (COMPRESSED  ),
         .ZKNEEnable   (ZKNEEnable  ),
         .ZICONDEnable (ZICONDEnable),
         .VEnable      (VEnable     ),
@@ -360,7 +359,6 @@ module RS5
         .vector_operation_i      (vector_operation_execute),
         .privilege_i             (privilege),
         .exc_ilegal_inst_i       (exc_ilegal_inst_execute),
-        .exc_misaligned_fetch_i  (exc_misaligned_fetch_execute),
         .exc_inst_access_fault_i (exc_inst_access_fault_execute),
         .exc_load_access_fault_i (mmu_data_fault),
         .hold_o                  (hold),

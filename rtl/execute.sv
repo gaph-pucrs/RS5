@@ -28,6 +28,7 @@ module execute
     parameter environment_e Environment  = ASIC,
     parameter mul_e         MULEXT       = MUL_M,
     parameter atomic_e      AMOEXT       = AMO_A,
+    parameter bit           COMPRESSED   = 1'b1,
     parameter bit           ZKNEEnable   = 1'b0,
     parameter bit           ZICONDEnable = 1'b0,
     parameter bit           VEnable      = 1'b0,
@@ -63,7 +64,6 @@ module execute
 
     input   privilegeLevel_e    privilege_i,
     input   logic               exc_ilegal_inst_i,
-    input   logic               exc_misaligned_fetch_i,
     input   logic               exc_inst_access_fault_i,
     input   logic               exc_load_access_fault_i,
 
@@ -748,6 +748,9 @@ module execute
         assign jump_rollback_o = 1'b0;
     end
 
+    logic iaddr_misaligned;
+    assign iaddr_misaligned = (!COMPRESSED && jump_target_o[1] && should_jump);
+
 //////////////////////////////////////////////////////////////////////////////
 // Privileged Architecture Control
 //////////////////////////////////////////////////////////////////////////////
@@ -757,7 +760,7 @@ module execute
             exc_inst_access_fault_i ||
             exc_ilegal_inst_i ||
             exc_ilegal_csr_inst ||
-            exc_misaligned_fetch_i ||
+            iaddr_misaligned ||
             (instruction_operation_i inside {ECALL, EBREAK}) ||
             (exc_load_access_fault_i && (mem_read_enable_o || (mem_write_enable_o != '0)))
         ) &&
@@ -779,7 +782,7 @@ module execute
             exception_code_o  = INSTRUCTION_ACCESS_FAULT;
         else if ((exc_ilegal_inst_i || exc_ilegal_csr_inst)) 
             exception_code_o  = ILLEGAL_INSTRUCTION;
-        else if (exc_misaligned_fetch_i)
+        else if (iaddr_misaligned)
             exception_code_o  = INSTRUCTION_ADDRESS_MISALIGNED;
         else if (instruction_operation_i == ECALL)
             exception_code_o  = (privilege_i == USER) ? ECALL_FROM_UMODE : ECALL_FROM_MMODE;
