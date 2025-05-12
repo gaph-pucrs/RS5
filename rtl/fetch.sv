@@ -37,7 +37,10 @@ module fetch  #(
     
     input   logic           bp_take_i,
     input   logic           jump_rollback_i,
+    /* Bits 1:0 unused without BP */
+    /* verilator lint_off UNUSEDSIGNAL */
     input   logic [31:0]    bp_target_i,
+    /* verilator lint_on UNUSEDSIGNAL */
     output  logic           bp_rollback_o,
 
     output  logic           jump_misaligned_o,
@@ -139,25 +142,66 @@ module fetch  #(
 ////////////////////////////////////////////////////////////////////////////////
 
     /**
-     * We need to separate instruction address from PC to
-     * 1. Identify misaligned fetches
-     * 2. Allow 2-byte aligned 2/4-byte fetch in case of compressed
+     * We need to separate instruction address from PC to allow 2-byte aligned 
+     * 2/4-byte fetch in case of compressed
      */
 
-    logic [31:0] pc_jumped;
+    logic [31:0] bp_target_r;
+
+    typedef enum logic [3:0] {
+        NO_JMP = 4'(1 << 0),
+        CTX_SW = 4'(1 << 1),
+        JMP_XU = 4'(1 << 2),
+        BP_DEC = 4'(1 << 3)
+    } jmp_reason_t;
+
+    jmp_reason_t jmp_reason;
+    always_comb begin
+        if (ctx_switch_i)
+            jmp_reason = CTX_SW;
+        else if (jump_i)
+            jmp_reason = JMP_XU;
+        else if (BRANCHPRED && enable_i && bp_take_i)
+            jmp_reason = BP_DEC;
+        else
+            jmp_reason = NO_JMP;
+    end
+
+    jmp_reason_t jmp_reason_r;
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
-            pc_jumped <= start_address;
+            jmp_reason_r <= NO_JMP;
         else if (sys_reset)
-            pc_jumped <= start_address;
-        else begin 
-            if (ctx_switch_i)
-                pc_jumped <= ctx_switch_target_i;
-            else if (jump_i)
-                pc_jumped <= jump_target_i;
-            else if (BRANCHPRED && enable_i && bp_take_i)
-                pc_jumped <= bp_target_i;
-        end
+            jmp_reason_r <= NO_JMP;
+        else
+            jmp_reason_r <= jmp_reason;
+    end
+
+    logic [31:0] ctx_switch_target_r;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            ctx_switch_target_r <= start_address;
+        else if (ctx_switch_i)
+            ctx_switch_target_r <= ctx_switch_target_i;
+    end
+
+    logic [31:0] jump_target_r;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            jump_target_r <= start_address;
+        else if (sys_reset)
+            jump_target_r <= start_address;
+        else if (jump_i)
+            jump_target_r <= jump_target_i;
+    end
+
+    logic [31:0] pc_jumped;
+    always_comb begin
+        unique case (jmp_reason_r)
+            CTX_SW:  pc_jumped = ctx_switch_target_r;
+            BP_DEC:  pc_jumped = BRANCHPRED ? bp_target_r : jump_target_r;
+            default: pc_jumped = jump_target_r; /* JMP_XU, allows for 2-input mux when no BP */
+        endcase
     end
 
     logic [31:0] pc_jumped_r;
@@ -231,6 +275,13 @@ module fetch  #(
     if (BRANCHPRED) begin : gen_bp_on
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
+                bp_target_r <= start_address;
+            else if (enable_i && bp_take_i)
+                bp_target_r <= bp_target_i;
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
                 iaddr_fetched <= '0;
             else if (enable_i && bp_take_i)
                 iaddr_fetched <= instruction_address_o[31:2];
@@ -276,6 +327,7 @@ module fetch  #(
         assign pc             = pc_o;
         assign jumped         = ctx_switch_i || jump_i;
         assign iaddr_fetched  = '0;
+        assign bp_target_r    = '0;
     end
 
 ////////////////////////////////////////////////////////////////////////////////
