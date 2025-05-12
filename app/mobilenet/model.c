@@ -6,7 +6,7 @@
 #include "layers.h"
 #include "weights.h"
 
-#define type    double
+#define type    int
 
 // general use functions
 type clamp(const type x, const type max, const type min) {
@@ -82,22 +82,42 @@ void batch_normalization (
     const type var[],
     const type gamma[],
     const type beta[],
-    const double eps
+    const type eps
 ) {
-    for (int i=0; i<HEIGHT; i++) 
-    {
-        for (int j=0; j<WIDTH; j++) 
+    #ifdef INT_HANDLER
+        for (int i=0; i<HEIGHT; i++) 
         {
-            for (int n=0; n<CHANNELS; n++) 
+            for (int j=0; j<WIDTH; j++) 
             {
-                int id = (n) + (j*CHANNELS) + (i*CHANNELS*WIDTH);
-                in[id] -= mean[n];
-                in[id] /= sqrt(var[n] + eps);
-                in[id] *= gamma[n];
-                in[id] += beta[n];
+                for (int n=0; n<CHANNELS; n++) 
+                {
+                    int id = (n) + (j*CHANNELS) + (i*CHANNELS*WIDTH);
+                    in[id] -= mean[n];
+                    // in[id] /= sqrt(var[n]*1000 + 1000*eps);
+                    in[id] /= sqrt(var[n] + eps);
+                    in[id] *= gamma[n];
+                    // in[id] /= 1000;
+                    in[id] /= sqrt(1000);
+                    in[id] += beta[n];
+                }
             }
         }
-    }
+    #else
+        for (int i=0; i<HEIGHT; i++) 
+        {
+            for (int j=0; j<WIDTH; j++) 
+            {
+                for (int n=0; n<CHANNELS; n++) 
+                {
+                    int id = (n) + (j*CHANNELS) + (i*CHANNELS*WIDTH);
+                    in[id] -= mean[n];
+                    in[id] /= sqrt(var[n] + eps);
+                    in[id] *= gamma[n];
+                    in[id] += beta[n];
+                }
+            }
+        }
+    #endif
 }
 
 void relu (
@@ -133,19 +153,30 @@ void avg_pooling (
     }
 }
 
+// ???????????????????
 void softmax (
     const int len,
     const type in[],
     type out[]
 ) {
     type sum = 0;
-    for (int i=0; i<len; i++) {
-        sum += exp(in[i]);
-    }
+    #ifdef INT_HANDLER
+        for (int i=0; i<len; i++) {
+            sum += exp(((1.0)*in[i])/1000);
+        }
 
-    for (int i=0; i<len; i++) {
-        out[i] = exp(in[i])/sum;
-    }
+        for (int i=0; i<len; i++) {
+            out[i] = exp(((1.0)*in[i])/1000)/sum;
+        }
+    #else 
+        for (int i=0; i<len; i++) {
+            sum += exp(in[i]);
+        }
+
+        for (int i=0; i<len; i++) {
+            out[i] = exp(in[i])/sum;
+        }
+    #endif
 }
 
 void _conv_block (
@@ -186,6 +217,9 @@ void _conv_block (
                             int idx_w = (n)+(m*OUTPUT_CHANNELS)+(j*OUTPUT_CHANNELS*INPUT_CHANNELS)+(i*OUTPUT_CHANNELS*INPUT_CHANNELS*kernel_size);
                             int idx_out = (n)+(l*OUTPUT_CHANNELS)+(k*OUTPUT_CHANNELS*OUTPUT_WIDTH);
                             out[idx_out] += in[idx_i]*weights[idx_w];
+                            #ifdef INT_HANDLER
+                                out[idx_out] /= 1000;
+                            #endif
                         }
                     }
                 }
@@ -195,21 +229,31 @@ void _conv_block (
         base_y += stride*INPUT_CHANNELS*INPUT_WIDTH;
     }
 
+    // #ifdef INT_HANDLER
+    //     for (int i=0; i<OUTPUT_CHANNELS*OUTPUT_WIDTH*OUTPUT_HEIGHT; i++) {
+    //         out[i] /= 1000;
+    //     }
+    // #endif 
+
     #ifdef BATCHNORMALIZATION
-    batch_normalization (
-        OUTPUT_HEIGHT,
-        OUTPUT_WIDTH,
-        OUTPUT_CHANNELS,
-        out, 
-        mean, 
-        var, 
-        gamma, 
-        beta, 
-        eps
-    );
+        batch_normalization (
+            OUTPUT_HEIGHT,
+            OUTPUT_WIDTH,
+            OUTPUT_CHANNELS,
+            out, 
+            mean, 
+            var, 
+            gamma, 
+            beta, 
+            eps
+        );
     #endif
 
-    relu(6.0, out, OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS);
+    #ifdef INT_HANDLER
+        relu(6000, out, OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS);
+    #else
+        relu(6.0, out, OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS);
+    #endif
 }
 
 void _depthwise_conv_block (
@@ -229,7 +273,7 @@ void _depthwise_conv_block (
     const type gamma[],
     const type beta[],
     const double eps
-) {
+) {    
     const int p = (OUTPUT_WIDTH) - (int)((INPUT_WIDTH-kernel_size)/stride) - 1;
     type *in_pd = calloc((INPUT_CHANNELS)*(INPUT_WIDTH+p)*(INPUT_HEIGHT+p), sizeof(type));
     
@@ -256,6 +300,9 @@ void _depthwise_conv_block (
                         int idx_w = (m)+(j*OUTPUT_CHANNELS)+(i*OUTPUT_CHANNELS*kernel_size);
                         int idx_out = (m)+(l*OUTPUT_CHANNELS)+(k*OUTPUT_CHANNELS*OUTPUT_WIDTH);
                         out[idx_out] += in_pd[idx_i]*weights[idx_w];
+                        #ifdef INT_HANDLER
+                            out[idx_out] /= 1000;
+                        #endif
                     }
                 }
             }
@@ -264,21 +311,32 @@ void _depthwise_conv_block (
         base_y += (stride)*(INPUT_CHANNELS)*(INPUT_WIDTH+p);
     }
 
+    // #ifdef INT_HANDLER
+    //     for (int i=0; i<OUTPUT_CHANNELS*OUTPUT_WIDTH*OUTPUT_HEIGHT; i++) {
+    //         out[i] /= 1000;
+    //     }
+    // #endif
+
     #ifdef BATCHNORMALIZATION
-    batch_normalization (
-        OUTPUT_HEIGHT,
-        OUTPUT_WIDTH,
-        OUTPUT_CHANNELS,
-        out, 
-        mean, 
-        var, 
-        gamma, 
-        beta, 
-        eps
-    );
+        batch_normalization (
+            OUTPUT_HEIGHT,
+            OUTPUT_WIDTH,
+            OUTPUT_CHANNELS,
+            out, 
+            mean, 
+            var, 
+            gamma, 
+            beta, 
+            eps
+        );
     #endif
 
-    relu(6.0, out, OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS);
+    #ifdef INT_HANDLER
+        relu(6000, out, OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS);
+    #else
+        relu(6.0, out, OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS);
+    #endif
+
     free(in_pd);
 }
 
@@ -334,14 +392,38 @@ void _fc (
         }
     }
 
-    for (int n=0; n<NEURONS; n++) 
-    {
+    #ifdef INT_HANDLER
+        for (int i=0; i<NEURONS; i++) {
+            out[i] /= 1000;
+        }
+    #endif
+
+    for (int n=0; n<NEURONS; n++) {
         out[n] += bias[n];
     }
-};
+}
 
 int main()
 {
+    int test_cases = 0;
+    scanf("%d", &test_cases);
+    printf("%d\n", test_cases);
+    for (int test_id=0; test_id<test_cases; test_id++)
+    {
+        // char *test_name = malloc(20);
+        // snprintf(test_name, 20, "data/%d.bin", test_id);
+        // FILE *img_in = fopen(test_name, "rb");
+        // type *img = malloc(IMAGE_CHANNELS*IMAGE_WIDTH*IMAGE_HEIGHT*sizeof(type));
+        // fread(img, sizeof(type), IMAGE_CHANNELS*IMAGE_WIDTH*IMAGE_HEIGHT, img_in);
+        // free(test_name);
+        // fclose(img_in);
+
+        // // for (int i=0; i<224*224*3; i++) {
+        // //     printf("%f\n", img[i]-img2[i]);
+        // // }
+        // free
+    }
+        // return 0;
 //------------------------------
 //          CONV 1
 //------------------------------
@@ -997,6 +1079,7 @@ int main()
 //------------------------------
 //         Predictions
 //------------------------------
+    // type *probs = calloc(CLASSES, sizeof(type));
     type *probs = calloc(CLASSES, sizeof(type));
     softmax (
         CLASSES,
@@ -1004,14 +1087,39 @@ int main()
         probs
     );
 
-    free(preds);
+    // free(preds);
 
 //------------------------------
 //          ~ END ~
 //------------------------------
 
-    print(probs, 1, 1, CLASSES);
+    // print(probs, 1, 1, CLASSES);
+
+    int class = 0;
+    int pred = 0;
+    for (int i=0; i<CLASSES; i++) {
+        if (preds[i] > pred) {
+            pred = preds[i];
+            class = i;
+        }
+    }
+
+    free(preds);
+
+    float predf = 0.0;
+    int classf = 0;
+    for (int i=0; i<CLASSES; i++) {
+        if (probs[i] > predf) {
+            predf = probs[i];
+            classf = i;
+
+        }
+    }
+
+    printf("%d %d %d %f\n", class, pred, classf, predf);
 
     free(probs);
+    // free(img);
+    // }
     return 0;
 }
