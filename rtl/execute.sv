@@ -240,9 +240,10 @@ module execute
     always_comb begin
         mem_write_enable = '0;
         unique case (instruction_operation_i)
-            SB: mem_write_enable[sum_result[1:0]]      = '1;
-            SH: mem_write_enable[sum_result[1:0]+1-:2] = '1;
-            SW: mem_write_enable                       = '1;
+            SB: mem_write_enable[sum_result[1:0]]      = 1'b1;
+            SH: mem_write_enable[sum_result[1:0]+1-:2] = 2'b11;
+            SW: mem_write_enable                       = 4'b1111;
+            default: mem_write_enable                  = '0;
         endcase
     end
 
