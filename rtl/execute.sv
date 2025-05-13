@@ -218,7 +218,7 @@ module execute
     assign misaligned_sw = (mem_address[1:0] != '0) && (instruction_operation_i inside {SW, AMO_W, LR_W, SC_W});
 
     logic misaligned_lh;
-    assign misaligned_lh = mem_address[0] && (instruction_operation_i == LH);
+    assign misaligned_lh = mem_address[0] && (instruction_operation_i inside {LH, LHU});
 
     logic misaligned_lw;
     assign misaligned_lw = (mem_address[1:0] != '0) && (instruction_operation_i == LW);
@@ -244,7 +244,7 @@ module execute
         endcase
     end
 
-    assign mem_address_o   = {mem_address[31:2], 2'b00};
+    assign mem_address_o   = mem_address;
     assign mem_read_enable = instruction_operation_i inside {LB, LBU, LH, LHU, LW, LR_W};
 
     always_comb begin

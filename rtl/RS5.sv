@@ -450,6 +450,7 @@ module RS5
         .machine_return_i           (MACHINE_RETURN),
         .exception_code_i           (Exception_Code),
         .pc_i                       (pc_execute),
+        .mem_address_i              (mem_address),
         .next_pc_i                  (pc_decode),
         .instruction_i              (instruction_execute),
         .instruction_compressed_i   (instruction_compressed_execute),
@@ -480,18 +481,18 @@ module RS5
 
     if (XOSVMEnable == 1'b1) begin : gen_d_mmu_on
         mmu d_mmu (
-            .en_i           (mmu_en        ),
-            .mask_i         (mvmdm         ),
-            .offset_i       (mvmdo         ),
-            .size_i         (mvmds         ),
-            .address_i      (mem_address   ),
-            .exception_o    (mmu_data_fault),
-            .address_o      (mem_address_o )
+            .en_i           (mmu_en                    ),
+            .mask_i         (mvmdm                     ),
+            .offset_i       (mvmdo                     ),
+            .size_i         (mvmds                     ),
+            .address_i      ({mem_address[31:2], 2'b00}),
+            .exception_o    (mmu_data_fault            ),
+            .address_o      (mem_address_o             )
         );
     end
     else begin : gen_d_mmu_off
         assign mmu_data_fault = 1'b0;
-        assign mem_address_o  = mem_address;
+        assign mem_address_o  = {mem_address[31:2], 2'b00};
     end
 
     always_comb begin
