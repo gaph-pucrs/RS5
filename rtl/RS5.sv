@@ -496,7 +496,7 @@ module RS5
     end
 
     always_comb begin
-        if ((mem_write_enable != '0 || mem_read_enable) && !mmu_data_fault)
+        if ((mem_write_enable != '0 || mem_read_enable) && !mmu_data_fault && !RAISE_EXCEPTION)
             mem_operation_enable_o = 1'b1;
         else
             mem_operation_enable_o = 1'b0;
