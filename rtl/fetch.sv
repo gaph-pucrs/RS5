@@ -141,7 +141,7 @@ module fetch  #(
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             pc_jumped_r <= '0;
-        else if (jumped_r || enable_i)
+        else if (jumped_r || (!COMPRESSED && enable_i))
             pc_jumped_r <= pc_jumped;
     end
 
