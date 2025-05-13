@@ -185,8 +185,8 @@ module execute
 
     /* verilator lint_off UNUSEDSIGNAL */
     logic [31:0] mem_address_vector;
-    logic [31:0] mem_address;
     /* verilator lint_on UNUSEDSIGNAL */
+    logic [31:0] mem_address;
 
     logic        mem_read_enable;
     logic        mem_read_enable_vector;
@@ -204,12 +204,30 @@ module execute
         unique case (instruction_operation_i)
             AMO_W,
             LR_W,
-            SC_W:    mem_address_o = (AMOEXT != AMO_OFF) ? rs1_data_i : mem_address;
+            SC_W:    mem_address = (AMOEXT != AMO_OFF) ? rs1_data_i : sum_result;
             VLOAD,
-            VSTORE:  mem_address_o = VEnable ? {mem_address_vector[31:2], 2'b00} : mem_address;
-            default: mem_address_o = mem_address;
+            VSTORE:  mem_address = VEnable ? mem_address_vector     : sum_result;
+            default: mem_address = sum_result;
         endcase
     end
+
+    logic misaligned_sh;
+    assign misaligned_sh = mem_address[0] && (instruction_operation_i == SH);
+
+    logic misaligned_sw;
+    assign misaligned_sw = (mem_address[1:0] != '0) && (instruction_operation_i inside {SW, AMO_W, LR_W, SC_W});
+
+    logic misaligned_lh;
+    assign misaligned_lh = mem_address[0] && (instruction_operation_i == LH);
+
+    logic misaligned_lw;
+    assign misaligned_lw = (mem_address[1:0] != '0) && (instruction_operation_i == LW);
+
+    logic laddr_misaligned;
+    assign laddr_misaligned = (misaligned_lh || misaligned_lw);
+
+    logic saddr_misaligned;
+    assign saddr_misaligned = (misaligned_sh || misaligned_sw);
 
     logic mem_read_enable_vector_inst;
     assign mem_read_enable_vector_inst = mem_read_enable_vector && (instruction_operation_i inside {VLOAD, VSTORE});
@@ -226,7 +244,7 @@ module execute
         endcase
     end
 
-    assign mem_address     = {sum_result[31:2], 2'b00};
+    assign mem_address_o   = {mem_address[31:2], 2'b00};
     assign mem_read_enable = instruction_operation_i inside {LB, LBU, LH, LHU, LW, LR_W};
 
     always_comb begin
@@ -762,6 +780,8 @@ module execute
             exc_ilegal_inst_i ||
             exc_ilegal_csr_inst ||
             iaddr_misaligned ||
+            laddr_misaligned ||
+            saddr_misaligned ||
             (instruction_operation_i inside {ECALL, EBREAK}) ||
             (exc_load_access_fault_i && (mem_read_enable_o || (mem_write_enable_o != '0)))
         ) &&
@@ -789,6 +809,10 @@ module execute
             exception_code_o  = (privilege_i == USER) ? ECALL_FROM_UMODE : ECALL_FROM_MMODE;
         else if (instruction_operation_i == EBREAK)
             exception_code_o  = BREAKPOINT;
+        else if (laddr_misaligned) 
+            exception_code_o  = LOAD_ADDRESS_MISALIGNED;
+        else if (saddr_misaligned) 
+            exception_code_o  = STORE_AMO_ADDRESS_MISALIGNED;
         else if (exc_load_access_fault_i)
             exception_code_o  = LOAD_ACCESS_FAULT;
         else
