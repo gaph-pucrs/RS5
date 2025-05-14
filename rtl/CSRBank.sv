@@ -1115,11 +1115,11 @@ module CSRBank
                     STORE_AMO_PAGE_FAULT,
                     STORE_AMO_ACCESS_FAULT,
                     LOAD_ADDRESS_MISALIGNED,
-                    INSTRUCTION_ACCESS_FAULT,
                     STORE_AMO_ADDRESS_MISALIGNED:   mtval <= mem_address_i;
-                    BREAKPOINT, 
+                    INSTRUCTION_ADDRESS_MISALIGNED: mtval <= jump_target_i;
+                    BREAKPOINT,
                     INSTRUCTION_PAGE_FAULT,
-                    INSTRUCTION_ADDRESS_MISALIGNED: mtval <= pc_i;
+                    INSTRUCTION_ACCESS_FAULT:       mtval <= pc_i;
                     ILLEGAL_INSTRUCTION:            mtval <= instruction_i;
                     default:                        mtval <= '0;
                 endcase
