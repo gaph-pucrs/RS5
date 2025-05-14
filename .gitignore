@@ -43,3 +43,4 @@ sim/obj_dir
 .vscode
 riscof/riscof_work
 riscof/**/__pycache__
+riscof/riscv-arch-test
