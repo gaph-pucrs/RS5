@@ -22,6 +22,7 @@ class sail_cSim(pluginTemplate):
 
     def __init__(self, *args, **kwargs):
         sclass = super().__init__(*args, **kwargs)
+        self.args = ""
 
         config = kwargs.get('config')
         if config is None:
@@ -60,6 +61,8 @@ class sail_cSim(pluginTemplate):
             self.isa += 'm'
         if "C" in ispec["ISA"]:
             self.isa += 'c'
+        else:
+            self.args += " --disable-compressed"
         if "F" in ispec["ISA"]:
             self.isa += 'f'
         if "D" in ispec["ISA"]:
@@ -102,7 +105,7 @@ class sail_cSim(pluginTemplate):
             execute += self.objdump_cmd.format(elf, self.xlen, 'ref.disass')
             sig_file = os.path.join(test_dir, self.name[:-1] + ".signature")
 
-            execute += self.sail_exe[self.xlen] + ' --test-signature={} {} > {}.log 2>&1;'.format(sig_file, elf, test_name)
+            execute += self.sail_exe[self.xlen] + self.args + ' --test-signature={} {} > {}.log 2>&1;'.format(sig_file, elf, test_name)
 
             cov_str = ' '
             for label in testentry['coverage_labels']:
