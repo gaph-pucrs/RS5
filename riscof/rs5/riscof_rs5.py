@@ -121,8 +121,6 @@ class rs5(pluginTemplate):
 
       dut_dir = self.work_dir + '/../../'
 
-      c = 0
-
       # we will iterate over each entry in the testList. Each entry node will be refered to by the
       # variable testname.
       for testname in testList:
@@ -185,8 +183,17 @@ class rs5(pluginTemplate):
 
             # set up the simulation command. Template is for spike. Please change.
             #simcmd = self.dut_exe + ' --isa={0} +signature={1} +signature-granularity=4 {2}'.format(self.isa, sig_file, elf)
-            verilatecmd = 'verilator --cc --exe ' + dut_dir + '/riscof/riscof_tb.sv' + ' --binary --timescale 1ns/1ns -j 0 -I' + dut_dir + '/rtl/' + ' -I' + dut_dir + '/sim/' + ' -I' + dut_dir + '/rtl/aes'
-            verilatecmd += " -GSIG_START=32\\'h" + signature_start + " -GSIG_END=32\\'h" + signature_end + " -GTOHOST_ADDR=32\\'h" + tohost_addr + " -GSIG_PATH='\"" + sig_file + "\"'"
+            verilatecmd = 'verilator --cc --exe ' + dut_dir + '/riscof/riscof_tb.sv' + ' --binary --timescale 1ns/1ns -j 0 -I' + \
+                          dut_dir + '/rtl/' + ' -I' + dut_dir + '/sim/' + ' -I' + dut_dir + '/rtl/aes'
+
+            verilatecmd += " -GSIG_START=32\\'h" + signature_start + " -GSIG_END=32\\'h" + signature_end + \
+                           " -GTOHOST_ADDR=32\\'h" + tohost_addr + " -GSIG_PATH='\"" + sig_file + "\"'"
+
+            if ("BP" in os.environ):
+                verilatecmd += " -GBRANCHPRED=1\\'b" + os.environ["BP"]
+            if ("FORWARDING" in os.environ):
+                verilatecmd += " -GFORWARDING=1\\'b" + os.environ["FORWARDING"]
+
             simcmd = './obj_dir/Vriscof_tb'
           else:
             simcmd = 'echo "NO RUN"'
@@ -194,8 +201,7 @@ class rs5(pluginTemplate):
             objcopycmd = ''
 
           # concatenate all commands that need to be executed within a make-target.
-          execute = 'cd {}; echo "{}";{}; {}; {}; {};'.format(testentry['work_dir'], c, cmd, objcopycmd, verilatecmd, simcmd)
-          c += 1
+          execute = 'cd {}; {}; {}; {}; {};'.format(testentry['work_dir'], cmd, objcopycmd, verilatecmd, simcmd)
           # create a target. The makeutil will create a target with the name "TARGET<num>" where num
           # starts from 0 and increments automatically for each new target that is added
           make.add_target(execute)

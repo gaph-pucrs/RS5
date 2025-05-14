@@ -28,7 +28,9 @@ module riscof_tb
     parameter logic[31:0] SIG_START   = 0,
     parameter logic[31:0] SIG_END     = 0,
     parameter logic[31:0] TOHOST_ADDR = 0,
-    parameter string      SIG_PATH    = ""
+    parameter string      SIG_PATH    = "",
+    parameter logic       BRANCHPRED  = 0,
+    parameter logic       FORWARDING  = 0
 )
 (
 );
@@ -48,7 +50,6 @@ module riscof_tb
     localparam bit           VEnable         = 1'b0;
     localparam int           VLEN            = 256;
     localparam bit           USE_HPMCOUNTER  = 1'b1;
-    localparam bit           BRANCHPRED      = 1'b0;
 
 `ifndef SYNTH
     localparam bit           PROFILING       = 1'b0;
@@ -190,7 +191,8 @@ module riscof_tb
         .ZICONDEnable    (USE_ZICOND    ),
         //.ZCBEnable       (USE_ZCB       ),
         .HPMCOUNTEREnable(USE_HPMCOUNTER),
-        .BRANCHPRED      (BRANCHPRED    )
+        .BRANCHPRED      (BRANCHPRED    ),
+        .FORWARDING      (FORWARDING    )
     ) dut (
         .clk                    (clk),
         .reset_n                (reset_n),
