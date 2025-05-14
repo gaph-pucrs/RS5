@@ -8,6 +8,7 @@ import random
 import string
 from string import Template
 import sys
+from multiprocessing import cpu_count
 
 import riscof.utils as utils
 import riscof.constants as constants
@@ -41,7 +42,7 @@ class rs5(pluginTemplate):
         # Number of parallel jobs that can be spawned off by RISCOF
         # for various actions performed in later functions, specifically to run the tests in
         # parallel on the DUT executable. Can also be used in the build function if required.
-        self.num_jobs = str(config['jobs'] if 'jobs' in config else 1)
+        self.num_jobs = str(cpu_count())
 
         # Path to the directory where this python file is located. Collect it from the config.ini
         self.pluginpath=os.path.abspath(config['pluginpath'])
@@ -119,7 +120,7 @@ class rs5(pluginTemplate):
       # function earlier
       make.makeCommand = 'make -k -j' + self.num_jobs
 
-      dut_dir = self.work_dir + '/../../'
+      dut_dir = self.pluginpath + '/../../'
 
       # we will iterate over each entry in the testList. Each entry node will be refered to by the
       # variable testname.
