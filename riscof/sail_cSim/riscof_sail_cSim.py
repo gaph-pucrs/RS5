@@ -7,6 +7,7 @@ import logging
 import random
 import string
 from string import Template
+from multiprocessing import cpu_count
 
 import riscof.utils as utils
 from riscof.pluginTemplate import pluginTemplate
@@ -26,7 +27,7 @@ class sail_cSim(pluginTemplate):
         if config is None:
             logger.error("Config node for sail_cSim missing.")
             raise SystemExit(1)
-        self.num_jobs = str(config['jobs'] if 'jobs' in config else 1)
+        self.num_jobs = str(cpu_count())
         self.pluginpath = os.path.abspath(config['pluginpath'])
         self.sail_exe = { '32' : os.path.join(config['PATH'] if 'PATH' in config else "","riscv_sim_RV32"),
                 '64' : os.path.join(config['PATH'] if 'PATH' in config else "","riscv_sim_RV64")}
