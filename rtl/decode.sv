@@ -740,7 +740,7 @@ module decode
         if (!reset_n)
             instruction_o <= '0;
         else if (enable)
-            instruction_o <= instruction_i;
+            instruction_o <= (!COMPRESSED && compressed_i) ? {16'h0000, instruction_i[15:0]} : instruction_i;
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
