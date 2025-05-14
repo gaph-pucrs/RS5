@@ -462,12 +462,18 @@ module fetch  #(
     end
     else begin : gen_compressed_off
         assign pc_jumped         = instruction_address_o;
-        assign compressed_o      = 1'b0;
         assign jump_misaligned_o = 1'b0;
         assign iaddr_continue    = enable_i;
         assign pc_update         = pc_jumped_r;
         assign instruction_next  = instruction_fetched;
         assign iaddr_rollback    = iaddr_fetched_adv;
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                compressed_o <= 1'b0;
+            else if (enable_i)
+                compressed_o <= (instruction_next[1:0] != '1);
+        end
     end
 
 endmodule
