@@ -107,60 +107,22 @@ module riscof_tb
     logic [31:0]            data_ram, data_plic, data_tb;
     logic                   enable_tb_r, enable_rtc_r, enable_plic_r;
     logic                   mti, mei;
-    logic [31:0]            irq;
-
-    assign irq = {20'h0, mei, 3'h0, mti, 7'h0};
 
 //////////////////////////////////////////////////////////////////////////////
 // Control
 //////////////////////////////////////////////////////////////////////////////
 
-    always_comb begin
-        if (mem_operation_enable) begin
-            if (mem_address[31:28] < 4'h2) begin
-                enable_ram  = 1'b1;
-                enable_rtc  = 1'b0;
-                enable_plic = 1'b0;
-                enable_tb   = 1'b0;
-            end
-            else if (mem_address[31:28] < 4'h3) begin
-                enable_ram  = 1'b0;
-                enable_rtc  = 1'b1;
-                enable_plic = 1'b0;
-                enable_tb   = 1'b0;
-            end
-            else if (mem_address[31:28] < 4'h8) begin
-                enable_ram  = 1'b0;
-                enable_rtc  = 1'b0;
-                enable_plic = 1'b1;
-                enable_tb   = 1'b0;
-            end
-            else begin
-                enable_ram  = 1'b0;
-                enable_rtc  = 1'b0;
-                enable_plic = 1'b0;
-                enable_tb   = 1'b1;
-            end
-        end
-        else begin
-            enable_ram  = 1'b0;
-            enable_rtc  = 1'b0;
-            enable_plic = 1'b0;
-            enable_tb   = 1'b0;
-        end
-    end
+    assign enable_rtc  = (mem_address[31:28] == 4'h2) && mem_operation_enable;
+    assign enable_plic = (mem_address[31:28] == 4'h4) && mem_operation_enable;
+    assign enable_ram  = (mem_address[31:28] == 4'h8) && mem_operation_enable;
 
     always_ff @(posedge clk) begin
-        enable_tb_r     <= enable_tb;
         enable_rtc_r    <= enable_rtc;
         enable_plic_r   <= enable_plic;
     end
 
     always_comb begin
-        if (enable_tb_r) begin
-            mem_data_read = data_tb;
-        end
-        else if (enable_rtc_r) begin
+        if (enable_rtc_r) begin
             mem_data_read = data_rtc[31:0];
         end
         else if (enable_plic_r) begin
@@ -183,6 +145,7 @@ module riscof_tb
         .Environment     (ASIC          ),
         .MULEXT          (MULEXT        ),
         .AMOEXT          (AMOEXT        ),
+        .START_ADDR      (32'h80000000  ),
         .COMPRESSED      (COMPRESSED    ),
         .VEnable         (VEnable       ),
         .VLEN            (VLEN          ),
@@ -287,26 +250,8 @@ module riscof_tb
     int fd;
 
     always_ff @(posedge clk) begin
-        if (enable_tb) begin
-            // OUTPUT REG
-            if ((mem_address == 32'h80004000 || mem_address == 32'h80001000) && mem_write_enable != '0) begin
-                char <= mem_data_write[7:0];
-                $write("%c",char);
-                $fflush();
-            end
-            else if (mem_address == 32'h80002000 && mem_write_enable != '0) begin
-                $write("%0d\n",mem_data_write);
-                $fflush();
-            end
-        end
-        else begin
-            data_tb <= '0;
-        end
-
-        // END REG
-        if (mem_address == TOHOST_ADDR && mem_write_enable != '0) begin
+        if (mem_address == TOHOST_ADDR && mem_write_enable != '0)
             $finish();
-        end
     end
 
     initial begin
@@ -316,9 +261,8 @@ module riscof_tb
     end
 
     final begin
-        for (int i = SIG_START; i < SIG_END; i=i+4) begin
+        for (int i = SIG_START; i < SIG_END; i=i+4)
             $fwrite(fd, "%x\n", {RAM_MEM.RAM[i+3],RAM_MEM.RAM[i+2],RAM_MEM.RAM[i+1],RAM_MEM.RAM[i]});
-        end
         $fclose(fd);
         $display("# %t END OF SIMULATION",$time);
     end
