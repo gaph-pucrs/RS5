@@ -120,7 +120,7 @@ class rs5(pluginTemplate):
       # function earlier
       make.makeCommand = 'make -k -j' + self.num_jobs
 
-      dut_dir = self.work_dir + '/../../'
+      dut_dir = self.pluginpath + '/../../'
 
       c = 0
 
