@@ -56,7 +56,7 @@ module riscof_tb
     localparam bit           DEBUG           = 1'b0;
 `endif
 
-    localparam int           MEM_WIDTH       = 65_536;
+    localparam int           MEM_WIDTH       = 2_097_152;
     localparam string        BIN_FILE        = "test.bin";
 
     localparam int           i_cnt = 1;
