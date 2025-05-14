@@ -185,7 +185,7 @@ class rs5(pluginTemplate):
 
             # set up the simulation command. Template is for spike. Please change.
             #simcmd = self.dut_exe + ' --isa={0} +signature={1} +signature-granularity=4 {2}'.format(self.isa, sig_file, elf)
-            verilatecmd = 'verilator --cc --exe ' + dut_dir + '/sim/riscof_tb.sv' + ' --binary --timescale 1ns/1ns -j 0 -I' + dut_dir + '/rtl/' + ' -I' + dut_dir + '/sim/' + ' -I' + dut_dir + '/rtl/aes'
+            verilatecmd = 'verilator --cc --exe ' + dut_dir + '/riscof/riscof_tb.sv' + ' --binary --timescale 1ns/1ns -j 0 -I' + dut_dir + '/rtl/' + ' -I' + dut_dir + '/sim/' + ' -I' + dut_dir + '/rtl/aes'
             verilatecmd += " -GSIG_START=32\\'h" + signature_start + " -GSIG_END=32\\'h" + signature_end + " -GTOHOST_ADDR=32\\'h" + tohost_addr + " -GSIG_PATH='\"" + sig_file + "\"'"
             simcmd = './obj_dir/Vriscof_tb'
           else:
