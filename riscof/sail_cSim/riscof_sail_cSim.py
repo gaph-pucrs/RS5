@@ -22,7 +22,7 @@ class sail_cSim(pluginTemplate):
 
     def __init__(self, *args, **kwargs):
         sclass = super().__init__(*args, **kwargs)
-        self.args = ""
+        self.args = " --disable-writable-misa --disable-vector-ext"
 
         config = kwargs.get('config')
         if config is None:
@@ -67,6 +67,10 @@ class sail_cSim(pluginTemplate):
             self.isa += 'f'
         if "D" in ispec["ISA"]:
             self.isa += 'd'
+        if not ('d' in self.isa or 'f' in self.isa):
+            self.args += " --disable-fdext"
+        if "Zcb" in ispec["ISA"]:
+            self.args += " --enable-zcb"
         objdump = "riscv64-elf-objdump".format(self.xlen)
         if shutil.which(objdump) is None:
             logger.error(objdump+": executable not found. Please check environment setup.")
