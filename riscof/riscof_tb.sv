@@ -15,14 +15,28 @@
  * Testbench for RS5 simulation.de
  */
 
-`include "../rtl/RS5_pkg.sv"
+`include "RS5_pkg.sv"
 
 //////////////////////////////////////////////////////////////////////////////
 // CPU TESTBENCH
 //////////////////////////////////////////////////////////////////////////////
 
-module testbench
+module riscof_tb
     import RS5_pkg::*;
+#(
+    parameter logic[31:0] SIG_START        = 0,
+    parameter logic[31:0] SIG_END          = 0,
+    parameter logic[31:0] TOHOST_ADDR      = 0,
+    parameter string      SIG_PATH         = "",
+    parameter bit         MEnable          = 1'b0,
+    parameter bit         AEnable          = 1'b0,
+    parameter bit         COMPRESSED       = 1'b0,
+    parameter bit         ZICONDEnable     = 1'b0,
+    parameter bit         HPMCOUNTEREnable = 1'b0,
+    parameter bit         ZKNEEnable       = 1'b0,
+    parameter bit         BRANCHPRED       = 1'b0,
+    parameter bit         FORWARDING       = 1'b0
+)
 (
 );
     timeunit 1ns; timeprecision 1ns;
@@ -31,28 +45,15 @@ module testbench
 // PARAMETERS FOR CORE INSTANTIATION
 //////////////////////////////////////////////////////////////////////////////
 
-    localparam mul_e         MULEXT          = MUL_M;
-    localparam atomic_e      AMOEXT          = AMO_A;
-    localparam bit           COMPRESSED      = 1'b1;
-    localparam bit           USE_XOSVM       = 1'b0;
-    localparam bit           USE_ZKNE        = 1'b1;
-    localparam bit           USE_ZICOND      = 1'b1;
-    localparam bit           USE_ZCB         = 1'b1;
-    localparam bit           VEnable         = 1'b0;
-    localparam int           VLEN            = 256;
-    localparam bit           USE_HPMCOUNTER  = 1'b1;
-    localparam bit           BRANCHPRED      = 1'b1;
-    localparam bit           FORWARDING      = 1'b1;
-
-`ifndef SYNTH
-    localparam bit           PROFILING       = 1'b1;
-    localparam bit           DEBUG           = 1'b0;
-`endif
-
-    localparam int           MEM_WIDTH       = 65_536;
-    localparam string        BIN_FILE        = "../app/riscv-tests/test.bin";
-
-    localparam int           i_cnt = 1;
+    localparam string   BIN_FILE  = "test.bin";
+    localparam int      MEM_WIDTH = 2_097_152;
+    localparam int      i_cnt     = 1;
+    localparam bit      USE_XOSVM = 1'b0;
+    localparam bit      VEnable   = 1'b0;
+    localparam bit      PROFILING = 1'b0;
+    localparam bit      DEBUG     = 1'b0;
+    localparam mul_e    MULEXT    = MEnable ? MUL_M : MUL_OFF;
+    localparam atomic_e AMOEXT    = AEnable ? AMO_A : AMO_OFF;
 
 ///////////////////////////////////////// Clock generator //////////////////////////////
 
@@ -105,52 +106,17 @@ module testbench
 // Control
 //////////////////////////////////////////////////////////////////////////////
 
-    always_comb begin
-        if (mem_operation_enable) begin
-            if (mem_address[31:28] < 4'h2) begin
-                enable_ram  = 1'b1;
-                enable_rtc  = 1'b0;
-                enable_plic = 1'b0;
-                enable_tb   = 1'b0;
-            end
-            else if (mem_address[31:28] < 4'h3) begin
-                enable_ram  = 1'b0;
-                enable_rtc  = 1'b1;
-                enable_plic = 1'b0;
-                enable_tb   = 1'b0;
-            end
-            else if (mem_address[31:28] < 4'h8) begin
-                enable_ram  = 1'b0;
-                enable_rtc  = 1'b0;
-                enable_plic = 1'b1;
-                enable_tb   = 1'b0;
-            end
-            else begin
-                enable_ram  = 1'b0;
-                enable_rtc  = 1'b0;
-                enable_plic = 1'b0;
-                enable_tb   = 1'b1;
-            end
-        end
-        else begin
-            enable_ram  = 1'b0;
-            enable_rtc  = 1'b0;
-            enable_plic = 1'b0;
-            enable_tb   = 1'b0;
-        end
-    end
+    assign enable_rtc  = (mem_address[31:28] == 4'h2) && mem_operation_enable;
+    assign enable_plic = (mem_address[31:28] == 4'h4) && mem_operation_enable;
+    assign enable_ram  = (mem_address[31:28] == 4'h8) && mem_operation_enable;
 
     always_ff @(posedge clk) begin
-        enable_tb_r     <= enable_tb;
         enable_rtc_r    <= enable_rtc;
         enable_plic_r   <= enable_plic;
     end
 
     always_comb begin
-        if (enable_tb_r) begin
-            mem_data_read = data_tb;
-        end
-        else if (enable_rtc_r) begin
+        if (enable_rtc_r) begin
             mem_data_read = data_rtc[31:0];
         end
         else if (enable_plic_r) begin
@@ -170,19 +136,18 @@ module testbench
 	    .DEBUG      (DEBUG          ),
 	    .PROFILING  (PROFILING      ),
     `endif
-        .Environment     (ASIC          ),
-        .MULEXT          (MULEXT        ),
-        .AMOEXT          (AMOEXT        ),
-        .COMPRESSED      (COMPRESSED    ),
-        .VEnable         (VEnable       ),
-        .VLEN            (VLEN          ),
-        .XOSVMEnable     (USE_XOSVM     ),
-        .ZKNEEnable      (USE_ZKNE      ),
-        .ZICONDEnable    (USE_ZICOND    ),
-        .ZCBEnable       (USE_ZCB       ),
-        .HPMCOUNTEREnable(USE_HPMCOUNTER),
-        .BRANCHPRED      (BRANCHPRED    ),
-        .FORWARDING      (FORWARDING    )
+        .Environment     (ASIC            ),
+        .MULEXT          (MULEXT          ),
+        .AMOEXT          (AMOEXT          ),
+        .START_ADDR      (32'h80000000    ),
+        .COMPRESSED      (COMPRESSED      ),
+        .VEnable         (VEnable         ),
+        .XOSVMEnable     (USE_XOSVM       ),
+        .ZKNEEnable      (ZKNEEnable      ),
+        .ZICONDEnable    (ZICONDEnable    ),
+        .HPMCOUNTEREnable(HPMCOUNTEREnable),
+        .BRANCHPRED      (BRANCHPRED      ),
+        .FORWARDING      (FORWARDING      )
     ) dut (
         .clk                    (clk),
         .reset_n                (reset_n),
@@ -200,6 +165,7 @@ module testbench
         .mem_data_o             (mem_data_write),
         .interrupt_ack_o        (interrupt_ack)
     );
+
 
 //////////////////////////////////////////////////////////////////////////////
 // RAM
@@ -273,27 +239,24 @@ module testbench
 // Memory Mapped regs
 //////////////////////////////////////////////////////////////////////////////
 
+    int fd;
+
     always_ff @(posedge clk) begin
-        if (enable_tb) begin
-            // OUTPUT REG
-            if ((mem_address == 32'h80004000 || mem_address == 32'h80001000) && mem_write_enable != '0) begin
-                char <= mem_data_write[7:0];
-                $write("%c",char);
-                $fflush();
-            end
-            else if (mem_address == 32'h80002000 && mem_write_enable != '0) begin
-                $write("%0d\n",mem_data_write);
-                $fflush();
-            end
-            // END REG
-            if (mem_address == 32'h80000000 && mem_write_enable != '0) begin
-                $display("# %t END OF SIMULATION",$time);
-                $finish;
-            end
-        end
-        else begin
-            data_tb <= '0;
-        end
+        if (mem_address == TOHOST_ADDR && mem_write_enable != '0)
+            $finish();
+    end
+
+    initial begin
+        fd = $fopen(SIG_PATH, "w");
+        #10ms;
+        $finish();
+    end
+
+    final begin
+        for (int i = SIG_START; i < SIG_END; i=i+4)
+            $fwrite(fd, "%x\n", {RAM_MEM.RAM[i+3],RAM_MEM.RAM[i+2],RAM_MEM.RAM[i+1],RAM_MEM.RAM[i]});
+        $fclose(fd);
+        $display("# %t END OF SIMULATION",$time);
     end
 
 endmodule
