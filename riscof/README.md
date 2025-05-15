@@ -89,7 +89,8 @@ E.g., to change `WORK_DIR` to `/tmp`:
 WORK_DIR=/tmp/riscof_work make
 ```
 
-At the end of the suite, a `report.html` is generated at the `WORK_DIR`, and automatically opened in the browser.
+At the end of the suite, a `report.html` is generated at the `WORK_DIR`.
+To view the report in browser, run `make report`.
 This report contains the tests that passed and failed.
 When a test fails, it shows the lines where its dumped memory contents differ.
 To see more details of the test, check the `WORK_DIR/rv32i_m` folder containing the desired test.
