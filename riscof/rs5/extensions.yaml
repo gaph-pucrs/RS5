@@ -1,5 +1,5 @@
 hart_ids: [0]
 hart0:
-  ISA: RV32IMACUZicond_Zicsr_Zihpm_Zkne
+  ISA: RV32IMACUZicond_Zicsr_Zihpm_Zca_Zcb_Zkne
   physical_addr_sz: 32
   supported_xlen: [32]
