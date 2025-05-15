@@ -1,24 +1,16 @@
 import os
-import re
 import shutil
-import subprocess
-import shlex
 import logging
-import random
-import string
-from string import Template
 from multiprocessing import cpu_count
 
 import riscof.utils as utils
 from riscof.pluginTemplate import pluginTemplate
-import riscof.constants as constants
-from riscv_isac.isac import isac
 
 logger = logging.getLogger()
 
 class sail_cSim(pluginTemplate):
     __model__ = "sail_c_simulator"
-    __version__ = "0.5.0"
+    __version__ = "0.7"
 
     def __init__(self, *args, **kwargs):
         sclass = super().__init__(*args, **kwargs)
@@ -35,6 +27,7 @@ class sail_cSim(pluginTemplate):
         self.isa_spec = os.path.abspath(config['ispec']) if 'ispec' in config else ''
         self.platform_spec = os.path.abspath(config['pspec']) if 'ispec' in config else ''
         self.make = config['make'] if 'make' in config else 'make'
+        self.triplet = os.environ["TRIPLET"]
         logger.debug("SAIL CSim plugin initialised using the following configuration.")
         for entry in config:
             logger.debug(entry+' : '+config[entry])
@@ -43,8 +36,8 @@ class sail_cSim(pluginTemplate):
     def initialise(self, suite, work_dir, archtest_env):
         self.suite = suite
         self.work_dir = work_dir
-        self.objdump_cmd = 'riscv64-elf-objdump -D {0} > {2};'
-        self.compile_cmd = 'riscv64-elf-gcc -march={0} \
+        self.objdump_cmd = self.triplet+'-objdump -D {0} > {2};'
+        self.compile_cmd = self.triplet+'-gcc -march={0} \
          -static -mcmodel=medany -fvisibility=hidden -nostdlib -nostartfiles\
          -T '+self.pluginpath+'/env/link.ld\
          -I '+self.pluginpath+'/env/\
@@ -55,27 +48,17 @@ class sail_cSim(pluginTemplate):
         self.xlen = ('64' if 64 in ispec['supported_xlen'] else '32')
         self.isa = 'rv' + self.xlen
         self.compile_cmd = self.compile_cmd+' -mabi='+('lp64 ' if 64 in ispec['supported_xlen'] else 'ilp32 ')
-        if "I" in ispec["ISA"]:
-            self.isa += 'i'
-        if "M" in ispec["ISA"]:
-            self.isa += 'm'
-        if "C" in ispec["ISA"]:
-            self.isa += 'c'
-        else:
+        if "C" not in ispec["ISA"]:
             self.args += " --disable-compressed"
-        if "F" in ispec["ISA"]:
-            self.isa += 'f'
-        if "D" in ispec["ISA"]:
-            self.isa += 'd'
         if not ('d' in self.isa or 'f' in self.isa):
             self.args += " --disable-fdext"
         if "Zcb" in ispec["ISA"]:
             self.args += " --enable-zcb"
-        objdump = "riscv64-elf-objdump".format(self.xlen)
+        objdump = f"{self.triplet}-objdump"
         if shutil.which(objdump) is None:
             logger.error(objdump+": executable not found. Please check environment setup.")
             raise SystemExit(1)
-        compiler = "riscv64-elf-gcc".format(self.xlen)
+        compiler = f"{self.triplet}-gcc"
         if shutil.which(compiler) is None:
             logger.error(compiler+": executable not found. Please check environment setup.")
             raise SystemExit(1)
