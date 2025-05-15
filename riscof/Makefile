@@ -10,10 +10,10 @@ default: baseline
 all: baseline extensions
 
 extensions: arch-test-update
-	@$(ENV_VARS) riscof run --suite=riscv-arch-test/riscv-test-suite --env=riscv-arch-test/riscv-test-suite/env --work-dir=$(WORK_DIR) --no-browser
+	@$(ENV_VARS) riscof run --suite=riscv-arch-test/riscv-test-suite --env=riscv-arch-test/riscv-test-suite/env --work-dir=$(WORK_DIR) --no-browser --config=extensions.ini
 
 baseline: arch-test-update
-	@$(ENV_VARS) riscof run --suite=riscv-arch-test/riscv-test-suite --env=riscv-arch-test/riscv-test-suite/env --work-dir=$(WORK_DIR) --no-browser
+	@$(ENV_VARS) riscof run --suite=riscv-arch-test/riscv-test-suite --env=riscv-arch-test/riscv-test-suite/env --work-dir=$(WORK_DIR) --no-browser --config=baseline.ini
 
 arch-test-update: riscv-arch-test
 	@riscof arch-test --update
