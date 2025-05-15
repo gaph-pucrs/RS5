@@ -1,16 +1,19 @@
 WORK_DIR   ?= ./riscof_work
 BRANCHPRED ?= 1
 FORWARDING ?= 1
+TRIPLET    ?= riscv64-elf
 
-all: baseline extensions
+ENV_VARS = TRIPLET=$(TRIPLET) BRANCHPRED=$(BRANCHPRED) FORWARDING=$(FORWARDING)
 
 default: baseline
 
+all: baseline extensions
+
 extensions: arch-test-update
-	@riscof run --suite=riscv-arch-test/riscv-test-suite --env=riscv-arch-test/riscv-test-suite/env --work-dir=$(WORK_DIR) --no-browser
+	@$(ENV_VARS) riscof run --suite=riscv-arch-test/riscv-test-suite --env=riscv-arch-test/riscv-test-suite/env --work-dir=$(WORK_DIR) --no-browser
 
 baseline: arch-test-update
-	@riscof run --suite=riscv-arch-test/riscv-test-suite --env=riscv-arch-test/riscv-test-suite/env --work-dir=$(WORK_DIR) --no-browser
+	@$(ENV_VARS) riscof run --suite=riscv-arch-test/riscv-test-suite --env=riscv-arch-test/riscv-test-suite/env --work-dir=$(WORK_DIR) --no-browser
 
 arch-test-update: riscv-arch-test
 	@riscof arch-test --update

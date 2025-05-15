@@ -21,6 +21,7 @@ Some applications are needed to run RISCOF:
 This is the same toolchain used to build RS5 [applications](/app/).
 If your distro doesn't provide the riscv64-elf toolchain with multilib support for RV32I, 
 you can follow [this tutorial](https://github.com/gaph-pucrs/Memphis-V/blob/master/docs/riscv.md) for manually building and installing the toolchain.
+If your distro provides a different triple name, e.g., riscv64-unknown-elf, you can change by defining the `TRIPLET` environment variable before running the scripts in this directory.
 
 ### sail-riscv
 

@@ -23,14 +23,19 @@
 
 module riscof_tb
     import RS5_pkg::*;
-
 #(
-    parameter logic[31:0] SIG_START   = 0,
-    parameter logic[31:0] SIG_END     = 0,
-    parameter logic[31:0] TOHOST_ADDR = 0,
-    parameter string      SIG_PATH    = "",
-    parameter logic       BRANCHPRED  = 0,
-    parameter logic       FORWARDING  = 0
+    parameter logic[31:0] SIG_START        = 0,
+    parameter logic[31:0] SIG_END          = 0,
+    parameter logic[31:0] TOHOST_ADDR      = 0,
+    parameter string      SIG_PATH         = "",
+    parameter bit         MEnable          = 1'b0,
+    parameter bit         AEnable          = 1'b0,
+    parameter bit         COMPRESSED       = 1'b0,
+    parameter bit         ZICONDEnable     = 1'b0,
+    parameter bit         HPMCOUNTEREnable = 1'b0,
+    parameter bit         ZKNEEnable       = 1'b0,
+    parameter bit         BRANCHPRED       = 1'b0,
+    parameter bit         FORWARDING       = 1'b0
 )
 (
 );
@@ -40,26 +45,15 @@ module riscof_tb
 // PARAMETERS FOR CORE INSTANTIATION
 //////////////////////////////////////////////////////////////////////////////
 
-    localparam mul_e         MULEXT          = MUL_M;
-    localparam atomic_e      AMOEXT          = AMO_A;
-    localparam bit           COMPRESSED      = 1'b0;
-    localparam bit           USE_XOSVM       = 1'b0;
-    localparam bit           USE_ZKNE        = 1'b0;
-    localparam bit           USE_ZICOND      = 1'b0;
-    localparam bit           USE_ZCB         = 1'b0;
-    localparam bit           VEnable         = 1'b0;
-    localparam int           VLEN            = 256;
-    localparam bit           USE_HPMCOUNTER  = 1'b1;
-
-`ifndef SYNTH
-    localparam bit           PROFILING       = 1'b0;
-    localparam bit           DEBUG           = 1'b0;
-`endif
-
-    localparam int           MEM_WIDTH       = 2_097_152;
-    localparam string        BIN_FILE        = "test.bin";
-
-    localparam int           i_cnt = 1;
+    localparam string   BIN_FILE  = "test.bin";
+    localparam int      MEM_WIDTH = 2_097_152;
+    localparam int      i_cnt     = 1;
+    localparam bit      USE_XOSVM = 1'b0;
+    localparam bit      VEnable   = 1'b0;
+    localparam bit      PROFILING = 1'b0;
+    localparam bit      DEBUG     = 1'b0;
+    localparam mul_e    MULEXT    = MEnable ? MUL_M : MUL_OFF;
+    localparam atomic_e AMOEXT    = AEnable ? AMO_A : AMO_OFF;
 
 ///////////////////////////////////////// Clock generator //////////////////////////////
 
@@ -142,20 +136,18 @@ module riscof_tb
 	    .DEBUG      (DEBUG          ),
 	    .PROFILING  (PROFILING      ),
     `endif
-        .Environment     (ASIC          ),
-        .MULEXT          (MULEXT        ),
-        .AMOEXT          (AMOEXT        ),
-        .START_ADDR      (32'h80000000  ),
-        .COMPRESSED      (COMPRESSED    ),
-        .VEnable         (VEnable       ),
-        .VLEN            (VLEN          ),
-        .XOSVMEnable     (USE_XOSVM     ),
-        .ZKNEEnable      (USE_ZKNE      ),
-        .ZICONDEnable    (USE_ZICOND    ),
-        //.ZCBEnable       (USE_ZCB       ),
-        .HPMCOUNTEREnable(USE_HPMCOUNTER),
-        .BRANCHPRED      (BRANCHPRED    ),
-        .FORWARDING      (FORWARDING    )
+        .Environment     (ASIC            ),
+        .MULEXT          (MULEXT          ),
+        .AMOEXT          (AMOEXT          ),
+        .START_ADDR      (32'h80000000    ),
+        .COMPRESSED      (COMPRESSED      ),
+        .VEnable         (VEnable         ),
+        .XOSVMEnable     (USE_XOSVM       ),
+        .ZKNEEnable      (ZKNEEnable      ),
+        .ZICONDEnable    (ZICONDEnable    ),
+        .HPMCOUNTEREnable(HPMCOUNTEREnable),
+        .BRANCHPRED      (BRANCHPRED      ),
+        .FORWARDING      (FORWARDING      )
     ) dut (
         .clk                    (clk),
         .reset_n                (reset_n),
