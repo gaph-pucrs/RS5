@@ -26,6 +26,7 @@ module decompresser
     logic [4:0]  lsu_rs2;
 
     logic [11:0] lsu_zcb_imm;
+    logic [11:0] lh_zcb_imm;
 
     logic [19:0] CJ_imm;
     logic [4:0]  CJ_rd;
@@ -78,8 +79,11 @@ module decompresser
     assign lsu_rs1 = {2'b01, instruction_i[9:7]};
     assign lsu_rs2 = {2'b01, instruction_i[4:2]};
 
-    // C.LHU, C.LBU, C.LH, C.SB, C.SH
+    // C.LBU, C.SB, C.SH
     assign lsu_zcb_imm = {10'b0, instruction_i[5], instruction_i[6]};
+
+    // C.LHU, C.LH
+    assign lh_zcb_imm = {10'b0, instruction_i[5], 1'b0};
 
     // C.J and C.JAL
     assign CJ_imm = {
@@ -200,7 +204,7 @@ module decompresser
         always_comb begin
             unique case (instruction_i[12:10]) inside
                 3'b000:  expansion_zcb0 = {lsu_zcb_imm, lsu_rs1, 3'b100, lsu_rs2, 7'b0000011}; /* C.LBU */
-                3'b001:  expansion_zcb0 = {lsu_zcb_imm, lsu_rs1, {~instruction_i[6], 2'b01}, lsu_rs2, 7'b0000011}; /* C.LHU, C.LH */
+                3'b001:  expansion_zcb0 = {lh_zcb_imm,  lsu_rs1, {~instruction_i[6], 2'b01}, lsu_rs2, 7'b0000011}; /* C.LHU, C.LH */
                 3'b010:  expansion_zcb0 = {lsu_zcb_imm[11:5], lsu_rs2, lsu_rs1, 3'b000, lsu_zcb_imm[4:0], 7'b0100011}; /* C.SB */
                 3'b011:  expansion_zcb0 = {lsu_zcb_imm[11:5], lsu_rs2, lsu_rs1, 3'b001, lsu_zcb_imm[4:0], 7'b0100011}; /* C.SH */
                 default: expansion_zcb0 = '0;
