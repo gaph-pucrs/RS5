@@ -1,0 +1,50 @@
+set FREQ 500
+set DB_FILE ./results_${FREQ}/gate_level/RS5_logic_mapped.db
+set APP conv_compressed
+set START_TIME 0ns
+set CONSTRAINTS_PATH ./scripts
+
+
+set LIB_PATH /pdk/tsmc/PDK28/PDK_TSMC28_bv/tcbn28hpcplusbwp30p140_190a/TSMCHOME/digital/Front_End
+set TECH_PATH /pdk/tsmc/PDK28/PDK_TSMC28_bv/tcbn28hpcplusbwp30p140_190a/TSMCHOME/digital/Back_End
+
+# tt0p9v25c
+create_library_set -name libset_0p90v_25c \
+    -timing  "${LIB_PATH}/timing_power_noise/NLDM/tcbn28hpcplusbwp30p140_180a/tcbn28hpcplusbwp30p140tt0p9v25c.lib"
+
+create_opcond -name opcond_0p90v_25c  -voltage 0.90 -temperature  25.0
+
+create_timing_condition -name timing_cond_0p90v_25c \
+    -opcond         opcond_0p90v_25c \
+    -library_sets { libset_0p90v_25c }
+
+create_rc_corner -name rc_corner_25c_captyp \
+    -temperature 25.0 \
+    -qrc_tech ${TECH_PATH}/qrc/RC_QRC_crn28hpc+_1p09m+ut-alrdl_5x1y1z1u_typical/qrcTechFile
+
+create_delay_corner -name delay_corner_0p90v_25c_captyp \
+    -timing_condition timing_cond_0p90v_25c \
+     -rc_corner rc_corner_25c_captyp
+
+create_constraint_mode -name constraints_default \
+    -sdc_files "${CONSTRAINTS_PATH}/constraints.sdc"
+
+create_analysis_view -name analysis_view_0p90v_25c_captyp_nominal \
+    -constraint_mode constraints_default \
+    -delay_corner delay_corner_0p90v_25c_captyp
+
+#############################################################################33
+## DESIGN
+#############################################################################33
+
+set CURRENT_VIEW analysis_view_0p90v_25c_captyp_nominal
+
+read_db ${DB_FILE}
+
+set_db interconnect_mode ple
+
+read_stimulus ../sim_final_${FREQ}/${APP}.shm -dut_instance testbench.dut -start ${START_TIME}
+#compute_power -mode average
+report_power -header -unit mW > ./results_${FREQ}/reports/rpt_power_${APP}.txt
+
+exit

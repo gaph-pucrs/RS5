@@ -37,6 +37,7 @@ do_break:
 
   TEST_PASSFAIL
 
+.align 4
 stvec_handler:
   li t1, CAUSE_BREAKPOINT
   csrr t0, scause
