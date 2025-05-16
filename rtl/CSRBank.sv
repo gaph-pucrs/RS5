@@ -71,6 +71,7 @@ module CSRBank
     input   logic               machine_return_i,
     input   exceptionCode_e     exception_code_i,
     input   logic [31:0]        pc_i,
+    input   logic [31:0]        mem_address_i,
     input   logic [31:0]        next_pc_i,
     input   logic [31:0]        instruction_i,
 
@@ -1109,16 +1110,16 @@ module CSRBank
         else begin
             if (raise_exception_i) begin
                 unique case (exception_code_i)
-                    BREAKPOINT, 
                     LOAD_PAGE_FAULT,
                     LOAD_ACCESS_FAULT,
                     STORE_AMO_PAGE_FAULT,
                     STORE_AMO_ACCESS_FAULT,
-                    INSTRUCTION_PAGE_FAULT,
                     LOAD_ADDRESS_MISALIGNED,
-                    INSTRUCTION_ACCESS_FAULT,
-                    STORE_AMO_ADDRESS_MISALIGNED,
-                    INSTRUCTION_ADDRESS_MISALIGNED: mtval <= pc_i;
+                    STORE_AMO_ADDRESS_MISALIGNED:   mtval <= mem_address_i;
+                    INSTRUCTION_ADDRESS_MISALIGNED: mtval <= jump_target_i;
+                    BREAKPOINT,
+                    INSTRUCTION_PAGE_FAULT,
+                    INSTRUCTION_ACCESS_FAULT:       mtval <= pc_i;
                     ILLEGAL_INSTRUCTION:            mtval <= instruction_i;
                     default:                        mtval <= '0;
                 endcase
