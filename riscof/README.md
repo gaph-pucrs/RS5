@@ -82,18 +82,20 @@ E.g., run *extensions* with branch prediction and without forwarding:
 BRANCHPRED=1 FORWARDING=0 make extensions
 ```
 
-The `WORK_DIR` controls the output directory of tests.
-The default is `./riscof_work`, but you may need to change if you do not want a lot of files being generated in this
+The `WORK_DIR` controls the base output directory of tests.
+*baseline* outputs to `$WORK_DIR/baseline_work`, and *extensions* outputs to `$WORK_DIR/extensions_work`.
+The default is `.`, but you may need to change if you do not want a lot of files being generated in this
 repo's folder.
 E.g., to change `WORK_DIR` to `/tmp`:
 ```
-WORK_DIR=/tmp/riscof_work make
+WORK_DIR=/tmp make
 ```
 
-At the end of the suite, a `report.html` is generated at the `WORK_DIR`.
-To view the report in browser, run `make report`.
+At the end of the suite, a `report.html` is generated at the `WORK_DIR/<isa>_work`.
+To view the report in browser, run `make report-baseline` or `make report-extensions`.
+It is also possible to open both reports with `make report-all`.
 This report contains the tests that passed and failed.
 When a test fails, it shows the lines where its dumped memory contents differ.
-To see more details of the test, check the `WORK_DIR/rv32i_m` folder containing the desired test.
+To see more details of the test, check the `WORK_DIR/<isa>_work/rv32i_m` folder containing the desired test.
 The `ref` subfolder contains a `.disass` file with the disassembled test binary, and a `.log` with an step-by-step execution log by the gold model.
 Both `ref` and `dut` folders contain a `.signature` that holds the test output and must match for the test to pass.

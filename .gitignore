@@ -41,6 +41,6 @@ sim/obj_dir
 *.fst
 *.dcp
 .vscode
-riscof/riscof_work
+riscof/*_work
 riscof/**/__pycache__
 riscof/riscv-arch-test
