@@ -2,7 +2,7 @@
 
 ## Description
 
-RS5 is a processor that implements the RISC-V 32 bits integer Module (RV32I) alongside the M, A, C, V, Zkne and Zicsr Extensions, as well as the Machine Mode of the RISC-V Privileged Architecture. It is written in the SystemVerilog Hardware Description Language (HDL) and implements the following interface:
+RS5 is a processor that implements the RISC-V 32 bits integer Module (RV32I) alongside the M, A, C, V, Zicond, Zcb, Zkne and Zicsr Extensions, as well as the Machine Mode of the RISC-V Privileged Architecture. It is written in the SystemVerilog Hardware Description Language (HDL) and implements the following interface:
 
 <img src="imgs/RS5_Interface.png" alt="Processor Interface">
 
@@ -27,20 +27,20 @@ The processor is a 4 stage pipeline, synchronized to the rising edge of the cloc
 This processor organization is an evolution of an Asynchronous RISC-V High-level Functional Model written in GO language. That can be found in the [ARV Go High-level Functional Model](https://github.com/marlls1989/arv) repository.
 
 - First Stage - Instruction Fetch:
-This stage is the Instruction Fetch Stage and is implemented by the [Fetch Unit](https://github.com/gaph-pucrs/RS5/blob/master/rtl/fetch.sv), this unit contains the Program Counter (PC) logic, the value contained in this register is used to index the instruction memory, at each clock cycle it is updated, it can be updated to the next instruction address (PC+4 or PC+2), or a branch address, it can also maintain the same address in case of a bubble being inserted due to a detection of a data hazard or memory stall. For the C extension, it implements an instruction decompresser, which will transform a compressed instruction into its uncompressed equivalent. It also handles any misaligned memory accesses that happen when using compressed instructions.
+This stage is the Instruction Fetch Stage and is implemented by the [Fetch Unit](./rtl/fetch.sv), this unit contains the Program Counter (PC) logic, the value contained in this register is used to index the instruction memory, at each clock cycle it is updated, it can be updated to the next instruction address (PC+4 or PC+2), or a branch address, it can also maintain the same address in case of a bubble being inserted due to a detection of a data hazard or memory stall. For the C extension, it implements an instruction decompresser, which will transform a compressed instruction into its uncompressed equivalent. It also handles any misaligned memory accesses that happen when using compressed instructions.
 
 - Second Stage - Instruction Decode:
-It comprehends the [Decoder Unit](https://github.com/gaph-pucrs/RS5/blob/master/rtl/decode.sv), It is responsible for the generation of the control signals, based on the instruction object code fetched by the previous stage. It identifies the instruction operation (e.g. addi, bne) that is implemented in a one-hot encoding. It also decodes the instruction format (e.g. Immediate, Branch). Also sends to the register bank the read addresses that are directly extracted from the instruction object code, the object code is also used for the immediate operand extraction, based on the instruction format. The instruction format also determines the operands that will be sent to the next stage. The Data Hazard Detection mechanism is implemented by this unit, it tracks the destination register (regD) of the instruction that currently is in execute stage, this register is called the "locked register", its value is updated every time that an instruction leaves the stage. A Data Hazard is detected when the instruction being processed by the decoding stage has an operator that must be read from the blocked register, this issues a signal called "hazard" that indicates that a bubble must be issued until the data conflict gets resolved. This unit also looks for data memory hazards, cases where a read is performed right after a write in the memory. Data Hazards are resolved by forwarding the result from the execute unit.
+It comprehends the [Decoder Unit](./rtl/decode.sv), It is responsible for the generation of the control signals, based on the instruction object code fetched by the previous stage. It identifies the instruction operation (e.g. addi, bne) that is implemented in a one-hot encoding. It also decodes the instruction format (e.g. Immediate, Branch). Also sends to the register bank the read addresses that are directly extracted from the instruction object code, the object code is also used for the immediate operand extraction, based on the instruction format. The instruction format also determines the operands that will be sent to the next stage. The Data Hazard Detection mechanism is implemented by this unit, it tracks the destination register (regD) of the instruction that currently is in execute stage, this register is called the "locked register", its value is updated every time that an instruction leaves the stage. A Data Hazard is detected when the instruction being processed by the decoding stage has an operator that must be read from the blocked register, this issues a signal called "hazard" that indicates that a bubble must be issued until the data conflict gets resolved. This unit also looks for data memory hazards, cases where a read is performed right after a write in the memory. Data Hazards are resolved by forwarding the result from the execute unit.
 The locked register value is used for indexing the register that must receive the write-back data from the retire unit.
 The decoder also implements Branch Prediction, which predicts a branch as taken when the immediate is negative (backwards branch).
 If the branch or jump has been confirmed, the following instructions are killed until the jump is finished, and the decode unit will send NOP instructions to the execute stage.
 
 - Third Stage - Instruction Execution:
-This stage comprehends the Instruction Execution Stage that is implemented by the [Execute Unit](https://github.com/gaph-pucrs/RS5/blob/master/rtl/execute.sv), It implements an Arithmetic Logic Unit (ALU) responsible for calculations, and it also has a Branch Unit that makes the decision of branching based on instruction operation and operands. Also implements the Memory Load and Store mechanism. Lastly, it implements the CSR access logic.
+This stage comprehends the Instruction Execution Stage that is implemented by the [Execute Unit](./rtl/execute.sv), It implements an Arithmetic Logic Unit (ALU) responsible for calculations, and it also has a Branch Unit that makes the decision of branching based on instruction operation and operands. Also implements the Memory Load and Store mechanism. Lastly, it implements the CSR access logic.
 For the M extension, it implements all the multiplication (4-5 cycles) and division instructions. It also implements all the atomic instructions, which can be separated into the Zalrsc and Zaamo sub-extensions.
 
 Fourth Stage:
-This is the last stage and it is responsible for the write-back of the instructions data, it is implemented by the [Retire Unit](https://github.com/gaph-pucrs/RS5/blob/master/rtl/retire.sv) and is responsible for closing the loops. It performs the write-back on the register bank. It also receives the data read from memory and process it based on instruction operation, then it decides which data should be sent to the register bank, either the data from memory or the data from execute unit. If the instruction is an atomic LR.W instruction, it will save the data read from memory into the registration set.
+This is the last stage and it is responsible for the write-back of the instructions data, it is implemented by the [Retire Unit](./rtl/retire.sv) and is responsible for closing the loops. It performs the write-back on the register bank. It also receives the data read from memory and process it based on instruction operation, then it decides which data should be sent to the register bank, either the data from memory or the data from execute unit. If the instruction is an atomic LR.W instruction, it will save the data read from memory into the registration set.
 
 ### The three loops
 
@@ -59,25 +59,28 @@ The processor implements The memory interface depicted in the above image. The M
 
 ## Requirements
 
-To perform code compilation the RISC-V toolchain is needed. The toolchain has a compiler that performs the compilation of the applications codes that are written in C language and generates a binary, this binary is the entry of the processor simulation. The applications are located in [app/](https://github.com/gaph-pucrs/RS5/tree/master/app).
+To perform code compilation the RISC-V toolchain is needed. The toolchain has a compiler that performs the compilation of the applications codes that are written in C language and generates a binary, this binary is the entry of the processor simulation. The applications are located in [app/](./app).
 
 The installation of the toolchain is only needed if you want to compile new applications or change parameters in the given ones.
 
-To install the Toolchain a guide and a script are provided inside the folder [tools/riscv-toolchain](https://github.com/gaph-pucrs/RS5/tree/master/tools/riscv-toolchain).
+To install the Toolchain a guide and a script are provided [here](https://github.com/gaph-pucrs/Memphis-V/blob/master/docs/riscv.md).
 
-To perform the simulation you must have a HDL simulator (e.g. XCELIUM, MODELSIM). To perform the simulation of a specific application, you must edit the binary input file in the [RAM_mem.sv](https://github.com/gaph-pucrs/RS5/blob/master/sim/RAM_mem.sv). The testbench and the ram implementation are located in the [/sim](https://github.com/gaph-pucrs/RS5/tree/master/sim) folder. Once the desired application is selected and the testbench is pointing to it, then you are able to perform the simulation using the HDL simulator.
+To perform the simulation you must have a HDL simulator (e.g. XCELIUM, MODELSIM). To perform the simulation of a specific application, you must edit the binary input file in the [testbench](./sim/testbench.sv). The testbench and the ram implementation are located in the [/sim](./sim) folder. Once the desired application is selected and the testbench is pointing to it, then you are able to perform the simulation using the HDL simulator.
 
 ## Applications
-In this repository, some applications that were used to validate the processor are provided. The source codes of the applications are located in the [app/](https://github.com/gaph-pucrs/RS5/tree/master/app) folder, all of them can be built using their own Makefile, which will generate the output binary of each application.
+In this repository, some applications that were used to validate the processor are provided. The source codes of the applications are located in the [app/](./app) folder, all of them can be built using their own Makefile, which will generate the output binary of each application.
 
 ### Coremark
-The [Coremark](https://github.com/gaph-pucrs/RS5/tree/master/app/coremark) is a Benchmark application that was developed by EEMBC, it was ported to run in RS5 and can be compiled by simply running the command "make" inside Coremark's folder, it will then generate a binary called "coremark.bin". In our processor, since we have only one thread we are running the coremark for only one iteration.
+[Coremark](./app/coremark) is a Benchmark application that was developed by EEMBC, it was ported to run in RS5 and can be compiled by simply running the command "make" inside Coremark's folder, it will then generate a binary called "coremark.bin". In our processor, since we have only one thread we are running the coremark for only one iteration.
 
 ### RISCV Tests
-The [riscv-tests](https://github.com/marlls1989/riscv-tests/tree/159079a82ecc332ce32e5db84aff9f814dc7ec12) is the "Berkeley Suite" that was developed to validate the RISC-V implementations. It tests all the instructions by running comparisons between the expected results and those generated by the Unit under verification.
+[riscv-tests](https://github.com/marlls1989/riscv-tests/tree/159079a82ecc332ce32e5db84aff9f814dc7ec12) is the "Berkeley Suite" that was developed to validate the RISC-V implementations. It tests all the instructions by running comparisons between the expected results and those generated by the Unit under verification.
+
+### RISCOF
+The processor supports running the RISC-V Architectural Tests with RISCOF. The [RISCOF folder](./riscof) contains the required RISCOF plugin, a Makefile to facilitate running the tests, and a README which contains more information on how to run the tests. 
 
 ### Sample Codes
-The [samplecode](https://github.com/gaph-pucrs/RS5/tree/master/app/samplecode) folder contains some simple applications that were used to test some functionalities in the processor. These applications use BareOS, which is a simple Operational System. All the applications are compiled at once by simply running the "make" command. To add more applications you must insert in the folder with the source code in C language and then edit the [Makefile](https://github.com/gaph-pucrs/RS5/blob/master/app/samplecode/Makefile) so it also compiles the new application, to do that, is just needed to edit line 13 of the Makefile by adding the name of the new application on the "PROGNAME" variable, that is a list of the applications that will be made.
+The [samplecode](./app/samplecode) folder contains some simple applications that were used to test some functionalities in the processor. These applications use BareOS, which is a simple Operational System. All the applications are compiled at once by simply running the "make" command. To add more applications you must insert in the folder with the source code in C language and then edit the [Makefile](./app/samplecode/Makefile) so it also compiles the new application, to do that, is just needed to edit line 13 of the Makefile by adding the name of the new application on the "PROGNAME" variable, that is a list of the applications that will be made.
 
 The applications provided are:
 1. Dummy - Test the halt function of the processor.
@@ -86,9 +89,9 @@ The applications provided are:
 
 ### Prototyping
 
-This processor is designed to be prototyped in FPGA environments. In the [proto/](https://github.com/gaph-pucrs/RS5/tree/master/proto) folder there is the designed environment for prototyping. The prototyping was made in a Vivado environment and the folder includes a Vivado ".xpr" project that includes all the required files for replication.
+This processor is designed to be prototyped in FPGA environments. In the [proto/](./proto) folder there is the designed environment for prototyping. The prototyping was made in a Vivado environment and the folder includes a Vivado ".xpr" project that includes all the required files for replication.
 
-The prototyping Environment is shown in the figure below. This environment is implemented by the [RS5_FPGA_Platform.sv](https://github.com/gaph-pucrs/RS5/blob/master/proto/RS5_FPGA_Platform.sv) module. This module instantiates the RS5 core and implements the memory using Block Rams, the RS5 also counts with a compiler "ifdef" macro to use a LUT RAM Register Bank to optimize FPGA resource usage. There is a module that implements the core peripherals that will be discussed in the next subsection. The peripheral access is made through the data memory interface and the peripherals are mapped in memory in addresses that are higher than the memory length, that in this case is 64Kbs.
+The prototyping Environment is shown in the figure below. This environment is implemented by the [RS5_FPGA_Platform.sv](./proto/RS5_FPGA_Platform.sv) module. This module instantiates the RS5 core and implements the memory using Block Rams, the RS5 also counts with a compiler "ifdef" macro to use a LUT RAM Register Bank to optimize FPGA resource usage. There is a module that implements the core peripherals that will be discussed in the next subsection. The peripheral access is made through the data memory interface and the peripherals are mapped in memory in addresses that are higher than the memory length, that in this case is 64Kbs.
 <img src="imgs/RS5_Environment.png" alt="Environment Diagram">
 > RS5 Environment DIAGRAM.
 
@@ -110,26 +113,26 @@ The Environment counts with a universal asynchronous receiver-transmitter (UART)
 
 ## How to Simulate
 
-The simulation is performed inside the [/Sim Folder](https://github.com/gaph-pucrs/RS5/blob/master/sim/). This folder contains the [testbench.sv](https://github.com/gaph-pucrs/RS5/blob/master/sim/testbench.sv) that instantiates the processor core and runs the simulation. It also has a wave configuration file and some scripts for simulating via the command line in different simulators.
+The simulation is performed inside the [/Sim Folder](./sim/). This folder contains the [testbench.sv](./sim/testbench.sv) that instantiates the processor core and runs the simulation. It also has a wave configuration file and some scripts for simulating via the command line in different simulators.
 
-Initially it would be necessary to have the desired application compiled as a binary file, for that you should have the Risc-V Toolchain installed. The section "Requirements" describe how you can install the toolchain in your system. To compile the binary file you should run the makefile on the desired folder, there are several applications provided inside the [App Folder](https://github.com/gaph-pucrs/RS5/blob/master/app/) as described in the above "Applications" section.
+Initially it would be necessary to have the desired application compiled as a binary file, for that you should have the Risc-V Toolchain installed. The section "Requirements" describe how you can install the toolchain in your system. To compile the binary file you should run the makefile on the desired folder, there are several applications provided inside the [App Folder](./app/) as described in the above "Applications" section.
 
-After the binary file is compiled, you should edit the binary file path on the [RAM_mem.sv](https://github.com/gaph-pucrs/RS5/blob/master/sim/RAM_mem.sv) file. This module initializes the RAM with the specified binary file contents. The repository file points to the Berkeley suite application that tests every instruction of the core using relative paths.
+After the binary file is compiled, you should edit the binary file path on the [RAM_mem.sv](./sim/RAM_mem.sv) file. This module initializes the RAM with the specified binary file contents. The repository file points to the Berkeley suite application that tests every instruction of the core using relative paths.
 
-On the [/Sim Folder](https://github.com/gaph-pucrs/RS5/blob/master/sim/) with the correct path specified on the RAM, you are now able to simulate the core on the following simulators:
+On the [/Sim Folder](./sim/) with the correct path specified on the RAM, you are now able to simulate the core on the following simulators:
 
-For Modelsim/Questa, the [sim.do](https://github.com/gaph-pucrs/RS5/blob/master/sim/RAM_mem.sv) script file is provided and simplifies the process of simulating using the command line. for that you can just run the command: `vsim -c -do sim.do`.
+For Modelsim/Questa, the [sim.do](./sim/RAM_mem.sv) script file is provided and simplifies the process of simulating using the command line. for that you can just run the command: `vsim -c -do sim.do`.
 
-For Xcelium simulator, the [sim.xrun](https://github.com/gaph-pucrs/RS5/blob/master/sim/RAM_mem.sv) script file is provided. To run via Xcelium you can run the command `xrun -f sim.xrun`.
+For Xcelium simulator, the [sim.xrun](./sim/RAM_mem.sv) script file is provided. To run via Xcelium you can run the command `xrun -f sim.xrun`.
 
 For Verilator you can run the commands: `verilator --cc testbench.sv --exe tb_top_verilator.cpp --build --Wall` followed by `./obj_dir/Vtestbench`.
 Or simply run `make` to verilate and simulate.
 
 ## How to Prototype on FPGA
 
-The [Proto Folder](https://github.com/gaph-pucrs/RS5/blob/master/proto/) provides all the files needed for the FPGA prototype. To load the application on the Block RAM (BRAM) run you will need the application binary file as described in the previous section. The BRAM is loaded using a ".coe" file. To generate the coe file a python script is provided in the [init_mem.py](https://github.com/gaph-pucrs/RS5/blob/master/proto/init_mem.py) file. The script input file path should point to the application binary file, after running the script via the `python3 init_mem.py` command it will generate the ".coe" file for the given application, you can also edit the output ".coe" file name.
+The [Proto Folder](./proto/) provides all the files needed for the FPGA prototype. To load the application on the Block RAM (BRAM) run you will need the application binary file as described in the previous section. The BRAM is loaded using a ".coe" file. To generate the coe file a python script is provided in the [init_mem.py](./proto/init_mem.py) file. The script input file path should point to the application binary file, after running the script via the `python3 init_mem.py` command it will generate the ".coe" file for the given application, you can also edit the output ".coe" file name.
 
-A Vivado project is provided in the [RS5.xpr](https://github.com/gaph-pucrs/RS5/blob/master/proto/RS5/RS5.xpr) file that can be imported into VIVADO. This project already points to all the processor, environment and FPGA IP files. After opening the project the processor should be ready for synthesis and implementation in a Xilinx Nexys A7 FPGA board. The ".coe" file should is automatically loaded by the BRAM IP but **you must reset output products** in Vivado every time you re-generate the ".coe" file. After running the synthesis you can generate the bitstream and then you should connect the FPGA board to your computer and then program the device, after these steps then the processor will be running in the FPGA board. To be able to capture the processor output you can either use VIVADO tools or use a serial port emulator such as Teraterm or PUTTY on Windows or running the `tio /dev/ttyUSB1 -b 115200 --map ICRNL,INLCRNL` command on Linux.
+A Vivado project is provided in the [RS5.xpr](./proto/RS5/RS5.xpr) file that can be imported into VIVADO. This project already points to all the processor, environment and FPGA IP files. After opening the project the processor should be ready for synthesis and implementation in a Xilinx Nexys A7 FPGA board. The ".coe" file should is automatically loaded by the BRAM IP but **you must reset output products** in Vivado every time you re-generate the ".coe" file. After running the synthesis you can generate the bitstream and then you should connect the FPGA board to your computer and then program the device, after these steps then the processor will be running in the FPGA board. To be able to capture the processor output you can either use VIVADO tools or use a serial port emulator such as Teraterm or PUTTY on Windows or running the `tio /dev/ttyUSB1 -b 115200 --map ICRNL,INLCRNL` command on Linux.
 
 ## References
 
