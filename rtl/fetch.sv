@@ -21,7 +21,7 @@
 module fetch  
     import RS5_pkg::*;
 #(
-    parameter     start_address = 32'b0,
+    parameter       start_address = 32'b0,
     parameter bit   COMPRESSED = 1'b0,
     parameter bit   BRANCHPRED = 1'b1,    
     parameter mul_e MULEXT     = MUL_M,
