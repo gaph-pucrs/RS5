@@ -160,12 +160,10 @@ module div
             rem_result_o = first_operand_i;
         else if (overflow || divide_by_one)
             rem_result_o = '0;
-        else if (sign_a)
-            rem_result_o = {1'b1, -acc[N-1:1]};
         else if (div_result == '0)
             rem_result_o = first_operand_i;
         else
-            rem_result_o = {1'b0, acc[N-1:1]};
+            rem_result_o = {sign_a && (acc[N-1:1] != '0), sign_a ? -acc[N-1:1] : acc[N-1:1]};
     end
 
     assign hold_o = (start | busy);

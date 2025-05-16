@@ -2,6 +2,10 @@
     
 module decompresser 
     import RS5_pkg::*;
+#(
+    parameter mul_e MULEXT    = MUL_M,
+    parameter bit   ZCBEnable = 1'b0
+)
 (
     input  logic [15:0] instruction_i,
     output logic [31:0] instruction_o
@@ -9,16 +13,20 @@ module decompresser
 
     logic [1:0]  op;
     logic [3:0]  funct4;
+    logic [5:0]  funct6;
     logic [2:0]  funct3;
     logic [1:0]  funct2;
-    logic [1:0]  funct;
+    logic [2:0]  zcb_funct;
 
     logic [11:0] CIW_imm;
     logic [4:0]  CIW_rd;
 
     logic [11:0] lw_sw_imm;
-    logic [4:0]  lw_sw_rs1;
-    logic [4:0]  lw_sw_rs2;
+    logic [4:0]  lsu_rs1;
+    logic [4:0]  lsu_rs2;
+
+    logic [11:0] lsu_zcb_imm;
+    logic [11:0] lh_zcb_imm;
 
     logic [19:0] CJ_imm;
     logic [4:0]  CJ_rd;
@@ -43,11 +51,12 @@ module decompresser
 
     logic [31:0] expansion_C0, expansion_C1, expansion_C2;
 
-    assign op     = instruction_i[1:0];
-    assign funct4 = instruction_i[15:12];
-    assign funct3 = instruction_i[15:13];
-    assign funct2 = instruction_i[11:10];
-    assign funct  = instruction_i[6:5];
+    assign op        = instruction_i[1:0];
+    assign funct4    = instruction_i[15:12];
+    assign funct6    = instruction_i[15:10];
+    assign funct3    = instruction_i[15:13];
+    assign funct2    = instruction_i[6:5];
+    assign zcb_funct = instruction_i[4:2];
 
     always_comb begin
         unique case (op)
@@ -65,8 +74,16 @@ module decompresser
 
     // C.LW and C.SW
     assign lw_sw_imm = {5'b00000, instruction_i[5], instruction_i[12:10], instruction_i[6], 2'b00};
-    assign lw_sw_rs1 = {2'b01, instruction_i[9:7]};
-    assign lw_sw_rs2 = {2'b01, instruction_i[4:2]};
+
+    // Registers for load/store instructions
+    assign lsu_rs1 = {2'b01, instruction_i[9:7]};
+    assign lsu_rs2 = {2'b01, instruction_i[4:2]};
+
+    // C.LBU, C.SB, C.SH
+    assign lsu_zcb_imm = {10'b0, instruction_i[5], instruction_i[6]};
+
+    // C.LHU, C.LH
+    assign lh_zcb_imm = {10'b0, instruction_i[5], 1'b0};
 
     // C.J and C.JAL
     assign CJ_imm = {
@@ -104,37 +121,44 @@ module decompresser
 
     /* op = C0 */
 
+    logic [31:0] expansion_zcb0;
+
     always_comb begin
-        unique case (funct3)
+        unique case (funct3) inside
             3'b000:  expansion_C0 = {CIW_imm, 5'h02, 3'b000, CIW_rd, 7'b0010011}; /* C.ADDI4SPN */
-            3'b010:  expansion_C0 = {lw_sw_imm, lw_sw_rs1, 3'b010, lw_sw_rs2, 7'b0000011}; /* C.LW */
-            3'b110:  expansion_C0 = {lw_sw_imm[11:5], lw_sw_rs2, lw_sw_rs1, 3'b010, lw_sw_imm[4:0], 7'b0100011}; /* C.SW */
+            3'b010:  expansion_C0 = {lw_sw_imm, lsu_rs1, 3'b010, lsu_rs2, 7'b0000011}; /* C.LW */
+            3'b110:  expansion_C0 = {lw_sw_imm[11:5], lsu_rs2, lsu_rs1, 3'b010, lw_sw_imm[4:0], 7'b0100011}; /* C.SW */
+            3'b100:  expansion_C0 = expansion_zcb0; /* C.LBU C.LH(U) C.SB, C.SH */
             default: expansion_C0 = '0;
         endcase
     end
 
     /* op = C1 */
 
+    logic [31:0] expansion_zcb1;
+
     always_comb begin
-        unique case ({funct3, funct2, funct}) inside
-            7'b000????: expansion_C1 = {{6{CI_imm[5]}}, CI_imm, CI_rd, 3'b000, CI_rd, 7'b0010011}; /* C.ADDI, C.NOP */
-            7'b001????: expansion_C1 = {CJ_imm, CJ_rd, 7'b1101111}; /* C.JAL */
-            7'b101????: expansion_C1 = {CJ_imm, CJ_rd, 7'b1101111}; /* C.J */
-            7'b010????: expansion_C1 = {{6{CI_imm[5]}}, CI_imm, 5'b00000, 3'b000, CI_rd, 7'b0010011}; /* C.LI */
-            7'b011????: begin
+        unique case ({funct6, funct2}) inside
+            8'b000?????: expansion_C1 = {{6{CI_imm[5]}}, CI_imm, CI_rd, 3'b000, CI_rd, 7'b0010011}; /* C.ADDI, C.NOP */
+            8'b001?????: expansion_C1 = {CJ_imm, CJ_rd, 7'b1101111}; /* C.JAL */
+            8'b101?????: expansion_C1 = {CJ_imm, CJ_rd, 7'b1101111}; /* C.J */
+            8'b010?????: expansion_C1 = {{6{CI_imm[5]}}, CI_imm, 5'b00000, 3'b000, CI_rd, 7'b0010011}; /* C.LI */
+            8'b011?????: begin
                 expansion_C1 = (CI_rd == 5'd2)
                     ? {{3{CI_imm[5]}}, CI_imm[2:1], CI_imm[3], CI_imm[0], CI_imm[4], 4'b0000, CI_rd, 3'b000, CI_rd, 7'b0010011} /* C.ADDI16SP */
                     : {{14{CI_imm[5]}}, CI_imm, CI_rd, 7'b0110111}; /* C.LUI */
             end
-            7'b110????: expansion_C1 = {branch_imm[11:5], 5'b00000, branch_rs1, 3'b000, branch_imm[4:0], 7'b1100011}; /* C.BEQZ */
-            7'b111????: expansion_C1 = {branch_imm[11:5], 5'b00000, branch_rs1, 3'b001, branch_imm[4:0], 7'b1100011}; /* C.BNEZ */
-            7'b10000??: expansion_C1 = {7'b0000000, CB_imm[4:0], CB_rd, 3'b101, CB_rd, 7'b0010011}; /* C.SRLI */
-            7'b10001??: expansion_C1 = {7'b0100000, CB_imm[4:0], CB_rd, 3'b101, CB_rd, 7'b0010011}; /* C.SRAI */
-            7'b10010??: expansion_C1 = {{6{CB_imm[5]}}, CB_imm, CB_rd, 3'b111, CB_rd, 7'b0010011}; /* C.ANDI */
-            7'b1001111: expansion_C1 = {7'b0000000, CS_rs2, CS_rs1, 3'b111, CS_rs1, 7'b0110011}; /* C.AND */
-            7'b1001110: expansion_C1 = {7'b0000000, CS_rs2, CS_rs1, 3'b110, CS_rs1, 7'b0110011}; /* C.OR */
-            7'b1001101: expansion_C1 = {7'b0000000, CS_rs2, CS_rs1, 3'b100, CS_rs1, 7'b0110011}; /* C.XOR */
-            7'b1001100: expansion_C1 = {7'b0100000, CS_rs2, CS_rs1, 3'b000, CS_rs1, 7'b0110011}; /* C.SUB */
+            8'b110?????: expansion_C1 = {branch_imm[11:5], 5'b00000, branch_rs1, 3'b000, branch_imm[4:0], 7'b1100011}; /* C.BEQZ */
+            8'b111?????: expansion_C1 = {branch_imm[11:5], 5'b00000, branch_rs1, 3'b001, branch_imm[4:0], 7'b1100011}; /* C.BNEZ */
+            8'b100?00??: expansion_C1 = {7'b0000000, CB_imm[4:0], CB_rd, 3'b101, CB_rd, 7'b0010011}; /* C.SRLI */
+            8'b100?01??: expansion_C1 = {7'b0100000, CB_imm[4:0], CB_rd, 3'b101, CB_rd, 7'b0010011}; /* C.SRAI */
+            8'b100?10??: expansion_C1 = {{6{CB_imm[5]}}, CB_imm, CB_rd, 3'b111, CB_rd, 7'b0010011}; /* C.ANDI */
+            8'b1001111?: expansion_C1 = expansion_zcb1; /* C.ZEXT.B, C.NOT, C.MUL */
+            8'b10001111: expansion_C1 = {7'b0000000, CS_rs2, CS_rs1, 3'b111, CS_rs1, 7'b0110011}; /* C.AND */
+            8'b10001110: expansion_C1 = {7'b0000000, CS_rs2, CS_rs1, 3'b110, CS_rs1, 7'b0110011}; /* C.OR */
+            8'b10001101: expansion_C1 = {7'b0000000, CS_rs2, CS_rs1, 3'b100, CS_rs1, 7'b0110011}; /* C.XOR */
+            8'b10001100: expansion_C1 = {7'b0100000, CS_rs2, CS_rs1, 3'b000, CS_rs1, 7'b0110011}; /* C.SUB */
+            default:     expansion_C1 = '0;
         endcase
     end
 
@@ -163,6 +187,33 @@ module decompresser
             end
             default: expansion_C2 = '0;
         endcase
+    end
+
+    /* Zcb instructions */
+
+    if (ZCBEnable) begin : gen_zcb_on
+        always_comb begin
+            unique case ({funct2, zcb_funct}) inside
+                5'b10???: expansion_zcb1 = (MULEXT != MUL_OFF) ? {7'b0000001, CS_rs2, CS_rs1, 3'b000, CS_rs1, 7'b0110011} : '0; /* C.MUL */
+                5'b11101: expansion_zcb1 = {4'b1111, 8'hff, CB_rd, 3'b100, CB_rd, 7'b0010011};  /* C.NOT */
+                5'b11000: expansion_zcb1 = {4'b0000, 8'hff, CB_rd, 3'b111, CB_rd, 7'b0010011}; /* C.ZEXT.B */
+                default:  expansion_zcb1 = '0;
+            endcase
+        end
+
+        always_comb begin
+            unique case (instruction_i[12:10]) inside
+                3'b000:  expansion_zcb0 = {lsu_zcb_imm, lsu_rs1, 3'b100, lsu_rs2, 7'b0000011}; /* C.LBU */
+                3'b001:  expansion_zcb0 = {lh_zcb_imm,  lsu_rs1, {~instruction_i[6], 2'b01}, lsu_rs2, 7'b0000011}; /* C.LHU, C.LH */
+                3'b010:  expansion_zcb0 = {lsu_zcb_imm[11:5], lsu_rs2, lsu_rs1, 3'b000, lsu_zcb_imm[4:0], 7'b0100011}; /* C.SB */
+                3'b011:  expansion_zcb0 = {lsu_zcb_imm[11:5], lsu_rs2, lsu_rs1, 3'b001, lsu_zcb_imm[4:0], 7'b0100011}; /* C.SH */
+                default: expansion_zcb0 = '0;
+            endcase
+        end
+    end
+    else begin : gen_zcb_off
+        assign expansion_zcb1 = '0;
+        assign expansion_zcb0 = '0;
     end
 
 endmodule
