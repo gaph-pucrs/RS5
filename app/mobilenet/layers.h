@@ -11,6 +11,7 @@
     #define CONV1_FEATUREMAP_HEIGHT     112
     #define CONV1_FEATUREMAP_WIDTH      112
     #define CONV1_FILTERS                32
+    #define CONV1_MULTIPLIER           1024
 
 //------------------------------
 //          BLOCK 1

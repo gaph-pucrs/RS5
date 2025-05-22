@@ -1,12 +1,33 @@
 #include <stdio.h>
+#include <stdint.h> 
 #include <stdlib.h>
 #include <math.h>
+#include <fenv.h>
 
 #include "params/data.h"
 #include "layers.h"
 #include "weights.h"
 
-#define type    int
+// #define type    float
+// #define MULTIPLIER   1000
+
+void clear_reg() {
+    int r = FE_INEXACT      |
+            FE_DIVBYZERO    |
+            FE_UNDERFLOW    |
+            FE_OVERFLOW     |
+            FE_INVALID;
+
+    feclearexcept(r);
+}
+
+void print_reg() {
+    printf("\nException FE_INEXACT:     %d\n", (fetestexcept(FE_INEXACT))    ? 1 : 0);
+    printf("Exception FE_DIVBYZERO:   %d\n",   (fetestexcept(FE_DIVBYZERO))  ? 1 : 0);
+    printf("Exception FE_UNDERFLOW:   %d\n",   (fetestexcept(FE_UNDERFLOW))  ? 1 : 0);
+    printf("Exception FE_OVERFLOW:    %d\n",   (fetestexcept(FE_OVERFLOW))   ? 1 : 0);
+    printf("Exception FE_INVALID:     %d\n",   (fetestexcept(FE_INVALID))    ? 1 : 0);
+}
 
 // general use functions
 type clamp(const type x, const type max, const type min) {
@@ -22,10 +43,17 @@ void print(const type in[], const int h, const int w, const int c) {
             for (int k=0; k<c; k++)
             {
                 int idx= (k)+((j)*(c))+((i)*(c)*(w));
-                printf("%.10lf\n", in[idx]);
+                #ifdef MULTIPLIER
+                    printf("%d\n", in[idx]);
+                #else
+                    printf("%.10lf\n", in[idx]);
+                #endif
             }
         }
     }
+    
+    printf("\n");
+    print_reg();
 }
 
 // full pad (border of 0's)
@@ -84,40 +112,23 @@ void batch_normalization (
     const type beta[],
     const type eps
 ) {
-    #ifdef INT_HANDLER
-        for (int i=0; i<HEIGHT; i++) 
+    for (int i=0; i<HEIGHT; i++) 
+    {
+        for (int j=0; j<WIDTH; j++) 
         {
-            for (int j=0; j<WIDTH; j++) 
+            for (int n=0; n<CHANNELS; n++) 
             {
-                for (int n=0; n<CHANNELS; n++) 
-                {
-                    int id = (n) + (j*CHANNELS) + (i*CHANNELS*WIDTH);
-                    in[id] -= mean[n];
-                    // in[id] /= sqrt(var[n]*1000 + 1000*eps);
-                    in[id] /= sqrt(var[n] + eps);
-                    in[id] *= gamma[n];
-                    // in[id] /= 1000;
-                    in[id] /= sqrt(1000);
-                    in[id] += beta[n];
-                }
+                int id = (n) + (j*CHANNELS) + (i*CHANNELS*WIDTH);
+                in[id] -= mean[n];
+                in[id] /= sqrt(var[n] + eps);
+                in[id] *= gamma[n];
+                #ifdef MULTIPLIER
+                    in[id] /= (type)(sqrt(MULTIPLIER));
+                #endif
+                in[id] += beta[n];
             }
         }
-    #else
-        for (int i=0; i<HEIGHT; i++) 
-        {
-            for (int j=0; j<WIDTH; j++) 
-            {
-                for (int n=0; n<CHANNELS; n++) 
-                {
-                    int id = (n) + (j*CHANNELS) + (i*CHANNELS*WIDTH);
-                    in[id] -= mean[n];
-                    in[id] /= sqrt(var[n] + eps);
-                    in[id] *= gamma[n];
-                    in[id] += beta[n];
-                }
-            }
-        }
-    #endif
+    }
 }
 
 void relu (
@@ -153,30 +164,19 @@ void avg_pooling (
     }
 }
 
-// ???????????????????
 void softmax (
     const int len,
     const type in[],
     type out[]
 ) {
     type sum = 0;
-    #ifdef INT_HANDLER
-        for (int i=0; i<len; i++) {
-            sum += exp(((1.0)*in[i])/1000);
-        }
+    for (int i=0; i<len; i++) {
+        sum += exp(in[i]);
+    }
 
-        for (int i=0; i<len; i++) {
-            out[i] = exp(((1.0)*in[i])/1000)/sum;
-        }
-    #else 
-        for (int i=0; i<len; i++) {
-            sum += exp(in[i]);
-        }
-
-        for (int i=0; i<len; i++) {
-            out[i] = exp(in[i])/sum;
-        }
-    #endif
+    for (int i=0; i<len; i++) {
+        out[i] = exp(in[i])/sum;
+    }
 }
 
 void _conv_block (
@@ -217,9 +217,6 @@ void _conv_block (
                             int idx_w = (n)+(m*OUTPUT_CHANNELS)+(j*OUTPUT_CHANNELS*INPUT_CHANNELS)+(i*OUTPUT_CHANNELS*INPUT_CHANNELS*kernel_size);
                             int idx_out = (n)+(l*OUTPUT_CHANNELS)+(k*OUTPUT_CHANNELS*OUTPUT_WIDTH);
                             out[idx_out] += in[idx_i]*weights[idx_w];
-                            #ifdef INT_HANDLER
-                                out[idx_out] /= 1000;
-                            #endif
                         }
                     }
                 }
@@ -229,11 +226,11 @@ void _conv_block (
         base_y += stride*INPUT_CHANNELS*INPUT_WIDTH;
     }
 
-    // #ifdef INT_HANDLER
-    //     for (int i=0; i<OUTPUT_CHANNELS*OUTPUT_WIDTH*OUTPUT_HEIGHT; i++) {
-    //         out[i] /= 1000;
-    //     }
-    // #endif 
+    #ifdef MULTIPLIER
+        for (int i=0; i<OUTPUT_CHANNELS*OUTPUT_WIDTH*OUTPUT_HEIGHT; i++) {
+            out[i] /= (MULTIPLIER);
+        }
+    #endif
 
     #ifdef BATCHNORMALIZATION
         batch_normalization (
@@ -249,11 +246,18 @@ void _conv_block (
         );
     #endif
 
-    #ifdef INT_HANDLER
-        relu(6000, out, OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS);
+    #ifdef MULTIPLIER
+        relu(6*MULTIPLIER, out, OUTPUT_CHANNELS*OUTPUT_WIDTH*OUTPUT_HEIGHT);
     #else
         relu(6.0, out, OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS);
     #endif
+
+    // relu(6.0, out, OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS);
+    // for (int i=0; i<OUTPUT_CHANNELS*OUTPUT_WIDTH*OUTPUT_HEIGHT; i++) {
+    //     printf("%f\n", out[i]);
+    // }
+
+    // return;
 }
 
 void _depthwise_conv_block (
@@ -300,9 +304,6 @@ void _depthwise_conv_block (
                         int idx_w = (m)+(j*OUTPUT_CHANNELS)+(i*OUTPUT_CHANNELS*kernel_size);
                         int idx_out = (m)+(l*OUTPUT_CHANNELS)+(k*OUTPUT_CHANNELS*OUTPUT_WIDTH);
                         out[idx_out] += in_pd[idx_i]*weights[idx_w];
-                        #ifdef INT_HANDLER
-                            out[idx_out] /= 1000;
-                        #endif
                     }
                 }
             }
@@ -311,11 +312,11 @@ void _depthwise_conv_block (
         base_y += (stride)*(INPUT_CHANNELS)*(INPUT_WIDTH+p);
     }
 
-    // #ifdef INT_HANDLER
-    //     for (int i=0; i<OUTPUT_CHANNELS*OUTPUT_WIDTH*OUTPUT_HEIGHT; i++) {
-    //         out[i] /= 1000;
-    //     }
-    // #endif
+    #ifdef MULTIPLIER
+        for (int i=0; i<OUTPUT_CHANNELS*OUTPUT_WIDTH*OUTPUT_HEIGHT; i++) {
+            out[i] /= (MULTIPLIER);
+        }
+    #endif
 
     #ifdef BATCHNORMALIZATION
         batch_normalization (
@@ -331,12 +332,13 @@ void _depthwise_conv_block (
         );
     #endif
 
-    #ifdef INT_HANDLER
-        relu(6000, out, OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS);
+    #ifdef MULTIPLIER
+        relu(6*MULTIPLIER, out, OUTPUT_CHANNELS*OUTPUT_WIDTH*OUTPUT_HEIGHT);
     #else
         relu(6.0, out, OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS);
     #endif
 
+    // relu(6.0, out, OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS);
     free(in_pd);
 }
 
@@ -392,22 +394,30 @@ void _fc (
         }
     }
 
-    #ifdef INT_HANDLER
-        for (int i=0; i<NEURONS; i++) {
-            out[i] /= 1000;
+    #ifdef MULTIPLIER
+        for (int n=0; n<NEURONS; n++) {
+            out[n] /= MULTIPLIER;
         }
     #endif
 
     for (int n=0; n<NEURONS; n++) {
         out[n] += bias[n];
     }
+
+    #ifdef MULTIPLIER
+        for (int n=0; n<NEURONS; n++) {
+            out[n] /= MULTIPLIER;
+        }
+    #endif
 }
 
 int main()
 {
-    int test_cases = 0;
-    scanf("%d", &test_cases);
-    printf("%d\n", test_cases);
+    clear_reg();
+
+    int test_cases = 1;
+    // scanf("%d", &test_cases);
+    // printf("%d\n", test_cases);
     for (int test_id=0; test_id<test_cases; test_id++)
     {
         // char *test_name = malloc(20);
@@ -458,6 +468,9 @@ int main()
     );
 
     free(img_padded);
+
+    // free(conv1_out);
+    // return 0;
 
 //------------------------------
 //          BLOCK 1
@@ -1087,27 +1100,14 @@ int main()
         probs
     );
 
-    // free(preds);
+    free(preds);
 
 //------------------------------
 //          ~ END ~
 //------------------------------
 
-    // print(probs, 1, 1, CLASSES);
-
-    int class = 0;
-    int pred = 0;
-    for (int i=0; i<CLASSES; i++) {
-        if (preds[i] > pred) {
-            pred = preds[i];
-            class = i;
-        }
-    }
-
-    free(preds);
-
-    float predf = 0.0;
     int classf = 0;
+    float predf = 0.0;
     for (int i=0; i<CLASSES; i++) {
         if (probs[i] > predf) {
             predf = probs[i];
@@ -1116,10 +1116,13 @@ int main()
         }
     }
 
-    printf("%d %d %d %f\n", class, pred, classf, predf);
+    printf("%d %f\n", classf, predf);
 
     free(probs);
     // free(img);
     // }
+
+    // print_reg();
+
     return 0;
 }

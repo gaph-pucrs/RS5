@@ -14,13 +14,14 @@ def cmp(file1, file2, output_file):
 
     with open(output_file, 'w') as out:
         for x, y in zip(x_values, y_values):
-            out.write(f"{x - y:.8f}\n")
+            out.write(f"{x/mult - y:.8f}\n")
 
-if len(sys.argv) > 1:
+if len(sys.argv) > 2:
     f = sys.argv[1]
+    mult = sys.argv[2]
     cfile = base + 'c/' + f + '.txt'
     pyfile = base + 'py/' + f + '.txt'
     out = base + 'cmp/' + f + '.txt'
     cmp(cfile, pyfile, out)
 else:
-    print(f"Usage: python err.py <filename>")
+    print(f"Usage: python err.py <filename> <multiplier>")

@@ -14,14 +14,17 @@ if len(sys.argv) > 1:
 else:
     type = 'float'
 
+multiplier = 1
+if len(sys.argv) > 2:
+    multiplier = int(sys.argv[2])
+
 x = keras.utils.img_to_array(img)
 x = preprocess_input(x)
 # x = np.pad(x, pad_width=((0,1), (0,1), (0,0)), mode='constant', constant_values=0)
 x = np.expand_dims(x, axis=0)
 
 img_input = x.flatten()
-if type == 'int':
-    img_input = [x*1000 for x in img_input]
+img_input = [x*multiplier for x in img_input]
 
 filename = "../params/data.h"
 
