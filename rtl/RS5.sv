@@ -32,6 +32,7 @@ module RS5
     parameter environment_e Environment      = ASIC,
     parameter mul_e         MULEXT           = MUL_M,
     parameter atomic_e      AMOEXT           = AMO_A,
+    parameter logic [31:0]  START_ADDR       = '0,
     parameter bit           COMPRESSED       = 1'b0,
     parameter bit           VEnable          = 1'b0,
     parameter int           VLEN             = 256,
@@ -180,8 +181,9 @@ module RS5
     logic [31:0] instruction_decode;
 
     fetch #(
-        .COMPRESSED(COMPRESSED),
-        .BRANCHPRED(BRANCHPRED)
+        .start_address(START_ADDR),
+        .COMPRESSED   (COMPRESSED),
+        .BRANCHPRED   (BRANCHPRED)
     ) fetch1 (
         .clk                  (clk                ),
         .reset_n              (reset_n            ),
