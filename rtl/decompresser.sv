@@ -16,7 +16,6 @@ module decompresser
     logic [5:0]  funct6;
     logic [2:0]  funct3;
     logic [1:0]  funct2;
-    logic [2:0]  zcb_funct;
 
     logic [11:0] CIW_imm;
     logic [4:0]  CIW_rd;
@@ -24,9 +23,6 @@ module decompresser
     logic [11:0] lw_sw_imm;
     logic [4:0]  lsu_rs1;
     logic [4:0]  lsu_rs2;
-
-    logic [11:0] lsu_zcb_imm;
-    logic [11:0] lh_zcb_imm;
 
     logic [19:0] CJ_imm;
     logic [4:0]  CJ_rd;
@@ -56,7 +52,6 @@ module decompresser
     assign funct6    = instruction_i[15:10];
     assign funct3    = instruction_i[15:13];
     assign funct2    = instruction_i[6:5];
-    assign zcb_funct = instruction_i[4:2];
 
     always_comb begin
         unique case (op)
@@ -78,12 +73,6 @@ module decompresser
     // Registers for load/store instructions
     assign lsu_rs1 = {2'b01, instruction_i[9:7]};
     assign lsu_rs2 = {2'b01, instruction_i[4:2]};
-
-    // C.LBU, C.SB, C.SH
-    assign lsu_zcb_imm = {10'b0, instruction_i[5], instruction_i[6]};
-
-    // C.LHU, C.LH
-    assign lh_zcb_imm = {10'b0, instruction_i[5], 1'b0};
 
     // C.J and C.JAL
     assign CJ_imm = {
@@ -192,6 +181,20 @@ module decompresser
     /* Zcb instructions */
 
     if (ZCBEnable) begin : gen_zcb_on
+
+        logic [11:0] lsu_zcb_imm;
+        logic [11:0] lh_zcb_imm;
+
+        logic [2:0]  zcb_funct;
+
+        // C.LBU, C.SB, C.SH
+        assign lsu_zcb_imm = {10'b0, instruction_i[5], instruction_i[6]};
+
+        // C.LHU, C.LH
+        assign lh_zcb_imm = {10'b0, instruction_i[5], 1'b0};
+
+        assign zcb_funct = instruction_i[4:2];
+
         always_comb begin
             unique case ({funct2, zcb_funct}) inside
                 5'b10???: expansion_zcb1 = (MULEXT != MUL_OFF) ? {7'b0000001, CS_rs2, CS_rs1, 3'b000, CS_rs1, 7'b0110011} : '0; /* C.MUL */
