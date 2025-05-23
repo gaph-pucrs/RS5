@@ -39,6 +39,7 @@ module RS5
     parameter bit           XOSVMEnable      = 1'b0,
     parameter bit           ZKNEEnable       = 1'b0,
     parameter bit           ZICONDEnable     = 1'b0,
+    parameter bit           ZCBEnable        = 1'b0,
     parameter bit           HPMCOUNTEREnable = 1'b0,
     parameter bit           BRANCHPRED       = 1'b1,
     parameter bit           FORWARDING       = 1'b1
@@ -182,6 +183,8 @@ module RS5
 
     fetch #(
         .start_address(START_ADDR),
+        .MULEXT       (MULEXT),
+        .ZCBEnable    (ZCBEnable),
         .COMPRESSED   (COMPRESSED),
         .BRANCHPRED   (BRANCHPRED)
     ) fetch1 (

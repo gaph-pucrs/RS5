@@ -18,10 +18,14 @@
  * on a new clock cycle or is replaced by a new address in case of a branch. 
  */
 
-module fetch  #(
-    parameter     start_address = 32'b0,
-    parameter bit COMPRESSED    = 1'b0,
-    parameter bit BRANCHPRED    = 1'b1
+module fetch  
+    import RS5_pkg::*;
+#(
+    parameter       start_address = 32'b0,
+    parameter bit   COMPRESSED = 1'b0,
+    parameter bit   BRANCHPRED = 1'b1,    
+    parameter mul_e MULEXT     = MUL_M,
+    parameter bit   ZCBEnable  = 1'b0
 )
 (
     input   logic           clk,
@@ -395,7 +399,11 @@ module fetch  #(
         end
 
         logic [31:0] instruction_decompressed;
-        decompresser decompresser (
+
+        decompresser #(
+            .MULEXT    (MULEXT),
+            .ZCBEnable (ZCBEnable)
+        ) decompresser (
             .instruction_i (instruction_built[15:0]),
             .instruction_o (instruction_decompressed)
         );

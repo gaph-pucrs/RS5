@@ -34,6 +34,7 @@ module riscof_tb
     parameter bit         ZICONDEnable     = 1'b0,
     parameter bit         HPMCOUNTEREnable = 1'b0,
     parameter bit         ZKNEEnable       = 1'b0,
+    parameter bit         ZCBEnable        = 1'b0,
     parameter bit         BRANCHPRED       = 1'b0,
     parameter bit         FORWARDING       = 1'b0
 )
@@ -145,6 +146,7 @@ module riscof_tb
         .XOSVMEnable     (USE_XOSVM       ),
         .ZKNEEnable      (ZKNEEnable      ),
         .ZICONDEnable    (ZICONDEnable    ),
+        .ZCBEnable       (ZCBEnable       ),
         .HPMCOUNTEREnable(HPMCOUNTEREnable),
         .BRANCHPRED      (BRANCHPRED      ),
         .FORWARDING      (FORWARDING      )
