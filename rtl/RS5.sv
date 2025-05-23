@@ -39,7 +39,8 @@ module RS5
     parameter bit           ZKNEEnable       = 1'b0,
     parameter bit           ZICONDEnable     = 1'b0,
     parameter bit           HPMCOUNTEREnable = 1'b0,
-    parameter bit           BRANCHPRED       = 1'b1
+    parameter bit           BRANCHPRED       = 1'b1,
+    parameter bit           FORWARDING       = 1'b1
 )
 (
     input  logic                    clk,
@@ -117,7 +118,6 @@ module RS5
     logic    [4:0]  rd_execute;
     logic    [4:0]  rs1_execute;
     logic           exc_ilegal_inst_execute;
-    logic           exc_misaligned_fetch_execute;
     logic           exc_inst_access_fault_execute;
     logic           instruction_compressed_execute;
     logic   [31:0]  vtype, vlen;
@@ -183,23 +183,25 @@ module RS5
         .COMPRESSED(COMPRESSED),
         .BRANCHPRED(BRANCHPRED)
     ) fetch1 (
-        .clk                    (clk),
-        .reset_n                (reset_n),
-        .sys_reset              (sys_reset_i),
-        .enable_i               (enable_fetch),
-        .ctx_switch_i           (ctx_switch),
-        .jump_rollback_i        (jump_rollback),
-        .ctx_switch_target_i    (ctx_switch_target),
-        .bp_take_i              (bp_take_fetch),
-        .bp_target_i            (bp_target),
-        .jumping_o              (jumping),
-        .bp_rollback_o          (bp_rollback),
-        .jump_misaligned_o      (jump_misaligned),
-        .compressed_o           (compressed_decode),
-        .instruction_address_o  (instruction_address), 
-        .instruction_data_i     (instruction_i),
-        .instruction_o          (instruction_decode),
-        .pc_o                   (pc_decode)
+        .clk                  (clk                ),
+        .reset_n              (reset_n            ),
+        .sys_reset            (sys_reset_i        ),
+        .enable_i             (enable_fetch       ),
+        .jump_i               (jump               ),
+        .jump_rollback_i      (jump_rollback      ),
+        .jump_target_i        (jump_target        ),
+        .ctx_switch_i         (ctx_switch         ),
+        .ctx_switch_target_i  (ctx_switch_target  ),
+        .bp_take_i            (bp_take_fetch      ),
+        .bp_target_i          (bp_target          ),
+        .jumping_o            (jumping            ),
+        .bp_rollback_o        (bp_rollback        ),
+        .jump_misaligned_o    (jump_misaligned    ),
+        .compressed_o         (compressed_decode  ),
+        .instruction_address_o(instruction_address), 
+        .instruction_data_i   (instruction_i      ),
+        .instruction_o        (instruction_decode ),
+        .pc_o                 (pc_decode          )
     );
 
     if (XOSVMEnable == 1'b1) begin : gen_xosvm_i_mmu_on
@@ -235,7 +237,8 @@ module RS5
         .ZKNEEnable   (ZKNEEnable  ),
         .ZICONDEnable (ZICONDEnable),
         .VEnable      (VEnable     ),
-        .BRANCHPRED   (BRANCHPRED  )
+        .BRANCHPRED   (BRANCHPRED  ),
+        .FORWARDING   (FORWARDING  )
     ) decoder1 (
         .clk                        (clk),
         .reset_n                    (reset_n),
@@ -269,6 +272,7 @@ module RS5
         .hazard_o                   (hazard),
         .killed_o                   (killed),
         .ctx_switch_i               (ctx_switch),
+        .jump_i                     (jump),
         .jumping_i                  (jumping),
         .jump_rollback_i            (jump_rollback),
         .rollback_i                 (bp_rollback),
@@ -279,8 +283,7 @@ module RS5
         .bp_target_o                (bp_target),
         .exc_inst_access_fault_i    (mmu_inst_fault),
         .exc_inst_access_fault_o    (exc_inst_access_fault_execute),
-        .exc_ilegal_inst_o          (exc_ilegal_inst_execute),
-        .exc_misaligned_fetch_o     (exc_misaligned_fetch_execute)
+        .exc_ilegal_inst_o          (exc_ilegal_inst_execute)
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -335,6 +338,7 @@ module RS5
         .Environment  (Environment ),
         .MULEXT       (MULEXT      ),
         .AMOEXT       (AMOEXT      ),
+        .COMPRESSED   (COMPRESSED  ),
         .ZKNEEnable   (ZKNEEnable  ),
         .ZICONDEnable (ZICONDEnable),
         .VEnable      (VEnable     ),
@@ -355,7 +359,6 @@ module RS5
         .vector_operation_i      (vector_operation_execute),
         .privilege_i             (privilege),
         .exc_ilegal_inst_i       (exc_ilegal_inst_execute),
-        .exc_misaligned_fetch_i  (exc_misaligned_fetch_execute),
         .exc_inst_access_fault_i (exc_inst_access_fault_execute),
         .exc_load_access_fault_i (mmu_data_fault),
         .hold_o                  (hold),
@@ -447,6 +450,7 @@ module RS5
         .machine_return_i           (MACHINE_RETURN),
         .exception_code_i           (Exception_Code),
         .pc_i                       (pc_execute),
+        .mem_address_i              (mem_address),
         .next_pc_i                  (pc_decode),
         .instruction_i              (instruction_execute),
         .instruction_compressed_i   (instruction_compressed_execute),
@@ -477,22 +481,22 @@ module RS5
 
     if (XOSVMEnable == 1'b1) begin : gen_d_mmu_on
         mmu d_mmu (
-            .en_i           (mmu_en        ),
-            .mask_i         (mvmdm         ),
-            .offset_i       (mvmdo         ),
-            .size_i         (mvmds         ),
-            .address_i      (mem_address   ),
-            .exception_o    (mmu_data_fault),
-            .address_o      (mem_address_o )
+            .en_i           (mmu_en                    ),
+            .mask_i         (mvmdm                     ),
+            .offset_i       (mvmdo                     ),
+            .size_i         (mvmds                     ),
+            .address_i      ({mem_address[31:2], 2'b00}),
+            .exception_o    (mmu_data_fault            ),
+            .address_o      (mem_address_o             )
         );
     end
     else begin : gen_d_mmu_off
         assign mmu_data_fault = 1'b0;
-        assign mem_address_o  = mem_address;
+        assign mem_address_o  = {mem_address[31:2], 2'b00};
     end
 
     always_comb begin
-        if ((mem_write_enable != '0 || mem_read_enable) && !mmu_data_fault)
+        if ((mem_write_enable != '0 || mem_read_enable) && !mmu_data_fault && !RAISE_EXCEPTION)
             mem_operation_enable_o = 1'b1;
         else
             mem_operation_enable_o = 1'b0;
