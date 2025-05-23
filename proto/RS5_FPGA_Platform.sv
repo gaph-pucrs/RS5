@@ -12,7 +12,7 @@ module RS5_FPGA_Platform
     parameter bit           HPMCOUNTEREnable  = 1'b0,
     parameter bit           ZKNEEnable        = 1'b0,
     parameter bit           ZICONDEnable      = 1'b0,
-    parameter bit           ZCBEnable         = 1'b0,
+    parameter bit           ZCBEnable         = 1'b1,
     parameter bit           VEnable           = 1'b0,
     parameter bit           BRANCHPRED        = 1'b1,
     parameter bit           FORWARDING        = 1'b1,
