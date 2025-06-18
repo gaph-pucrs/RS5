@@ -15,11 +15,12 @@ def classifier_mapper(state_dict):
     keys = list(state_dict.keys())
 
     for idx, key in enumerate(keys):
-        if key.endswith('weight') and ('.classifier' in key or '.fc' in key):
+        if key.endswith('weight') and ('.fc' in key or '.classifier' in key):
             class_name_base = key.rsplit('.weight', 1)[0]
             class_bias = class_name_base + 'bias'
+            print(f"{state_dict[key].shape}")
             classifier_map[class_name_base] = {
-                'weight': state_dict[key].cpu().numpy(),
+                'weight': state_dict[key].cpu().permute(1, 0).numpy(),
                 'bias': state_dict.get(class_bias, None).cpu().numpy() if class_bias in state_dict else None
             }
     
@@ -41,7 +42,7 @@ def stemblock_mapper(state_dict):
     var_key = bn_name_base + '.running_var'
 
     stemblock_map[layer_name] = {
-        'conv_weight': state_dict[key].cpu().numpy(),
+        'conv_weight': state_dict[key].cpu().permute(2, 3, 1, 0).numpy(),
         'conv_bias': state_dict.get(conv_bias, None).cpu().numpy() if conv_bias in state_dict else None,
         'bn_gamma': state_dict[gamma_key].cpu().numpy(),
         'bn_beta': state_dict[beta_key].cpu().numpy(),
@@ -51,12 +52,13 @@ def stemblock_mapper(state_dict):
 
     return stemblock_map
 
+# MMCBlock
 def conv_bn_mapper(state_dict):
     conv_bn_map = {}
     keys = list(state_dict.keys())
 
     for idx, key in enumerate(keys):
-        if key.endswith('weight') and ('.conv.' in key or '.stemConv212' in key):
+        if key.endswith('weight') and ('.conv.' in key):
             conv_name = key.rsplit('.weight', 1)[0]
             bn_name_base = conv_name.replace('.conv', '.norm')
 
@@ -68,10 +70,9 @@ def conv_bn_mapper(state_dict):
             has_bn = all(k in state_dict for k in [gamma_key, beta_key, mean_key, var_key])
 
             conv_bn_map[conv_name] = {
-                'conv_weight': state_dict[key].cpu().numpy(),
+                'conv_weight': state_dict[key].cpu().permute(2, 3, 1, 0).numpy(),
                 'conv_bias': state_dict.get(conv_name + '.bias', None)
                 .cpu().numpy() if conv_name + '.bias' in state_dict else None
-                # 'has_bn': has_bn
             }
 
             if has_bn:
@@ -81,8 +82,6 @@ def conv_bn_mapper(state_dict):
                     'bn_running_mean': state_dict[mean_key].cpu().numpy(),
                     'bn_running_var': state_dict[var_key].cpu().numpy()
                 })
-        # else:
-            # print(f"Skipped: {key}")
 
     return conv_bn_map
 
@@ -108,6 +107,7 @@ def create_c_header(name, value):
     with open(filename, "w") as f:
         f.write(f"#ifndef __{real_name}___h\n")
         f.write(f"#define __{real_name}___h\n\n")
+        f.write(f"// {value.shape}\n")
         f.write(f"const {type} {real_name}[{x.size}] = {{\n")
         f.write(f",\n".join(map(str, x)))
         f.write(f"\n}};")
@@ -116,14 +116,16 @@ def create_c_header(name, value):
     print(f"[+] parameters generated in {filename} file!")
 
 def save_to_numpy(out_dir, layers):
-    os.makedirs(out_dir)
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
 
     for l in layers:
         for layer_name, params in l.items():
             safe_name = layer_name.replace('.', '_')
             for param_name, value in params.items():
                 if value is not None:
-                    name = f"{safe_name}_{param_name}"
+                    name = safe_name.rsplit('_conv', 1)[0]
+                    name = f"{name}_{param_name}"
                     create_c_header(name, value)
 
     print(f"[!] Done generating data in {out_dir} directory!")

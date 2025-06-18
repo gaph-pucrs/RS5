@@ -15,7 +15,6 @@ img = Image.open('../cifar-10/test/3364.png').convert('RGB')
 img = transform(img)
 img = img.unsqueeze(0)
 
-x = img.numpy().flatten()
+x = img.permute(0, 2, 3, 1).numpy().flatten()
 
-print(f"{img.numpy().shape}")
 print(f",\n".join(map(str, x)))

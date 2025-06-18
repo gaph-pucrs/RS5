@@ -10,3 +10,5 @@ OurLMFRNet.py
 utils.py
 *.txt
 *.bin
+*.jpg
+*.png

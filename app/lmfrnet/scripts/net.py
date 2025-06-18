@@ -13,10 +13,17 @@ checkpoint = torch.load('../checkpoint/ckpt.pth')
 # layer = checkpoint['net']['module.features.stemBlock.stemConv.1.running_mean']
 # print(f"{layer.shape}")
 
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 model = LMFRNet()
-m, u = model.load_state_dict(checkpoint['net'], strict=False)
+
+if device == 'cuda':
+    model = torch.nn.DataParallel(model)
+    # cudnn.benchmark = True
+
+m, u = model.load_state_dict(checkpoint['net'])
+
 
 for name, l in model.named_parameters():
     print(f"{name} : {l.shape}")
-
+    
 # print(f"{m}")
