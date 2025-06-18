@@ -15,7 +15,7 @@ def classifier_mapper(state_dict):
     keys = list(state_dict.keys())
 
     for idx, key in enumerate(keys):
-        if key.endswith('weight') and ('.fc' in key or '.classifier' in key):
+        if key.endswith('weight') and ('.fc' in key):
             class_name_base = key.rsplit('.weight', 1)[0]
             class_bias = class_name_base + 'bias'
             print(f"{state_dict[key].shape}")
