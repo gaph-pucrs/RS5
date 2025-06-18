@@ -1,8 +1,15 @@
+import os
 import torch
 import numpy as np
 import torchvision.transforms as transforms
 from PIL import Image
 
+OUTPUT_DIRECTORY = '../c-dataset/'
+filename = OUTPUT_DIRECTORY + 'image1.h'
+type = 'float'
+
+if not os.path.exists(OUTPUT_DIRECTORY):
+        os.makedirs(OUTPUT_DIRECTORY)
 transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize(
@@ -17,4 +24,14 @@ img = img.unsqueeze(0)
 
 x = img.permute(0, 2, 3, 1).numpy().flatten()
 
-print(f",\n".join(map(str, x)))
+with open(filename, "w") as f:
+    f.write(f"#ifndef __LMFRNET_INPUT_IMAGE__h\n")
+    f.write(f"#define __LMFRNET_INPUT_IMAGE__h\n\n")
+    f.write(f"const {type} image1[{x.size}] = {{\n")
+    f.write(f",\n".join(map(str, x)))
+    f.write(f"\n}};")
+    f.write(f"\n\n#endif")
+
+print(f"[+] parameters generated in {filename} file!")
+
+# print(f",\n".join(map(str, x)))
