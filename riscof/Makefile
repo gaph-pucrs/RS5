@@ -26,7 +26,7 @@ riscv-arch-test:
 report-baseline: $(WORK_DIR)/baseline_work/report.html
 	@xdg-open $^
 
-report-extensions: $(WORK_DIR)/baseline_work/report.html
+report-extensions: $(WORK_DIR)/extensions_work/report.html
 	@xdg-open $^
 
 $(WORK_DIR)/baseline_work/report.html:
