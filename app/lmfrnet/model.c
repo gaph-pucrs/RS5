@@ -14,6 +14,7 @@
     #include "include/stage_1.h"
 //
 
+// full pad: adds a border of zeros
 void pad (
     const int HEIGHT,
     const int WIDTH,
