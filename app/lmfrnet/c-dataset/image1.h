@@ -1,7 +1,7 @@
 #ifndef __LMFRNET_INPUT_IMAGE__h
 #define __LMFRNET_INPUT_IMAGE__h
 
-const float image1[3072] = {
+float image1[3072] = {
 2.4171634,
 2.4984562,
 2.6756902,

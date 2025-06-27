@@ -1,7 +1,9 @@
 __pycache__
 autodl-tmp
 checkpoint
+c-dataset
 cifar-10
+cmp
 params
 logs
 util
@@ -12,3 +14,6 @@ utils.py
 *.bin
 *.jpg
 *.png
+*.zip
+*.7z
+*.tar.gz

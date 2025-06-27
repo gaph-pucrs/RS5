@@ -1,3 +1,4 @@
+import os
 import torch
 import numpy as np
 import torchvision.transforms as transforms
@@ -33,8 +34,47 @@ img = Image.open('./cifar-10/test/3364.png').convert('RGB') # frog
 img = transform(img)
 img = img.unsqueeze(0)
 
+def save(name, out):
+    # NHWC format
+    out_nhwc = out.permute(0, 2, 3, 1).numpy()
+    x = out_nhwc.flatten()
+
+    base = './cmp/'
+    if not os.path.exists(base):
+        os.makedirs(base)
+
+    base += 'py/'
+    if not os.path.exists(base):
+        os.makedirs(base)
+
+    filename = base + name + '.txt'
+    with open(filename, "w") as f:
+        f.write(f",\n".join(map(str,x)))
+
+    print(f"[+] results for compare generated in {filename} file!")
+
+debug = {}
+def make_hook(layer_name):
+    def hook_fn(module, input, output):
+        debug[layer_name] = output.detach().cpu()
+    return hook_fn
+
+handles = []
+for name, layer in model.module.features.named_children():
+    hook = layer.register_forward_hook(make_hook(name))
+    handles.append(hook)
+
 with torch.no_grad():
     outputs = model(img)
     predicted_class = torch.argmax(outputs, dim=1).item()
 
-print(f"Predicted class: {classes[predicted_class]}")
+for name, output in debug.items():
+    #print(f"Layer {name}:\n {output.numpy().flatten()}")
+    save(name, output)
+    break
+    print(f"Layer {name}: shape = {output.shape}")
+
+#print(f"Predicted class: {classes[predicted_class]}")
+
+for handle in handles:
+    handle.remove()

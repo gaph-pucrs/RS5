@@ -14,7 +14,28 @@
     #include "include/stage_1.h"
 //
 
-type max(const type x, const type y) {
+void pad (
+    const int HEIGHT,
+    const int WIDTH,
+    const int CHANNELS,
+    const type in[],
+    type out[]
+) {
+    for (int i=0; i<HEIGHT; i++)
+    {
+        for (int j=0; j<WIDTH; j++)
+        {
+            for (int k=0; k<CHANNELS; k++)
+            {
+                int idx_in = (k)+(j*CHANNELS)+(i*CHANNELS*WIDTH);
+                int idx_out = (k)+((j+1)*CHANNELS)+((i+1)*CHANNELS*(WIDTH+2));
+                out[idx_out] = in[idx_in];
+            }
+        }
+    }
+}
+
+type max (const type x, const type y) {
     return (x < y) ? y : x;
 }
 
@@ -45,9 +66,6 @@ void batch_normalization (
                 in[id] -= mean[n];
                 in[id] /= sqrt(var[n] + eps);
                 in[id] *= gamma[n];
-                #ifdef MULTIPLIER
-                    in[id] /= (type)(sqrt(MULTIPLIER));
-                #endif
                 in[id] += beta[n];
             }
         }
@@ -60,6 +78,7 @@ void _conv_block (
     const int INPUT_CHANNELS,
     const type in[],
     const type weights[],
+    const type bias[],
     const int OUTPUT_WIDTH,
     const int OUTPUT_HEIGHT,
     const int OUTPUT_CHANNELS,
@@ -72,6 +91,13 @@ void _conv_block (
     const type var[],
     const double eps
 ) {
+    int p = (OUTPUT_WIDTH)-(int)((INPUT_WIDTH-kernel_size)/stride)-1;
+    type *in_pd = calloc((INPUT_CHANNELS)*(INPUT_WIDTH+p)*(INPUT_HEIGHT+p), sizeof(type));
+
+    if (p == 2) {
+        pad (INPUT_HEIGHT, INPUT_WIDTH, INPUT_CHANNELS, in, in_pd);
+    }
+
     // "(0,0)" of the 3x3 image
     int base_y=0, base_x=0;
 
@@ -86,19 +112,30 @@ void _conv_block (
                 {
                     for (int m=0; m<INPUT_CHANNELS; m++)
                     {
-                        int idx_i = (m)+(base_x)+(base_y)+(j*INPUT_CHANNELS)+(i*INPUT_CHANNELS*INPUT_WIDTH);
+                        int idx_i = (m)+(base_x)+(base_y)+(j*INPUT_CHANNELS)+(i*INPUT_CHANNELS*(INPUT_WIDTH+p));
                         for (int n=0; n<OUTPUT_CHANNELS; n++)
                         {
                             int idx_w = (n)+(m*OUTPUT_CHANNELS)+(j*OUTPUT_CHANNELS*INPUT_CHANNELS)+(i*OUTPUT_CHANNELS*INPUT_CHANNELS*kernel_size);
                             int idx_out = (n)+(l*OUTPUT_CHANNELS)+(k*OUTPUT_CHANNELS*OUTPUT_WIDTH);
-                            out[idx_out] += in[idx_i]*weights[idx_w];
+                            out[idx_out] += in_pd[idx_i]*weights[idx_w];
                         }
                     }
                 }
             }
             base_x += stride*INPUT_CHANNELS;
         }
-        base_y += stride*INPUT_CHANNELS*INPUT_WIDTH;
+        base_y += stride*INPUT_CHANNELS*(INPUT_WIDTH+p);
+    }
+
+    for (int k=0; k<OUTPUT_HEIGHT; k++)
+    {
+        for (int l=0; l<OUTPUT_WIDTH; l++)
+        {
+            for (int n=0; n<OUTPUT_CHANNELS; n++)
+            {
+                out[(n)+(l*OUTPUT_CHANNELS)+(k*OUTPUT_CHANNELS*OUTPUT_WIDTH)] += bias[n];
+            }
+        }
     }
 
     batch_normalization (
@@ -114,11 +151,13 @@ void _conv_block (
     );
 
     relu(out, OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS);
+
+    free(in_pd);
 }
 
 void print(type v[], int size) {
     for (int i=0; i<size; i++) {
-        printf("%f\n", v[i]);
+        printf("%.10f\n", v[i]);
     }
 }
 
@@ -132,6 +171,7 @@ int main()
         IMAGE_CHANNELS,
         image1,
         stemBlock_stemConv_conv_weight,
+        stemBlock_stemConv_conv_bias,
         STAGE_1_WIDTH,
         STAGE_1_HEIGHT,
         STAGE_1_CHANNELS,
@@ -142,7 +182,7 @@ int main()
         stemBlock_stemConv_bn_beta,
         stemBlock_stemConv_bn_running_mean,
         stemBlock_stemConv_bn_running_var,
-        0.001
+        1e-5
     );
 
     print(stage_1_out, STAGE_1_WIDTH*STAGE_1_HEIGHT*STAGE_1_CHANNELS);

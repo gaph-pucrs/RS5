@@ -1,7 +1,7 @@
 #ifndef __LMFRNET_STAGE1_H__
 #define __LMFRNET_STAGE1_H__
 
-    #define STAGE_1_CHANNELS    3
+    #define STAGE_1_CHANNELS   32
     #define STAGE_1_HEIGHT     32
     #define STAGE_1_WIDTH      32
     #define STAGE_1_STRIDE      1
