@@ -10,6 +10,7 @@ util
 main.py 
 OurLMFRNet.py
 utils.py
+gpt.py
 concat.c
 *.txt
 *.bin
