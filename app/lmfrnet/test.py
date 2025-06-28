@@ -1,11 +1,18 @@
 import os
+import sys
 import torch
 import numpy as np
 import torchvision.transforms as transforms
 from PIL import Image
 from OurLMFRNet import LMFRNet
 
-debug_layer = 'MMCBlock1'
+debug_layer = 'tran_ConvNormRelu1'
+
+if len(sys.argv) > 1:
+    debug_layer = sys.argv[1]
+else:
+    print(f"Usage: python test.py <debug_layer>")
+    exit()
 
 checkpoint = torch.load('./checkpoint/ckpt.pth')
 
