@@ -279,7 +279,7 @@ int main()
 //-------------------------------------------
 //                STAGE_1
 //-------------------------------------------
-    //{{{
+//{{{
 
     type *stage_1_out = calloc(STAGE_1_WIDTH*STAGE_1_HEIGHT*STAGE_1_CHANNELS, sizeof(type));
 
@@ -303,7 +303,7 @@ int main()
         1e-5    // eps
     );
     
-    //}}}
+//}}}
 
 type *y0 = calloc(MMCBlock1_mmLayer1_branch11_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH, sizeof(type));
 type *y1 = calloc(MMCBlock1_mmLayer1_branch33a_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH, sizeof(type));    
@@ -315,11 +315,11 @@ type *tmp2 = calloc(STAGE_2_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH, sizeof(type))
 //-------------------------------------------
 //              STAGE_2
 //-------------------------------------------
-    //{{{
+//{{{
     //-----------------------------------------------
     //                  Layer1
     //-----------------------------------------------
-        //{{{
+    //{{{
 
         _conv_block (
             STAGE_1_HEIGHT,
@@ -417,7 +417,7 @@ type *tmp2 = calloc(STAGE_2_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH, sizeof(type))
 
         free(stage_1_out);
 
-        //}}} 
+    //}}} 
     //-----------------------------------------------
     //                  Layer2
     //-----------------------------------------------
@@ -526,7 +526,7 @@ type *tmp2 = calloc(STAGE_2_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH, sizeof(type))
     //-----------------------------------------------
     //                  Layer3
     //-----------------------------------------------
-        //{{{
+    //{{{
 
         memset(y0, 0, MMCBlock1_mmLayer3_branch11_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH*sizeof(type));
         memset(y1, 0, MMCBlock1_mmLayer3_branch33a_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH*sizeof(type));
@@ -627,11 +627,11 @@ type *tmp2 = calloc(STAGE_2_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH, sizeof(type))
             tmp1
         );
 
-        //}}}
+    //}}}
     //-----------------------------------------------
     //                  Conv1
     //-----------------------------------------------
-        //{{{
+    //{{{
 
         memset(tmp2, 0, STAGE_2_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH*sizeof(type));
 
@@ -655,11 +655,11 @@ type *tmp2 = calloc(STAGE_2_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH, sizeof(type))
             1e-5    // eps
         );
 
-        //}}}
+    //}}}
     //-----------------------------------------------
     //                 Pooling1 
     //-----------------------------------------------
-        //{{{
+    //{{{
 
         memset(tmp1, 0, STAGE_2_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH*sizeof(type));
 
@@ -676,9 +676,14 @@ type *tmp2 = calloc(STAGE_2_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH, sizeof(type))
 
         print(tmp1, 104*16*16);
 
-        //}}}
     //}}}
+//}}}
 
+//-------------------------------------------
+//              STAGE_3
+//-------------------------------------------
+//{{{
+//}}}
 
     free(y0);
     free(y1);
