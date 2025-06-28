@@ -5,6 +5,8 @@ import torchvision.transforms as transforms
 from PIL import Image
 from OurLMFRNet import LMFRNet
 
+debug_layer = 'MMCBlock1'
+
 checkpoint = torch.load('./checkpoint/ckpt.pth')
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -70,9 +72,12 @@ with torch.no_grad():
 
 for name, output in debug.items():
     #print(f"Layer {name}:\n {output.numpy().flatten()}")
-    save(name, output)
-    break
-    print(f"Layer {name}: shape = {output.shape}")
+    #save(name, output)
+    if name == debug_layer:
+        save(name, output)
+        break;
+    #break
+    #print(f"Layer {name}: shape = {output.shape}")
 
 #print(f"Predicted class: {classes[predicted_class]}")
 

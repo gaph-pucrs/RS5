@@ -12,9 +12,11 @@
 //      LMFRNet stages
 //----------------------------
     #include "include/stage_1.h"
+    #include "include/stage_2.h"
 //
 
 // full pad: adds a border of zeros
+// {{{
 void pad (
     const int HEIGHT,
     const int WIDTH,
@@ -35,6 +37,7 @@ void pad (
         }
     }
 }
+// }}}
 
 type max (const type x, const type y) {
     return (x < y) ? y : x;
@@ -46,6 +49,7 @@ void relu (type in[], const int size) {
     }
 }
 
+// {{{
 void batch_normalization (
     const int HEIGHT,
     const int WIDTH,
@@ -72,16 +76,18 @@ void batch_normalization (
         }
     }
 }
+// }}}
 
+// {{{
 void _conv_block (
-    const int INPUT_WIDTH,
     const int INPUT_HEIGHT,
+    const int INPUT_WIDTH,
     const int INPUT_CHANNELS,
     const type in[],
     const type weights[],
     const type bias[],
-    const int OUTPUT_WIDTH,
     const int OUTPUT_HEIGHT,
+    const int OUTPUT_WIDTH,
     const int OUTPUT_CHANNELS,
     type out[], 
     const int kernel_size,
@@ -95,8 +101,15 @@ void _conv_block (
     int p = (OUTPUT_WIDTH)-(int)((INPUT_WIDTH-kernel_size)/stride)-1;
     type *in_pd = calloc((INPUT_CHANNELS)*(INPUT_WIDTH+p)*(INPUT_HEIGHT+p), sizeof(type));
 
+    //printf("padding: %d\n", p);
     if (p == 2) {
         pad (INPUT_HEIGHT, INPUT_WIDTH, INPUT_CHANNELS, in, in_pd);
+    }
+    else {
+        // no padding
+        for (int i=0; i<INPUT_HEIGHT*INPUT_WIDTH*INPUT_CHANNELS; i++) {
+            in_pd[i] = in[i];
+        }
     }
 
     // "(0,0)" of the 3x3 image
@@ -127,14 +140,17 @@ void _conv_block (
         }
         base_y += stride*INPUT_CHANNELS*(INPUT_WIDTH+p);
     }
-
-    for (int k=0; k<OUTPUT_HEIGHT; k++)
+    
+    if (bias != NULL)
     {
-        for (int l=0; l<OUTPUT_WIDTH; l++)
+        for (int k=0; k<OUTPUT_HEIGHT; k++)
         {
-            for (int n=0; n<OUTPUT_CHANNELS; n++)
+            for (int l=0; l<OUTPUT_WIDTH; l++)
             {
-                out[(n)+(l*OUTPUT_CHANNELS)+(k*OUTPUT_CHANNELS*OUTPUT_WIDTH)] += bias[n];
+                for (int n=0; n<OUTPUT_CHANNELS; n++)
+                {
+                    out[(n)+(l*OUTPUT_CHANNELS)+(k*OUTPUT_CHANNELS*OUTPUT_WIDTH)] += bias[n];
+                }
             }
         }
     }
@@ -155,6 +171,50 @@ void _conv_block (
 
     free(in_pd);
 }
+// }}}
+
+// cooncatenate 4 tensors (MFBlock filter concatenation)
+//{{{
+void concat4 (
+    const int H,
+    const int W,
+    const int CH0,
+    const int CH1,
+    const int CH2,
+    const int CH3,
+    const type *v0,
+    const type *v1,
+    const type *v2,
+    const type *v3,
+    type *out
+) {
+    int C = CH0 + CH1 + CH2 + CH3;
+    for (int i=0; i<H; i++)
+    {
+        for (int j=0; j<W; j++)
+        {
+            int offset = 0;
+            for (int k=0; k<CH0; k++) {
+                out[k + j*C + i*C*W] = v0[k + j*CH0 + i*CH0*W];
+            }
+            offset += CH0;
+            for (int k=0; k<CH0; k++) {
+                out[k + offset + j*C + i*C*W] = v1[k + j*CH1 + i*CH1*W];
+            }
+
+            offset += CH1;
+            for (int k=0; k<CH0; k++) {
+                out[k + offset + j*C + i*C*W] = v2[k + j*CH2 + i*CH2*W];
+            }
+
+            offset += CH2;
+            for (int k=0; k<CH0; k++) {
+                out[k + offset + j*C + i*C*W] = v3[k + j*CH3 + i*CH3*W];
+            }
+        }
+    }
+}
+//}}}
 
 void print(type v[], int size) {
     for (int i=0; i<size; i++) {
@@ -164,17 +224,21 @@ void print(type v[], int size) {
 
 int main()
 {
+//-------------------------------------------
+//                STAGE_1
+//-------------------------------------------
+    //{{{
     type *stage_1_out = calloc(STAGE_1_WIDTH*STAGE_1_HEIGHT*STAGE_1_CHANNELS, sizeof(type));
 
     _conv_block (
-        IMAGE_WIDTH,
         IMAGE_HEIGHT,
+        IMAGE_WIDTH,
         IMAGE_CHANNELS,
         image1,
         stemBlock_stemConv_conv_weight,
         stemBlock_stemConv_conv_bias,
-        STAGE_1_WIDTH,
         STAGE_1_HEIGHT,
+        STAGE_1_WIDTH,
         STAGE_1_CHANNELS,
         stage_1_out, 
         3,
@@ -185,8 +249,356 @@ int main()
         stemBlock_stemConv_bn_running_var,
         1e-5
     );
+    //}}}
 
-    print(stage_1_out, STAGE_1_WIDTH*STAGE_1_HEIGHT*STAGE_1_CHANNELS);
+//    print(stage_1_out, STAGE_1_WIDTH*STAGE_1_HEIGHT*STAGE_1_CHANNELS);
+
+//-------------------------------------------
+//              STAGE_2
+//-------------------------------------------
+    //-----------------------------------------------
+    //                  Layer1
+    //-----------------------------------------------
+        //{{{
+        type *y0 = calloc(12*32*32, sizeof(type)); 
+        type *y1 = calloc(12*32*32, sizeof(type));    
+        type *y2 = calloc(6*32*32, sizeof(type));    
+        type *y3 = calloc(6*32*32, sizeof(type));    
+        type *MMCBlock1_mmLayer1_out = calloc(56*32*32, sizeof(type));
+
+        _conv_block (
+            STAGE_1_HEIGHT,
+            STAGE_1_WIDTH,
+            STAGE_1_CHANNELS,
+            stage_1_out,
+            MMCBlock1_mmLayer1_branch11_conv_weight,
+            NULL,
+            STAGE_1_HEIGHT,
+            STAGE_1_WIDTH,
+            MMCBlock1_mmLayer1_branch11_CHANNELS,
+            y0,
+            1,
+            1,
+            MMCBlock1_mmLayer1_branch11_bn_gamma,
+            MMCBlock1_mmLayer1_branch11_bn_beta,
+            MMCBlock1_mmLayer1_branch11_bn_running_mean,
+            MMCBlock1_mmLayer1_branch11_bn_running_var,
+            1e-5
+        );
+
+        _conv_block (
+            STAGE_1_HEIGHT,
+            STAGE_1_WIDTH,
+            MMCBlock1_mmLayer1_branch11_CHANNELS,
+            y0,
+            MMCBlock1_mmLayer1_branch33a_conv_weight,
+            NULL,
+            STAGE_1_HEIGHT,
+            STAGE_1_WIDTH,
+            MMCBlock1_mmLayer1_branch33a_CHANNELS,
+            y1,
+            3,
+            1,
+            MMCBlock1_mmLayer1_branch33a_bn_gamma,
+            MMCBlock1_mmLayer1_branch33a_bn_beta,
+            MMCBlock1_mmLayer1_branch33a_bn_running_mean,
+            MMCBlock1_mmLayer1_branch33a_bn_running_var,
+            1e-5
+        );
+
+        _conv_block (
+            STAGE_1_HEIGHT,
+            STAGE_1_WIDTH,
+            MMCBlock1_mmLayer1_branch33a_CHANNELS,
+            y1,
+            MMCBlock1_mmLayer1_branch33b_conv_weight,
+            NULL,
+            STAGE_1_HEIGHT,
+            STAGE_1_WIDTH,
+            MMCBlock1_mmLayer1_branch33b_CHANNELS,
+            y2,
+            3,
+            1,
+            MMCBlock1_mmLayer1_branch33b_bn_gamma,
+            MMCBlock1_mmLayer1_branch33b_bn_beta,
+            MMCBlock1_mmLayer1_branch33b_bn_running_mean,
+            MMCBlock1_mmLayer1_branch33b_bn_running_var,
+            1e-5
+        );
+
+        _conv_block (
+            STAGE_1_HEIGHT,
+            STAGE_1_WIDTH,
+            MMCBlock1_mmLayer1_branch33b_CHANNELS,
+            y2,
+            MMCBlock1_mmLayer1_branch33c_conv_weight,
+            NULL,
+            STAGE_1_HEIGHT,
+            STAGE_1_WIDTH,
+            MMCBlock1_mmLayer1_branch33c_CHANNELS,
+            y3,
+            3,
+            1,
+            MMCBlock1_mmLayer1_branch33c_bn_gamma,
+            MMCBlock1_mmLayer1_branch33c_bn_beta,
+            MMCBlock1_mmLayer1_branch33c_bn_running_mean,
+            MMCBlock1_mmLayer1_branch33c_bn_running_var,
+            1e-5
+        );
+
+        // concat em MMCBlock1_mmLayer1_out
+        concat4 (
+            32, 
+            32, 
+            32,
+            12,
+            6,
+            6,
+            stage_1_out, 
+            y1, 
+            y2, 
+            y3, 
+            MMCBlock1_mmLayer1_out
+        );
+
+        free(stage_1_out);
+        free(y0);
+        free(y1);
+        free(y2);
+        free(y3);
+        //}}} 
+
+    //-----------------------------------------------
+    //                  Layer2
+    //-----------------------------------------------
+        //{{{
+        y0 = calloc(12*32*32, sizeof(type)); 
+        y1 = calloc(12*32*32, sizeof(type));    
+        y2 = calloc(6*32*32, sizeof(type));    
+        y3 = calloc(6*32*32, sizeof(type));    
+        type *MMCBlock1_mmLayer2_out = calloc(80*32*32, sizeof(type));
+
+        _conv_block (
+            STAGE_1_HEIGHT,
+            STAGE_1_WIDTH,
+            MMCBlock1_mmLayer1_CHANNELS,
+            MMCBlock1_mmLayer1_out,
+            MMCBlock1_mmLayer2_branch11_conv_weight,
+            NULL,
+            STAGE_1_HEIGHT,
+            STAGE_1_WIDTH,
+            MMCBlock1_mmLayer2_branch11_CHANNELS,
+            y0,
+            1,
+            1,
+            MMCBlock1_mmLayer2_branch11_bn_gamma,
+            MMCBlock1_mmLayer2_branch11_bn_beta,
+            MMCBlock1_mmLayer2_branch11_bn_running_mean,
+            MMCBlock1_mmLayer2_branch11_bn_running_var,
+            1e-5
+        );
+
+        _conv_block (
+            STAGE_1_HEIGHT,
+            STAGE_1_WIDTH,
+            MMCBlock1_mmLayer2_branch11_CHANNELS,
+            y0,
+            MMCBlock1_mmLayer2_branch33a_conv_weight,
+            NULL,
+            STAGE_1_HEIGHT,
+            STAGE_1_WIDTH,
+            MMCBlock1_mmLayer2_branch33a_CHANNELS,
+            y1,
+            3,
+            1,
+            MMCBlock1_mmLayer2_branch33a_bn_gamma,
+            MMCBlock1_mmLayer2_branch33a_bn_beta,
+            MMCBlock1_mmLayer2_branch33a_bn_running_mean,
+            MMCBlock1_mmLayer2_branch33a_bn_running_var,
+            1e-5
+        );
+
+        _conv_block (
+            STAGE_1_HEIGHT,
+            STAGE_1_WIDTH,
+            MMCBlock1_mmLayer2_branch33a_CHANNELS,
+            y1,
+            MMCBlock1_mmLayer2_branch33b_conv_weight,
+            NULL,
+            STAGE_1_HEIGHT,
+            STAGE_1_WIDTH,
+            MMCBlock1_mmLayer2_branch33b_CHANNELS,
+            y2,
+            3,
+            1,
+            MMCBlock1_mmLayer2_branch33b_bn_gamma,
+            MMCBlock1_mmLayer2_branch33b_bn_beta,
+            MMCBlock1_mmLayer2_branch33b_bn_running_mean,
+            MMCBlock1_mmLayer2_branch33b_bn_running_var,
+            1e-5
+        );
+
+        _conv_block (
+            STAGE_1_HEIGHT,
+            STAGE_1_WIDTH,
+            MMCBlock1_mmLayer2_branch33b_CHANNELS,
+            y2,
+            MMCBlock1_mmLayer2_branch33c_conv_weight,
+            NULL,
+            STAGE_1_HEIGHT,
+            STAGE_1_WIDTH,
+            MMCBlock1_mmLayer2_branch33c_CHANNELS,
+            y3,
+            3,
+            1,
+            MMCBlock1_mmLayer2_branch33c_bn_gamma,
+            MMCBlock1_mmLayer2_branch33c_bn_beta,
+            MMCBlock1_mmLayer2_branch33c_bn_running_mean,
+            MMCBlock1_mmLayer2_branch33c_bn_running_var,
+            1e-5
+        );
+
+        // concat em MMCBlock1_mmLayer2_out
+        concat4 (
+            32, 
+            32, 
+            56,
+            12,
+            6,
+            6,
+            MMCBlock1_mmLayer1_out, 
+            y1, 
+            y2, 
+            y3, 
+            MMCBlock1_mmLayer2_out
+        );
+
+        free(MMCBlock1_mmLayer1_out);
+        free(y0);
+        free(y1);
+        free(y2);
+        free(y3);
+        //}}}
+
+    //-----------------------------------------------
+    //                  Layer3
+    //-----------------------------------------------
+        //{{{
+        y0 = calloc(12*32*32, sizeof(type)); 
+        y1 = calloc(12*32*32, sizeof(type));    
+        y2 = calloc(6*32*32, sizeof(type));    
+        y3 = calloc(6*32*32, sizeof(type));    
+        type *MMCBlock1_mmLayer3_out = calloc(104*32*32, sizeof(type));
+
+        _conv_block (
+            STAGE_1_HEIGHT,
+            STAGE_1_WIDTH,
+            MMCBlock1_mmLayer2_CHANNELS,
+            MMCBlock1_mmLayer2_out,
+            MMCBlock1_mmLayer3_branch11_conv_weight,
+            NULL,
+            STAGE_1_HEIGHT,
+            STAGE_1_WIDTH,
+            MMCBlock1_mmLayer3_branch11_CHANNELS,
+            y0,
+            1,
+            1,
+            MMCBlock1_mmLayer3_branch11_bn_gamma,
+            MMCBlock1_mmLayer3_branch11_bn_beta,
+            MMCBlock1_mmLayer3_branch11_bn_running_mean,
+            MMCBlock1_mmLayer3_branch11_bn_running_var,
+            1e-5
+        );
+
+        _conv_block (
+            STAGE_1_HEIGHT,
+            STAGE_1_WIDTH,
+            MMCBlock1_mmLayer3_branch11_CHANNELS,
+            y0,
+            MMCBlock1_mmLayer3_branch33a_conv_weight,
+            NULL,
+            STAGE_1_HEIGHT,
+            STAGE_1_WIDTH,
+            MMCBlock1_mmLayer3_branch33a_CHANNELS,
+            y1,
+            3,
+            1,
+            MMCBlock1_mmLayer3_branch33a_bn_gamma,
+            MMCBlock1_mmLayer3_branch33a_bn_beta,
+            MMCBlock1_mmLayer3_branch33a_bn_running_mean,
+            MMCBlock1_mmLayer3_branch33a_bn_running_var,
+            1e-5
+        );
+
+        _conv_block (
+            STAGE_1_HEIGHT,
+            STAGE_1_WIDTH,
+            MMCBlock1_mmLayer3_branch33a_CHANNELS,
+            y1,
+            MMCBlock1_mmLayer3_branch33b_conv_weight,
+            NULL,
+            STAGE_1_HEIGHT,
+            STAGE_1_WIDTH,
+            MMCBlock1_mmLayer3_branch33b_CHANNELS,
+            y2,
+            3,
+            1,
+            MMCBlock1_mmLayer3_branch33b_bn_gamma,
+            MMCBlock1_mmLayer3_branch33b_bn_beta,
+            MMCBlock1_mmLayer3_branch33b_bn_running_mean,
+            MMCBlock1_mmLayer3_branch33b_bn_running_var,
+            1e-5
+        );
+
+        _conv_block (
+            STAGE_1_HEIGHT,
+            STAGE_1_WIDTH,
+            MMCBlock1_mmLayer3_branch33b_CHANNELS,
+            y2,
+            MMCBlock1_mmLayer3_branch33c_conv_weight,
+            NULL,
+            STAGE_1_HEIGHT,
+            STAGE_1_WIDTH,
+            MMCBlock1_mmLayer3_branch33c_CHANNELS,
+            y3,
+            3,
+            1,
+            MMCBlock1_mmLayer3_branch33c_bn_gamma,
+            MMCBlock1_mmLayer3_branch33c_bn_beta,
+            MMCBlock1_mmLayer3_branch33c_bn_running_mean,
+            MMCBlock1_mmLayer3_branch33c_bn_running_var,
+            1e-5
+        );
+
+        // concat em MMCBlock1_mmLayer2_out
+        concat4 (
+            32, 
+            32, 
+            80,
+            12,
+            6,
+            6,
+            MMCBlock1_mmLayer2_out, 
+            y1, 
+            y2, 
+            y3, 
+            MMCBlock1_mmLayer3_out
+        );
+
+        free(MMCBlock1_mmLayer2_out);
+        free(y0);
+        free(y1);
+        free(y2);
+        free(y3);
+
+        print(MMCBlock1_mmLayer3_out, 32*32*104);
+        //}}}
+
+
+
+
+    // concat(x, y1, y2, y3)
+
     free(stage_1_out);
 
     return 0;
