@@ -43,10 +43,13 @@ img = Image.open('./cifar-10/test/3364.png').convert('RGB') # frog
 img = transform(img)
 img = img.unsqueeze(0)
 
-def save(name, out):
-    # NHWC format
-    out_nhwc = out.permute(0, 2, 3, 1).numpy()
-    x = out_nhwc.flatten()
+def save(name, out, classifier=0):
+    if classifier == 0:
+        # NHWC format
+        out_nhwc = out.permute(0, 2, 3, 1).numpy()
+        x = out_nhwc.flatten()
+    else:
+        x = out.cpu().numpy().flatten()
 
     base = './cmp/'
     if not os.path.exists(base):
@@ -69,24 +72,33 @@ def make_hook(layer_name):
     return hook_fn
 
 handles = []
-for name, layer in model.module.features.named_children():
-    hook = layer.register_forward_hook(make_hook(name))
+for name, module in model.named_modules():
+    hook = module.register_forward_hook(make_hook(name))
     handles.append(hook)
+
+
+#for name, layer in model.module.features.named_children():
+#    hook = layer.register_forward_hook(make_hook(name))
+#    handles.append(hook)
 
 with torch.no_grad():
     outputs = model(img)
     predicted_class = torch.argmax(outputs, dim=1).item()
 
+#for name in debug:
+#    print(name, debug[name].shape)
+
+#exit()
+
 for name, output in debug.items():
-    #print(f"Layer {name}:\n {output.numpy().flatten()}")
-    #save(name, output)
     if name == debug_layer:
         save(name, output)
         break;
-    #break
-    #print(f"Layer {name}: shape = {output.shape}")
 
 #print(f"Predicted class: {classes[predicted_class]}")
+
+if debug_layer == 'fc' or debug_layer == 'classifier':
+    save('classifier', outputs, 1)
 
 for handle in handles:
     handle.remove()
