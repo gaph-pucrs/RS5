@@ -16,6 +16,7 @@
     #include "include/stage_1.h"
     #include "include/stage_2.h"
     #include "include/stage_3.h"
+    #include "include/stage_4.h"
 //}}}
 
 // full pad: adds a border of zeros
@@ -1152,11 +1153,909 @@ type *tmp2 = calloc(STAGE_2_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH, sizeof(type))
             tmp1
         );
 
-        print(tmp1, 200*8*8);
-
     //}}}
 //}}}
 
+//-------------------------------------------
+//              STAGE_3
+//-------------------------------------------
+//{{{
+    //-----------------------------------------------
+    //                  Layer1
+    //-----------------------------------------------
+    //{{{
+
+        memset(y0, 0, MMCBlock3_mmLayer1_branch11_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+        memset(y1, 0, MMCBlock3_mmLayer1_branch33a_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+        memset(y2, 0, MMCBlock3_mmLayer1_branch33b_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+        memset(y3, 0, MMCBlock3_mmLayer1_branch33c_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            STAGE_3_CHANNELS,
+            tmp1,
+            MMCBlock3_mmLayer1_branch11_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer1_branch11_CHANNELS,
+            y0,
+            1,      // kernel_size
+            1,      // stride
+            MMCBlock3_mmLayer1_branch11_bn_gamma,
+            MMCBlock3_mmLayer1_branch11_bn_beta,
+            MMCBlock3_mmLayer1_branch11_bn_running_mean,
+            MMCBlock3_mmLayer1_branch11_bn_running_var,
+            1e-5    // eps
+        );
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer1_branch11_CHANNELS,
+            y0,
+            MMCBlock3_mmLayer1_branch33a_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer1_branch33a_CHANNELS,
+            y1,
+            3,      // kernel_size
+            1,      // stride
+            MMCBlock3_mmLayer1_branch33a_bn_gamma,
+            MMCBlock3_mmLayer1_branch33a_bn_beta,
+            MMCBlock3_mmLayer1_branch33a_bn_running_mean,
+            MMCBlock3_mmLayer1_branch33a_bn_running_var,
+            1e-5    // eps
+        );
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer1_branch33a_CHANNELS,
+            y1,
+            MMCBlock3_mmLayer1_branch33b_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer1_branch33b_CHANNELS,
+            y2,
+            3,      // kernel_size
+            1,      // stride
+            MMCBlock3_mmLayer1_branch33b_bn_gamma,
+            MMCBlock3_mmLayer1_branch33b_bn_beta,
+            MMCBlock3_mmLayer1_branch33b_bn_running_mean,
+            MMCBlock3_mmLayer1_branch33b_bn_running_var,
+            1e-5    // eps
+        );
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer1_branch33b_CHANNELS,
+            y2,
+            MMCBlock3_mmLayer1_branch33c_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer1_branch33c_CHANNELS,
+            y3,
+            3,      // kernel_size
+            1,      // stride
+            MMCBlock3_mmLayer1_branch33c_bn_gamma,
+            MMCBlock3_mmLayer1_branch33c_bn_beta,
+            MMCBlock3_mmLayer1_branch33c_bn_running_mean,
+            MMCBlock3_mmLayer1_branch33c_bn_running_var,
+            1e-5    // eps
+        );
+
+        concat4 (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            STAGE_3_CHANNELS,
+            MMCBlock3_mmLayer1_branch33a_CHANNELS,
+            MMCBlock3_mmLayer1_branch33b_CHANNELS,
+            MMCBlock3_mmLayer1_branch33c_CHANNELS,
+            tmp1,
+            y1, 
+            y2, 
+            y3, 
+            tmp2
+        );
+
+
+    //}}} 
+    //-----------------------------------------------
+    //                  Layer2
+    //-----------------------------------------------
+    //{{{
+
+        memset(y0, 0, MMCBlock3_mmLayer2_branch11_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+        memset(y1, 0, MMCBlock3_mmLayer2_branch33a_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+        memset(y2, 0, MMCBlock3_mmLayer2_branch33b_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+        memset(y3, 0, MMCBlock3_mmLayer2_branch33c_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer1_CHANNELS,
+            tmp2,
+            MMCBlock3_mmLayer2_branch11_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer2_branch11_CHANNELS,
+            y0,
+            1,      // kernel_size
+            1,      // stride 
+            MMCBlock3_mmLayer2_branch11_bn_gamma,
+            MMCBlock3_mmLayer2_branch11_bn_beta,
+            MMCBlock3_mmLayer2_branch11_bn_running_mean,
+            MMCBlock3_mmLayer2_branch11_bn_running_var,
+            1e-5    // eps
+        );
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer2_branch11_CHANNELS,
+            y0,
+            MMCBlock3_mmLayer2_branch33a_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer2_branch33a_CHANNELS,
+            y1,
+            3,      // kernel_size
+            1,      // stride
+            MMCBlock3_mmLayer2_branch33a_bn_gamma,
+            MMCBlock3_mmLayer2_branch33a_bn_beta,
+            MMCBlock3_mmLayer2_branch33a_bn_running_mean,
+            MMCBlock3_mmLayer2_branch33a_bn_running_var,
+            1e-5    // eps
+        );
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer2_branch33a_CHANNELS,
+            y1,
+            MMCBlock3_mmLayer2_branch33b_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer2_branch33b_CHANNELS,
+            y2,
+            3,      // kernel_size
+            1,      // stride
+            MMCBlock3_mmLayer2_branch33b_bn_gamma,
+            MMCBlock3_mmLayer2_branch33b_bn_beta,
+            MMCBlock3_mmLayer2_branch33b_bn_running_mean,
+            MMCBlock3_mmLayer2_branch33b_bn_running_var,
+            1e-5    // eps
+        );
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer2_branch33b_CHANNELS,
+            y2,
+            MMCBlock3_mmLayer2_branch33c_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer2_branch33c_CHANNELS,
+            y3,
+            3,      // kernel_size
+            1,      // stride
+            MMCBlock3_mmLayer2_branch33c_bn_gamma,
+            MMCBlock3_mmLayer2_branch33c_bn_beta,
+            MMCBlock3_mmLayer2_branch33c_bn_running_mean,
+            MMCBlock3_mmLayer2_branch33c_bn_running_var,
+            1e-5    // eps
+        );
+
+        concat4 (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer1_CHANNELS,
+            MMCBlock3_mmLayer2_branch33a_CHANNELS,
+            MMCBlock3_mmLayer2_branch33b_CHANNELS,
+            MMCBlock3_mmLayer2_branch33c_CHANNELS,
+            tmp2,
+            y1, 
+            y2, 
+            y3, 
+            tmp1
+        );
+
+        //}}}
+    //-----------------------------------------------
+    //                  Layer3
+    //-----------------------------------------------
+    //{{{
+
+        memset(y0, 0, MMCBlock3_mmLayer3_branch11_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+        memset(y1, 0, MMCBlock3_mmLayer3_branch33a_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+        memset(y2, 0, MMCBlock3_mmLayer3_branch33b_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+        memset(y3, 0, MMCBlock3_mmLayer3_branch33c_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer2_CHANNELS,
+            tmp1,
+            MMCBlock3_mmLayer3_branch11_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer3_branch11_CHANNELS,
+            y0,
+            1,      // kernel_size
+            1,      // stride
+            MMCBlock3_mmLayer3_branch11_bn_gamma,
+            MMCBlock3_mmLayer3_branch11_bn_beta,
+            MMCBlock3_mmLayer3_branch11_bn_running_mean,
+            MMCBlock3_mmLayer3_branch11_bn_running_var,
+            1e-5    // eps
+        );
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer3_branch11_CHANNELS,
+            y0,
+            MMCBlock3_mmLayer3_branch33a_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer3_branch33a_CHANNELS,
+            y1,
+            3,      // kernel_size
+            1,      // stride 
+            MMCBlock3_mmLayer3_branch33a_bn_gamma,
+            MMCBlock3_mmLayer3_branch33a_bn_beta,
+            MMCBlock3_mmLayer3_branch33a_bn_running_mean,
+            MMCBlock3_mmLayer3_branch33a_bn_running_var,
+            1e-5    // eps
+        );
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer3_branch33a_CHANNELS,
+            y1,
+            MMCBlock3_mmLayer3_branch33b_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer3_branch33b_CHANNELS,
+            y2,
+            3,      // kernel_size
+            1,      // stride
+            MMCBlock3_mmLayer3_branch33b_bn_gamma,
+            MMCBlock3_mmLayer3_branch33b_bn_beta,
+            MMCBlock3_mmLayer3_branch33b_bn_running_mean,
+            MMCBlock3_mmLayer3_branch33b_bn_running_var,
+            1e-5    // eps
+        );
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer3_branch33b_CHANNELS,
+            y2,
+            MMCBlock3_mmLayer3_branch33c_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer3_branch33c_CHANNELS,
+            y3,
+            3,      // kernel_size
+            1,      // stride
+            MMCBlock3_mmLayer3_branch33c_bn_gamma,
+            MMCBlock3_mmLayer3_branch33c_bn_beta,
+            MMCBlock3_mmLayer3_branch33c_bn_running_mean,
+            MMCBlock3_mmLayer3_branch33c_bn_running_var,
+            1e-5    // eps
+        );
+
+        concat4 (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer2_CHANNELS,
+            MMCBlock3_mmLayer3_branch33a_CHANNELS,
+            MMCBlock3_mmLayer3_branch33b_CHANNELS,
+            MMCBlock3_mmLayer3_branch33c_CHANNELS,
+            tmp1,
+            y1, 
+            y2, 
+            y3, 
+            tmp2
+        );
+
+    //}}}
+
+    //-----------------------------------------------
+    //                  Layer4
+    //-----------------------------------------------
+    //{{{
+
+        memset(y0, 0, MMCBlock3_mmLayer4_branch11_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+        memset(y1, 0, MMCBlock3_mmLayer4_branch33a_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+        memset(y2, 0, MMCBlock3_mmLayer4_branch33b_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+        memset(y3, 0, MMCBlock3_mmLayer4_branch33c_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer3_CHANNELS,
+            tmp2,
+            MMCBlock3_mmLayer4_branch11_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer4_branch11_CHANNELS,
+            y0,
+            1,      // kernel_size
+            1,      // stride
+            MMCBlock3_mmLayer4_branch11_bn_gamma,
+            MMCBlock3_mmLayer4_branch11_bn_beta,
+            MMCBlock3_mmLayer4_branch11_bn_running_mean,
+            MMCBlock3_mmLayer4_branch11_bn_running_var,
+            1e-5    // eps
+        );
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer4_branch11_CHANNELS,
+            y0,
+            MMCBlock3_mmLayer4_branch33a_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer4_branch33a_CHANNELS,
+            y1,
+            3,      // kernel_size
+            1,      // stride 
+            MMCBlock3_mmLayer4_branch33a_bn_gamma,
+            MMCBlock3_mmLayer4_branch33a_bn_beta,
+            MMCBlock3_mmLayer4_branch33a_bn_running_mean,
+            MMCBlock3_mmLayer4_branch33a_bn_running_var,
+            1e-5    // eps
+        );
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer4_branch33a_CHANNELS,
+            y1,
+            MMCBlock3_mmLayer4_branch33b_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer4_branch33b_CHANNELS,
+            y2,
+            3,      // kernel_size
+            1,      // stride
+            MMCBlock3_mmLayer4_branch33b_bn_gamma,
+            MMCBlock3_mmLayer4_branch33b_bn_beta,
+            MMCBlock3_mmLayer4_branch33b_bn_running_mean,
+            MMCBlock3_mmLayer4_branch33b_bn_running_var,
+            1e-5    // eps
+        );
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer4_branch33b_CHANNELS,
+            y2,
+            MMCBlock3_mmLayer4_branch33c_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer4_branch33c_CHANNELS,
+            y3,
+            3,      // kernel_size
+            1,      // stride
+            MMCBlock3_mmLayer4_branch33c_bn_gamma,
+            MMCBlock3_mmLayer4_branch33c_bn_beta,
+            MMCBlock3_mmLayer4_branch33c_bn_running_mean,
+            MMCBlock3_mmLayer4_branch33c_bn_running_var,
+            1e-5    // eps
+        );
+
+        concat4 (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer3_CHANNELS,
+            MMCBlock3_mmLayer4_branch33a_CHANNELS,
+            MMCBlock3_mmLayer4_branch33b_CHANNELS,
+            MMCBlock3_mmLayer4_branch33c_CHANNELS,
+            tmp2,
+            y1, 
+            y2, 
+            y3, 
+            tmp1
+        );
+       
+    //}}}
+
+    //-----------------------------------------------
+    //                  Layer5
+    //-----------------------------------------------
+    //{{{
+
+        memset(y0, 0, MMCBlock3_mmLayer5_branch11_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+        memset(y1, 0, MMCBlock3_mmLayer5_branch33a_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+        memset(y2, 0, MMCBlock3_mmLayer5_branch33b_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+        memset(y3, 0, MMCBlock3_mmLayer5_branch33c_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer4_CHANNELS,
+            tmp1,
+            MMCBlock3_mmLayer5_branch11_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer5_branch11_CHANNELS,
+            y0,
+            1,      // kernel_size
+            1,      // stride
+            MMCBlock3_mmLayer5_branch11_bn_gamma,
+            MMCBlock3_mmLayer5_branch11_bn_beta,
+            MMCBlock3_mmLayer5_branch11_bn_running_mean,
+            MMCBlock3_mmLayer5_branch11_bn_running_var,
+            1e-5    // eps
+        );
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer5_branch11_CHANNELS,
+            y0,
+            MMCBlock3_mmLayer5_branch33a_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer5_branch33a_CHANNELS,
+            y1,
+            3,      // kernel_size
+            1,      // stride 
+            MMCBlock3_mmLayer5_branch33a_bn_gamma,
+            MMCBlock3_mmLayer5_branch33a_bn_beta,
+            MMCBlock3_mmLayer5_branch33a_bn_running_mean,
+            MMCBlock3_mmLayer5_branch33a_bn_running_var,
+            1e-5    // eps
+        );
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer5_branch33a_CHANNELS,
+            y1,
+            MMCBlock3_mmLayer5_branch33b_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer5_branch33b_CHANNELS,
+            y2,
+            3,      // kernel_size
+            1,      // stride
+            MMCBlock3_mmLayer5_branch33b_bn_gamma,
+            MMCBlock3_mmLayer5_branch33b_bn_beta,
+            MMCBlock3_mmLayer5_branch33b_bn_running_mean,
+            MMCBlock3_mmLayer5_branch33b_bn_running_var,
+            1e-5    // eps
+        );
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer5_branch33b_CHANNELS,
+            y2,
+            MMCBlock3_mmLayer5_branch33c_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer5_branch33c_CHANNELS,
+            y3,
+            3,      // kernel_size
+            1,      // stride
+            MMCBlock3_mmLayer5_branch33c_bn_gamma,
+            MMCBlock3_mmLayer5_branch33c_bn_beta,
+            MMCBlock3_mmLayer5_branch33c_bn_running_mean,
+            MMCBlock3_mmLayer5_branch33c_bn_running_var,
+            1e-5    // eps
+        );
+
+        concat4 (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer4_CHANNELS,
+            MMCBlock3_mmLayer5_branch33a_CHANNELS,
+            MMCBlock3_mmLayer5_branch33b_CHANNELS,
+            MMCBlock3_mmLayer5_branch33c_CHANNELS,
+            tmp1,
+            y1, 
+            y2, 
+            y3, 
+            tmp2
+        );
+       
+    //}}}
+
+    //-----------------------------------------------
+    //                  Layer6
+    //-----------------------------------------------
+    //{{{
+
+        memset(y0, 0, MMCBlock3_mmLayer6_branch11_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+        memset(y1, 0, MMCBlock3_mmLayer6_branch33a_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+        memset(y2, 0, MMCBlock3_mmLayer6_branch33b_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+        memset(y3, 0, MMCBlock3_mmLayer6_branch33c_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer5_CHANNELS,
+            tmp2,
+            MMCBlock3_mmLayer6_branch11_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer6_branch11_CHANNELS,
+            y0,
+            1,      // kernel_size
+            1,      // stride
+            MMCBlock3_mmLayer6_branch11_bn_gamma,
+            MMCBlock3_mmLayer6_branch11_bn_beta,
+            MMCBlock3_mmLayer6_branch11_bn_running_mean,
+            MMCBlock3_mmLayer6_branch11_bn_running_var,
+            1e-5    // eps
+        );
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer6_branch11_CHANNELS,
+            y0,
+            MMCBlock3_mmLayer6_branch33a_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer6_branch33a_CHANNELS,
+            y1,
+            3,      // kernel_size
+            1,      // stride 
+            MMCBlock3_mmLayer6_branch33a_bn_gamma,
+            MMCBlock3_mmLayer6_branch33a_bn_beta,
+            MMCBlock3_mmLayer6_branch33a_bn_running_mean,
+            MMCBlock3_mmLayer6_branch33a_bn_running_var,
+            1e-5    // eps
+        );
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer6_branch33a_CHANNELS,
+            y1,
+            MMCBlock3_mmLayer6_branch33b_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer6_branch33b_CHANNELS,
+            y2,
+            3,      // kernel_size
+            1,      // stride
+            MMCBlock3_mmLayer6_branch33b_bn_gamma,
+            MMCBlock3_mmLayer6_branch33b_bn_beta,
+            MMCBlock3_mmLayer6_branch33b_bn_running_mean,
+            MMCBlock3_mmLayer6_branch33b_bn_running_var,
+            1e-5    // eps
+        );
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer6_branch33b_CHANNELS,
+            y2,
+            MMCBlock3_mmLayer6_branch33c_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer6_branch33c_CHANNELS,
+            y3,
+            3,      // kernel_size
+            1,      // stride
+            MMCBlock3_mmLayer6_branch33c_bn_gamma,
+            MMCBlock3_mmLayer6_branch33c_bn_beta,
+            MMCBlock3_mmLayer6_branch33c_bn_running_mean,
+            MMCBlock3_mmLayer6_branch33c_bn_running_var,
+            1e-5    // eps
+        );
+
+        concat4 (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer5_CHANNELS,
+            MMCBlock3_mmLayer6_branch33a_CHANNELS,
+            MMCBlock3_mmLayer6_branch33b_CHANNELS,
+            MMCBlock3_mmLayer6_branch33c_CHANNELS,
+            tmp2,
+            y1, 
+            y2, 
+            y3, 
+            tmp1
+        );
+       
+    //}}}
+
+    //-----------------------------------------------
+    //                  Layer7
+    //-----------------------------------------------
+    //{{{
+
+        memset(y0, 0, MMCBlock3_mmLayer7_branch11_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+        memset(y1, 0, MMCBlock3_mmLayer7_branch33a_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+        memset(y2, 0, MMCBlock3_mmLayer7_branch33b_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+        memset(y3, 0, MMCBlock3_mmLayer7_branch33c_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer6_CHANNELS,
+            tmp1,
+            MMCBlock3_mmLayer7_branch11_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer7_branch11_CHANNELS,
+            y0,
+            1,      // kernel_size
+            1,      // stride
+            MMCBlock3_mmLayer7_branch11_bn_gamma,
+            MMCBlock3_mmLayer7_branch11_bn_beta,
+            MMCBlock3_mmLayer7_branch11_bn_running_mean,
+            MMCBlock3_mmLayer7_branch11_bn_running_var,
+            1e-5    // eps
+        );
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer7_branch11_CHANNELS,
+            y0,
+            MMCBlock3_mmLayer7_branch33a_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer7_branch33a_CHANNELS,
+            y1,
+            3,      // kernel_size
+            1,      // stride 
+            MMCBlock3_mmLayer7_branch33a_bn_gamma,
+            MMCBlock3_mmLayer7_branch33a_bn_beta,
+            MMCBlock3_mmLayer7_branch33a_bn_running_mean,
+            MMCBlock3_mmLayer7_branch33a_bn_running_var,
+            1e-5    // eps
+        );
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer7_branch33a_CHANNELS,
+            y1,
+            MMCBlock3_mmLayer7_branch33b_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer7_branch33b_CHANNELS,
+            y2,
+            3,      // kernel_size
+            1,      // stride
+            MMCBlock3_mmLayer7_branch33b_bn_gamma,
+            MMCBlock3_mmLayer7_branch33b_bn_beta,
+            MMCBlock3_mmLayer7_branch33b_bn_running_mean,
+            MMCBlock3_mmLayer7_branch33b_bn_running_var,
+            1e-5    // eps
+        );
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer7_branch33b_CHANNELS,
+            y2,
+            MMCBlock3_mmLayer7_branch33c_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer7_branch33c_CHANNELS,
+            y3,
+            3,      // kernel_size
+            1,      // stride
+            MMCBlock3_mmLayer7_branch33c_bn_gamma,
+            MMCBlock3_mmLayer7_branch33c_bn_beta,
+            MMCBlock3_mmLayer7_branch33c_bn_running_mean,
+            MMCBlock3_mmLayer7_branch33c_bn_running_var,
+            1e-5    // eps
+        );
+
+        concat4 (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer6_CHANNELS,
+            MMCBlock3_mmLayer7_branch33a_CHANNELS,
+            MMCBlock3_mmLayer7_branch33b_CHANNELS,
+            MMCBlock3_mmLayer7_branch33c_CHANNELS,
+            tmp1,
+            y1, 
+            y2, 
+            y3, 
+            tmp2
+        );
+       
+    //}}}
+
+    //-----------------------------------------------
+    //                  Layer8
+    //-----------------------------------------------
+    //{{{
+
+        memset(y0, 0, MMCBlock3_mmLayer8_branch11_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+        memset(y1, 0, MMCBlock3_mmLayer8_branch33a_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+        memset(y2, 0, MMCBlock3_mmLayer8_branch33b_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+        memset(y3, 0, MMCBlock3_mmLayer8_branch33c_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer7_CHANNELS,
+            tmp2,
+            MMCBlock3_mmLayer8_branch11_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer8_branch11_CHANNELS,
+            y0,
+            1,      // kernel_size
+            1,      // stride
+            MMCBlock3_mmLayer8_branch11_bn_gamma,
+            MMCBlock3_mmLayer8_branch11_bn_beta,
+            MMCBlock3_mmLayer8_branch11_bn_running_mean,
+            MMCBlock3_mmLayer8_branch11_bn_running_var,
+            1e-5    // eps
+        );
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer8_branch11_CHANNELS,
+            y0,
+            MMCBlock3_mmLayer8_branch33a_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer8_branch33a_CHANNELS,
+            y1,
+            3,      // kernel_size
+            1,      // stride 
+            MMCBlock3_mmLayer8_branch33a_bn_gamma,
+            MMCBlock3_mmLayer8_branch33a_bn_beta,
+            MMCBlock3_mmLayer8_branch33a_bn_running_mean,
+            MMCBlock3_mmLayer8_branch33a_bn_running_var,
+            1e-5    // eps
+        );
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer8_branch33a_CHANNELS,
+            y1,
+            MMCBlock3_mmLayer8_branch33b_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer8_branch33b_CHANNELS,
+            y2,
+            3,      // kernel_size
+            1,      // stride
+            MMCBlock3_mmLayer8_branch33b_bn_gamma,
+            MMCBlock3_mmLayer8_branch33b_bn_beta,
+            MMCBlock3_mmLayer8_branch33b_bn_running_mean,
+            MMCBlock3_mmLayer8_branch33b_bn_running_var,
+            1e-5    // eps
+        );
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer8_branch33b_CHANNELS,
+            y2,
+            MMCBlock3_mmLayer8_branch33c_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer8_branch33c_CHANNELS,
+            y3,
+            3,      // kernel_size
+            1,      // stride
+            MMCBlock3_mmLayer8_branch33c_bn_gamma,
+            MMCBlock3_mmLayer8_branch33c_bn_beta,
+            MMCBlock3_mmLayer8_branch33c_bn_running_mean,
+            MMCBlock3_mmLayer8_branch33c_bn_running_var,
+            1e-5    // eps
+        );
+
+        concat4 (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            MMCBlock3_mmLayer7_CHANNELS,
+            MMCBlock3_mmLayer8_branch33a_CHANNELS,
+            MMCBlock3_mmLayer8_branch33b_CHANNELS,
+            MMCBlock3_mmLayer8_branch33c_CHANNELS,
+            tmp2,
+            y1, 
+            y2, 
+            y3, 
+            tmp1
+        );
+       
+    //}}}
+
+    //-----------------------------------------------
+    //                  Conv3
+    //-----------------------------------------------
+    //{{{
+
+        memset(tmp2, 0, STAGE_4_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+
+        _conv_block (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            STAGE_4_CHANNELS,
+            tmp1,
+            tran_ConvNormRelu3_conv_weight,
+            NULL,   // bias
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            STAGE_4_CHANNELS,
+            tmp2,
+            1,      // kernel_size
+            1,      // stride
+            tran_ConvNormRelu3_bn_gamma,
+            tran_ConvNormRelu3_bn_beta,
+            tran_ConvNormRelu3_bn_running_mean,
+            tran_ConvNormRelu3_bn_running_var,
+            1e-5    // eps
+        );
+
+    //}}}
+    //-----------------------------------------------
+    //                 Pooling3 
+    //-----------------------------------------------
+    //{{{
+
+        memset(tmp1, 0, STAGE_4_CHANNELS*STAGE_4_HEIGHT*STAGE_4_WIDTH*sizeof(type));
+
+        avg_pool (
+            STAGE_3_HEIGHT,
+            STAGE_3_WIDTH,
+            STAGE_4_CHANNELS,
+            tmp2,
+            STAGE_4_HEIGHT,
+            STAGE_4_WIDTH,
+            STAGE_4_CHANNELS,
+            tmp1
+        );
+
+        print(tmp1, STAGE_4_CHANNELS*STAGE_4_HEIGHT*STAGE_4_WIDTH);
+
+    //}}}
     free(y0);
     free(y1);
     free(y2);
