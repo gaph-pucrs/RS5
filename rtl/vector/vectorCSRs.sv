@@ -1,4 +1,15 @@
-`include "../RS5_pkg.sv"
+/*!\file vectorCSRs.sv
+ *
+ * Willian Nunes    <willian.nunes@edu.pucrs.br>
+ * Angelo Dal Zotto <angelo.dalzotto@edu.pucrs.br>
+ * Marcos Sartori   <marcos.sartori@acad.pucrs.br>
+ * Ney Calazans     <ney.calazans@ufsc.br>
+ * Fernando Moraes  <fernando.moraes@pucrs.br>
+ * GAPH - Hardware Design Support Group
+ * PUCRS - Pontifical Catholic University of Rio Grande do Sul <https://pucrs.br/>
+ */
+
+`include "RS5_pkg.sv"
 
 /* verilator lint_off WIDTHEXPAND */
 /* verilator lint_off WIDTHTRUNC */

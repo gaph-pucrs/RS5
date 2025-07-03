@@ -3,11 +3,13 @@
  *
  * Distribution:  July 2023
  *
- * Willian Nunes   <willian.nunes@edu.pucrs.br>
- * Marcos Sartori  <marcos.sartori@acad.pucrs.br>
- * Ney calazans    <ney.calazans@pucrs.br>
- *
- * Research group: GAPH-PUCRS  <>
+ * Willian Nunes    <willian.nunes@edu.pucrs.br>
+ * Angelo Dal Zotto <angelo.dalzotto@edu.pucrs.br>
+ * Marcos Sartori   <marcos.sartori@acad.pucrs.br>
+ * Ney Calazans     <ney.calazans@ufsc.br>
+ * Fernando Moraes  <fernando.moraes@pucrs.br>
+ * GAPH - Hardware Design Support Group
+ * PUCRS - Pontifical Catholic University of Rio Grande do Sul <https://pucrs.br/>
  *
  * \brief
  * Decoder Unit is the second stage of RS5 processor core.
@@ -26,29 +28,36 @@
 module decode
     import RS5_pkg::*;
 #(
-    parameter mul_e         MULEXT      = MUL_M,
-    parameter atomic_e      AMOEXT      = AMO_A,
-    parameter bit           COMPRESSED  = 1'b1,
-    parameter bit           ZKNEEnable  = 1'b0,
-    parameter bit           VEnable     = 1'b0,
-    parameter bit           BRANCHPRED  = 1'b1
+    parameter mul_e         MULEXT       = MUL_M,
+    parameter atomic_e      AMOEXT       = AMO_A,
+    parameter bit           COMPRESSED   = 1'b1,
+    parameter bit           ZKNEEnable   = 1'b0,
+    parameter bit           ZICONDEnable = 1'b0,
+    parameter bit           VEnable      = 1'b0,
+    parameter bit           BRANCHPRED   = 1'b1,
+    parameter bit           FORWARDING   = 1'b1
 )
 (
     input   logic           clk,
     input   logic           reset_n,
     input   logic           enable,
+    input   logic           sys_reset,
 
     input   logic [31:0]    instruction_i,
     input   logic [31:0]    pc_i,
     input   logic [31:0]    rs1_data_read_i,
     input   logic [31:0]    rs2_data_read_i,
     input   logic [31:0]    writeback_i,
-    input   logic [31:0]    result_i,
     input   logic [ 4:0]    rd_retire_i,
     input   logic           regbank_we_i,
-    input   logic           execute_we_i,
     input   logic           rollback_i,
     input   logic           compressed_i,
+
+    /* Not used without forwarding */
+    /* verilator lint_off UNUSEDSIGNAL */
+    input   logic [31:0]    result_i,
+    input   logic           execute_we_i,
+    /* verilator lint_on UNUSEDSIGNAL */
 
     output  logic  [4:0]    rs1_o,
     output  logic  [4:0]    rs2_o,
@@ -61,6 +70,8 @@ module decode
     output  logic [31:0]    pc_o,
     output  logic [31:0]    instruction_o,
     output  logic [31:0]    jump_imm_target_o,
+    output  logic [31:0]    pc_next_o,
+
     output  logic           compressed_o,
     output  iType_e         instruction_operation_o,
     output  iTypeAtomic_e   atomic_operation_o,
@@ -73,6 +84,7 @@ module decode
     input   logic           jump_rollback_i,
     /* verilator lint_on UNUSEDSIGNAL */
     input   logic           ctx_switch_i,
+    input   logic           jump_i,
     input   logic           jumping_i,
     /* Not used without C */
     /* verilator lint_off UNUSEDSIGNAL */
@@ -84,8 +96,7 @@ module decode
 
     input   logic           exc_inst_access_fault_i,
     output  logic           exc_inst_access_fault_o,
-    output  logic           exc_ilegal_inst_o,
-    output  logic           exc_misaligned_fetch_o
+    output  logic           exc_ilegal_inst_o
 );
 
 //////////////////////////////////////////////////////////////////////////////
@@ -175,8 +186,10 @@ module decode
             10'b0000001101:     decode_op = (MULEXT == MUL_M  ) ? DIVU   : INVALID;
             10'b0000001110:     decode_op = (MULEXT == MUL_M  ) ? REM    : INVALID;
             10'b0000001111:     decode_op = (MULEXT == MUL_M  ) ? REMU   : INVALID;
-            10'b??10001000:     decode_op = ZKNEEnable ? AES32ESI  : INVALID;
-            10'b??10011000:     decode_op = ZKNEEnable ? AES32ESMI : INVALID;
+            10'b??10001000:     decode_op = ZKNEEnable   ? AES32ESI  : INVALID;
+            10'b??10011000:     decode_op = ZKNEEnable   ? AES32ESMI : INVALID;
+            10'b0000111101:     decode_op = ZICONDEnable ? CZERO_EQZ : INVALID;
+            10'b0000111111:     decode_op = ZICONDEnable ? CZERO_NEZ : INVALID;
             default:            decode_op = INVALID;
         endcase
     end
@@ -466,10 +479,12 @@ module decode
 
         assign bp_take_o   = (bp_jump_taken || bp_branch_taken) && !jumping_i && !killed;
 
-        assign jump_confirmed = ctx_switch_i || (jumping_i && !jump_rollback_i);
+        assign jump_confirmed = ctx_switch_i || jump_i || (jumping_i && !jump_rollback_i);
         
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
+                bp_taken_o <= 1'b0;
+            else if (sys_reset)
                 bp_taken_o <= 1'b0;
             else if (enable && !hazard_o)
                 bp_taken_o <= bp_take_o;
@@ -478,7 +493,7 @@ module decode
     else begin : gen_bp_off
         assign bp_take_o   = 1'b0;
         assign bp_taken_o  = 1'b0;
-        assign jump_confirmed = ctx_switch_i || jumping_i;
+        assign jump_confirmed = ctx_switch_i || jump_i || jumping_i;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -487,11 +502,9 @@ module decode
 
     logic is_load;
     logic is_store;
-    logic forwardingless;
 
     assign is_load  = (opcode == 5'b00000) || (instruction_operation == LR_W);
     assign is_store = (opcode == 5'b01000) || (instruction_operation inside {SC_W, AMO_W});
-    assign forwardingless = (instruction_operation inside {SC_W});
     
     logic           locked_memory;
     logic  [4:0]    locked_register;
@@ -507,7 +520,7 @@ module decode
             if (hazard_o || killed)
                 locked_register <= '0;
             else    // Read-after-write on LOAD
-                locked_register <= (is_load || forwardingless) ? rd : '0;
+                locked_register <= (is_load || !FORWARDING) ? rd : '0;
         end
     end
 
@@ -619,34 +632,19 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     logic invalid_inst;
-    logic misaligned_fetch;
     logic exc_inst_access_fault;
 
     assign invalid_inst = ((instruction_i[1:0] != '1) || instruction_operation == INVALID || amo_invalid);
 
-    if (COMPRESSED) begin : gen_compressed_on
-        assign misaligned_fetch = (pc_i[0] != 1'b0);
-    end
-    else begin : gen_compressed_off
-        assign misaligned_fetch = (pc_i[1:0] != 2'b00);
-    end
-
     assign exc_inst_access_fault = exc_inst_access_fault_i;
 
-    assign exception = exc_inst_access_fault || invalid_inst || misaligned_fetch;
+    assign exception = exc_inst_access_fault || invalid_inst;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             exc_ilegal_inst_o <= 1'b0;
         else if (enable)
             exc_ilegal_inst_o <= invalid_inst;
-    end
-
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            exc_misaligned_fetch_o <= 1'b0;
-        else if (enable)
-            exc_misaligned_fetch_o <= misaligned_fetch;
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
@@ -663,22 +661,39 @@ module decode
     logic [31:0] rs1_data;
     logic [31:0] rs2_data;
 
-    always_comb begin
-        if (rs1_o == rd_o && execute_we_i)  // Forwarding from execute
-            rs1_data = result_i;
-        else if (rs1_o == rd_retire_i && regbank_we_i)  // Forwarding from retire on LOAD
-            rs1_data = writeback_i;
-        else
-            rs1_data = rs1_data_read_i;
-    end
+    if (FORWARDING) begin : gen_forwarding_on
+        always_comb begin
+            if (rs1_o == rd_o && execute_we_i)  // Forwarding from execute
+                rs1_data = result_i;
+            else if (rs1_o == rd_retire_i && regbank_we_i)  // Forwarding from retire on LOAD
+                rs1_data = writeback_i;
+            else
+                rs1_data = rs1_data_read_i;
+        end
 
-    always_comb begin
-        if (rs2_o == rd_o && execute_we_i)  // Forwarding from execute
-            rs2_data = result_i;
-        else if (rs2_o == rd_retire_i && regbank_we_i)  // Forwarding from retire on LOAD
-            rs2_data = writeback_i;
-        else
-            rs2_data = rs2_data_read_i;
+        always_comb begin
+            if (rs2_o == rd_o && execute_we_i)  // Forwarding from execute
+                rs2_data = result_i;
+            else if (rs2_o == rd_retire_i && regbank_we_i)  // Forwarding from retire on LOAD
+                rs2_data = writeback_i;
+            else
+                rs2_data = rs2_data_read_i;
+        end
+    end
+    else begin : gen_forwarding_off
+        always_comb begin
+            if (rs1_o == rd_retire_i && regbank_we_i)  // Forwarding from retire on LOAD
+                rs1_data = writeback_i;
+            else
+                rs1_data = rs1_data_read_i;
+        end
+
+        always_comb begin
+            if (rs2_o == rd_retire_i && regbank_we_i)  // Forwarding from retire on LOAD
+                rs2_data = writeback_i;
+            else
+                rs2_data = rs2_data_read_i;
+        end
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
@@ -713,7 +728,7 @@ module decode
     end
 
 //////////////////////////////////////////////////////////////////////////////
-// Outputs do execution unit
+// Outputs to execution unit
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk or negedge reset_n) begin
@@ -727,7 +742,7 @@ module decode
         if (!reset_n)
             instruction_o <= '0;
         else if (enable)
-            instruction_o <= instruction_i;
+            instruction_o <= (!COMPRESSED && compressed_i) ? {16'h0000, instruction_i[15:0]} : instruction_i;
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
@@ -741,11 +756,24 @@ module decode
         if (!reset_n) begin
             instruction_operation_o <= NOP;
         end
+        else if (sys_reset) begin
+            instruction_operation_o <= NOP;
+        end
         else if (enable) begin
             if (hazard_o || killed)
                 instruction_operation_o <= NOP;
             else
                 instruction_operation_o <= instruction_operation;
+        end
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            pc_next_o <= '0;
+        end
+        else begin
+            // To link register. Maybe we can remove this by using the PC in decode stage
+            pc_next_o <= pc_i + ((COMPRESSED && compressed_i) ? 32'd2 : 32'd4);
         end
     end
 
