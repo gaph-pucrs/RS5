@@ -60,13 +60,13 @@ module vectorUnit
     logic [VLEN-1:0]  v0_mask;
 
     logic [4:0]       rs1_addr, rs2_addr, rd_addr;
-    logic [4:0]       vs1_addr, vs2_addr;
-    logic [VLEN-1:0]  vs1_data, vs2_data;
+    logic [4:0]       vs1_addr, vs2_addr, vs3_addr;
+    logic [VLEN-1:0]  vs1_data, vs2_data, vs3_data;
     logic [3:0]       cycle_count, cycle_count_r, cycle_count_vd;
     logic             hazard_detected;
-    logic             hold, hold_widening, hold_accumulation, hold_alu, hold_lsu;
+    logic             hold, hold_widening, hold_alu, hold_lsu;
 
-    logic [VLEN-1:0]  first_operand, second_operand;
+    logic [VLEN-1:0]  first_operand, second_operand, third_operand;
 
     logic [4:0]       vd_addr, vd_addr_r;
     logic [VLEN-1:0]  result_alu, result_alu_mask, result_lsu, result;
@@ -139,7 +139,7 @@ module vectorUnit
 // FSM
 //////////////////////////////////////////////////////////////////////////////
 
-    assign hazard_detected = (state == V_IDLE && |write_enable == 1'b1 && (vs1_addr == vd_addr_r || vs2_addr == vd_addr_r));
+    assign hazard_detected = (state == V_IDLE && |write_enable == 1'b1 && (vs1_addr == vd_addr_r || vs2_addr == vd_addr_r || vs3_addr == vd_addr_r));
 
     assign hold_o = (instruction_operation_i inside {VECTOR, VLOAD, VSTORE}) && (next_state == V_EXEC || hazard_detected == 1'b1);
 
@@ -314,28 +314,9 @@ module vectorUnit
 
     always_comb begin
         // VS1 Address
-        vs1_addr =  (instruction_operation_i == VSTORE)
-                    ? rd_addr
-                    : rs1_addr;
-
-        // VS2 Address
-        if (accumulate_instruction) begin
-            if (!hold_accumulation) begin
-                unique case (vector_operation_i)
-                    VMADD, VNMSUB: vs2_addr = rd_addr;
-                    default:       vs2_addr = rs2_addr;
-                endcase
-            end
-            else begin
-                unique case (vector_operation_i)
-                    VMADD, VNMSUB: vs2_addr = rs2_addr - 1;
-                    default:       vs2_addr = vd_addr;
-                endcase
-            end
-        end
-        else begin
-            vs2_addr = rs2_addr;
-        end
+        vs1_addr = (instruction_operation_i == VSTORE) ? rd_addr : rs1_addr;
+        vs2_addr = rs2_addr;
+        vs3_addr = rd_addr;
     end
 
     always_ff @(posedge clk) begin
@@ -399,12 +380,14 @@ module vectorUnit
         .reset_n  (reset_n),
         .vs1_addr (vs1_addr),
         .vs2_addr (vs2_addr),
+        .vs3_addr (vs3_addr),
         .enable   (write_enable),
         .vd_addr  (vd_addr_r),
         .result   (result),
         .v0_mask  (v0_mask),
         .vs1_data (vs1_data),
-        .vs2_data (vs2_data)
+        .vs2_data (vs2_data),
+        .vs3_data (vs3_data)
     );
 
 //////////////////////////////////////////////////////////////////////////////
@@ -443,13 +426,14 @@ module vectorUnit
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk) begin
-        if (!hold || hold_accumulation) begin
-            first_operand  <= vs2_data;
+        if (!hold) begin
+            first_operand  <= (vector_operation_i inside {VMADD, VNMSUB}) ? vs3_data : vs2_data;
+            third_operand  <= (vector_operation_i inside {VMADD, VNMSUB}) ? vs2_data : vs3_data;
         end
     end
 
     always_ff @(posedge clk) begin
-        if (!hold || hold_accumulation) begin
+        if (!hold) begin
             if (instruction_operation_i == VSTORE) begin
                 second_operand <= vs1_data;
             end
@@ -517,6 +501,7 @@ module vectorUnit
         .reset_n            (reset_n),
         .first_operand      (first_operand),
         .second_operand     (second_operand),
+        .third_operand      (third_operand),
         .vector_operation_i (vector_operation_i),
         .cycle_count        (cycle_count),
         .cycle_count_r      (cycle_count_r),
@@ -530,7 +515,6 @@ module vectorUnit
         .vsew               (vsew),
         .hold_o             (hold_alu),
         .hold_widening_o    (hold_widening),
-        .hold_accumulation_o(hold_accumulation),
         .result_mask_o      (result_alu_mask),
         .result_o           (result_alu)
     );

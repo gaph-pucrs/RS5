@@ -21,6 +21,7 @@ module vectorALU
 
     input  logic [VLEN-1:0]             first_operand,
     input  logic [VLEN-1:0]             second_operand,
+    input  logic [VLEN-1:0]             third_operand,
     input  vector_states_e              current_state,
     input  logic [3:0]                  cycle_count,
     input  logic [3:0]                  cycle_count_r,
@@ -41,7 +42,8 @@ module vectorALU
     output logic [VLEN-1:0]             result_o
 );
 
-    localparam LANES = VLEN/32;
+    localparam LANES = VLEN/128;
+    localparam LLEN = VLEN/LANES;
 
     logic [LANES-1:0] hold_lanes;
     logic             hold_reductions;
@@ -177,14 +179,18 @@ module vectorALU
 // Lanes
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [LANES-1:0][ 3:0] result_lanes_mask;
+    logic enable_lane;
+    logic [LANES-1:0][LLEN/8-1:0] result_lanes_mask;
     logic [(2*VLEN)-1:0]    result_lanes_mult;
     logic [   VLEN -1:0]    result_lanes;
     logic [   VLEN -1:0]    result_mult_low;
 
+    assign enable_lane = current_state == V_EXEC && vector_operation_i != VNOP && !hold_widening_r && !hold_accumulation_r && !reduction_instruction;
+
     generate
         for (genvar i_lane = 0; i_lane < LANES; i_lane++) begin : LANE_LOOP
             vectorLane #(
+                .LLEN        (LLEN),
                 .V_LOGIC_ON  (V_LOGIC_ON),
                 .V_MINMAX_ON (V_MINMAX_ON),
                 .V_MERGE_ON  (V_MERGE_ON),
@@ -192,21 +198,24 @@ module vectorALU
             )   vectorLane (
                 .clk               (clk),
                 .reset_n           (reset_n),
-                .first_operand     (first_operand[(32*i_lane)+:32]),
-                .second_operand    (second_operand[(32*i_lane)+:32]),
-                .vm                (vm),
-                .mask_sew8         (mask_sew8 [cycle_count_r][(4*i_lane)+:4]),
-                .mask_sew16        (mask_sew16[cycle_count_r][(2*i_lane)+:2]),
-                .mask_sew32        (mask_sew32[cycle_count_r][i_lane]),
+                .first_operand_i   (first_operand [(LLEN*i_lane)+:LLEN]),
+                .second_operand_i  (second_operand[(LLEN*i_lane)+:LLEN]),
+                .third_operand_i   (third_operand [(LLEN*i_lane)+:LLEN]),
+                .mask_sew8_i       (mask_sew8 [cycle_count_r][((LLEN/ 8)*i_lane)+:LLEN/8]),
+                .mask_sew16_i      (mask_sew16[cycle_count_r][((LLEN/16)*i_lane)+:LLEN/16]),
+                .mask_sew32_i      (mask_sew32[cycle_count_r][((LLEN/32)*i_lane)+:LLEN/32]),
+                .enable_i          (enable_lane),
                 .vector_operation_i(vector_operation_i),
                 .vsew              (vsew),
+                .vm                (vm),
                 .mult_enable       (mult_enable),
+                .hold_widening     (hold_widening_r),
                 .mult_signed_mode  (mult_signed_mode),
                 .div_enable        (div_enable),
                 .hold_o            (hold_lanes[i_lane]),
                 .result_mask_o     (result_lanes_mask[i_lane]),
-                .result_mult_o     (result_lanes_mult[(64*i_lane)+:64]),
-                .result_o          (result_lanes[(32*i_lane)+:32])
+                .result_mult_o     (result_lanes_mult[(2*LLEN*i_lane)+:2*LLEN]),
+                .result_o          (result_lanes[(LLEN*i_lane)+:LLEN])
             );
         end
     endgenerate
@@ -227,19 +236,19 @@ module vectorALU
         unique case (vsew)
             EW8:
                 for (int i = 0; i < LANES; i++)
-                    result_mask[(4*i)+:4] = result_lanes_mask[i];
+                    result_mask[(LLEN/8)*i+:LLEN/8] = result_lanes_mask[i];
 
             EW16:
                 for (int i = 0; i < LANES; i++)
-                    result_mask[(2*i)+:2] = result_lanes_mask[i][1:0];
+                    result_mask[(LLEN/16)*i+:LLEN/16] = result_lanes_mask[i][(LLEN/16)-1:0];
 
             default:
                 for (int i = 0; i < LANES; i++)
-                    result_mask[i] = result_lanes_mask[i][0];
+                    result_mask[(LLEN/32)*i+:LLEN/32] = result_lanes_mask[i][(LLEN/32)-1:0];
         endcase
     end
 
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         unique case (vsew)
             EW8:
                 for (int i = 0; i < 8; i++)
@@ -261,6 +270,7 @@ module vectorALU
 //////////////////////////////////////////////////////////////////////////////
 // Hold generation
 //////////////////////////////////////////////////////////////////////////////
+    logic ended_acc_r;
 
     assign hold = |hold_lanes;
 
@@ -275,11 +285,12 @@ module vectorALU
     iTypeVector_e    vector_operation_r;
     logic            hold_widening_2r;
 
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         first_operand_r    <= first_operand;
         second_operand_r   <= second_operand;
         vector_operation_r <= vector_operation_i;
         hold_widening_2r   <= hold_widening_r;
+        ended_acc_r        <= ended_acc;
     end
 
     always_comb begin

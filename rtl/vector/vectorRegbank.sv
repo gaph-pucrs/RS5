@@ -12,6 +12,7 @@ module vectorRegbank
 
     input   logic [4:0]       vs1_addr,
     input   logic [4:0]       vs2_addr,
+    input   logic [4:0]       vs3_addr,
 
     input   logic [VLENB-1:0] enable,
     input   logic [4:0]       vd_addr,
@@ -19,7 +20,8 @@ module vectorRegbank
 
     output  logic [VLEN-1:0]  v0_mask,
     output  logic [VLEN-1:0]  vs1_data,
-    output  logic [VLEN-1:0]  vs2_data
+    output  logic [VLEN-1:0]  vs2_data,
+    output  logic [VLEN-1:0]  vs3_data
 );
 
     //////////////////////////////////////////////////////////////////////////////
@@ -64,6 +66,15 @@ module vectorRegbank
                 .dpra       (vs2_addr),
                 .dpo        (vs2_data[(8*j)+:8])
             );
+
+            DRAM_Vector_RegBank VectorRegBankC (
+                .clk        (clk),
+                .we         (enable[j]),
+                .a          (vd_addr),
+                .d          (result[(8*j)+:8]),
+                .dpra       (vs3_addr),
+                .dpo        (vs3_data[(8*j)+:8])
+            );
         end
 
     end
@@ -76,6 +87,7 @@ module vectorRegbank
 
         assign vs1_data = regfile[vs1_addr];
         assign vs2_data = regfile[vs2_addr];
+        assign vs3_data = regfile[vs3_addr];
         assign v0_mask  = regfile[0];
 
         //////////////////////////////////////////////////////////////////////////////

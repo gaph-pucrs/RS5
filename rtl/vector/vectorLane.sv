@@ -5,33 +5,95 @@
 module vectorLane
     import RS5_pkg::*;
 #(
+    parameter int LLEN        = 32,
     parameter bit V_LOGIC_ON  = 1'b1,
     parameter bit V_MINMAX_ON = 1'b1,
     parameter bit V_MERGE_ON  = 1'b1,
     parameter bit V_DIV_ON    = 1'b1
 ) (
-    input  logic         clk,
-    input  logic         reset_n,
+    input  logic              clk,
+    input  logic              reset_n,
 
-    input  logic [31:0]  first_operand,
-    input  logic [31:0]  second_operand,
-    input  logic         vm,
-    input  logic [ 3:0]  mask_sew8,
-    input  logic [ 1:0]  mask_sew16,
-    input  logic         mask_sew32,
+    input  logic [LLEN-1:0]    first_operand_i,
+    input  logic [LLEN-1:0]    second_operand_i,
+    input  logic [LLEN-1:0]    third_operand_i,
+    input  logic [LLEN/ 8-1:0] mask_sew8_i,
+    input  logic [LLEN/16-1:0] mask_sew16_i,
+    input  logic [LLEN/32-1:0] mask_sew32_i,
 
-    input  iTypeVector_e vector_operation_i,
-    input  vew_e         vsew,
+    input  logic               enable_i,
+    input  iTypeVector_e       vector_operation_i,
+    input  vew_e               vsew,
+    input  logic               vm,
 
-    input  logic         mult_enable,
-    input  logic [ 1:0]  mult_signed_mode,
-    input  logic         div_enable,
+    input  logic               mult_enable,
+    input  logic               hold_widening,
+    input  logic [ 1:0]        mult_signed_mode,
+    input  logic               div_enable,
 
-    output logic         hold_o,
-    output logic [ 3:0]  result_mask_o,
-    output logic [63:0]  result_mult_o,
-    output logic [31:0]  result_o
+    output logic               hold_o,
+    output logic [LLEN/8-1:0]  result_mask_o,
+    output logic [2*LLEN-1:0]  result_mult_o,
+    output logic [  LLEN-1:0]  result_o
 );
+
+    logic hold_mult;
+    logic hold_div;
+
+//////////////////////////////////////////////////////////////////////////////
+// Operands Control
+//////////////////////////////////////////////////////////////////////////////
+
+    localparam ELEMENTS_PER_LANE = LLEN/32;
+    logic [$clog2(LLEN/32)-1:0] cycle;
+    logic [$clog2(LLEN/32)-1:0] cycle_r;
+    logic hold_llen;
+
+    logic [31:0] first_operand;
+    logic [31:0] second_operand;
+    logic [31:0] third_operand;
+    logic [ 3:0] mask_sew8;
+    logic [ 1:0] mask_sew16;
+    logic        mask_sew32;
+
+    if (LLEN > 32) begin
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n) begin
+                cycle <= '0;
+            end
+            else if (!enable_i) begin
+                cycle <= '0;
+            end
+            else if (enable_i && !hold_mult && !hold_div) begin
+                cycle <= cycle + 1;
+            end
+        end
+
+        always_ff @(posedge clk) begin
+            cycle_r <= cycle;
+        end
+
+        assign hold_llen = cycle < ELEMENTS_PER_LANE-1 && enable_i ;
+
+    end
+    else begin
+        assign cycle     = 1'b0;
+        assign cycle_r   = 1'b0;
+        assign hold_llen = 1'b0;
+    end
+
+    always_comb begin
+        first_operand  = first_operand_i [(32*cycle)+:32];
+        second_operand = second_operand_i[(32*cycle)+:32];
+        third_operand  = third_operand_i [(32*cycle)+:32];
+        mask_sew8      = mask_sew8_i [(4*cycle)+:4];
+        mask_sew16     = mask_sew16_i[(2*cycle)+:2];
+        mask_sew32     = mask_sew32_i[cycle];
+    end
+
+//////////////////////////////////////////////////////////////////////////////
+// 8 and 16 Operands
+//////////////////////////////////////////////////////////////////////////////
 
     logic [3:0][ 7:0] second_op_8b;
     logic [1:0][15:0] second_op_16b;
@@ -200,9 +262,9 @@ module vectorLane
 
     always_comb begin
         unique case (vsew)
-            EW8:     result_mask_o =        result_comparison_8b  & ({4{vm}} | mask_sew8);
-            EW16:    result_mask_o = {2'b0, result_comparison_16b & ({2{vm}} | mask_sew16)};
-            default: result_mask_o = {3'b0, result_comparison_32b & (   vm   | mask_sew32)};
+            EW8:     result_mask_o[(4*cycle)+:4] =        result_comparison_8b  & ({4{vm}} | mask_sew8);
+            EW16:    result_mask_o[(2*cycle)+:2] = {2'b0, result_comparison_16b & ({2{vm}} | mask_sew16)};
+            default: result_mask_o[(  cycle)   ] = {3'b0, result_comparison_32b & ({1{vm}} | mask_sew32)};
         endcase
     end
 
@@ -263,7 +325,6 @@ module vectorLane
 
     logic widening_instruction;
     logic mult_low;
-    logic hold_mult;
 
     always_comb begin
         unique case (vsew)
@@ -355,6 +416,7 @@ module vectorLane
 //////////////////////////////////////////////////////////////////////////////
     logic [63:0] result_mult;
     logic [31:0] result_mult_r;
+    logic [31:0] third_operand_r;
 
     always_comb begin
         result_mult = '0;
@@ -382,9 +444,10 @@ module vectorLane
         endcase
     end
 
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (!hold_mult) begin
-            result_mult_r <= result_mult[31:0];
+            result_mult_r   <= result_mult[31:0];
+            third_operand_r <= third_operand;
         end
     end
 
@@ -395,7 +458,6 @@ module vectorLane
     logic [3:0] hold_div_8b;
     logic [1:0] hold_div_16b;
     logic       hold_div_32b;
-    logic       hold_div;
 
     logic        div_signed;
     logic [31:0] result_div;
@@ -579,9 +641,16 @@ module vectorLane
             subtraend_8b[(8*i)+:8] = subtraend_neg[(8*i)+:8] + 1'b1;
     end
 
-    assign summand_1 = (vector_operation_i == VRSUB)
-                       ? second_operand
-                       : first_operand;
+    always_comb begin
+         unique case (vector_operation_i)
+             VRSUB:   summand_1 = second_operand;
+             VNMSAC,
+             VMACC,
+             VMADD,
+             VNMSUB:  summand_1 = third_operand_r;
+             default: summand_1 = first_operand;
+         endcase
+     end
 
     assign summand_2_int = (vector_operation_i inside {VMACC, VMADD})
                            ? result_mult_r
@@ -626,33 +695,36 @@ module vectorLane
 // Hold generation
 //////////////////////////////////////////////////////////////////////////////
 
-    assign hold_o = hold_mult | hold_div;
+    assign hold_o = hold_mult | hold_div | hold_llen;
 
 //////////////////////////////////////////////////////////////////////////////
 // Result Demux
 //////////////////////////////////////////////////////////////////////////////
 
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         unique case(vector_operation_i)
-            VAND:              result_o <= result_and;
-            VOR:               result_o <= result_or;
-            VXOR:              result_o <= result_xor;
-            VSLL:              result_o <= result_sll;
-            VSRL:              result_o <= result_srl;
-            VSRA:              result_o <= result_sra;
-            VMIN:              result_o <= result_min;
-            VMINU:             result_o <= result_minu;
-            VMAX:              result_o <= result_max;
-            VMAXU:             result_o <= result_maxu;
-            VMERGE:            result_o <= result_merge;
-            VDIV, VDIVU:       result_o <= result_div;
-            VREM, VREMU:       result_o <= result_rem;
-            default:           result_o <= result_add;
+            VAND:              result_o[(32*cycle)+:32] <= result_and;
+            VOR:               result_o[(32*cycle)+:32] <= result_or;
+            VXOR:              result_o[(32*cycle)+:32] <= result_xor;
+            VSLL:              result_o[(32*cycle)+:32] <= result_sll;
+            VSRL:              result_o[(32*cycle)+:32] <= result_srl;
+            VSRA:              result_o[(32*cycle)+:32] <= result_sra;
+            VMIN:              result_o[(32*cycle)+:32] <= result_min;
+            VMINU:             result_o[(32*cycle)+:32] <= result_minu;
+            VMAX:              result_o[(32*cycle)+:32] <= result_max;
+            VMAXU:             result_o[(32*cycle)+:32] <= result_maxu;
+            VMERGE:            result_o[(32*cycle)+:32] <= result_merge;
+            VDIV, VDIVU:       result_o[(32*cycle)+:32] <= result_div;
+            VREM, VREMU:       result_o[(32*cycle)+:32] <= result_rem;
+            VMACC, VNMSAC,
+            VMADD, VNMSUB:     result_o[(32*cycle_r)+:32] <= result_add;
+            default:           result_o[(32*cycle)  +:32] <= result_add;
         endcase
     end
 
-    always @(posedge clk) begin
-        result_mult_o <= result_mult;
+    always_ff @(posedge clk) begin
+        if (!hold_widening)
+            result_mult_o[(64*cycle)+:64] <= result_mult;
     end
 
 endmodule
