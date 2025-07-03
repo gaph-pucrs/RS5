@@ -64,12 +64,22 @@ void TEST_CASE2() {
   // VCMP_I64(7, v1, 1);
 }
 
+void TEST_CASE3() {
+  scalar_32b = 55 << 16;
+  VSET(32, e32, m2);
+  VLOAD_32(v1, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  asm volatile("vmv.s.x v1, %0" ::"r"(scalar_32b));
+  VCMP_I32(8, v1, scalar_32b);
+  VCMP_I32(9, v1, scalar_32b);
+}
+
 int main(void) {
   INIT_CHECK();
   enable_vec();
 
   TEST_CASE1();
   TEST_CASE2();
+  TEST_CASE3();
 
   EXIT_CHECK();
 }

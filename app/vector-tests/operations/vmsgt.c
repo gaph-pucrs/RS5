@@ -155,6 +155,17 @@ void TEST_CASE4(void) {
   // VCMP_U8(16, v1, 0x88, 0x88);
 };
 
+void TEST_CASE5(void) {
+  VSET(32, e32, m2);
+  VLOAD_32(v2, 12345, -8, -25, 199, 12345, -8, -25, 199, 12345, -8, -25, 199,
+           12345, -8, -25, 199,
+           12345, -8, -25, 199, 12345, -8, -25, 199, 12345, -8, -25, 199,
+           12345, -8, -25, 199);
+  asm volatile("vmsgt.vi v1, v2, 15");
+  VSET(4, e8, m1);
+  VCMP_U8(17, v1, 0x99, 0x99, 0x99, 0x99);
+};
+
 int main(void) {
   INIT_CHECK();
   enable_vec();
@@ -163,6 +174,7 @@ int main(void) {
   TEST_CASE2();
   TEST_CASE3();
   TEST_CASE4();
+  TEST_CASE5();
 
   EXIT_CHECK();
 }
