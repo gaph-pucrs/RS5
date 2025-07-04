@@ -9,6 +9,8 @@
 #define IMAGE_HEIGHT   32
 #define IMAGE_WIDTH    32
 
+#define MULTIP       100000
+
 //----------------------------
 //      LMFRNet stages
 //----------------------------
@@ -69,6 +71,12 @@ void _fc (
     for (int n=0; n<NEURONS; n++)
     {
         out[n] += bias[n];
+    }
+
+    // int handler
+    for (int n=0; n<NEURONS; n++)
+    {
+        out[n] /= MULTIP;
     }
 }
 //}}}
@@ -256,10 +264,16 @@ void _conv_block (
             {
                 for (int n=0; n<OUTPUT_CHANNELS; n++)
                 {
-                    out[(n)+(l*OUTPUT_CHANNELS)+(k*OUTPUT_CHANNELS*OUTPUT_WIDTH)] += bias[n];
+                    //out[(n)+(l*OUTPUT_CHANNELS)+(k*OUTPUT_CHANNELS*OUTPUT_WIDTH)] += bias[n];
                 }
             }
         }
+    }
+
+    // int handler
+    for (int i=0; i<OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS; i++)
+    {
+        out[i] /= MULTIP;
     }
 
     batch_normalization (
@@ -325,7 +339,8 @@ void concat4 (
 
 void print(type v[], int size) {
     for (int i=0; i<size; i++) {
-        printf("%.10f\n", v[i]);
+        //printf("%.10f\n", v[i]);
+        printf("%d\n", v[i]);
     }
 }
 
@@ -355,9 +370,13 @@ int main()
         stemBlock_stemConv_bn_beta,
         stemBlock_stemConv_bn_running_mean,
         stemBlock_stemConv_bn_running_var,
-        1e-5    // eps
+        1e-5*MULTIP*MULTIP    // eps
     );
     
+    print(stage_1_out, STAGE_1_WIDTH*STAGE_1_HEIGHT*STAGE_1_CHANNELS);
+
+    return 0;
+
 //}}}
 
 type *y0 = calloc(MMCBlock1_mmLayer1_branch11_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH, sizeof(type));

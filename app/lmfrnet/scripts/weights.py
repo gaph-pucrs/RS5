@@ -3,7 +3,12 @@ import torch
 import numpy as np
 
 OUTPUT_DIRECTORY = '../params'
-type = 'float'
+type = 'int'
+MULTIP = 100000
+MULTIP_GAMMA = 100000
+MULTIP_BETA  = 100000
+MULTIP_MEAN = 100000
+MULTIP_VAR = 10000000000
 
 def load_checkpoint(ckpt_path):
     checkpoint = torch.load(ckpt_path, map_location='cpu')
@@ -18,10 +23,10 @@ def classifier_mapper(state_dict):
         if key.endswith('weight') and ('.fc' in key or 'classifier' in key):
             class_name_base = key.rsplit('.weight', 1)[0]
             class_bias = class_name_base + '.bias'
-            print(f"{state_dict[key].shape}")
+            #print(f"{state_dict[key].shape}")
             classifier_map[class_name_base] = {
-                'weight': state_dict[key].cpu().permute(1, 0).numpy(),
-                'bias': state_dict.get(class_bias, None).cpu().numpy() if class_bias in state_dict else None
+                'weight': np.array([x*MULTIP for x in state_dict[key].cpu().permute(1, 0).numpy()]),
+                'bias'  : np.array([x*MULTIP for x in state_dict.get(class_bias, None).cpu().numpy()]) if class_bias in state_dict else None
             }
     
     return classifier_map
@@ -42,12 +47,12 @@ def stemblock_mapper(state_dict):
     var_key = bn_name_base + '.running_var'
 
     stemblock_map[layer_name] = {
-        'conv_weight': state_dict[key].cpu().permute(2, 3, 1, 0).numpy(),
-        'conv_bias': state_dict.get(conv_bias, None).cpu().numpy() if conv_bias in state_dict else None,
-        'bn_gamma': state_dict[gamma_key].cpu().numpy(),
-        'bn_beta': state_dict[beta_key].cpu().numpy(),
-        'bn_running_mean': state_dict[mean_key].cpu().numpy(),
-        'bn_running_var': state_dict[var_key].cpu().numpy()
+        'conv_weight': np.array([x*MULTIP for x in state_dict[key].cpu().permute(2, 3, 1, 0).numpy()]),
+        'conv_bias'  : state_dict.get(conv_bias, None).cpu().numpy() if conv_bias in state_dict else None,
+        'bn_gamma'   : np.array([x*MULTIP_GAMMA for x in state_dict[gamma_key].cpu().numpy()]),
+        'bn_beta'    : np.array([x*MULTIP_BETA  for x in state_dict[beta_key].cpu().numpy() ]),
+        'bn_running_mean': np.array([x*MULTIP_MEAN for x in state_dict[mean_key].cpu().numpy()]),
+        'bn_running_var' : np.array([x*MULTIP_VAR  for x in state_dict[var_key].cpu().numpy() ])
     }
 
     return stemblock_map
@@ -70,17 +75,17 @@ def conv_bn_mapper(state_dict):
             has_bn = all(k in state_dict for k in [gamma_key, beta_key, mean_key, var_key])
 
             conv_bn_map[conv_name] = {
-                'conv_weight': state_dict[key].cpu().permute(2, 3, 1, 0).numpy(),
-                'conv_bias': state_dict.get(conv_name + '.bias', None)
+                'conv_weight': np.array([x*MULTIP for x in state_dict[key].cpu().permute(2, 3, 1, 0).numpy()]),
+                'conv_bias'  : state_dict.get(conv_name + '.bias', None)
                 .cpu().numpy() if conv_name + '.bias' in state_dict else None
             }
 
             if has_bn:
                 conv_bn_map[conv_name].update({
-                    'bn_gamma': state_dict[gamma_key].cpu().numpy(),
-                    'bn_beta': state_dict[beta_key].cpu().numpy(),
-                    'bn_running_mean': state_dict[mean_key].cpu().numpy(),
-                    'bn_running_var': state_dict[var_key].cpu().numpy()
+                    'bn_gamma': np.array([x*MULTIP_GAMMA for x in state_dict[gamma_key].cpu().numpy()]),
+                    'bn_beta' : np.array([x*MULTIP_BETA  for x in state_dict[beta_key].cpu().numpy() ]),
+                    'bn_running_mean': np.array([x*MULTIP_MEAN for x in state_dict[mean_key].cpu().numpy()]),
+                    'bn_running_var' : np.array([x*MULTIP_VAR  for x in state_dict[var_key].cpu().numpy() ])
                 })
 
     return conv_bn_map

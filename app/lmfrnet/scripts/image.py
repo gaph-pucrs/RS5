@@ -6,7 +6,8 @@ from PIL import Image
 
 OUTPUT_DIRECTORY = '../c-dataset/'
 filename = OUTPUT_DIRECTORY + 'image1.h'
-type = 'float'
+type = 'int'
+MULTIP = 100000
 
 if not os.path.exists(OUTPUT_DIRECTORY):
         os.makedirs(OUTPUT_DIRECTORY)
@@ -22,7 +23,7 @@ img = Image.open('../cifar-10/test/3364.png').convert('RGB')
 img = transform(img)
 img = img.unsqueeze(0)
 
-x = img.permute(0, 2, 3, 1).numpy().flatten()
+x = np.array([x*MULTIP for x in img.permute(0, 2, 3, 1).numpy().flatten()])
 
 with open(filename, "w") as f:
     f.write(f"#ifndef __LMFRNET_INPUT_IMAGE__h\n")
