@@ -17,6 +17,7 @@ module vectorALU
     import RS5_pkg::*;
 #(
     parameter int VLEN                   = 64,
+    parameter int LLEN                   = 32,
     parameter int VLENB                  = 8,
     parameter bit V_LOGIC_ON             = 1'b1,
     parameter bit V_MINMAX_ON            = 1'b1,
@@ -48,16 +49,15 @@ module vectorALU
 
     output logic                        hold_o,
     output logic                        hold_widening_o,
-    output logic                        hold_accumulation_o,
     output logic [VLEN-1:0]             result_mask_o,
     output logic [VLEN-1:0]             result_o
 );
 
-    localparam LANES = VLEN/128;
-    localparam LLEN = VLEN/LANES;
+    localparam LANES = VLEN/LLEN;
 
     logic [LANES-1:0] hold_lanes;
     logic             hold_reductions;
+    logic             hold_accumulation;
     logic             hold;
 
 //////////////////////////////////////////////////////////////////////////////
@@ -92,11 +92,11 @@ module vectorALU
             hold_accumulation_r <= 1'b0;
         end
         else begin
-            hold_accumulation_r <= hold_accumulation_o;
+            hold_accumulation_r <= hold_accumulation;
         end
     end
 
-    assign hold_accumulation_o = accumulate_instruction && !hold && current_state == V_EXEC && !hold_accumulation_r;
+    assign hold_accumulation = accumulate_instruction && !hold && current_state == V_EXEC && !hold_accumulation_r;
 
 //////////////////////////////////////////////////////////////////////////////
 // Reductions
@@ -285,7 +285,7 @@ module vectorALU
 
     assign hold = |hold_lanes;
 
-    assign hold_o = hold | hold_widening_o | hold_accumulation_o | hold_reductions;
+    assign hold_o = hold | hold_widening_o | hold_accumulation | hold_reductions;
 
 //////////////////////////////////////////////////////////////////////////////
 // Result Demux

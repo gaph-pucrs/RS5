@@ -35,6 +35,7 @@ module execute
     parameter bit           ZICONDEnable = 1'b0,
     parameter bit           VEnable      = 1'b0,
     parameter int           VLEN         = 64,
+    parameter int           LLEN         = 32,
     parameter bit           BRANCHPRED   = 1'b1
 )
 (
@@ -53,7 +54,7 @@ module execute
     input   logic  [4:0]        rd_i,
     input   logic  [4:0]        rs1_i,
     input   iType_e             instruction_operation_i,
-    
+
     /* Not used without zaamo */
     /* verilator lint_off UNUSEDSIGNAL */
     input   iTypeAtomic_e       atomic_operation_i,
@@ -278,11 +279,11 @@ module execute
 
     always_comb begin
         unique case (instruction_operation_i)
-            CSRRW, 
+            CSRRW,
             CSRRWI:  csr_read_enable = (rd_i != '0);
-            CSRRS, 
-            CSRRC, 
-            CSRRSI, 
+            CSRRS,
+            CSRRC,
+            CSRRSI,
             CSRRCI:  csr_read_enable = 1'b1;
             default: csr_read_enable  = 1'b0;
         endcase
@@ -290,11 +291,11 @@ module execute
 
     always_comb begin
         unique case (instruction_operation_i)
-            CSRRW, 
+            CSRRW,
             CSRRWI:  csr_write_enable = 1'b1;
-            CSRRS, 
-            CSRRC, 
-            CSRRSI, 
+            CSRRS,
+            CSRRC,
+            CSRRSI,
             CSRRCI:  csr_write_enable = (rs1_i != '0);
             default: csr_write_enable = 1'b0;
         endcase
@@ -445,7 +446,8 @@ module execute
     if (VEnable) begin : v_gen_on
         vectorUnit #(
             .Environment (Environment),
-            .VLEN        (VLEN)
+            .VLEN        (VLEN),
+            .LLEN        (LLEN)
         ) vector (
             .clk                    (clk),
             .reset_n                (reset_n),
@@ -545,7 +547,7 @@ module execute
 
             logic amo_lt;
             assign amo_lt = $signed(amo_operand) < $signed(rs2_data_i);
-            
+
             logic amo_ltu;
             assign amo_ltu = amo_operand < rs2_data_i;
 
@@ -655,7 +657,7 @@ module execute
     end
 
     logic we_atomic;
-    assign we_atomic = (rd_i != '0 && atomic_write_enable && !raise_exception_o);  
+    assign we_atomic = (rd_i != '0 && atomic_write_enable && !raise_exception_o);
 
     logic we_default;
     assign we_default = (rd_i != '0 && !hold_o && !raise_exception_o);
@@ -663,7 +665,7 @@ module execute
     always_comb begin
         unique case (instruction_operation_i)
             NOP,
-            SB,SH,SW, 
+            SB,SH,SW,
             BEQ,BNE,
             BLT,BLTU,
             BGE,BGEU:   write_enable = 1'b0;
@@ -681,7 +683,7 @@ module execute
 ////////////////////////////////////////////////////////////////////////////////
 // Output Registers
 ////////////////////////////////////////////////////////////////////////////////
-    
+
     assign hold_o = hold_div || hold_mul || hold_vector || atomic_hold;
 
     always_ff @(posedge clk or negedge reset_n) begin
@@ -711,9 +713,9 @@ module execute
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) 
+        if (!reset_n)
             result_o <= '0;
-        else if (!stall) 
+        else if (!stall)
             result_o <= result;
     end
 
@@ -803,7 +805,7 @@ module execute
     always_comb begin
         if (exc_inst_access_fault_i)
             exception_code_o  = INSTRUCTION_ACCESS_FAULT;
-        else if ((exc_ilegal_inst_i || exc_ilegal_csr_inst)) 
+        else if ((exc_ilegal_inst_i || exc_ilegal_csr_inst))
             exception_code_o  = ILLEGAL_INSTRUCTION;
         else if (iaddr_misaligned)
             exception_code_o  = INSTRUCTION_ADDRESS_MISALIGNED;
@@ -811,9 +813,9 @@ module execute
             exception_code_o  = (privilege_i == USER) ? ECALL_FROM_UMODE : ECALL_FROM_MMODE;
         else if (instruction_operation_i == EBREAK)
             exception_code_o  = BREAKPOINT;
-        else if (laddr_misaligned) 
+        else if (laddr_misaligned)
             exception_code_o  = LOAD_ADDRESS_MISALIGNED;
-        else if (saddr_misaligned) 
+        else if (saddr_misaligned)
             exception_code_o  = STORE_AMO_ADDRESS_MISALIGNED;
         else if (exc_load_access_fault_i)
             exception_code_o  = LOAD_ACCESS_FAULT;

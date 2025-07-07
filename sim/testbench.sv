@@ -43,6 +43,7 @@ module testbench
     localparam bit           USE_ZCB         = 1'b1;
     localparam bit           VEnable         = 1'b0;
     localparam int           VLEN            = 256;
+    localparam int           LLEN            = 32;
     localparam bit           USE_HPMCOUNTER  = 1'b1;
     localparam bit           BRANCHPRED      = 1'b1;
     localparam bit           FORWARDING      = 1'b1;
@@ -182,6 +183,7 @@ module testbench
         .COMPRESSED      (COMPRESSED    ),
         .VEnable         (VEnable       ),
         .VLEN            (VLEN          ),
+        .LLEN            (LLEN          ),
         .XOSVMEnable     (USE_XOSVM     ),
         .ZKNEEnable      (USE_ZKNE      ),
         .ZICONDEnable    (USE_ZICOND    ),

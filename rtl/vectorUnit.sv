@@ -17,7 +17,8 @@ module vectorUnit
     import RS5_pkg::*;
 #(
     parameter environment_e Environment = ASIC,
-    parameter int           VLEN        = 64
+    parameter int           VLEN        = 64,
+    parameter int           LLEN        = 32
 )
 (
     input   logic           clk,
@@ -71,8 +72,8 @@ module vectorUnit
     logic [VLEN-1:0]  v0_mask;
 
     logic [4:0]       rs1_addr, rs2_addr, rd_addr;
-    logic [4:0]       vs1_addr, vs2_addr, vs3_addr;
-    logic [VLEN-1:0]  vs1_data, vs2_data, vs3_data;
+    logic [4:0]       vs1_addr, vs2_addr;
+    logic [VLEN-1:0]  vs1_data, vs2_data;
     logic [3:0]       cycle_count, cycle_count_r, cycle_count_vd;
     logic             hazard_detected;
     logic             hold, hold_widening, hold_alu, hold_lsu;
@@ -150,7 +151,7 @@ module vectorUnit
 // FSM
 //////////////////////////////////////////////////////////////////////////////
 
-    assign hazard_detected = (state == V_IDLE && |write_enable == 1'b1 && (vs1_addr == vd_addr_r || vs2_addr == vd_addr_r || vs3_addr == vd_addr_r));
+    assign hazard_detected = (state == V_IDLE && |write_enable == 1'b1 && (vs1_addr == vd_addr_r || vs2_addr == vd_addr_r));
 
     assign hold_o = (instruction_operation_i inside {VECTOR, VLOAD, VSTORE}) && (next_state == V_EXEC || hazard_detected == 1'b1);
 
@@ -325,9 +326,28 @@ module vectorUnit
 
     always_comb begin
         // VS1 Address
-        vs1_addr = (instruction_operation_i == VSTORE) ? rd_addr : rs1_addr;
-        vs2_addr = rs2_addr;
-        vs3_addr = rd_addr;
+        vs1_addr = (instruction_operation_i == VSTORE)
+                    ? rd_addr
+                    : rs1_addr;
+
+        // VS2 Address
+        if (accumulate_instruction) begin
+            if (!hold) begin
+                unique case (vector_operation_i)
+                    VMADD, VNMSUB: vs2_addr = rd_addr;
+                    default:       vs2_addr = rs2_addr;
+                endcase
+            end
+            else begin
+                unique case (vector_operation_i)
+                    VMADD, VNMSUB: vs2_addr = rs2_addr - 1;
+                    default:       vs2_addr = vd_addr;
+                endcase
+            end
+        end
+        else begin
+            vs2_addr = rs2_addr;
+        end
     end
 
     always_ff @(posedge clk) begin
@@ -391,14 +411,12 @@ module vectorUnit
         .reset_n  (reset_n),
         .vs1_addr (vs1_addr),
         .vs2_addr (vs2_addr),
-        .vs3_addr (vs3_addr),
         .enable   (write_enable),
         .vd_addr  (vd_addr_r),
         .result   (result),
         .v0_mask  (v0_mask),
         .vs1_data (vs1_data),
-        .vs2_data (vs2_data),
-        .vs3_data (vs3_data)
+        .vs2_data (vs2_data)
     );
 
 //////////////////////////////////////////////////////////////////////////////
@@ -438,8 +456,13 @@ module vectorUnit
 
     always_ff @(posedge clk) begin
         if (!hold) begin
-            first_operand  <= (vector_operation_i inside {VMADD, VNMSUB}) ? vs3_data : vs2_data;
-            third_operand  <= (vector_operation_i inside {VMADD, VNMSUB}) ? vs2_data : vs3_data;
+            first_operand  <= vs2_data;
+        end
+    end
+
+    always_ff @(posedge clk) begin
+        if (hold) begin
+            third_operand  <= vs2_data;
         end
     end
 
@@ -506,6 +529,7 @@ module vectorUnit
 
     vectorALU #(
         .VLEN   (VLEN),
+        .LLEN   (LLEN),
         .VLENB  (VLENB)
     ) vectorALU1 (
         .clk                (clk),

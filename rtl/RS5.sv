@@ -38,6 +38,7 @@ module RS5
     parameter bit           COMPRESSED       = 1'b0,
     parameter bit           VEnable          = 1'b0,
     parameter int           VLEN             = 256,
+    parameter int           LLEN             = 32,
     parameter bit           XOSVMEnable      = 1'b0,
     parameter bit           ZKNEEnable       = 1'b0,
     parameter bit           ZICONDEnable     = 1'b0,
@@ -350,6 +351,7 @@ module RS5
         .ZICONDEnable (ZICONDEnable),
         .VEnable      (VEnable     ),
         .VLEN         (VLEN        ),
+        .LLEN         (LLEN        ),
         .BRANCHPRED   (BRANCHPRED  )
     ) execute1 (
         .clk                     (clk),
