@@ -2,30 +2,8 @@
 #include <stdio.h>
 #include <math.h>
 
-#include "model.h"
-
-typedef struct _dataset {
-    int rel_time;
-    int hops;
-    int size;
-    int prod;
-    int cons;
-    int latency;
-} dataset_t;
-
-dataset_t data[] = {
-    {0,     2, 133, 5, 0, 668},
-    {7109,  1, 133, 5, 1, 660},
-    {17729, 3, 133, 5, 2, 673},
-    {23788, 1, 133, 5, 3, 659},
-    {30784, 2, 133, 5, 4, 668},
-    {38507, 2, 133, 5, 0, 580},
-    {45441, 1, 133, 5, 1, 574},
-    {52381, 3, 133, 5, 2, 588},
-    {59280, 1, 133, 5, 3, 572},
-};
-
-int model(int rel_timestamp, int hops, int size, int prod, int cons);
+#include <model.h>
+#include <test.h>
 
 int main()
 {
