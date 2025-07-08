@@ -67,7 +67,7 @@ module vectorLane
     logic [ 1:0] mask_sew16;
     logic        mask_sew32;
 
-    if (LLEN > 32) begin
+    if (LLEN > 32) begin : gen_lane_32
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n) begin
                 cycle <= '0;
@@ -87,7 +87,7 @@ module vectorLane
         assign hold_llen = cycle < ELEMENTS_PER_LANE-1 && enable_i ;
 
     end
-    else begin
+    else begin : gen_lane_off
         assign cycle     = 1'b0;
         assign cycle_r   = 1'b0;
         assign hold_llen = 1'b0;
