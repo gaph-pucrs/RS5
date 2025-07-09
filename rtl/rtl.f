@@ -1,3 +1,6 @@
+-incdir ./
+-incdir ./aes/
+-incdir ./vector/
 ./aes/riscv_crypto_sbox_inv_mid.sv
 ./aes/riscv_crypto_sbox_aes_top.sv
 ./aes/riscv_crypto_sbox_aes_out.sv
