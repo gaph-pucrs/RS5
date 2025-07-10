@@ -166,6 +166,20 @@ void rvfi_tools_perfcount_cb_div(rvfi_performance_counter_t* self, const rvfi_tr
     }
 }
 
+void rvfi_tools_perfcount_cb_total_jumps(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
+
+    switch (op->match) {
+        case MATCH_JAL:
+        case MATCH_C_JAL:
+        case MATCH_C_J:
+            self->val += 1;
+
+        default:
+            break;
+    }
+
+}
+
 void rvfi_tools_perfcount_cb_fwd_static_jumps(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
     switch (op->match) {
@@ -228,151 +242,189 @@ void rvfi_tools_perfcount_cb_bwd_reg_jumps(rvfi_performance_counter_t* self, con
 
 void rvfi_tools_perfcount_cb_misaligned_jumps(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
-    switch (op->match) {
-        case MATCH_JAL:
-        case MATCH_C_JAL:
-        case MATCH_C_J:
-        case MATCH_JALR:
-        case MATCH_C_JALR:
-        case MATCH_C_JR:
-            if (rvfi_trace->rvfi_pc_wdata & 3)
-                self->val += 1;
+    // switch (op->match) {
+    //     case MATCH_JAL:
+    //     case MATCH_C_JAL:
+    //     case MATCH_C_J:
+    //     case MATCH_JALR:
+    //     case MATCH_C_JALR:
+    //     case MATCH_C_JR:
+    //         if (rvfi_trace->rvfi_pc_wdata & 3)
+    //             self->val += 1;
 
-        default:
-            break;
-    }
+    //     default:
+    //         break;
+    // }
+    if ((op->pinfo & INSN_TYPE) == INSN_BRANCH)
+        if (rvfi_trace->rvfi_pc_wdata & 3)
+            self->val += 1;
+
+}
+
+void rvfi_tools_perfcount_cb_total_branches(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
+
+    if ((op->pinfo & INSN_TYPE) == INSN_CONDBRANCH)
+        self->val += 1;
 
 }
 
 void rvfi_tools_perfcount_cb_taken_fwd_branches(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
-// size_t inst_length(rv_inst inst);
-    switch (op->match) {
-        case MATCH_BEQ:
-        case MATCH_BNE:
-        case MATCH_BLT:
-        case MATCH_BGE:
-        case MATCH_BLTU:
-        case MATCH_BGEU:
-        case MATCH_C_BEQZ:
-        case MATCH_C_BNEZ:
-            if (rvfi_trace->rvfi_pc_wdata != (rvfi_trace->rvfi_pc_rdata + riscv_insn_length(rvfi_trace->rvfi_pc_rdata)) && rvfi_trace->rvfi_pc_wdata > rvfi_trace->rvfi_pc_rdata)
-                self->val += 1;
+    // switch (op->match) {
+    //     case MATCH_BEQ:
+    //     case MATCH_BNE:
+    //     case MATCH_BLT:
+    //     case MATCH_BGE:
+    //     case MATCH_BLTU:
+    //     case MATCH_BGEU:
+    //     case MATCH_C_BEQZ:
+    //     case MATCH_C_BNEZ:
+    //         if (rvfi_trace->rvfi_pc_wdata != (rvfi_trace->rvfi_pc_rdata + riscv_insn_length(rvfi_trace->rvfi_pc_rdata)) && rvfi_trace->rvfi_pc_wdata > rvfi_trace->rvfi_pc_rdata)
+    //             self->val += 1;
 
-        default:
-            break;
-    }
+    //     default:
+    //         break;
+    // }
+    if ((op->pinfo & INSN_TYPE) == INSN_CONDBRANCH)
+        if (rvfi_trace->rvfi_pc_wdata != (rvfi_trace->rvfi_pc_rdata + riscv_insn_length(rvfi_trace->rvfi_pc_rdata)) && rvfi_trace->rvfi_pc_wdata > rvfi_trace->rvfi_pc_rdata)
+            self->val += 1;
 
 }
 
 void rvfi_tools_perfcount_cb_taken_bwd_branches(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
-    switch (op->match) {
-        case MATCH_BEQ:
-        case MATCH_BNE:
-        case MATCH_BLT:
-        case MATCH_BGE:
-        case MATCH_BLTU:
-        case MATCH_BGEU:
-        case MATCH_C_BEQZ:
-        case MATCH_C_BNEZ:
-            if (rvfi_trace->rvfi_pc_wdata != (rvfi_trace->rvfi_pc_rdata + riscv_insn_length(rvfi_trace->rvfi_pc_rdata)) && rvfi_trace->rvfi_pc_wdata < rvfi_trace->rvfi_pc_rdata)
-                self->val += 1;
+    // switch (op->match) {
+    //     case MATCH_BEQ:
+    //     case MATCH_BNE:
+    //     case MATCH_BLT:
+    //     case MATCH_BGE:
+    //     case MATCH_BLTU:
+    //     case MATCH_BGEU:
+    //     case MATCH_C_BEQZ:
+    //     case MATCH_C_BNEZ:
+    //         if (rvfi_trace->rvfi_pc_wdata != (rvfi_trace->rvfi_pc_rdata + riscv_insn_length(rvfi_trace->rvfi_pc_rdata)) && rvfi_trace->rvfi_pc_wdata < rvfi_trace->rvfi_pc_rdata)
+    //             self->val += 1;
 
-        default:
-            break;
-    }
+    //     default:
+    //         break;
+    // }
+    if ((op->pinfo & INSN_TYPE) == INSN_CONDBRANCH)
+        if (rvfi_trace->rvfi_pc_wdata != (rvfi_trace->rvfi_pc_rdata + riscv_insn_length(rvfi_trace->rvfi_pc_rdata)) && rvfi_trace->rvfi_pc_wdata < rvfi_trace->rvfi_pc_rdata)
+            self->val += 1;
 
 }
 
 void rvfi_tools_perfcount_cb_not_taken_fwd_branches(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
-    switch (op->match) {
-        case MATCH_BEQ:
-        case MATCH_BNE:
-        case MATCH_BLT:
-        case MATCH_BGE:
-        case MATCH_BLTU:
-        case MATCH_BGEU:
-        case MATCH_C_BEQZ:
-        case MATCH_C_BNEZ:
-            if (rvfi_trace->rvfi_pc_wdata == (rvfi_trace->rvfi_pc_rdata + riscv_insn_length(rvfi_trace->rvfi_pc_rdata)) && rvfi_trace->rvfi_pc_wdata > rvfi_trace->rvfi_pc_rdata)
-                self->val += 1;
-    }
+    // switch (op->match) {
+    //     case MATCH_BEQ:
+    //     case MATCH_BNE:
+    //     case MATCH_BLT:
+    //     case MATCH_BGE:
+    //     case MATCH_BLTU:
+    //     case MATCH_BGEU:
+    //     case MATCH_C_BEQZ:
+    //     case MATCH_C_BNEZ:
+    //         if (rvfi_trace->rvfi_pc_wdata == (rvfi_trace->rvfi_pc_rdata + riscv_insn_length(rvfi_trace->rvfi_pc_rdata)) && rvfi_trace->rvfi_pc_wdata > rvfi_trace->rvfi_pc_rdata)
+    //             self->val += 1;
+    // }
+    if ((op->pinfo & INSN_TYPE) == INSN_CONDBRANCH)
+        if (rvfi_trace->rvfi_pc_wdata == (rvfi_trace->rvfi_pc_rdata + riscv_insn_length(rvfi_trace->rvfi_pc_rdata)) && rvfi_trace->rvfi_pc_wdata > rvfi_trace->rvfi_pc_rdata)
+            self->val += 1;
 
 }
 
 void rvfi_tools_perfcount_cb_not_taken_bwd_branches(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
-    switch (op->match) {
-        case MATCH_BEQ:
-        case MATCH_BNE:
-        case MATCH_BLT:
-        case MATCH_BGE:
-        case MATCH_BLTU:
-        case MATCH_BGEU:
-        case MATCH_C_BEQZ:
-        case MATCH_C_BNEZ:
-            if (rvfi_trace->rvfi_pc_wdata == (rvfi_trace->rvfi_pc_rdata + riscv_insn_length(rvfi_trace->rvfi_pc_rdata)) && rvfi_trace->rvfi_pc_wdata < rvfi_trace->rvfi_pc_rdata)
-                self->val += 1;
-    }
+    // switch (op->match) {
+    //     case MATCH_BEQ:
+    //     case MATCH_BNE:
+    //     case MATCH_BLT:
+    //     case MATCH_BGE:
+    //     case MATCH_BLTU:
+    //     case MATCH_BGEU:
+    //     case MATCH_C_BEQZ:
+    //     case MATCH_C_BNEZ:
+    //         if (rvfi_trace->rvfi_pc_wdata == (rvfi_trace->rvfi_pc_rdata + riscv_insn_length(rvfi_trace->rvfi_pc_rdata)) && rvfi_trace->rvfi_pc_wdata < rvfi_trace->rvfi_pc_rdata)
+    //             self->val += 1;
+    // }
+    if ((op->pinfo & INSN_TYPE) == INSN_CONDBRANCH)
+        if (rvfi_trace->rvfi_pc_wdata == (rvfi_trace->rvfi_pc_rdata + riscv_insn_length(rvfi_trace->rvfi_pc_rdata)) && rvfi_trace->rvfi_pc_wdata < rvfi_trace->rvfi_pc_rdata)
+            self->val += 1;
 
 }
 
 void rvfi_tools_perfcount_cb_misaligned_branches(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
-    switch (op->match) {
-        case MATCH_BEQ:
-        case MATCH_BNE:
-        case MATCH_BLT:
-        case MATCH_BGE:
-        case MATCH_BLTU:
-        case MATCH_BGEU:
-        case MATCH_C_BEQZ:
-        case MATCH_C_BNEZ:
-            if (rvfi_trace->rvfi_pc_wdata & 3)
-                self->val += 1;
-    }
+    // switch (op->match) {
+    //     case MATCH_BEQ:
+    //     case MATCH_BNE:
+    //     case MATCH_BLT:
+    //     case MATCH_BGE:
+    //     case MATCH_BLTU:
+    //     case MATCH_BGEU:
+    //     case MATCH_C_BEQZ:
+    //     case MATCH_C_BNEZ:
+    //         if (rvfi_trace->rvfi_pc_wdata & 3)
+    //             self->val += 1;
+    // }
+    if ((op->pinfo & INSN_TYPE) == INSN_CONDBRANCH)
+        if (rvfi_trace->rvfi_pc_wdata & 3)
+            self->val += 1;
+
+}
+
+void rvfi_tools_perfcount_cb_total_loads(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
+
+    // switch (op->match) {
+    //     case MATCH_SB:
+    //         self->val += 1;
+    // }
+    if (rvfi_trace->rvfi_mem_rmask != 0)
+        self->val += 1;
 
 }
 
 void rvfi_tools_perfcount_cb_byte_loads(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
-    // TODO: AMO conditional load/store, Zc* LSU ops
-    switch (op->match) {
-        case MATCH_LB:
-        case MATCH_LBU:
-            self->val += 1;
+    // switch (op->match) {
+    //     case MATCH_LB:
+    //     case MATCH_LBU:
+    //         self->val += 1;
 
-    }
+    // }
+    if (rvfi_trace->rvfi_mem_rmask != 0 && (op->pinfo & INSN_DATA_SIZE) == INSN_1_BYTE)
+        self->val += 1;
 
 }
 
 void rvfi_tools_perfcount_cb_halfword_loads(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
-    // TODO: AMO conditional load/store, Zc* LSU ops
-    switch (op->match) {
-        case MATCH_LH:
-        case MATCH_LHU:
-            self->val += 1;
+    // switch (op->match) {
+    //     case MATCH_LH:
+    //     case MATCH_LHU:
+    //         self->val += 1;
 
-    }
+    // }
+    if (rvfi_trace->rvfi_mem_rmask != 0 && (op->pinfo & INSN_DATA_SIZE) == INSN_2_BYTE)
+        self->val += 1;
 
 }
 
 void rvfi_tools_perfcount_cb_word_loads(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
-    // TODO: AMO conditional load/store, Zc* LSU ops
-    switch (op->match) {
-        case MATCH_LW:
-        case MATCH_LWU:
-        case MATCH_C_LW:
-        case MATCH_C_FLW:
-        case MATCH_C_FLDSP:
-        case MATCH_C_LWSP:
-        case MATCH_C_FLWSP:
-            self->val += 1;
-    }
+    // switch (op->match) {
+    //     case MATCH_LW:
+    //     case MATCH_LWU:
+    //     case MATCH_C_LW:
+    //     case MATCH_C_FLW:
+    //     case MATCH_C_FLDSP:
+    //     case MATCH_C_LWSP:
+    //     case MATCH_C_FLWSP:
+    //         self->val += 1;
+    // }
+    if (rvfi_trace->rvfi_mem_rmask != 0 && (op->pinfo & INSN_DATA_SIZE) == INSN_4_BYTE)
+        self->val += 1;
 
 }
 
@@ -385,37 +437,54 @@ void rvfi_tools_perfcount_cb_misaligned_loads(rvfi_performance_counter_t* self, 
 
 }
 
+void rvfi_tools_perfcount_cb_total_stores(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
+
+    // switch (op->match) {
+    //     case MATCH_SB:
+    //         self->val += 1;
+    // }
+    if (rvfi_trace->rvfi_mem_wmask != 0)
+        self->val += 1;
+
+}
+
 void rvfi_tools_perfcount_cb_byte_stores(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
-    // TODO: AMO conditional load/store, Zc* LSU ops
-    switch (op->match) {
-        case MATCH_SB:
-            self->val += 1;
-    }
+    // switch (op->match) {
+    //     case MATCH_SB:
+    //         self->val += 1;
+    // }
+    if (rvfi_trace->rvfi_mem_wmask != 0 && (op->pinfo & INSN_DATA_SIZE) == INSN_1_BYTE)
+        self->val += 1;
+
 }
 
 void rvfi_tools_perfcount_cb_halfword_stores(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
-    // TODO: AMO conditional load/store, Zc* LSU ops
-    switch (op->match) {
-        case MATCH_SH:
-            self->val += 1;
-    }
+    // switch (op->match) {
+    //     case MATCH_SH:
+    //         self->val += 1;
+    // }
+    if (rvfi_trace->rvfi_mem_wmask != 0 && (op->pinfo & INSN_DATA_SIZE) == INSN_2_BYTE)
+        self->val += 1;
 
 }
 
 void rvfi_tools_perfcount_cb_word_stores(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
 
     // TODO: AMO conditional load/store, Zc* LSU ops
-    switch (op->match) {
-        case MATCH_SW:
-        case MATCH_C_SW:
-        case MATCH_C_FSW:
-        case MATCH_C_SWSP:
-        case MATCH_C_FSWSP:
-            self->val += 1;
+    // switch (op->match) {
+    //     case MATCH_SW:
+    //     case MATCH_C_SW:
+    //     case MATCH_C_FSW:
+    //     case MATCH_C_SWSP:
+    //     case MATCH_C_FSWSP:
+    //         self->val += 1;
 
-    }
+    // }
+    if (rvfi_trace->rvfi_mem_wmask != 0 && (op->pinfo & INSN_DATA_SIZE) == INSN_4_BYTE)
+        self->val += 1;
+
 }
 
 void rvfi_tools_perfcount_cb_misaligned_stores(rvfi_performance_counter_t* self, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, const struct riscv_opcode* op, void* local_ctx) {
