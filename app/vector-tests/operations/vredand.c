@@ -82,12 +82,26 @@ void TEST_CASE2(void) {
   // VCMP_U64(8, v3, 0x1000000000000000);
 }
 
+void TEST_CASE3(void) {
+  VSET(32, e32, m2);
+  VLOAD_32(v1, 0xffffffff, 0x100ff001, 0xf0f0f0f0, 0xffffffff, 0x100ff001,
+           0xf0f0f0f0, 0xffffffff, 0x100ff001, 0xf0f0f0f0, 0xffffffff,
+           0x100ff001, 0xf0f0f0f0,
+           0xffffffff, 0x100ff001, 0xf0f0f0f0, 0xffffffff, 0x100ff001,
+           0xf0f0f0f0, 0xffffffff, 0x100f0001, 0xf0f0f0f0, 0xffffffff,
+           0x100ff001, 0xf0f0f0f0);
+  VLOAD_32(v3, 0x00f010f0);
+  asm volatile("vredand.vs v4, v1, v3");
+  VCMP_U32(9, v4, 0x00000000);
+}
+
 int main(void) {
   INIT_CHECK();
   enable_vec();
 
   TEST_CASE1();
   TEST_CASE2();
+  TEST_CASE3();
 
   EXIT_CHECK();
 }

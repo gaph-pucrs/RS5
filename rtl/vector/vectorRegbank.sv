@@ -1,4 +1,15 @@
-`include "RS5_pkg.sv"
+/*!\file vectorRegbank.sv
+ *
+ * Willian Nunes    <willian.nunes@edu.pucrs.br>
+ * Angelo Dal Zotto <angelo.dalzotto@edu.pucrs.br>
+ * Marcos Sartori   <marcos.sartori@acad.pucrs.br>
+ * Ney Calazans     <ney.calazans@ufsc.br>
+ * Fernando Moraes  <fernando.moraes@pucrs.br>
+ * GAPH - Hardware Design Support Group
+ * PUCRS - Pontifical Catholic University of Rio Grande do Sul <https://pucrs.br/>
+ */
+
+`include "../RS5_pkg.sv"
 
 module vectorRegbank
     import RS5_pkg::*;
@@ -45,23 +56,26 @@ module vectorRegbank
 
         assign v0_mask = v0;
 
-        DRAM_Vector_RegBank VectorRegBankA (
-            .clk        (clk),
-            .we         (enable),
-            .a          (vd_addr),
-            .d          (result),
-            .dpra       (vs1_addr),
-            .dpo        (vs1_data)
-        );
+        for (genvar j = 0; j < VLENB ; j++) begin : gen_vectorRegfile
 
-        DRAM_Vector_RegBank VectorRegBankB (
-            .clk        (clk),
-            .we         (enable),
-            .a          (vd_addr),
-            .d          (result),
-            .dpra       (vs2_addr),
-            .dpo        (vs2_data)
-        );
+            DRAM_Vector_RegBank VectorRegBankA (
+                .clk        (clk),
+                .we         (enable[j]),
+                .a          (vd_addr),
+                .d          (result[(8*j)+:8]),
+                .dpra       (vs1_addr),
+                .dpo        (vs1_data[(8*j)+:8])
+            );
+
+            DRAM_Vector_RegBank VectorRegBankB (
+                .clk        (clk),
+                .we         (enable[j]),
+                .a          (vd_addr),
+                .d          (result[(8*j)+:8]),
+                .dpra       (vs2_addr),
+                .dpo        (vs2_data[(8*j)+:8])
+            );
+        end
 
     end
     else begin : gen_vector_regbank_asic

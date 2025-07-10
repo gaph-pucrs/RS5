@@ -1,3 +1,17 @@
+/*!\file div.sv
+ *
+ * Willian Nunes    <willian.nunes@edu.pucrs.br>
+ * Angelo Dal Zotto <angelo.dalzotto@edu.pucrs.br>
+ * Marcos Sartori   <marcos.sartori@acad.pucrs.br>
+ * Ney Calazans     <ney.calazans@ufsc.br>
+ * Fernando Moraes  <fernando.moraes@pucrs.br>
+ * GAPH - Hardware Design Support Group
+ * PUCRS - Pontifical Catholic University of Rio Grande do Sul <https://pucrs.br/>
+ *
+ * \brief
+ * Integer division module.
+ */
+
 `include "RS5_pkg.sv"
 
 module div
@@ -160,12 +174,10 @@ module div
             rem_result_o = first_operand_i;
         else if (overflow || divide_by_one)
             rem_result_o = '0;
-        else if (sign_a)
-            rem_result_o = {1'b1, -acc[N-1:1]};
         else if (div_result == '0)
             rem_result_o = first_operand_i;
         else
-            rem_result_o = {1'b0, acc[N-1:1]};
+            rem_result_o = {sign_a && (acc[N-1:1] != '0), sign_a ? -acc[N-1:1] : acc[N-1:1]};
     end
 
     assign hold_o = (start | busy);

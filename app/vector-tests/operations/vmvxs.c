@@ -24,11 +24,11 @@ void TEST_CASE1() {
   asm volatile("vmv.x.s %0, v1" : "=r"(scalar_16b));
   XCMP(2, scalar_16b, 55 << 8);
 
-  // scalar_32b = 0;
-  // VSET(16, e32, m1);
-  // VLOAD_32(v1, 55 << 16, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
-  // asm volatile("vmv.x.s %0, v1" : "=r"(scalar_32b));
-  // XCMP(3, scalar_32b, 55 << 16);
+  scalar_32b = 0;
+  VSET(16, e32, m1);
+  VLOAD_32(v1, 55 << 16, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  asm volatile("vmv.x.s %0, v1" : "=r"(scalar_32b));
+  XCMP(3, scalar_32b, 55 << 16);
 
   // scalar_64b = 0;
   // VSET(16, e64, m1);

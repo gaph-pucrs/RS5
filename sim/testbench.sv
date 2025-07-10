@@ -5,8 +5,11 @@
  *
  * Willian Nunes    <willian.nunes@edu.pucrs.br>
  * Angelo Dal Zotto <angelo.dalzotto@edu.pucrs.br>
- *
- * Research group: GAPH-PUCRS  <>
+ * Marcos Sartori   <marcos.sartori@acad.pucrs.br>
+ * Ney Calazans     <ney.calazans@ufsc.br>
+ * Fernando Moraes  <fernando.moraes@pucrs.br>
+ * GAPH - Hardware Design Support Group
+ * PUCRS - Pontifical Catholic University of Rio Grande do Sul <https://pucrs.br/>
  *
  * \brief
  * Testbench for RS5 simulation.
@@ -35,12 +38,15 @@ module testbench
     localparam atomic_e      AMOEXT          = AMO_A;
     localparam bit           COMPRESSED      = 1'b1;
     localparam bit           USE_XOSVM       = 1'b0;
-    localparam bit           USE_ZIHPM       = 1'b1;
     localparam bit           USE_ZKNE        = 1'b1;
+    localparam bit           USE_ZICOND      = 1'b1;
+    localparam bit           USE_ZCB         = 1'b1;
     localparam bit           VEnable         = 1'b0;
     localparam int           VLEN            = 256;
+    localparam int           LLEN            = 32;
+    localparam bit           USE_HPMCOUNTER  = 1'b1;
     localparam bit           BRANCHPRED      = 1'b1;
-    // localparam bit           BRANCHPRED      = 1'b0;
+    localparam bit           FORWARDING      = 1'b1;
 
 `ifndef SYNTH
     // localparam bit           PROFILING       = 1'b1;
@@ -49,6 +55,8 @@ module testbench
     localparam bit           ENABLE_TRACER   = 1'b1;
     localparam bit           ENABLE_PROFILER = 1'b1;
 `endif
+    localparam string        PROFILING_FILE  = "./results/Report.txt";
+    localparam string        OUTPUT_FILE     = "./results/Output.txt";
 
     localparam int           MEM_WIDTH       = 65_536;
     // localparam string        BIN_FILE        = "../app/riscv-tests/test.bin";
@@ -103,9 +111,6 @@ module testbench
     logic [31:0]            data_ram, data_plic, data_tb;
     logic                   enable_tb_r, enable_rtc_r, enable_plic_r;
     logic                   mti, mei;
-    logic [31:0]            irq;
-
-    assign irq = {20'h0, mei, 3'h0, mti, 7'h0};
 
     `ifdef RVFI
     logic                    rvfi_valid;
@@ -198,19 +203,24 @@ module testbench
 
     RS5 #(
     `ifndef SYNTH
-	    .DEBUG      (DEBUG          ),
-	    .PROFILING  (PROFILING      ),
+	    .DEBUG          (DEBUG          ),
+	    .PROFILING      (PROFILING      ),
+        .PROFILING_FILE (PROFILING_FILE ),
     `endif
-        .Environment(ASIC           ),
-        .MULEXT     (MULEXT         ),
-        .AMOEXT     (AMOEXT         ),
-        .COMPRESSED (COMPRESSED     ),
-        .VEnable    (VEnable        ),
-        .VLEN       (VLEN           ),
-        .XOSVMEnable(USE_XOSVM      ),
-        .ZIHPMEnable(USE_ZIHPM      ),
-        .ZKNEEnable (USE_ZKNE       ),
-        .BRANCHPRED (BRANCHPRED     )
+        .Environment     (ASIC          ),
+        .MULEXT          (MULEXT        ),
+        .AMOEXT          (AMOEXT        ),
+        .COMPRESSED      (COMPRESSED    ),
+        .VEnable         (VEnable       ),
+        .VLEN            (VLEN          ),
+        .LLEN            (LLEN          ),
+        .XOSVMEnable     (USE_XOSVM     ),
+        .ZKNEEnable      (USE_ZKNE      ),
+        .ZICONDEnable    (USE_ZICOND    ),
+        .ZCBEnable       (USE_ZCB       ),
+        .HPMCOUNTEREnable(USE_HPMCOUNTER),
+        .BRANCHPRED      (BRANCHPRED    ),
+        .FORWARDING      (FORWARDING    )
     ) dut (
 
         .clk                    (clk),
@@ -245,7 +255,8 @@ module testbench
         .instruction_i          (instruction),
         .mem_data_i             (mem_data_read),
         .mtime_i                (mtime),
-        .irq_i                  (irq),
+        .tip_i                  (mti),
+        .eip_i                  (mei),
         .instruction_address_o  (instruction_address),
         .mem_operation_enable_o (mem_operation_enable),
         .mem_write_enable_o     (mem_write_enable),
@@ -326,6 +337,10 @@ module testbench
 //////////////////////////////////////////////////////////////////////////////
 // Memory Mapped regs
 //////////////////////////////////////////////////////////////////////////////
+    int fd;
+    initial begin
+        fd = $fopen(OUTPUT_FILE,"w");
+    end
 
     always_ff @(posedge clk) begin
         if (enable_tb) begin
@@ -333,11 +348,19 @@ module testbench
             if ((mem_address == 32'h80004000 || mem_address == 32'h80001000) && mem_write_enable != '0) begin
                 char <= mem_data_write[7:0];
                 $write("%c",char);
+                if (char != 8'h00)
+                    $fwrite(fd,"%c",char);
+                $fflush();
+            end
+            else if (mem_address == 32'h80002000 && mem_write_enable != '0) begin
+                $write(    "%0d\n",mem_data_write);
+                $fwrite(fd,"%0d\n",mem_data_write);
                 $fflush();
             end
             // END REG
             if (mem_address == 32'h80000000 && mem_write_enable != '0) begin
-                $display("# %t END OF SIMULATION",$time);
+                $display(    "\n# %0t END OF SIMULATION",$time);
+                $fdisplay(fd,"\n# %0t END OF SIMULATION",$time);
                 $finish;
             end
         end

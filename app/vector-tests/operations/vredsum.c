@@ -167,6 +167,12 @@ void TEST_CASE5(void) {
   asm volatile("vredsum.vs v3, v1, v2, v0.t");
   // VCMP_U32(20, v3, 3, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
   VCMP_U32(20, v3, 3, 2, 3);
+
+  VSET(32, e32, m2);
+  VLOAD_32(v1, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  VLOAD_32(v3, 1);
+  asm volatile("vredsum.vs v4, v1, v3");
+  VCMP_U32(21, v4, 145);
 }
 
 int main(void) {

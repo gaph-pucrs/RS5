@@ -33,12 +33,14 @@ default: run
 run:
 	@echo
 	@echo "-- VERILATE ----------------"
-	@$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_INPUT) --binary -j 0 -I../rtl -I../rtl/aes --timescale 1ns/1ns
+	@$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_INPUT) --binary -j 0 -I../rtl -I../rtl/aes -I../rtl/vector --timescale 1ns/1ns
 
 	@echo
 	@echo "-- RUN ---------------------"
 	@rm -rf debug
+	@rm -rf results
 	@mkdir -p debug
+	@mkdir -p results
 	@obj_dir/Vtestbench
 
 	@echo
@@ -62,7 +64,7 @@ xrun:
 clean:
 	@echo
 	@echo "-- CLEAN -------------------"
-	rm -rf obj_dir debug
+	rm -rf obj_dir debug results
 	rm -rf rvfi_tools.so
 	rm -rf waves.shm
 	rm -rf xcelium.d

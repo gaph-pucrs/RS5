@@ -1,3 +1,14 @@
+/*!\file vectorUnit.sv
+ *
+ * Willian Nunes    <willian.nunes@edu.pucrs.br>
+ * Angelo Dal Zotto <angelo.dalzotto@edu.pucrs.br>
+ * Marcos Sartori   <marcos.sartori@acad.pucrs.br>
+ * Ney Calazans     <ney.calazans@ufsc.br>
+ * Fernando Moraes  <fernando.moraes@pucrs.br>
+ * GAPH - Hardware Design Support Group
+ * PUCRS - Pontifical Catholic University of Rio Grande do Sul <https://pucrs.br/>
+ */
+
 `include "RS5_pkg.sv"
 
 /* verilator lint_off WIDTHEXPAND */
@@ -6,7 +17,8 @@ module vectorUnit
     import RS5_pkg::*;
 #(
     parameter environment_e Environment = ASIC,
-    parameter int           VLEN        = 64
+    parameter int           VLEN        = 64,
+    parameter int           LLEN        = 32
 )
 (
     input   logic           clk,
@@ -64,9 +76,9 @@ module vectorUnit
     logic [VLEN-1:0]  vs1_data, vs2_data;
     logic [3:0]       cycle_count, cycle_count_r, cycle_count_vd;
     logic             hazard_detected;
-    logic             hold, hold_widening, hold_accumulation, hold_alu, hold_lsu;
+    logic             hold, hold_widening, hold_alu, hold_lsu;
 
-    logic [VLEN-1:0]  first_operand, second_operand;
+    logic [VLEN-1:0]  first_operand, second_operand, third_operand;
 
     logic [4:0]       vd_addr, vd_addr_r;
     logic [VLEN-1:0]  result_alu, result_alu_mask, result_lsu, result;
@@ -141,7 +153,7 @@ module vectorUnit
 
     assign hazard_detected = (state == V_IDLE && |write_enable == 1'b1 && (vs1_addr == vd_addr_r || vs2_addr == vd_addr_r));
 
-    assign hold_o = (next_state == V_EXEC || hazard_detected == 1'b1);
+    assign hold_o = (instruction_operation_i inside {VECTOR, VLOAD, VSTORE}) && (next_state == V_EXEC || hazard_detected == 1'b1);
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
@@ -269,7 +281,7 @@ module vectorUnit
     always_ff @(posedge clk or negedge reset_n)
         if (!reset_n)
             cycle_count_r <= 0;
-        else if (widening_instruction)
+        else if (widening_instruction && (!hold || hold_widening))
             cycle_count_r <= cycle_count_vd;
         else if (!hold)
             cycle_count_r <= cycle_count;
@@ -314,13 +326,13 @@ module vectorUnit
 
     always_comb begin
         // VS1 Address
-        vs1_addr =  (instruction_operation_i == VSTORE)
+        vs1_addr = (instruction_operation_i == VSTORE)
                     ? rd_addr
                     : rs1_addr;
 
         // VS2 Address
         if (accumulate_instruction) begin
-            if (!hold_accumulation) begin
+            if (!hold) begin
                 unique case (vector_operation_i)
                     VMADD, VNMSUB: vs2_addr = rd_addr;
                     default:       vs2_addr = rs2_addr;
@@ -443,13 +455,19 @@ module vectorUnit
 //////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk) begin
-        if (!hold || hold_accumulation) begin
+        if (!hold) begin
             first_operand  <= vs2_data;
         end
     end
 
     always_ff @(posedge clk) begin
-        if (!hold || hold_accumulation) begin
+        if (hold) begin
+            third_operand  <= vs2_data;
+        end
+    end
+
+    always_ff @(posedge clk) begin
+        if (!hold) begin
             if (instruction_operation_i == VSTORE) begin
                 second_operand <= vs1_data;
             end
@@ -511,12 +529,14 @@ module vectorUnit
 
     vectorALU #(
         .VLEN   (VLEN),
+        .LLEN   (LLEN),
         .VLENB  (VLENB)
     ) vectorALU1 (
         .clk                (clk),
         .reset_n            (reset_n),
         .first_operand      (first_operand),
         .second_operand     (second_operand),
+        .third_operand      (third_operand),
         .vector_operation_i (vector_operation_i),
         .cycle_count        (cycle_count),
         .cycle_count_r      (cycle_count_r),
@@ -530,7 +550,6 @@ module vectorUnit
         .vsew               (vsew),
         .hold_o             (hold_alu),
         .hold_widening_o    (hold_widening),
-        .hold_accumulation_o(hold_accumulation),
         .result_mask_o      (result_alu_mask),
         .result_o           (result_alu)
     );

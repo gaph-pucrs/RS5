@@ -3,11 +3,13 @@
  *
  * Distribution:  July 2023
  *
- * Willian Nunes   <willian.nunes@edu.pucrs.br>
- * Marcos Sartori  <marcos.sartori@acad.pucrs.br>
- * Ney calazans    <ney.calazans@pucrs.br>
- *
- * Research group: GAPH-PUCRS  <>
+ * Willian Nunes    <willian.nunes@edu.pucrs.br>
+ * Angelo Dal Zotto <angelo.dalzotto@edu.pucrs.br>
+ * Marcos Sartori   <marcos.sartori@acad.pucrs.br>
+ * Ney Calazans     <ney.calazans@ufsc.br>
+ * Fernando Moraes  <fernando.moraes@pucrs.br>
+ * GAPH - Hardware Design Support Group
+ * PUCRS - Pontifical Catholic University of Rio Grande do Sul <https://pucrs.br/>
  *
  * \brief
  * Is the top Module of RS5 processor core.
@@ -29,16 +31,21 @@ module RS5
     parameter bit           PROFILING      = 1'b0,
     parameter string        PROFILING_FILE = "./debug/Report.txt",
 `endif
-    parameter environment_e Environment    = ASIC,
-    parameter mul_e         MULEXT         = MUL_M,
-    parameter atomic_e      AMOEXT         = AMO_A,
-    parameter bit           COMPRESSED     = 1'b0,
-    parameter bit           VEnable        = 1'b0,
-    parameter int           VLEN           = 256,
-    parameter bit           XOSVMEnable    = 1'b0,
-    parameter bit           ZIHPMEnable    = 1'b0,
-    parameter bit           ZKNEEnable     = 1'b0,
-    parameter bit           BRANCHPRED     = 1'b1
+    parameter environment_e Environment      = ASIC,
+    parameter mul_e         MULEXT           = MUL_M,
+    parameter atomic_e      AMOEXT           = AMO_A,
+    parameter logic [31:0]  START_ADDR       = '0,
+    parameter bit           COMPRESSED       = 1'b0,
+    parameter bit           VEnable          = 1'b0,
+    parameter int           VLEN             = 256,
+    parameter int           LLEN             = 32,
+    parameter bit           XOSVMEnable      = 1'b0,
+    parameter bit           ZKNEEnable       = 1'b0,
+    parameter bit           ZICONDEnable     = 1'b0,
+    parameter bit           ZCBEnable        = 1'b0,
+    parameter bit           HPMCOUNTEREnable = 1'b0,
+    parameter bit           BRANCHPRED       = 1'b1,
+    parameter bit           FORWARDING       = 1'b1
 )
 (
     input  logic                    clk,
@@ -73,7 +80,8 @@ module RS5
     input  logic [31:0]             instruction_i,
     input  logic [31:0]             mem_data_i,
     input  logic [63:0]             mtime_i,
-    input  logic [31:0]             irq_i,
+    input  logic                    tip_i,
+    input  logic                    eip_i,
 
     output logic [31:0]             instruction_address_o,
     output logic                    mem_operation_enable_o,
@@ -140,7 +148,6 @@ module RS5
     logic    [4:0]  rd_execute;
     logic    [4:0]  rs1_execute;
     logic           exc_ilegal_inst_execute;
-    logic           exc_misaligned_fetch_execute;
     logic           exc_inst_access_fault_execute;
     logic           instruction_compressed_execute;
     logic   [31:0]  vtype, vlen;
@@ -203,26 +210,31 @@ module RS5
     logic [31:0] instruction_decode;
 
     fetch #(
-        .COMPRESSED(COMPRESSED),
-        .BRANCHPRED(BRANCHPRED)
+        .start_address(START_ADDR),
+        .MULEXT       (MULEXT),
+        .ZCBEnable    (ZCBEnable),
+        .COMPRESSED   (COMPRESSED),
+        .BRANCHPRED   (BRANCHPRED)
     ) fetch1 (
-        .clk                    (clk),
-        .reset_n                (reset_n),
-        .sys_reset              (sys_reset_i),
-        .enable_i               (enable_fetch),
-        .ctx_switch_i           (ctx_switch),
-        .jump_rollback_i        (jump_rollback),
-        .ctx_switch_target_i    (ctx_switch_target),
-        .bp_take_i              (bp_take_fetch),
-        .bp_target_i            (bp_target),
-        .jumping_o              (jumping),
-        .bp_rollback_o          (bp_rollback),
-        .jump_misaligned_o      (jump_misaligned),
-        .compressed_o           (compressed_decode),
-        .instruction_address_o  (instruction_address),
-        .instruction_data_i     (instruction_i),
-        .instruction_o          (instruction_decode),
-        .pc_o                   (pc_decode)
+        .clk                  (clk                ),
+        .reset_n              (reset_n            ),
+        .sys_reset            (sys_reset_i        ),
+        .enable_i             (enable_fetch       ),
+        .jump_i               (jump               ),
+        .jump_rollback_i      (jump_rollback      ),
+        .jump_target_i        (jump_target        ),
+        .ctx_switch_i         (ctx_switch         ),
+        .ctx_switch_target_i  (ctx_switch_target  ),
+        .bp_take_i            (bp_take_fetch      ),
+        .bp_target_i          (bp_target          ),
+        .jumping_o            (jumping            ),
+        .bp_rollback_o        (bp_rollback        ),
+        .jump_misaligned_o    (jump_misaligned    ),
+        .compressed_o         (compressed_decode  ),
+        .instruction_address_o(instruction_address),
+        .instruction_data_i   (instruction_i      ),
+        .instruction_o        (instruction_decode ),
+        .pc_o                 (pc_decode          )
     );
 
     if (XOSVMEnable == 1'b1) begin : gen_xosvm_i_mmu_on
@@ -249,18 +261,22 @@ module RS5
     logic        write_enable_exec;
     logic [31:0] result_exec;
     logic [31:0] jump_imm_target_exec;
+    logic [31:0] pc_next;
 
     decode # (
-        .MULEXT    (MULEXT    ),
-        .AMOEXT    (AMOEXT    ),
-        .COMPRESSED(COMPRESSED),
-        .ZKNEEnable(ZKNEEnable),
-        .VEnable   (VEnable   ),
-        .BRANCHPRED(BRANCHPRED)
+        .MULEXT       (MULEXT      ),
+        .AMOEXT       (AMOEXT      ),
+        .COMPRESSED   (COMPRESSED  ),
+        .ZKNEEnable   (ZKNEEnable  ),
+        .ZICONDEnable (ZICONDEnable),
+        .VEnable      (VEnable     ),
+        .BRANCHPRED   (BRANCHPRED  ),
+        .FORWARDING   (FORWARDING  )
     ) decoder1 (
         .clk                        (clk),
         .reset_n                    (reset_n),
         .enable                     (enable_decode),
+        .sys_reset                  (sys_reset_i),
         .instruction_i              (instruction_decode),
         .pc_i                       (pc_decode),
         .rs1_data_read_i            (regbank_data1),
@@ -281,6 +297,7 @@ module RS5
         .pc_o                       (pc_execute),
         .instruction_o              (instruction_execute),
         .jump_imm_target_o          (jump_imm_target_exec),
+        .pc_next_o                  (pc_next),
         .compressed_o               (instruction_compressed_execute),
         .instruction_operation_o    (instruction_operation_execute),
         .atomic_operation_o         (atomic_operation_execute),
@@ -288,6 +305,7 @@ module RS5
         .hazard_o                   (hazard),
         .killed_o                   (killed),
         .ctx_switch_i               (ctx_switch),
+        .jump_i                     (jump),
         .jumping_i                  (jumping),
         .jump_rollback_i            (jump_rollback),
         .rollback_i                 (bp_rollback),
@@ -298,8 +316,7 @@ module RS5
         .bp_target_o                (bp_target),
         .exc_inst_access_fault_i    (mmu_inst_fault),
         .exc_inst_access_fault_o    (exc_inst_access_fault_execute),
-        .exc_ilegal_inst_o          (exc_ilegal_inst_execute),
-        .exc_misaligned_fetch_o     (exc_misaligned_fetch_execute)
+        .exc_ilegal_inst_o          (exc_ilegal_inst_execute)
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -351,31 +368,31 @@ module RS5
     logic [31:0] reservation_data;
 
     execute #(
-        .Environment (Environment),
-        .MULEXT      (MULEXT),
-        .AMOEXT      (AMOEXT),
-        .ZKNEEnable  (ZKNEEnable),
-        .VEnable     (VEnable),
-        .VLEN        (VLEN),
-        .BRANCHPRED  (BRANCHPRED)
+        .Environment  (Environment ),
+        .MULEXT       (MULEXT      ),
+        .AMOEXT       (AMOEXT      ),
+        .COMPRESSED   (COMPRESSED  ),
+        .ZKNEEnable   (ZKNEEnable  ),
+        .ZICONDEnable (ZICONDEnable),
+        .VEnable      (VEnable     ),
+        .VLEN         (VLEN        ),
+        .LLEN         (LLEN        ),
+        .BRANCHPRED   (BRANCHPRED  )
     ) execute1 (
         .clk                     (clk),
         .reset_n                 (reset_n),
         .stall                   (stall),
         .instruction_i           (instruction_execute),
-        .pc_i                    (pc_execute),
         .rs1_data_i              (rs1_data_execute),
         .rs2_data_i              (rs2_data_execute),
         .second_operand_i        (second_operand_execute),
         .rd_i                    (rd_execute),
         .rs1_i                   (rs1_execute),
         .instruction_operation_i (instruction_operation_execute),
-        .instruction_compressed_i(instruction_compressed_execute),
         .atomic_operation_i      (atomic_operation_execute),
         .vector_operation_i      (vector_operation_execute),
         .privilege_i             (privilege),
         .exc_ilegal_inst_i       (exc_ilegal_inst_execute),
-        .exc_misaligned_fetch_i  (exc_misaligned_fetch_execute),
         .exc_inst_access_fault_i (exc_inst_access_fault_execute),
         .exc_load_access_fault_i (mmu_data_fault),
         .hold_o                  (hold),
@@ -405,6 +422,7 @@ module RS5
         .jump_imm_target_i       (jump_imm_target_exec),
         .reservation_data_i      (reservation_data),
         .jump_target_o           (jump_target),
+        .pc_next_i               (pc_next),
         .interrupt_pending_i     (interrupt_pending),
         .mtvec_i                 (mtvec),
         .mepc_i                  (mepc),
@@ -438,12 +456,12 @@ module RS5
         .PROFILING     (PROFILING     ),
         .PROFILING_FILE(PROFILING_FILE),
     `endif
-        .XOSVMEnable   (XOSVMEnable   ),
-        .ZIHPMEnable   (ZIHPMEnable   ),
-        .COMPRESSED    (COMPRESSED    ),
-        .MULEXT        (MULEXT        ),
-        .VEnable       (VEnable       ),
-        .VLEN          (VLEN          )
+        .HPMCOUNTEREnable(HPMCOUNTEREnable),
+        .XOSVMEnable     (XOSVMEnable     ),
+        .COMPRESSED      (COMPRESSED      ),
+        .MULEXT          (MULEXT          ),
+        .VEnable         (VEnable         ),
+        .VLEN            (VLEN            )
     ) CSRBank1 (
         .clk                        (clk),
         .reset_n                    (reset_n),
@@ -451,10 +469,10 @@ module RS5
         .read_enable_i              (csr_read_enable),
         .write_enable_i             (csr_write_enable),
         .operation_i                (csr_operation),
-        .address_i                  (csr_addr),
+        .address_i                  (CSRs'(csr_addr)),
         .data_i                     (csr_data_to_write),
         .killed                     (killed),
-        .out                        (csr_data_read),
+        .data_o                     (csr_data_read),
         .instruction_operation_i    (instruction_operation_execute),
         .vector_operation_i         (vector_operation_execute),
         .hazard                     (hazard),
@@ -466,6 +484,7 @@ module RS5
         .machine_return_i           (MACHINE_RETURN),
         .exception_code_i           (Exception_Code),
         .pc_i                       (pc_execute),
+        .mem_address_i              (mem_address),
         .next_pc_i                  (pc_decode),
         .instruction_i              (instruction_execute),
         .instruction_compressed_i   (instruction_compressed_execute),
@@ -473,12 +492,13 @@ module RS5
         .jump_i                     (jump),
         .jump_target_i              (jump_target),
         .mtime_i                    (mtime_i),
-        .irq_i                      (irq_i),
+        .tip_i                      (tip_i),
+        .eip_i                      (eip_i),
         .interrupt_ack_i            (interrupt_ack_o),
         .interrupt_pending_o        (interrupt_pending),
         .privilege_o                (privilege),
-        .mepc                       (mepc),
-        .mtvec                      (mtvec),
+        .mepc_o                     (mepc),
+        .mtvec_o                    (mtvec),
     // XOSVM Signals
         .mvmctl_o                   (mvmctl),
         .mvmdo_o                    (mvmdo),
@@ -495,22 +515,22 @@ module RS5
 
     if (XOSVMEnable == 1'b1) begin : gen_d_mmu_on
         mmu d_mmu (
-            .en_i           (mmu_en        ),
-            .mask_i         (mvmdm         ),
-            .offset_i       (mvmdo         ),
-            .size_i         (mvmds         ),
-            .address_i      (mem_address   ),
-            .exception_o    (mmu_data_fault),
-            .address_o      (mem_address_o )
+            .en_i           (mmu_en                    ),
+            .mask_i         (mvmdm                     ),
+            .offset_i       (mvmdo                     ),
+            .size_i         (mvmds                     ),
+            .address_i      ({mem_address[31:2], 2'b00}),
+            .exception_o    (mmu_data_fault            ),
+            .address_o      (mem_address_o             )
         );
     end
     else begin : gen_d_mmu_off
         assign mmu_data_fault = 1'b0;
-        assign mem_address_o  = mem_address;
+        assign mem_address_o  = {mem_address[31:2], 2'b00};
     end
 
     always_comb begin
-        if ((mem_write_enable != '0 || mem_read_enable) && !mmu_data_fault)
+        if ((mem_write_enable != '0 || mem_read_enable) && !mmu_data_fault && !RAISE_EXCEPTION)
             mem_operation_enable_o = 1'b1;
         else
             mem_operation_enable_o = 1'b0;
