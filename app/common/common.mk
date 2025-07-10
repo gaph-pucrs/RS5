@@ -3,7 +3,8 @@ NC   =\033[0m # No Color
 
 TARGET   ?= $(notdir $(CURDIR))
 MEM_SIZE ?= 65536
-ARCH     ?= rv32im_zicsr
+ARCH     ?= rv32imc_zicsr
+# ARCH     ?= rv32im_zicsr
 
 CC 		= riscv64-elf-gcc
 OBJDUMP = riscv64-elf-objdump
@@ -14,15 +15,13 @@ INCDIR  = $(SRCDIR)/include
 HEADERS = $(wildcard $(INCDIR)/*.h) $(wildcard ../common/include/*.h)
 
 CFLAGS  = -march=$(ARCH) -mabi=ilp32 -Os -Wall -std=c23 -I$(INCDIR) -I../common/include
-LDFLAGS = --specs=nano.specs -T ../common/link.ld -march=$(ARCH) -mabi=ilp32 -nostartfiles
+LDFLAGS = --specs=nano.specs -T ../common/link.ld -march=$(ARCH) -mabi=ilp32 -nostartfiles -lm
 
 CCSRC = $(wildcard $(SRCDIR)/*.c) $(wildcard ../common/*.c)
 CCOBJ = $(patsubst %.c, %.o, $(CCSRC))
 
-ASSRC = $(wildcard ../common/*.S)
+ASSRC = $(wildcard $(SRCDIR)/*.S) $(wildcard ../common/*.S)
 ASOBJ = $(patsubst %.S,%.o, $(ASSRC))
-
-RVFI_PROFILER_SYMBOL_LIST_FILE?=rvfi_profiler_symbol_table.txt
 
 all: $(TARGET).bin $(TARGET).lst
 
@@ -37,7 +36,7 @@ $(TARGET).lst: $(TARGET).elf
 $(TARGET).elf: $(CCOBJ) $(ASOBJ)
 	@printf "${RED}Linking %s...${NC}\n" "$@"
 	@$(CC) $(CCOBJ) $(ASOBJ) -Wl,-Map=$(TARGET).map -N -o $@ $(LDFLAGS)
-	// TODO: Dump symbol table to $RVFI_PROFILER_SYMBOL_LIST_FILE
+	cp $@ ../../sim/rvfi_monitor_profiler_elf.elf
 
 %.o: %.S
 	@printf "${RED}Assemblying %s...${NC}\n" "$<"
@@ -45,7 +44,7 @@ $(TARGET).elf: $(CCOBJ) $(ASOBJ)
 
 %.o: %.c $(HEADERS)
 	@printf "${RED}Compiling %s...${NC}\n" "$<"
-	@$(CC) -c $< -o $@ $(CFLAGS)
+	$(CC) -c $< -o $@ $(CFLAGS)
 
 clean:
 	@printf "Cleaning up\n"

@@ -15,7 +15,7 @@ int _close (int file) {
 	return -1;
 }
 
-void _exit (int  rc)
+ inline __attribute__((always_inline)) void _exit (int  rc)
 {
 	while (true) {
 		HALT = 0;
@@ -38,7 +38,7 @@ int _lseek(int file, int offset, int whence)
 	if((STDOUT_FILENO != file) && (STDERR_FILENO != file)){
 		errno = EBADF;
 		return -1;
-	} 
+	}
 	return 0;
 }
 
