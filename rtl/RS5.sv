@@ -638,7 +638,7 @@ module RS5
     // assign rvfi_stage_valid_d[0] = !hold && !stall &&!killed;
     // assign rvfi_stage_valid_d[0] = !hold && !stall && !killed && !hazard;
     assign rvfi_stage_valid_d[0] = !hold && !stall && !killed && !hazard_q;
-    assign rvfi_stage_order_d[0] = rvfi_stage_order[0] + 1'b1;
+    assign rvfi_stage_order_d[0] = rvfi_stage_valid_d[0] ? rvfi_stage_order[0] + 1'b1 : rvfi_stage_order[0];
     // assign rvfi_stage_insn_d[0] = compressed_decode ? {16'd0, instruction_built_q[15:0]} : instruction_decode;
     assign rvfi_stage_insn_d[0] = instruction_compressed_execute ? {16'd0, instruction_built_2q[15:0]} : instruction_execute;
     // assign rvfi_stage_insn_d[0] = compressed_q ? {16'd0, instruction_built_2q[15:0]} : instruction_built_2q;
@@ -655,8 +655,8 @@ module RS5
     assign rvfi_stage_rd_addr_d[0] = rd_execute & {5{write_enable_exec}};
     assign rvfi_stage_rd_wdata_d[0] = result_exec;
     assign rvfi_stage_pc_rdata_d[0] = pc_execute;
-    // assign rvfi_stage_pc_wdata_d[0] = ctx_switch ? ctx_switch_target : (pc_execute + (compressed_q ? 32'd2 : 32'd4));
-    assign rvfi_stage_pc_wdata_d[0] = (ctx_switch || bp_taken_exec) ? ctx_switch_target : pc_decode;
+    // assign rvfi_stage_pc_wdata_d[0] = (ctx_switch || bp_taken_exec) ? ctx_switch_target : pc_decode;
+    assign rvfi_stage_pc_wdata_d[0] = (ctx_switch || (bp_taken_exec && !jump_rollback)) ? ctx_switch_target : pc_decode;
     assign rvfi_stage_mem_addr_d[0] = mem_address;
     assign rvfi_stage_mem_rmask_d[0] = {4{mem_read_enable}};
     assign rvfi_stage_mem_wmask_d[0] = mem_write_enable;
@@ -774,6 +774,27 @@ module RS5
                 // end
 
             end
+
+        end
+
+    end
+
+    logic[31:0] rvfi_pc_wdata_last;
+    logic rvfi_pc_wdata_last_valid;
+
+    always_ff @(posedge clk or negedge reset_n) begin
+
+        if (!reset_n) begin
+            rvfi_pc_wdata_last <= '0;
+            rvfi_pc_wdata_last_valid <= '0;
+
+        end else if (rvfi_valid) begin
+
+            if (rvfi_pc_wdata_last_valid && rvfi_pc_wdata_last != rvfi_pc_rdata)
+                $error("rvfi_pc_rdata = <%0x>, expected <%0x>", rvfi_pc_rdata, rvfi_pc_wdata_last);
+
+            rvfi_pc_wdata_last <= rvfi_pc_wdata;
+            rvfi_pc_wdata_last_valid <= 1'b1;
 
         end
 
