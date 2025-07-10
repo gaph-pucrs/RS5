@@ -12,14 +12,15 @@
 
 #ifdef RV64
 typedef uint64_t rv_xlen_t;
+typedef uint32_t rv_ilen_t;
 #else
 typedef uint32_t rv_xlen_t;
+typedef uint32_t rv_ilen_t;
 #endif
 
 typedef struct {
-    // rvfi_valid is implicit
     uint64_t rvfi_order;
-    uint32_t rvfi_insn;
+    rv_ilen_t rvfi_insn;
     uint8_t rvfi_trap;
     uint8_t rvfi_halt;
     uint8_t rvfi_intr;
@@ -38,7 +39,18 @@ typedef struct {
     uint8_t rvfi_mem_wmask;
     rv_xlen_t rvfi_mem_rdata;
     rv_xlen_t rvfi_mem_wdata;
+    uint8_t rvfi_valid;
 } rvfi_trace_t;
+
+// typedef struct {
+//     uint8_t valid;
+//     uint64_t order;
+//     rv_ilen_t insn;
+//     rv_xlen_t pc_rdata;
+//     rv_xlen_t pc_wdata;
+//     rv_xlen_t x_wdata[32];
+//     uint32_t x_wb;
+// } rvvi_trace_reduced_t;
 
 typedef struct {
     char function_name[200];
@@ -81,6 +93,7 @@ typedef struct {
     char* time_unit_suffix;
 
     unsigned long march;
+    int max_retire;
 
     int en_tracer;
     int en_profiler;
@@ -91,6 +104,8 @@ typedef struct {
     char* profiler_call_graph_file_name;
     char* profiler_elf_file_name;
     char* symbol_watchlist_file_name;
+
+    char* output_dir;
 
     FILE* tracer_log_file;
     FILE* profiler_log_file;
@@ -141,11 +156,11 @@ static const char rv_ireg_name_sym[32][5] = {
 
 #endif
 
-rvfi_monitor_context* rvfi_monitor_init(char* monitor_prefix, char* elf_file_name, char* time_unit_suffix, unsigned long isa, int en_tracer, int en_profiler, int en_checker);
+rvfi_monitor_context* rvfi_monitor_init(char* monitor_prefix, char* elf_file_name, char* watchlist_file_name, char* output_dir, char* time_unit_suffix, unsigned long isa, int max_retire, int en_tracer, int en_profiler, int en_checker);
 void rvfi_monitor_add_counter(rvfi_monitor_context* ctx, rvfi_performance_counter_t ctr);
 void rvfi_monitor_add_default_performance_counters(rvfi_monitor_context* ctx);
 void rvfi_monitor_push_counters_to_stack(rvfi_monitor_context *ctx, symbol_info_t *current_symbol, const rvfi_trace_t *rvfi_trace);
-void rvfi_monitor_step(rvfi_monitor_context* ctx, const rvfi_trace_t *rvfi_trace, uint64_t current_clock_cycle, char* time_string, double time_float);
+void rvfi_monitor_step(rvfi_monitor_context* ctx, const rvfi_trace_t* rvfi_traces, uint64_t current_clock_cycle, char* time_string, double time_float);
 void rvfi_monitor_final(rvfi_monitor_context* ctx);
 
 void rvfi_monitor_print_call_graph(rvfi_monitor_context* ctx, GNode* call_node, int indent_level);

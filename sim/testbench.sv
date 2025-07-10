@@ -40,6 +40,7 @@ module testbench
     localparam bit           VEnable         = 1'b0;
     localparam int           VLEN            = 256;
     localparam bit           BRANCHPRED      = 1'b1;
+    // localparam bit           BRANCHPRED      = 1'b0;
 
 `ifndef SYNTH
     // localparam bit           PROFILING       = 1'b1;
@@ -52,6 +53,7 @@ module testbench
     localparam int           MEM_WIDTH       = 65_536;
     // localparam string        BIN_FILE        = "../app/riscv-tests/test.bin";
     localparam string        BIN_FILE        = "../app/aes-test/aes128_nist_enc_test.bin";
+    // localparam string        BIN_FILE        = "../app/bolt/bolt.bin";
 
     localparam int           i_cnt = 1;
 
@@ -353,27 +355,27 @@ module testbench
         .rvfi_ext_clk(clk),
         .rvfi_ext_reset_n(reset_n),
 
-        .rvfi_valid(rvfi_valid),
-        .rvfi_order(rvfi_order),
-        .rvfi_insn(rvfi_insn),
-        .rvfi_trap(rvfi_trap),
-        .rvfi_halt(rvfi_halt),
-        .rvfi_intr(rvfi_intr),
-        .rvfi_mode(rvfi_mode),
-        .rvfi_ixl(rvfi_ixl),
-        .rvfi_rs1_addr(rvfi_rs1_addr),
-        .rvfi_rs2_addr(rvfi_rs2_addr),
-        .rvfi_rs1_rdata(rvfi_rs1_rdata),
-        .rvfi_rs2_rdata(rvfi_rs2_rdata),
-        .rvfi_rd_addr(rvfi_rd_addr),
-        .rvfi_rd_wdata(rvfi_rd_wdata),
-        .rvfi_pc_rdata(rvfi_pc_rdata),
-        .rvfi_pc_wdata(rvfi_pc_wdata),
-        .rvfi_mem_addr(rvfi_mem_addr),
-        .rvfi_mem_rmask(rvfi_mem_rmask),
-        .rvfi_mem_wmask(rvfi_mem_wmask),
-        .rvfi_mem_rdata(rvfi_mem_rdata),
-        .rvfi_mem_wdata(rvfi_mem_wdata)
+        .rvfi_valid('{rvfi_valid}),
+        .rvfi_order('{rvfi_order}),
+        .rvfi_insn('{rvfi_insn}),
+        .rvfi_trap('{rvfi_trap}),
+        .rvfi_halt('{rvfi_halt}),
+        .rvfi_intr('{rvfi_intr}),
+        .rvfi_mode('{rvfi_mode}),
+        .rvfi_ixl('{rvfi_ixl}),
+        .rvfi_rs1_addr('{rvfi_rs1_addr}),
+        .rvfi_rs2_addr('{rvfi_rs2_addr}),
+        .rvfi_rs1_rdata('{rvfi_rs1_rdata}),
+        .rvfi_rs2_rdata('{rvfi_rs2_rdata}),
+        .rvfi_rd_addr('{rvfi_rd_addr}),
+        .rvfi_rd_wdata('{rvfi_rd_wdata}),
+        .rvfi_pc_rdata('{rvfi_pc_rdata}),
+        .rvfi_pc_wdata('{rvfi_pc_wdata}),
+        .rvfi_mem_addr('{rvfi_mem_addr}),
+        .rvfi_mem_rmask('{rvfi_mem_rmask}),
+        .rvfi_mem_wmask('{rvfi_mem_wmask}),
+        .rvfi_mem_rdata('{rvfi_mem_rdata}),
+        .rvfi_mem_wdata('{rvfi_mem_wdata})
 
     );
     `endif
