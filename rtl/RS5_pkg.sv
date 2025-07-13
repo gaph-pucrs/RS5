@@ -278,7 +278,9 @@ package RS5_pkg;
         VMVR,
         VMVSX,
         VMVXS,
-        VMERGE
+        VMERGE,
+        VSLIDE1UP,
+        VSLIDE1DOWN
     } iTypeVector_e;
 
     typedef enum  logic[9:0] {

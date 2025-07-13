@@ -34,6 +34,7 @@ module vectorALU
     input  logic [VLEN-1:0]             first_operand,
     input  logic [VLEN-1:0]             second_operand,
     input  logic [VLEN-1:0]             third_operand,
+    input  logic [31:0]                 scalar_operand,
     input  vector_states_e              current_state,
     input  logic [3:0]                  cycle_count,
     input  logic [3:0]                  cycle_count_r,
@@ -122,7 +123,7 @@ module vectorALU
             .V_REDLOGIC_ON   (V_REDLOGIC_ON),
             .V_REDMINMAX_ON  (V_REDMINMAX_ON),
             .MULTI_CYCLE     (MULTI_CYCLE_REDUCTIONS)
-    )   vector_reductions (
+    )   u_vector_reductions (
             .clk               (clk),
             .reset_n           (reset_n),
             .enable_i          (reduction_enable),
@@ -138,6 +139,27 @@ module vectorALU
             .mask_sew32        (mask_sew32),
             .hold_o            (hold_reductions),
             .result_o          (result_reductions)
+        );
+
+//////////////////////////////////////////////////////////////////////////////
+// Slides
+//////////////////////////////////////////////////////////////////////////////
+    logic [VLEN-1:0] result_slide;
+
+    vectorSlide #(
+            .VLEN (VLEN)
+    )   u_vector_slides (
+            .clk               (clk),
+            .reset_n           (reset_n),
+            .vector_operation_i(vector_operation_i),
+            .first_operand     (first_operand),
+            .second_operand    (second_operand),
+            .scalar_operand    (scalar_operand),
+            .cycle_count       (cycle_count),
+            .vsew              (vsew),
+            .vlmul             (vlmul),
+            .vl                (vl),
+            .result_o          (result_slide)
         );
 
 //////////////////////////////////////////////////////////////////////////////
@@ -206,7 +228,7 @@ module vectorALU
                 .V_MINMAX_ON (V_MINMAX_ON),
                 .V_MERGE_ON  (V_MERGE_ON),
                 .V_DIV_ON    (V_DIV_ON)
-            )   vectorLane (
+            )   u_vectorLane (
                 .clk               (clk),
                 .reset_n           (reset_n),
                 .first_operand_i   (first_operand [(LLEN*i_lane)+:LLEN]),
@@ -316,6 +338,8 @@ module vectorALU
             VMULHU, VMULHSU:   result_o = result_mult_low;
             VWMUL, VWMULU,
             VWMULSU:           result_o = (hold_widening_2r == 1'b1) ? result_lanes_mult[(2*VLEN)-1:VLEN] : result_lanes_mult[VLEN-1:0];
+            VSLIDE1UP,
+            VSLIDE1DOWN:       result_o = result_slide;
             default:           result_o = result_lanes;
         endcase
     end
