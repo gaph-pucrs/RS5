@@ -352,6 +352,8 @@ module decode
                 6'b000101:     decode_vector_opm = VREDMIN;
                 6'b000110:     decode_vector_opm = VREDMAXU;
                 6'b000111:     decode_vector_opm = VREDMAX;
+                6'b001110:     decode_vector_opm = VSLIDE1UP;
+                6'b001111:     decode_vector_opm = VSLIDE1DOWN;
                 6'b010000:     decode_vector_opm = (opCat == OPMVX)
                                                 ? VMVSX
                                                 : VMVXS;

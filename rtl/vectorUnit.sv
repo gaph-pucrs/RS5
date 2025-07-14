@@ -326,9 +326,15 @@ module vectorUnit
 
     always_comb begin
         // VS1 Address
-        vs1_addr = (instruction_operation_i == VSTORE)
-                    ? rd_addr
-                    : rs1_addr;
+        if (instruction_operation_i == VSTORE) begin
+            vs1_addr = rd_addr;
+        end
+        else if (vector_operation_i inside {VSLIDE1UP, VSLIDE1DOWN}) begin
+            vs1_addr = rs2_addr + 1;
+        end
+        else begin
+            vs1_addr = rs1_addr;
+        end
 
         // VS2 Address
         if (accumulate_instruction) begin
@@ -471,6 +477,9 @@ module vectorUnit
             if (instruction_operation_i == VSTORE) begin
                 second_operand <= vs1_data;
             end
+            else if (instruction_operation_i == VECTOR && vector_operation_i inside {VSLIDE1UP, VSLIDE1DOWN}) begin
+                second_operand <= vs1_data;
+            end
             else begin
                 unique case (opCat)
                     OPIVX, OPFVF, OPMVX: second_operand <= scalar_replicated;
@@ -537,6 +546,7 @@ module vectorUnit
         .first_operand      (first_operand),
         .second_operand     (second_operand),
         .third_operand      (third_operand),
+        .scalar_operand     (op1_scalar_i),
         .vector_operation_i (vector_operation_i),
         .cycle_count        (cycle_count),
         .cycle_count_r      (cycle_count_r),
