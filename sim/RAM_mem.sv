@@ -32,22 +32,23 @@ module RAM_mem
     parameter string DEBUG_PATH = "./debug/",
 `endif
     parameter int    MEM_WIDTH  = 65536,
+    parameter int    BUS_WIDTH  = 32,
     parameter string BIN_FILE   = "../app/berkeley_suite/test.bin"
 )
 (
     input  logic                             clk,
 
     input  logic                             enA_i,
-    input  logic [ 3:0]                      weA_i,
+    input  logic [BUS_WIDTH/8-1:0]           weA_i,
     input  logic [($clog2(MEM_WIDTH) - 1):0] addrA_i,
-    input  logic [31:0]                      dataA_i,
-    output logic [31:0]                      dataA_o,
+    input  logic [BUS_WIDTH-1:0]             dataA_i,
+    output logic [BUS_WIDTH-1:0]             dataA_o,
 
     input  logic                             enB_i,
-    input  logic [ 3:0]                      weB_i,
+    input  logic [BUS_WIDTH/8-1:0]           weB_i,
     input  logic [($clog2(MEM_WIDTH) - 1):0] addrB_i,
-    input  logic [31:0]                      dataB_i,
-    output logic [31:0]                      dataB_o
+    input  logic [BUS_WIDTH  -1:0]           dataB_i,
+    output logic [BUS_WIDTH  -1:0]           dataB_o
 );
 
     reg [7:0] RAM [0:MEM_WIDTH-1];
@@ -78,27 +79,24 @@ module RAM_mem
     /* Write */
     always_ff @(posedge clk) begin
         if (enA_i == 1'b1) begin
-            if (weA_i[3] == 1'b1) begin                                 // Store Word(4 bytes)
-                RAM[addrA_i+3] <= dataA_i[31:24];
-            end
-            if (weA_i[2] == 1'b1) begin                                 // Store Word(4 bytes)
-                RAM[addrA_i+2] <= dataA_i[23:16];
-            end
-            if (weA_i[1] == 1'b1) begin                                 // Store Half(2 bytes)
-                RAM[addrA_i+1] <= dataA_i[15:8];
-            end
-            if (weA_i[0] == 1'b1) begin                                 // Store Byte(1 byte)
-                RAM[addrA_i]   <= dataA_i[7:0];
+            for (int i = 0; i < (BUS_WIDTH/8); i++) begin
+                if (weA_i[i] == 1'b1) begin                                 // Store Word(4 bytes)
+                    RAM[addrA_i+i] <= dataA_i[(8*i)+:8];
+                end
             end
 
         `ifndef SYNTH
             if (DEBUG) begin
                 if (weA_i != '0) begin
                     $fwrite(fd_w_a,"[%0d] ", $time);
-                    if (weA_i[3] == 1'b1) $fwrite(fd_w_a,"%h ", dataA_i[31:24]); else $fwrite(fd_w_a,"-- ");
-                    if (weA_i[2] == 1'b1) $fwrite(fd_w_a,"%h ", dataA_i[23:16]); else $fwrite(fd_w_a,"-- ");
-                    if (weA_i[1] == 1'b1) $fwrite(fd_w_a,"%h ", dataA_i[15:8 ]); else $fwrite(fd_w_a,"-- ");
-                    if (weA_i[0] == 1'b1) $fwrite(fd_w_a,"%h ", dataA_i[ 7:0 ]); else $fwrite(fd_w_a,"-- ");
+                    for (int i = (BUS_WIDTH/8)-1; i >= 0; i--) begin
+                        if (weA_i[i] == 1'b1) begin
+                            $fwrite(fd_w_a,"%h ", dataA_i[(8*i)+:8]);
+                        end
+                        else begin
+                            $fwrite(fd_w_a,"-- ");
+                        end
+                    end
                     $fwrite(fd_w_a," --> 0x%4h\n", addrA_i);
                 end
             end
@@ -106,27 +104,24 @@ module RAM_mem
         end
 
         if (enB_i == 1'b1) begin
-            if (weB_i[3] == 1'b1) begin                                 // Store Word(4 bytes)
-                RAM[addrB_i+3] <= dataB_i[31:24];
-            end
-            if (weB_i[2] == 1'b1) begin                                 // Store Word(4 bytes)
-                RAM[addrB_i+2] <= dataB_i[23:16];
-            end
-            if (weB_i[1] == 1'b1) begin                                 // Store Half(2 bytes)
-                RAM[addrB_i+1] <= dataB_i[15:8];
-            end
-            if (weB_i[0] == 1'b1) begin                                 // Store Byte(1 byte)
-                RAM[addrB_i]   <= dataB_i[7:0];
+            for (int i = 0; i < (BUS_WIDTH/8); i++) begin
+                if (weB_i[i] == 1'b1) begin                                 // Store Word(4 bytes)
+                    RAM[addrB_i+i] <= dataB_i[(8*i)+:8];
+                end
             end
 
         `ifndef SYNTH
             if (DEBUG) begin
                 if (weB_i != '0) begin
                     $fwrite(fd_w_b,"[%0d] ", $time);
-                    if (weB_i[3] == 1'b1) $fwrite(fd_w_b,"%h ", dataB_i[31:24]); else $fwrite(fd_w_b,"-- ");
-                    if (weB_i[2] == 1'b1) $fwrite(fd_w_b,"%h ", dataB_i[23:16]); else $fwrite(fd_w_b,"-- ");
-                    if (weB_i[1] == 1'b1) $fwrite(fd_w_b,"%h ", dataB_i[15:8]);  else $fwrite(fd_w_b,"-- ");
-                    if (weB_i[0] == 1'b1) $fwrite(fd_w_b,"%h ", dataB_i[7:0]);   else $fwrite(fd_w_b,"-- ");
+                    for (int i = (BUS_WIDTH/8)-1; i >= 0; i--) begin
+                        if (weB_i[i] == 1'b1) begin
+                            $fwrite(fd_w_b,"%h ", dataB_i[(8*i)+:8]);
+                        end
+                        else begin
+                            $fwrite(fd_w_b,"-- ");
+                        end
+                    end
                     $fwrite(fd_w_b," --> 0x%4h\n", addrB_i);
                 end
             end
@@ -138,16 +133,18 @@ module RAM_mem
     always_ff @(posedge clk) begin
         if (enA_i == 1'b1) begin
             if (weA_i == '0) begin
-                dataA_o[31:24] <= RAM[addrA_i+3];
-                dataA_o[23:16] <= RAM[addrA_i+2];
-                dataA_o[15:8]  <= RAM[addrA_i+1];
-                dataA_o[7:0]   <= RAM[addrA_i];
+                for (int i = 0; i < (BUS_WIDTH/8); i++) begin
+                    dataA_o[(8*i)+:8] <= RAM[addrA_i+i];
+                end
 
             `ifndef SYNTH
                 if (DEBUG) begin
                     if (addrA_i != '0) begin
-                        $fwrite(fd_r_a,"[%0d] %h %h %h %h <-- 0x%4h\n",
-                            $time, RAM[addrA_i+3], RAM[addrA_i+2], RAM[addrA_i+1], RAM[addrA_i], addrA_i);
+                        $fwrite(fd_r_a,"[%0d] ", $time);
+                        for (int i = (BUS_WIDTH/8)-1; i >= 0; i--) begin
+                            $fwrite(fd_r_a,"%h ", RAM[addrA_i+i]);
+                        end
+                        $fwrite(fd_r_a," <-- 0x%4h\n", addrA_i);
                     end
                 end
             `endif
@@ -156,16 +153,18 @@ module RAM_mem
 
         if (enB_i == 1'b1) begin
             if (weB_i == '0) begin
-                dataB_o[31:24] <= RAM[addrB_i+3];
-                dataB_o[23:16] <= RAM[addrB_i+2];
-                dataB_o[15:8]  <= RAM[addrB_i+1];
-                dataB_o[7:0]   <= RAM[addrB_i];
+                for (int i = 0; i < (BUS_WIDTH/8); i++) begin
+                    dataB_o[(8*i)+:8] <= RAM[addrB_i+i];
+                end
 
             `ifndef SYNTH
                 if (DEBUG) begin
                     if (addrB_i != '0) begin
-                        $fwrite(fd_r_b,"[%0d] %h %h %h %h <-- 0x%4h\n",
-                            $time, RAM[addrB_i+3], RAM[addrB_i+2], RAM[addrB_i+1], RAM[addrB_i], addrB_i);
+                        $fwrite(fd_r_b,"[%0d] ", $time);
+                        for (int i = (BUS_WIDTH/8)-1; i >= 0; i--) begin
+                            $fwrite(fd_r_b,"%h ", RAM[addrB_i+i]);
+                        end
+                        $fwrite(fd_r_b," <-- 0x%4h\n", addrB_i);
                     end
                 end
             `endif

@@ -39,6 +39,7 @@ module RS5
     parameter bit           VEnable          = 1'b0,
     parameter int           VLEN             = 256,
     parameter int           LLEN             = 32,
+    parameter int           BUS_WIDTH        = 32,
     parameter bit           XOSVMEnable      = 1'b0,
     parameter bit           ZKNEEnable       = 1'b0,
     parameter bit           ZICONDEnable     = 1'b0,
@@ -54,16 +55,16 @@ module RS5
     input  logic                    stall,
 
     input  logic [31:0]             instruction_i,
-    input  logic [31:0]             mem_data_i,
+    input  logic [BUS_WIDTH-1:0]    mem_data_i,
     input  logic [63:0]             mtime_i,
     input  logic                    tip_i,
     input  logic                    eip_i,
 
     output logic [31:0]             instruction_address_o,
     output logic                    mem_operation_enable_o,
-    output logic  [3:0]             mem_write_enable_o,
+    output logic [BUS_WIDTH/8-1:0]  mem_write_enable_o,
     output logic [31:0]             mem_address_o,
-    output logic [31:0]             mem_data_o,
+    output logic [BUS_WIDTH-1:0]    mem_data_o,
     output logic                    interrupt_ack_o
 );
 
@@ -81,10 +82,10 @@ module RS5
     privilegeLevel_e privilege;
     logic   [31:0]   jump_target;
 
-    logic            mem_read_enable;
-    logic    [3:0]   mem_write_enable;
-    logic   [31:0]   mem_address;
-    logic   [31:0]   instruction_address;
+    logic                   mem_read_enable;
+    logic [BUS_WIDTH/8-1:0] mem_write_enable;
+    logic [31:0]            mem_address;
+    logic [31:0]            instruction_address;
 
 //////////////////////////////////////////////////////////////////////////////
 // Fetch signals
@@ -352,6 +353,7 @@ module RS5
         .VEnable      (VEnable     ),
         .VLEN         (VLEN        ),
         .LLEN         (LLEN        ),
+        .BUS_WIDTH    (BUS_WIDTH   ),
         .BRANCHPRED   (BRANCHPRED  )
     ) execute1 (
         .clk                     (clk),
@@ -418,7 +420,7 @@ module RS5
         .reset_n                (reset_n),
         .instruction_operation_i(instruction_operation_retire),
         .result_i               (result_retire),
-        .mem_data_i             (mem_data_i),
+        .mem_data_i             (mem_data_i[31:0]),
         .reservation_data_o     (reservation_data),
         .regbank_data_o         (regbank_data_writeback)
     );

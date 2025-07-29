@@ -18,32 +18,33 @@ module vectorUnit
 #(
     parameter environment_e Environment = ASIC,
     parameter int           VLEN        = 64,
-    parameter int           LLEN        = 32
+    parameter int           LLEN        = 32,
+    parameter int           BUS_WIDTH   = 32
 )
 (
-    input   logic           clk,
-    input   logic           reset_n,
+    input   logic                  clk,
+    input   logic                  reset_n,
 
-    input   logic [31:0]    instruction_i,
-    input   iType_e         instruction_operation_i,
-    input   iTypeVector_e   vector_operation_i,
+    input   logic [31:0]           instruction_i,
+    input   iType_e                instruction_operation_i,
+    input   iTypeVector_e          vector_operation_i,
 
-    input   logic [31:0]    op1_scalar_i,
-    input   logic [31:0]    op2_scalar_i,
+    input   logic [31:0]           op1_scalar_i,
+    input   logic [31:0]           op2_scalar_i,
 
-    output  logic           hold_o,
+    output  logic                  hold_o,
 
-    output  logic [31:0]    vtype_o,
-    output  logic [31:0]    vlen_o,
+    output  logic [31:0]           vtype_o,
+    output  logic [31:0]           vlen_o,
 
-    output logic [31:0]     mem_address_o,
-    output logic            mem_read_enable_o,
-    output logic [ 3:0]     mem_write_enable_o,
-    output logic [31:0]     mem_write_data_o,
-    input  logic [31:0]     mem_read_data_i,
+    output logic [31:0]            mem_address_o,
+    output logic                   mem_read_enable_o,
+    output logic [BUS_WIDTH/8-1:0] mem_write_enable_o,
+    output logic [BUS_WIDTH-1:0]   mem_write_data_o,
+    input  logic [BUS_WIDTH-1:0]   mem_read_data_i,
 
-    output  logic [31:0]    res_scalar_o,
-    output  logic           wr_en_scalar_o
+    output  logic [31:0]           res_scalar_o,
+    output  logic                  wr_en_scalar_o
 );
 
     localparam VLENB = VLEN/8;
@@ -495,8 +496,9 @@ module vectorUnit
 //////////////////////////////////////////////////////////////////////////////
 
     vectorLSU #(
-        .VLEN   (VLEN),
-        .VLENB  (VLENB)
+        .VLEN      (VLEN     ),
+        .VLENB     (VLENB    ),
+        .BUS_WIDTH (BUS_WIDTH)
     ) vectorLSU1 (
         .clk                    (clk),
         .reset_n                (reset_n),

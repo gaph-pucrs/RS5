@@ -153,7 +153,7 @@ module vectorALU
             .reset_n           (reset_n),
             .vector_operation_i(vector_operation_i),
             .first_operand     (first_operand),
-            .second_operand    (second_operand),
+            .second_operand    (second_operand[31:0]),
             .scalar_operand    (scalar_operand),
             .cycle_count       (cycle_count),
             .vsew              (vsew),

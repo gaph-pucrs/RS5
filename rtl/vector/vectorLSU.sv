@@ -15,8 +15,10 @@
 module vectorLSU
     import RS5_pkg::*;
 #(
-    parameter int VLEN  = 64,
-    parameter int VLENB = 8
+    parameter int VLEN      = 64,
+    parameter int VLENB     = 8,
+    parameter int BUS_WIDTH = 32
+
 ) (
     input  logic                      clk,
     input  logic                      reset_n,
@@ -50,9 +52,9 @@ module vectorLSU
 
     output logic [31:0]               mem_address_o,
     output logic                      mem_read_enable_o,
-    output logic [ 3:0]               mem_write_enable_o,
-    output logic [31:0]               mem_write_data_o,
-    input  logic [31:0]               mem_read_data_i,
+    output logic [BUS_WIDTH/8-1:0]    mem_write_enable_o,
+    output logic [BUS_WIDTH  -1:0]    mem_write_data_o,
+    input  logic [BUS_WIDTH  -1:0]    mem_read_data_i,
 
     output logic [VLEN-1:0]           read_data_o
 );
@@ -100,6 +102,10 @@ module vectorLSU
 // Cycle Control
 //////////////////////////////////////////////////////////////////////////////
 
+    localparam ELEMENTS_PER_ACCESS_EW8  = BUS_WIDTH/8;
+    localparam ELEMENTS_PER_ACCESS_EW16 = BUS_WIDTH/16;
+    localparam ELEMENTS_PER_ACCESS_EW32 = BUS_WIDTH/32;
+
     logic next_cycle_is_last;
     logic indexed_wait_update_index_reg;
 
@@ -108,9 +114,9 @@ module vectorLSU
     always_comb begin
         if (addrMode == UNIT_STRIDED) begin
             unique case(width)
-                EW8:     next_cycle_is_last = ((elementsPerRegister - nextElementsProcessedRegister) <= 4);
-                EW16:    next_cycle_is_last = ((elementsPerRegister - nextElementsProcessedRegister) <= 2);
-                default: next_cycle_is_last = ((elementsPerRegister - nextElementsProcessedRegister) <= 1);
+                EW8:     next_cycle_is_last = ((elementsPerRegister - nextElementsProcessedRegister) <= ELEMENTS_PER_ACCESS_EW8);
+                EW16:    next_cycle_is_last = ((elementsPerRegister - nextElementsProcessedRegister) <= ELEMENTS_PER_ACCESS_EW16);
+                default: next_cycle_is_last = ((elementsPerRegister - nextElementsProcessedRegister) <= ELEMENTS_PER_ACCESS_EW32);
             endcase
         end
         else begin
@@ -194,7 +200,7 @@ module vectorLSU
             offset_strided <= '0;
         end
         else if (addrMode == UNIT_STRIDED) begin
-            offset_strided <= offset_strided + 32'h4;
+            offset_strided <= offset_strided + 32'(ELEMENTS_PER_ACCESS_EW8);
         end
         else if (addrMode == STRIDED) begin
             if (state != VLSU_LAST_CYCLE)
@@ -206,7 +212,7 @@ module vectorLSU
         unique case(width)
             EW8:     offset_indexed = {24'h0, indexed_offsets_i[( 8*elementsProcessedRegister)+:8 ]};
             EW16:    offset_indexed = {16'h0, indexed_offsets_i[(16*elementsProcessedRegister)+:16]};
-            default: offset_indexed = indexed_offsets_i[(32*elementsProcessedRegister)+:32];
+            default: offset_indexed =         indexed_offsets_i[(32*elementsProcessedRegister)+:32];
         endcase
     end
 
@@ -241,29 +247,29 @@ module vectorLSU
             if (width == EW8) begin
                 if(state == VLSU_FIRST_CYCLE) begin
                     unique case(base_address_i[1:0])
-                        2'b11:      elementsProcessedCycle = 1;
-                        2'b10:      elementsProcessedCycle = 2;
-                        2'b01:      elementsProcessedCycle = 3;
-                        default:    elementsProcessedCycle = 4;
+                        2'b11:      elementsProcessedCycle = ELEMENTS_PER_ACCESS_EW8-3;
+                        2'b10:      elementsProcessedCycle = ELEMENTS_PER_ACCESS_EW8-2;
+                        2'b01:      elementsProcessedCycle = ELEMENTS_PER_ACCESS_EW8-1;
+                        default:    elementsProcessedCycle = ELEMENTS_PER_ACCESS_EW8;
                     endcase
                 end
                 else begin
-                    elementsProcessedCycle = 4;
+                    elementsProcessedCycle = ELEMENTS_PER_ACCESS_EW8;
                 end
             end
             else if (width == EW16) begin
                 if(state == VLSU_FIRST_CYCLE) begin
                     unique case(base_address_i[1])
-                        1'b1:       elementsProcessedCycle = 1;
-                        default:    elementsProcessedCycle = 2;
+                        1'b1:       elementsProcessedCycle = ELEMENTS_PER_ACCESS_EW16-1;
+                        default:    elementsProcessedCycle = ELEMENTS_PER_ACCESS_EW16;
                     endcase
                 end
                 else begin
-                    elementsProcessedCycle = 2;
+                    elementsProcessedCycle = ELEMENTS_PER_ACCESS_EW16;
                 end
             end
             else begin
-                elementsProcessedCycle = 1;
+                elementsProcessedCycle = ELEMENTS_PER_ACCESS_EW32;
             end
         end
         else begin
@@ -284,14 +290,14 @@ module vectorLSU
 // STAGE 1 - Write Enable Control
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [3:0] mem_write_enable;
+    logic [BUS_WIDTH/8-1:0] mem_write_enable;
     logic [4:0] shift_amount;
 
     always_comb begin
         if (addrMode == UNIT_STRIDED) begin
             if (width == EW8) begin
                 if(state == VLSU_FIRST_CYCLE) begin
-                    for (int i = 0, int j = 0; i < 4; i++)
+                    for (int i = 0, int j = 0; i < ELEMENTS_PER_ACCESS_EW8; i++)
                         if (i >= base_address_i[1:0] && j < vl_curr_reg) begin
                             mem_write_enable[i] = (vm | mask_sew8[cycle_count_r][j]);
                             j++;
@@ -309,7 +315,7 @@ module vectorLSU
                 end
                 else if (state == VLSU_LAST_CYCLE) begin
                     shift_amount = 0;
-                    for (int i = 0; i < 4; i++)
+                    for (int i = 0; i < ELEMENTS_PER_ACCESS_EW8; i++)
                         if ((i < base_address_i[1:0] || base_address_i[1:0] == 0) && (elementsProcessedRegister + i) < vl_curr_reg)
                             mem_write_enable[i] = (vm | mask_sew8[cycle_count_r][elementsProcessedRegister + i]);
                         else
@@ -317,13 +323,13 @@ module vectorLSU
                 end
                 else begin
                     shift_amount = 0;
-                    for (int i = 0; i < 4; i++)
+                    for (int i = 0; i < ELEMENTS_PER_ACCESS_EW8; i++)
                         mem_write_enable[i] = (vm | mask_sew8[cycle_count_r][elementsProcessedRegister+i]) && ((elementsProcessedRegister + i) < vl_curr_reg);
                 end
             end
             else if (width == EW16) begin
                 if(state == VLSU_FIRST_CYCLE) begin
-                    for (int i = 0, int j = 0; i < 2; i++)
+                    for (int i = 0, int j = 0; i < ELEMENTS_PER_ACCESS_EW16; i++)
                         if (i >= base_address_i[1] && j < vl_curr_reg) begin
                             mem_write_enable[(2*i)+:2] = (vm | mask_sew16[cycle_count_r][j])
                                                         ? 2'b11
@@ -341,7 +347,7 @@ module vectorLSU
                 end
                 else if(state == VLSU_LAST_CYCLE) begin
                     shift_amount = 0;
-                    for (int i = 0; i < 2; i++)
+                    for (int i = 0; i < ELEMENTS_PER_ACCESS_EW16; i++)
                         if ((i < base_address_i[1] || base_address_i[1] == 0) && (elementsProcessedRegister + i) < vl_curr_reg)
                             mem_write_enable[(2*i)+:2] = (vm | mask_sew16[cycle_count_r][elementsProcessedRegister + i])
                                                         ? 2'b11
@@ -351,7 +357,7 @@ module vectorLSU
                 end
                 else begin
                     shift_amount = 0;
-                    for (int i = 0; i < 2; i++)
+                    for (int i = 0; i < ELEMENTS_PER_ACCESS_EW16; i++)
                         mem_write_enable[(2*i)+:2] = (vm | mask_sew16[cycle_count_r][elementsProcessedRegister+i]) && ((elementsProcessedRegister + i) < vl_curr_reg)
                                                     ? 2'b11
                                                     : 2'b00;
@@ -359,37 +365,39 @@ module vectorLSU
             end
             else begin
                 shift_amount = 0;
-                if(state inside {VLSU_IDLE}) begin
-                    mem_write_enable = 4'b0000;
+                if(state == VLSU_IDLE) begin
+                    mem_write_enable = '0;
                 end
                 else begin
-                    mem_write_enable = (vm | mask_sew32[cycle_count_r][elementsProcessedRegister]) && (elementsProcessedRegister < vl_curr_reg)
-                                        ? 4'b1111
-                                        : 4'b0000;
+                    for (int i = 0; i < ELEMENTS_PER_ACCESS_EW16; i++)
+                        mem_write_enable[(4*i)+:4] = (vm | mask_sew32[cycle_count_r][elementsProcessedRegister+i]) && ((elementsProcessedRegister + i) < vl_curr_reg)
+                                                    ? 4'b1111
+                                                    : 4'b0000;
                 end
             end
         end
         else begin
             shift_amount = 0;
+
             if ((width == EW8) && (vm | mask_sew8[cycle_count_r][elementsProcessedRegister]) && (elementsProcessedRegister < vl_curr_reg)) begin
                 unique case(address[1:0])
-                    2'b11:   mem_write_enable = 4'b1000;
-                    2'b10:   mem_write_enable = 4'b0100;
-                    2'b01:   mem_write_enable = 4'b0010;
-                    default: mem_write_enable = 4'b0001;
+                    2'b11:   mem_write_enable = {'0, 4'b1000};
+                    2'b10:   mem_write_enable = {'0, 4'b0100};
+                    2'b01:   mem_write_enable = {'0, 4'b0010};
+                    default: mem_write_enable = {'0, 4'b0001};
                 endcase
             end
             else if ((width == EW16) && (vm | mask_sew16[cycle_count_r][elementsProcessedRegister]) && (elementsProcessedRegister < vl_curr_reg)) begin
                 unique case(address[1])
-                    1'b1:       mem_write_enable = 4'b1100;
-                    default:    mem_write_enable = 4'b0011;
+                    1'b1:       mem_write_enable = {'0, 4'b1100};
+                    default:    mem_write_enable = {'0, 4'b0011};
                 endcase
             end
             else if ((width == EW32) && (vm | mask_sew32[cycle_count_r][elementsProcessedRegister]) && (elementsProcessedRegister < vl_curr_reg)) begin
-                mem_write_enable = 4'b1111;
+                mem_write_enable = {'0, 4'b1111};
             end
             else begin
-                mem_write_enable = 4'b0000;
+                mem_write_enable = '0;
             end
         end
     end
@@ -398,35 +406,33 @@ module vectorLSU
 // STAGE 1 - Write Data Control
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [31:0] write_data;
+    logic [BUS_WIDTH-1:0] write_data;
 
     always_comb begin
         if (addrMode == UNIT_STRIDED) begin
             unique case (width)
                 EW8: begin
-                    write_data[ 7: 0] = write_data_i[(8*(elementsProcessedRegister  ))+:8];
-                    write_data[15: 8] = write_data_i[(8*(elementsProcessedRegister+1))+:8];
-                    write_data[23:16] = write_data_i[(8*(elementsProcessedRegister+2))+:8];
-                    write_data[31:24] = write_data_i[(8*(elementsProcessedRegister+3))+:8];
+                    for (int i = 0; i < ELEMENTS_PER_ACCESS_EW8; i++)
+                        write_data[(8*i)+:8] = write_data_i[(8*(elementsProcessedRegister+i))+:8];
                 end
                 EW16: begin
-                    write_data[15: 0] = write_data_i[(16*(elementsProcessedRegister  ))+:16];
-                    write_data[31:16] = write_data_i[(16*(elementsProcessedRegister+1))+:16];
+                    for (int i = 0; i < ELEMENTS_PER_ACCESS_EW16; i++)
+                        write_data[(16*i)+:16] = write_data_i[(16*(elementsProcessedRegister+i))+:16];
                 end
                 default: begin
-                    write_data[31: 0] = write_data_i[(32*(elementsProcessedRegister  ))+:32];
+                    for (int i = 0; i < ELEMENTS_PER_ACCESS_EW32; i++)
+                        write_data[(32*i)+:32] = write_data_i[(32*(elementsProcessedRegister+i))+:32];
                 end
             endcase
         end
         else begin
             unique case (width)
-                EW8:     write_data = {4{write_data_i[( 8*elementsProcessedRegister)+:8 ]}};
-                EW16:    write_data = {2{write_data_i[(16*elementsProcessedRegister)+:16]}};
-                default: write_data =    write_data_i[(32*elementsProcessedRegister)+:32];
+                EW8:     write_data = {'0, {4{write_data_i[( 8*elementsProcessedRegister)+:8 ]}}};
+                EW16:    write_data = {'0, {2{write_data_i[(16*elementsProcessedRegister)+:16]}}};
+                default: write_data = {'0,    write_data_i[(32*elementsProcessedRegister)+:32]};
             endcase
         end
     end
-
 
 //////////////////////////////////////////////////////////////////////////////
 // Temporal barrier
@@ -469,77 +475,91 @@ module vectorLSU
 // STAGE 2 - Read Data Control
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [3:0][ 7:0] read_data_8b;
-    logic [1:0][15:0] read_data_16b;
+    logic [ELEMENTS_PER_ACCESS_EW8 -1:0][ 7:0] read_data_8b;
+    logic [ELEMENTS_PER_ACCESS_EW16-1:0][15:0] read_data_16b;
+    logic [ELEMENTS_PER_ACCESS_EW32-1:0][31:0] read_data_32b;
     logic [VLEN-1:0]  read_data;
 
     always_comb begin
         if (addrMode != UNIT_STRIDED || (addrMode == UNIT_STRIDED && state_r == VLSU_FIRST_CYCLE)) begin
             case (address_r[1:0])
                 2'b11: begin
-                    read_data_8b[0] = mem_read_data_i[31:24];
-                    read_data_8b[1] = mem_read_data_i[31:24];
-                    read_data_8b[2] = mem_read_data_i[31:24];
+                    for (int i = 0; i < ELEMENTS_PER_ACCESS_EW8; i++) begin
+                        read_data_8b[i] = mem_read_data_i[24+(8*i)+:8];
+                    end
                 end
                 2'b10: begin
-                    read_data_8b[0] = mem_read_data_i[23:16];
-                    read_data_8b[1] = mem_read_data_i[31:24];
-                    read_data_8b[2] = mem_read_data_i[31:24];
+                    for (int i = 0; i < ELEMENTS_PER_ACCESS_EW8; i++) begin
+                        read_data_8b[i] = mem_read_data_i[16+(8*i)+:8];
+                    end
                 end
                 2'b01: begin
-                    read_data_8b[0] = mem_read_data_i[15: 8];
-                    read_data_8b[1] = mem_read_data_i[23:16];
-                    read_data_8b[2] = mem_read_data_i[31:24];
+                    for (int i = 0; i < ELEMENTS_PER_ACCESS_EW8; i++) begin
+                        read_data_8b[i] = mem_read_data_i[8+(8*i)+:8];
+                    end
                 end
                 default: begin
-                    read_data_8b[0] = mem_read_data_i[ 7: 0];
-                    read_data_8b[1] = mem_read_data_i[15: 8];
-                    read_data_8b[2] = mem_read_data_i[23:16];
+                    for (int i = 0; i < ELEMENTS_PER_ACCESS_EW8; i++) begin
+                        read_data_8b[i] = mem_read_data_i[(8*i)+:8];
+                    end
                 end
             endcase
         end
         else begin
-            read_data_8b[0] = mem_read_data_i[ 7: 0];
-            read_data_8b[1] = mem_read_data_i[15: 8];
-            read_data_8b[2] = mem_read_data_i[23:16];
+            for (int i = 0; i < ELEMENTS_PER_ACCESS_EW8; i++) begin
+                read_data_8b[i]  = mem_read_data_i[(8*i)+:8];
+            end
         end
     end
-
-    assign read_data_8b [3] = mem_read_data_i[31:24];
-    assign read_data_16b[1] = mem_read_data_i[31:16];
 
     always_comb begin
         if (addrMode != UNIT_STRIDED || (addrMode == UNIT_STRIDED && state_r == VLSU_FIRST_CYCLE)) begin
             case (address_r[1])
                 1'b1:
-                    read_data_16b[0] = mem_read_data_i[31:16];
-                default:
-                    read_data_16b[0] = mem_read_data_i[15:0];
+                    for (int i = 0; i < ELEMENTS_PER_ACCESS_EW16; i++) begin
+                        read_data_16b[i] = mem_read_data_i[16+(16*i)+:16];
+                    end
+                default: begin
+                    for (int i = 0; i < ELEMENTS_PER_ACCESS_EW16; i++) begin
+                        read_data_16b[i] = mem_read_data_i[(16*i)+:16];
+                    end
+                end
             endcase
         end
         else begin
-            read_data_16b[0] = mem_read_data_i[15:0];
+            for (int i = 0; i < ELEMENTS_PER_ACCESS_EW16; i++) begin
+                read_data_16b[i] = mem_read_data_i[(16*i)+:16];
+            end
         end
+    end
+
+    always_comb begin
+        for (int i = 0; i < ELEMENTS_PER_ACCESS_EW32; i++)
+            read_data_32b[i] = mem_read_data_i[(32*i)+:32];
     end
 
     always_comb begin
         unique case (width)
             EW8: begin
-                read_data[(8*elementsProcessedRegister_r)+:8] = read_data_8b[0];
-                if (elementsProcessedCycle_r > 1)
-                    read_data[(8*(elementsProcessedRegister_r+1))+:8] = read_data_8b[1];
-                if (elementsProcessedCycle_r > 2)
-                    read_data[(8*(elementsProcessedRegister_r+2))+:8] = read_data_8b[2];
-                if (elementsProcessedCycle_r > 3)
-                    read_data[(8*(elementsProcessedRegister_r+3))+:8] = read_data_8b[3];
+                for (int i = 0; i < ELEMENTS_PER_ACCESS_EW8;  i++) begin
+                    if (elementsProcessedCycle_r > i) begin
+                        read_data[(8*(elementsProcessedRegister_r+i))+:8] = read_data_8b[i];
+                    end
+                end
             end
             EW16: begin
-                read_data[(16*elementsProcessedRegister_r)+:16] = read_data_16b[0];
-                if (elementsProcessedCycle_r > 1)
-                    read_data[(16*(elementsProcessedRegister_r+1))+:16] = read_data_16b[1];
+                for (int i = 0; i < ELEMENTS_PER_ACCESS_EW16;  i++) begin
+                    if (elementsProcessedCycle_r > i) begin
+                        read_data[(16*(elementsProcessedRegister_r+i))+:16] = read_data_16b[i];
+                    end
+                end
             end
             default: begin
-                read_data[(32*elementsProcessedRegister_r)+:32] = mem_read_data_i;
+                for (int i = 0; i < ELEMENTS_PER_ACCESS_EW32;  i++) begin
+                    if (elementsProcessedCycle_r > i) begin
+                        read_data[(32*(elementsProcessedRegister_r+i))+:32] = read_data_32b[i];
+                    end
+                end
             end
         endcase
     end
