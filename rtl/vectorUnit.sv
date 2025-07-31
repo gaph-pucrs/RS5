@@ -58,6 +58,7 @@ module vectorUnit
     logic        accumulate_instruction;
     logic        widening_instruction;
     logic        whole_reg_load_store;
+    logic        mask_load_store;
     logic        mask_instruction;
 
     vew_e   vsew, vsew_effective;
@@ -103,6 +104,7 @@ module vectorUnit
     assign reduction_instruction  = (vector_operation_i inside {VREDSUM, VREDMAXU, VREDMAX, VREDMINU, VREDMIN, VREDAND, VREDOR, VREDXOR});
     assign widening_instruction   = (vector_operation_i inside {VWMUL, VWMULU, VWMULSU});
     assign whole_reg_load_store   = (instruction_i[24:20] == 5'b01000 && instruction_operation_i inside {VLOAD, VSTORE});
+    assign mask_load_store        = (instruction_i[24:20] == 5'b01011 && instruction_operation_i inside {VLOAD, VSTORE});
     assign mask_instruction       = (vector_operation_i inside {VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT});
 
     assign elements_per_reg = VLENB >> vsew;
@@ -238,6 +240,9 @@ module vectorUnit
                 default: vlmul_effective = LMUL_1;
             endcase
         end
+        else if (mask_load_store) begin
+            vlmul_effective = LMUL_1;
+        end
         else if (widening_instruction) begin
             unique case (vlmul)
                 LMUL_1:
@@ -298,6 +303,8 @@ module vectorUnit
             vl_curr_reg <= 0;
         else if (whole_reg_load_store)
             vl_curr_reg <= '1;
+        else if (mask_load_store)
+            vl_curr_reg <= (vl >> 3) + ((vl[2:0] & 3'h7) != 3'h0 ? 1 : 0);
         else if (state == V_IDLE && next_state == V_EXEC)
             vl_curr_reg <= vl;
         else if (next_state == V_EXEC && !hold)
