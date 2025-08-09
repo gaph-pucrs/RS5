@@ -9,8 +9,8 @@ import matplotlib.pyplot as plt
 # *********************************
 # PARAMS
 # *********************************
-BUS_WIDTHs = [32, 64]
-VLENs = [64, 128, 256]
+BUS_WIDTHs = [32]
+VLENs = [64]
 #LLENs = [2**i for i in range((vlen//32).bit_length()) if 2**i <= (vlen//32)]
 
 print(f'\nBenchmark Executions will consider:')
@@ -27,6 +27,7 @@ benchmarks_dir = os.path.join(script_dir, "../app/vector-benchmarks/")
 
 benchmarks_list =  [entry for entry in os.listdir(benchmarks_dir) if os.path.isdir(os.path.join(benchmarks_dir, entry)) and entry != "results"]
 benchmarks_list = sorted(benchmarks_list)
+benchmarks_list = ['conv3d-8b']
 
 print('Benchmarks that will be executed:')
 for i, benchmark in enumerate(benchmarks_list):

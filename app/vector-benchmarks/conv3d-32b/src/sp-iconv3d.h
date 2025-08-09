@@ -39,12 +39,6 @@ void sp_iconv3d_CHx7x7(int32_t *o, int32_t *i, int32_t *f, int32_t M, int32_t N,
 void sp_iconv3d_CHx7x7_block(int32_t *o, int32_t *i, int32_t *f, int32_t M,
                              int32_t N, int32_t n_, int32_t C, int32_t F);
 
-void sp_iconv3d_CHx7x7_warm(int32_t *o, int32_t *i, int32_t *f, int32_t M,
-                            int32_t N, int32_t C, int32_t F);
-
-void sp_iconv3d_warm(int32_t *o, int32_t *i, int32_t *f, int32_t M, int32_t N,
-                     int32_t n_, int32_t C, int32_t F);
-
 // Verify the matrices
 int sp_iconv3d_verify(int32_t *matrix, int32_t *golden_matrix, int32_t R,
                       int32_t C, int32_t threshold);

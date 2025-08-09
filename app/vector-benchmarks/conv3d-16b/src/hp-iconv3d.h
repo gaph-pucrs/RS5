@@ -39,12 +39,6 @@ void hp_iconv3d_CHx7x7(int16_t *o, int16_t *i, int16_t *f, int32_t M, int32_t N,
 void hp_iconv3d_CHx7x7_block(int16_t *o, int16_t *i, int16_t *f, int32_t M,
                              int32_t N, int32_t n_, int32_t C, int32_t F);
 
-void hp_iconv3d_CHx7x7_warm(int16_t *o, int16_t *i, int16_t *f, int32_t M,
-                            int32_t N, int32_t C, int32_t F);
-
-void hp_iconv3d_warm(int16_t *o, int16_t *i, int16_t *f, int32_t M, int32_t N,
-                     int32_t n_, int32_t C, int32_t F);
-
 // Verify the matrices
 int hp_iconv3d_verify(int16_t *matrix, int16_t *golden_matrix, int32_t R,
                       int32_t C, int32_t threshold);
