@@ -103,8 +103,8 @@ module vectorUnit
     assign accumulate_instruction = (vector_operation_i inside {VMACC, VNMSAC, VMADD, VNMSUB});
     assign reduction_instruction  = (vector_operation_i inside {VREDSUM, VREDMAXU, VREDMAX, VREDMINU, VREDMIN, VREDAND, VREDOR, VREDXOR});
     assign widening_instruction   = (vector_operation_i inside {VWMUL, VWMULU, VWMULSU});
-    assign whole_reg_load_store   = (instruction_i[24:20] == 5'b01000 && instruction_operation_i inside {VLOAD, VSTORE});
-    assign mask_load_store        = (instruction_i[24:20] == 5'b01011 && instruction_operation_i inside {VLOAD, VSTORE});
+    assign whole_reg_load_store   = (instruction_i[24:20] == 5'b01000 && instruction_operation_i inside {VLOAD, VSTORE} && instruction_i[27:26] == 2'b00);
+    assign mask_load_store        = (instruction_i[24:20] == 5'b01011 && instruction_operation_i inside {VLOAD, VSTORE} && instruction_i[27:26] == 2'b00);
     assign mask_instruction       = (vector_operation_i inside {VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT});
 
     assign elements_per_reg = VLENB >> vsew;
