@@ -1,0 +1,124 @@
+// Copyright 2020 ETH Zurich and University of Bologna.
+//
+// SPDX-License-Identifier: Apache-2.0
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Author: Matheus Cavalcante, ETH Zurich
+//         Samuel Riedel, ETH Zurich
+
+#include <stdint.h>
+#include <string.h>
+#include <stdio.h>
+#include <riscv-csr.h>
+#include "data.h"
+
+#define MIN(a, b) ((a) <= (b) ? (a) : (b))
+
+// Define the different data types
+#define INT32 5
+#define INT16 6
+#define INT8 7
+
+#define DTYPE INT32
+
+// Map DTYPE to the actual data type
+#ifndef DTYPE
+#warning                                                                       \
+    "Please explicitly define DTYPE. Example command: make bin/dtype-matmul ENV_DEFINES='-DDTYPE=INT32' def_args_dtype-matmul='int32 128 128 128'. Compiling now under the assumption of DTYPE == INT32"
+#define DTYPE INT32
+#endif
+
+#if DTYPE == INT32
+typedef int32_t _DTYPE;
+#define _KERNEL sp_imatmul
+#define _VERIFY sp_imatmul_verify
+#include "sp-imatmul.h"
+#elif DTYPE == INT16
+typedef int16_t _DTYPE;
+#define _KERNEL hp_imatmul
+#define _VERIFY hp_imatmul_verify
+#include "hp-imatmul.h"
+#elif DTYPE == INT8
+typedef int8_t _DTYPE;
+#define _KERNEL bp_imatmul
+#define _VERIFY bp_imatmul_verify
+#include "bp-imatmul.h"
+#else
+#error "Unsupported data type"
+#endif
+
+// Define Matrix dimensions:
+// C = AB with A=[MxN], B=[NxP], C=[MxP]
+extern uint32_t M;
+extern uint32_t N;
+extern uint32_t P;
+
+extern _DTYPE a[] __attribute__((aligned(4)));
+extern _DTYPE b[] __attribute__((aligned(4)));
+extern _DTYPE c[] __attribute__((aligned(4)));
+extern _DTYPE g[] __attribute__((aligned(4)));
+
+uint64_t cycles_start;
+uint64_t cycles_end;
+
+int main() {
+  printf("\n");
+  printf("============\n");
+  printf("=  MATMUL  =\n");
+  printf("============\n");
+  printf("\n");
+  printf("\n");
+
+  printf("\n");
+  printf("------------------------------------------------------------\n");
+  printf("Calculating a (%d x %d) x (%d x %d) matrix multiplication...\n", (int)M, (int)N,
+         (int)N, (int)P);
+  printf("------------------------------------------------------------\n");
+  printf("\n");
+
+  // Matrices are initialized --> Start calculating
+  printf("Calculating matmul...\n");
+  int unsigned loop_cont = 1;
+  do {
+    _KERNEL(c, a, b, M, N, P);
+  } while (--loop_cont != 0);
+
+  cycles_start = csr_read_mcycle();
+  _KERNEL(c, a, b, M, N, P);
+  cycles_end = csr_read_mcycle();
+
+  // Metrics
+  int runtime = (int)(cycles_end - cycles_start);
+  //float performance = 2.0 * M * N * P / runtime;
+  //float utilization = 100 * performance / (2.0 * NR_LANES * DTYPE_FACTOR);
+
+  printf("The execution took %d cycles.\n\n", runtime);
+  //printf("The performance is %f FLOP/cycle (%f%% utilization).\n", performance,
+  //       utilization);
+
+  // Verify the result
+  printf("Verifying result...\n");
+  int error = _VERIFY(c, g, M, P);
+  if (error != 0) {
+    unsigned int idx = error == -1 ? 0 : error;
+    printf("Fail.\n");
+    printf("Error code %d\n", error);
+    printf("c[%d]=%d\n", idx, (int)c[idx]);
+    return 1;
+  } else {
+    printf("Passed.\n\n");
+  }
+
+  return 0;
+}
