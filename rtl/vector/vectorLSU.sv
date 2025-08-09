@@ -168,7 +168,12 @@ module vectorLSU
                 ||  (vlmul == LMUL_4  && reg_count < 4)
                 ||  (vlmul == LMUL_8  && reg_count < 8)
                 ) && !vector_process_done)
-                    next_state = VLSU_FIRST_CYCLE;
+                    if (addrMode == UNIT_STRIDED && (ELEMENTS_PER_ACCESS_EW8 == VLEN/8 || ELEMENTS_PER_ACCESS_EW16 == VLEN/16 || ELEMENTS_PER_ACCESS_EW32 == VLEN/32)) begin
+                        next_state = VLSU_LAST_CYCLE;
+                    end
+                    else begin
+                        next_state = VLSU_FIRST_CYCLE;
+                    end
                 else
                     next_state = VLSU_IDLE;
 
@@ -200,7 +205,14 @@ module vectorLSU
             offset_strided <= '0;
         end
         else if (addrMode == UNIT_STRIDED) begin
-            offset_strided <= offset_strided + 32'(ELEMENTS_PER_ACCESS_EW8);
+            if (ELEMENTS_PER_ACCESS_EW8 == VLEN/8 || ELEMENTS_PER_ACCESS_EW16 == VLEN/16 || ELEMENTS_PER_ACCESS_EW32 == VLEN/32) begin
+                if (state == VLSU_LAST_CYCLE) begin
+                    offset_strided <= offset_strided + 32'(ELEMENTS_PER_ACCESS_EW8);
+                end
+            end
+            else begin
+                offset_strided <= offset_strided + 32'(ELEMENTS_PER_ACCESS_EW8);
+            end
         end
         else if (addrMode == STRIDED) begin
             if (state != VLSU_LAST_CYCLE)
@@ -244,7 +256,11 @@ module vectorLSU
 
     always_comb begin
         if (addrMode == UNIT_STRIDED) begin
-            if (width == EW8) begin
+            if (state == VLSU_FIRST_CYCLE && base_address_i[1:0] == 2'b00
+                && (ELEMENTS_PER_ACCESS_EW8 == VLEN/8 || ELEMENTS_PER_ACCESS_EW16 == VLEN/16 || ELEMENTS_PER_ACCESS_EW32 == VLEN/32)) begin
+                elementsProcessedCycle = '0;
+            end
+            else if (width == EW8) begin
                 if(state == VLSU_FIRST_CYCLE) begin
                     unique case(base_address_i[1:0])
                         2'b11:      elementsProcessedCycle = ELEMENTS_PER_ACCESS_EW8-3;
