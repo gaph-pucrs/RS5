@@ -55,21 +55,23 @@ def write_header_file(filepath, v32a, v32b, v16a, v16b, v8a, v8b):
 def main():
     if len(sys.argv) != 2:
         print("Usage: python gen_data.py <N>")
-        sys.exit(1)
-
-    try:
-        n = int(sys.argv[1])
-        if n <= 0:
-            raise ValueError
-    except ValueError:
-        print("N must be a positive integer.")
-        sys.exit(1)
+        n = 4096
+    else:
+        try:
+            n = int(sys.argv[1])
+            if n <= 0:
+                raise ValueError
+        except ValueError:
+            print("N must be a positive integer.")
+            sys.exit(1)
 
     # Generate random data
     v32a, v32b, v16a, v16b, v8a, v8b = generate_random_arrays(n)
 
     # Write the data to a header file
-    write_header_file("./src/data.h", v32a, v32b, v16a, v16b, v8a, v8b)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    header_file_path = os.path.join(script_dir, "../src/data.h")
+    write_header_file(header_file_path, v32a, v32b, v16a, v16b, v8a, v8b)
 
     print(f"Generated ./src/data.h with {n} random numbers in each array.")
 

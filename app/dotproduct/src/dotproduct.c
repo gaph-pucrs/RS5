@@ -299,7 +299,7 @@ int main() {
 
       if (CHECK) {
         if (res32_v != res32_s) {
-          printf("Error: v = %ld, g = %ld\n", res32_v, res32_s);
+          printf("Fail - Error: v = %ld, g = %ld\n", res32_v, res32_s);
           return -1;
         }
       }
@@ -329,7 +329,7 @@ int main() {
 
       if (CHECK) {
         if (res16_v != res16_s) {
-          printf("Error: v = %ld, g = %ld\n", res16_v, res16_s);
+          printf("Fail - Error: v = %ld, g = %ld\n", res16_v, res16_s);
           return -1;
         }
       }
@@ -346,10 +346,10 @@ int main() {
     printf("Calulating 8b dotp with vectors with length = %u\n", avl);
     index = 0;
     cycles_start = csr_read_mcycle();
-    res8_v = dotp_v32b(v32a, v32b, avl);
+    res8_v = dotp_v8b(v8a, v8b, avl);
     cycles_end = csr_read_mcycle();
     cycles_v8[index] = cycles_end - cycles_start;
-    printf("VECTOR 32b - AVL = %lu, cycles = %ld\n", avl, cycles_v8[index]);
+    printf("VECTOR 8b - AVL = %lu, cycles = %ld\n", avl, cycles_v8[index]);
     if (SCALAR) {
       cycles_start = csr_read_mcycle();
       res8_s = dotp_s8b(v8a, v8b, avl);
@@ -359,7 +359,7 @@ int main() {
 
       if (CHECK) {
         if (res8_v != res8_s) {
-          printf("Error: v = %d, g = %d\n", res8_v, res8_s);
+          printf("Fail - Error: v = %d, g = %d\n", res8_v, res8_s);
           return -1;
         }
       }
