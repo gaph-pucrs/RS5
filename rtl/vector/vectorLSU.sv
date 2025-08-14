@@ -168,7 +168,7 @@ module vectorLSU
                 ||  (vlmul == LMUL_4  && reg_count < 4)
                 ||  (vlmul == LMUL_8  && reg_count < 8)
                 ) && !vector_process_done)
-                    if (addrMode == UNIT_STRIDED && (ELEMENTS_PER_ACCESS_EW8 == VLEN/8 || ELEMENTS_PER_ACCESS_EW16 == VLEN/16 || ELEMENTS_PER_ACCESS_EW32 == VLEN/32)) begin
+                    if (base_address_i[1:0] == 2'b00 && addrMode == UNIT_STRIDED && (ELEMENTS_PER_ACCESS_EW8 == VLEN/8 || ELEMENTS_PER_ACCESS_EW16 == VLEN/16 || ELEMENTS_PER_ACCESS_EW32 == VLEN/32)) begin
                         next_state = VLSU_LAST_CYCLE;
                     end
                     else begin
@@ -205,13 +205,17 @@ module vectorLSU
             offset_strided <= '0;
         end
         else if (addrMode == UNIT_STRIDED) begin
-            if (ELEMENTS_PER_ACCESS_EW8 == VLEN/8 || ELEMENTS_PER_ACCESS_EW16 == VLEN/16 || ELEMENTS_PER_ACCESS_EW32 == VLEN/32) begin
+            if (base_address_i[1:0] == 2'b00 && (ELEMENTS_PER_ACCESS_EW8 == VLEN/8 || ELEMENTS_PER_ACCESS_EW16 == VLEN/16 || ELEMENTS_PER_ACCESS_EW32 == VLEN/32)) begin
                 if (state == VLSU_LAST_CYCLE) begin
                     offset_strided <= offset_strided + 32'(ELEMENTS_PER_ACCESS_EW8);
                 end
             end
             else begin
-                offset_strided <= offset_strided + 32'(ELEMENTS_PER_ACCESS_EW8);
+                unique case(width)
+                    EW8:     offset_strided <= offset_strided + elementsProcessedCycle;
+                    EW16:    offset_strided <= offset_strided + (elementsProcessedCycle << 1);
+                    default: offset_strided <= offset_strided + 32'(ELEMENTS_PER_ACCESS_EW8);
+                endcase
             end
         end
         else if (addrMode == STRIDED) begin
@@ -269,6 +273,14 @@ module vectorLSU
                         default:    elementsProcessedCycle = ELEMENTS_PER_ACCESS_EW8;
                     endcase
                 end
+                else if (state == VLSU_LAST_CYCLE) begin
+                    unique case(base_address_i[1:0])
+                        2'b11:      elementsProcessedCycle = 3;
+                        2'b10:      elementsProcessedCycle = 2;
+                        2'b01:      elementsProcessedCycle = 1;
+                        default:    elementsProcessedCycle = ELEMENTS_PER_ACCESS_EW8;
+                    endcase
+                end
                 else begin
                     elementsProcessedCycle = ELEMENTS_PER_ACCESS_EW8;
                 end
@@ -277,6 +289,12 @@ module vectorLSU
                 if(state == VLSU_FIRST_CYCLE) begin
                     unique case(base_address_i[1])
                         1'b1:       elementsProcessedCycle = ELEMENTS_PER_ACCESS_EW16-1;
+                        default:    elementsProcessedCycle = ELEMENTS_PER_ACCESS_EW16;
+                    endcase
+                end
+                else if (state == VLSU_LAST_CYCLE) begin
+                    unique case(base_address_i[1])
+                        1'b1:       elementsProcessedCycle = 1;
                         default:    elementsProcessedCycle = ELEMENTS_PER_ACCESS_EW16;
                     endcase
                 end
