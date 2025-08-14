@@ -63,7 +63,7 @@ module vectorUnit
 
     vew_e   vsew, vsew_effective;
     vlmul_e vlmul, vlmul_effective;
-    logic[$bits(VLEN )-1:0] vl, vl_curr_reg, vl_next;
+    logic[$bits(VLEN )-1:0] vl, vl_curr_reg, vl_next_reg, vl_next;
     logic[$bits(VLENB)-1:0] elements_per_reg;
     logic[$bits(VLEN )-1:0] total_elements_processed;
     logic                   vector_process_done;
@@ -296,6 +296,10 @@ module vectorUnit
 // Vector Length Control
 //////////////////////////////////////////////////////////////////////////////
 
+    assign vl_next_reg = ($signed(vl_curr_reg - elements_per_reg) >= 0)
+                        ? vl_curr_reg - elements_per_reg
+                        : 0;
+
     always_ff @(posedge clk or negedge reset_n)
         if (!reset_n)
             vl_curr_reg <= '0;
@@ -308,10 +312,7 @@ module vectorUnit
         else if (state == V_IDLE && next_state == V_EXEC)
             vl_curr_reg <= vl;
         else if (next_state == V_EXEC && !hold)
-            if ($signed(vl_curr_reg - elements_per_reg) >= 0)
-                vl_curr_reg <= vl_curr_reg - elements_per_reg;
-            else
-                vl_curr_reg <= 0;
+            vl_curr_reg <= vl_next_reg;
 
     always_ff @(posedge clk or negedge reset_n)
         if (!reset_n)
@@ -561,6 +562,7 @@ module vectorUnit
         .cycle_count_r      (cycle_count_r),
         .vlmul              (vlmul),
         .vl                 (vl_reductions),
+        .vl_next            (vl_next_reg),
         .vm                 (vm),
         .mask_sew8          (mask_sew8),
         .mask_sew16         (mask_sew16),

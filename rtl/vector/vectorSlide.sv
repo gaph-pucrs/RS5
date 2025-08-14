@@ -29,6 +29,7 @@ module vectorSlide
     input  vew_e                        vsew,
     input  vlmul_e                      vlmul,
     input  logic[$bits(VLEN)-1:0]       vl,
+    input  logic[$bits(VLEN)-1:0]       vl_next,
 
     output logic [VLEN-1:0]             result_o
 );
@@ -47,10 +48,12 @@ module vectorSlide
                         result_slide1down[(8*i)+:8] = first_operand[(8*(i+1))+:8];
                     end
                     else if (i == (vl-1)) begin // last element
-                        if ((vlmul == LMUL_1 && cycle_count == 1)
+                        if ( vl_next == 0
+                         || (vlmul == LMUL_1 && cycle_count == 1)
                          || (vlmul == LMUL_2 && cycle_count == 2)
                          || (vlmul == LMUL_4 && cycle_count == 4)
-                         || (vlmul == LMUL_8 && cycle_count == 8)) begin
+                         || (vlmul == LMUL_8 && cycle_count == 8)
+                         ) begin
                             result_slide1down[(8*i)+:8] = scalar_operand[7:0];
                          end
                          else begin
@@ -68,7 +71,8 @@ module vectorSlide
                         result_slide1down[(16*i)+:16] = first_operand[(16*(i+1))+:16];
                     end
                     else if (i == (vl-1)) begin // last element
-                        if ((vlmul == LMUL_1 && cycle_count == 1)
+                        if ( vl_next == 0
+                         || (vlmul == LMUL_1 && cycle_count == 1)
                          || (vlmul == LMUL_2 && cycle_count == 2)
                          || (vlmul == LMUL_4 && cycle_count == 4)
                          || (vlmul == LMUL_8 && cycle_count == 8)) begin
@@ -89,7 +93,8 @@ module vectorSlide
                         result_slide1down[(32*i)+:32] = first_operand[(32*(i+1))+:32];
                     end
                     else if (i == (vl-1)) begin // last element
-                        if ((vlmul == LMUL_1 && cycle_count == 1)
+                        if ( vl_next == 0
+                         || (vlmul == LMUL_1 && cycle_count == 1)
                          || (vlmul == LMUL_2 && cycle_count == 2)
                          || (vlmul == LMUL_4 && cycle_count == 4)
                          || (vlmul == LMUL_8 && cycle_count == 8)) begin

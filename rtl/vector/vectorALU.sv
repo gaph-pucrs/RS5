@@ -40,6 +40,7 @@ module vectorALU
     input  logic [3:0]                  cycle_count_r,
     input  vlmul_e                      vlmul,
     input  logic[$bits(VLEN)-1:0]       vl,
+    input  logic[$bits(VLEN)-1:0]       vl_next,
     input  logic                        vm,
     input  logic [7:0][ VLENB   -1:0]   mask_sew8,
     input  logic [7:0][(VLENB/2)-1:0]   mask_sew16,
@@ -144,7 +145,10 @@ module vectorALU
 //////////////////////////////////////////////////////////////////////////////
 // Slides
 //////////////////////////////////////////////////////////////////////////////
+    logic            slide_instruction;
     logic [VLEN-1:0] result_slide;
+
+    assign slide_instruction = vector_operation_i inside {VSLIDE1UP, VSLIDE1DOWN};
 
     vectorSlide #(
             .VLEN (VLEN)
@@ -159,6 +163,7 @@ module vectorALU
             .vsew              (vsew),
             .vlmul             (vlmul),
             .vl                (vl),
+            .vl_next           (vl_next),
             .result_o          (result_slide)
         );
 
@@ -218,7 +223,7 @@ module vectorALU
     logic [   VLEN -1:0]    result_lanes;
     logic [   VLEN -1:0]    result_mult_low;
 
-    assign enable_lane = current_state == V_EXEC && vector_operation_i != VNOP && !hold_widening_r && !hold_accumulation_r && !reduction_instruction;
+    assign enable_lane = current_state == V_EXEC && vector_operation_i != VNOP && !hold_widening_r && !hold_accumulation_r && !reduction_instruction && !slide_instruction;
 
     generate
         for (genvar i_lane = 0; i_lane < LANES; i_lane++) begin : LANE_LOOP
