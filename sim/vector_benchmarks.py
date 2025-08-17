@@ -24,8 +24,9 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 
 benchmarks_dir = os.path.join(script_dir, "../app/vector-benchmarks/")
 
-benchmarks_list =  [entry for entry in os.listdir(benchmarks_dir) if os.path.isdir(os.path.join(benchmarks_dir, entry)) and entry != "results"]
+benchmarks_list = [entry for entry in os.listdir(benchmarks_dir) if os.path.isdir(os.path.join(benchmarks_dir, entry)) and entry != "results"]
 benchmarks_list = sorted(benchmarks_list)
+benchmarks_list = ['dropout']
 
 print('Benchmarks that will be executed:')
 for i, benchmark in enumerate(benchmarks_list):
@@ -34,6 +35,7 @@ print()
 # *********************************
 # Execution
 # *********************************
+"""
 for benchmark in benchmarks_list:
     print("\n*********************************")
     print(f'Starting execution of {benchmark}.')
@@ -79,6 +81,7 @@ for benchmark in benchmarks_list:
     for bus_width in BUS_WIDTHs:
         for vlen in VLENs:
             LANES = [2**i for i in range((vlen//32).bit_length()) if 2**i <= (vlen//32)]
+            #LANES = [LANES[-1]]
             for lanes in LANES:
                 llen = lanes*32
                 print(f'Executing: BUS_WIDTH ={bus_width:3d}, VLEN ={vlen:3d}, LANES ={vlen//llen:2d}.')
@@ -98,22 +101,24 @@ for benchmark in benchmarks_list:
                     content = result_file.read()
                     if "fail" in content.lower():
                         os.rename(result_path, os.path.join(results_dir, f"[fail]bus{bus_width}_vlen{vlen}_lanes{vlen//llen}.txt"))
-
+"""
 # *********************************
 # Result extraction
 # *********************************
 
 print("\n*********************************")
-print(f'!!! Generating Charts !!!')
-print("*********************************")
+print(f'!!! Extracting Data !!!')
+print("*********************************\n")
 
 # Regex to find the cycle count line inside the file
-cycle_pattern = re.compile(r"The execution took (\d+) cycles\.")
+cycle_pattern = re.compile(r"\[VECTOR\] The execution took (\d+) cycles\.")
+scalar_pattern = re.compile(r"\[SCALAR\] The execution took (\d+) cycles\.")
 # Regex to parse bus, vlen, lanes from the filename
 filename_pattern = re.compile(r"bus(\d+)_vlen(\d+)_lanes(\d+)\.txt")
 
 for benchmark in benchmarks_list:
     data = []
+    scalar = 0
     results_dir = os.path.join(benchmarks_dir, 'results', benchmark)
     for filename in os.listdir(results_dir):
         match = filename_pattern.match(filename)
@@ -128,54 +133,18 @@ for benchmark in benchmarks_list:
             cycle_match = cycle_pattern.search(content)
             if cycle_match:
                 cycles = int(cycle_match.group(1))
-                data.append((bus, vlen, lanes, cycles))
+                data.append((vlen, bus, lanes, cycles))
+            scalar_match = scalar_pattern.search(content)
+            if scalar_match:
+                scalar = int(scalar_match.group(1))
 
-    df = pd.DataFrame(data, columns=["BUS_WIDTH", "VLEN", "LANES", "CYCLES"])
-    df = df.sort_values(by=["BUS_WIDTH", "LANES", "VLEN"])
+    df = pd.DataFrame(data, columns=["VLEN", "BUS_WIDTH", "LANES", "CYCLES"])
+    df = df.sort_values(by=["VLEN", "BUS_WIDTH", "LANES"])
+    scalar_row = pd.DataFrame({"VLEN": [0], "BUS_WIDTH": [32], "LANES": [0], "CYCLES": scalar})
+    df = pd.concat([scalar_row, df]).reset_index(drop=True)
     df.to_csv(os.path.join(results_dir, f'{benchmark}.csv'), index=False)
 
-    vlen_vals = sorted(df['VLEN'].unique())
-    lanes_vals = sorted(df['LANES'].unique())
-    bus_width_vals = sorted(df['BUS_WIDTH'].unique())
+    print(f"✅ Succesful Data Extraction for {benchmark}!!!\n")
 
-    bar_width = 0.08
-    spacing = 0.02
-    n_lanes = len(lanes_vals)
-    n_bus = len(bus_width_vals)
-
-    fig, ax = plt.subplots(figsize=(10, 5))
-    x = np.arange(len(vlen_vals))
-
-    offsets = np.linspace(
-        -((n_lanes * n_bus - 1) / 2) * (bar_width + spacing),
-        ((n_lanes * n_bus - 1) / 2) * (bar_width + spacing),
-        n_lanes * n_bus
-    )
-
-    colors = {1: 'tab:blue', 2: 'tab:olive', 4: 'tab:orange', 8: 'tab:green'}
-    patterns = {32: '', 64: '//'}
-
-    for i, lanes in enumerate(lanes_vals):
-        for j, bus in enumerate(bus_width_vals):
-            subset = df[(df['LANES'] == lanes) & (df['BUS_WIDTH'] == bus)]
-            # Map VLEN to CYCLES with NaN fill for missing
-            cycles = [subset[subset['VLEN'] == v]['CYCLES'].values[0] if v in subset['VLEN'].values else np.nan for v in vlen_vals]
-            bar_pos = x + offsets[i * n_bus + j]
-            ax.bar(bar_pos, cycles, bar_width,
-                label=f'LANES: {lanes} - BUS_WIDTH: {bus}',
-                color=colors[lanes],
-                hatch=patterns[bus],
-                edgecolor='black')
-
-    ax.set_xlabel('VLEN')
-    ax.set_ylabel('Cycles')
-    ax.set_title('Cycles vs VLEN grouped by LANES and BUS_WIDTH')
-    ax.set_xticks(x)
-    ax.set_xticklabels(vlen_vals)
-    ax.legend(loc='upper right', bbox_to_anchor=(1.35, 1))
-
-    plt.tight_layout()
-    plt.savefig(os.path.join(results_dir, f'{benchmark}.png'), dpi=300)
-    plt.close()
-
-    print(f"✅ Succesful Chart Generation for {benchmark} !!!\n")
+command = ["python3", os.path.join(benchmarks_dir, 'gen_charts.py')]
+result = subprocess.run(command, check=True)
