@@ -37,6 +37,7 @@ typedef int16_t _DTYPE;
 extern _DTYPE i[] __attribute__((aligned(4))); // [ (M+floor(F/2)) * (N+floor(F/2)) * CH ]
 extern _DTYPE f[] __attribute__((aligned(4)));        // [ F*F*CH ]
 extern _DTYPE o[] __attribute__((aligned(4)));        // [ M*N ]
+extern _DTYPE o_g[] __attribute__((aligned(4)));      // [ M*N ]
 extern _DTYPE golden_o[] __attribute__((aligned(4))); // [ M*N ]
 // M, N, F defined in data.S
 extern int32_t M;
@@ -60,28 +61,34 @@ int main() {
 
   uint64_t cycles_start;
   uint64_t cycles_end;
+  int runtime;
 
   // Call the main kernel, and measure cycles
   cycles_start = csr_read_mcycle();
-  if (F == 7)
-    _KERNEL(o, i, f, M, N, CH, F);
-  else
-    printf("Error: the filter size is different from 7.\n");
+  _KERNEL(o, i, f, M, N, CH, F);
   cycles_end = csr_read_mcycle();
 
   // Performance metrics
-  int runtime = (int)(cycles_end - cycles_start);
+  runtime = (int)(cycles_end - cycles_start);
+  printf("[VECTOR] The execution took %d cycles.\n\n", runtime);
   //float performance = 2.0 * CH * F * F * M * N / runtime;
   //float utilization = 100 * performance / (2.0 * NR_LANES * DTYPE_FACTOR);
 
-  printf("The execution took %d cycles.\n\n", runtime);
   //printf("The performance is %f %s-OP/cycle (%f%% utilization).\n", performance,
   //       DTYPE_PREFIX, utilization);
+
+  cycles_start = csr_read_mcycle();
+  convolve2D(o_g, i, f, (int)(M + F - 1), (int)(N + F - 1), CH, F);
+  cycles_end = csr_read_mcycle();
+
+  runtime = (int)(cycles_end - cycles_start);
+  printf("[SCALAR] The execution took %d cycles.\n\n", runtime);
 
   // Verify correctness
   printf("Verifying result...\n");
   int error = _VERIFY(o, golden_o, M, N, THRESHOLD);
-  if (error != 0) {
+  int error2 = _VERIFY(o_g, golden_o, M, N, THRESHOLD);
+  if (error != 0 || error2 != 0) {
     printf("Fail.\n\n");
   } else {
     printf("Passed.\n\n");

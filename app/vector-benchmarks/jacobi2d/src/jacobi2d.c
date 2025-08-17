@@ -305,7 +305,8 @@ int main() {
   cycles_start = csr_read_mcycle();
   j2d_s(R, C, A_fixed_s, B_fixed_s, TSTEPS);
   cycles_end = csr_read_mcycle();
-  printf("Scalar jacobi2d cycle count: %d\n\n", (int)(cycles_end - cycles_start));
+  //printf("Scalar jacobi2d cycle count: %d\n\n", (int)(cycles_end - cycles_start));
+  printf("[SCALAR] The execution took %d cycles.\n\n", (int)(cycles_end - cycles_start));
 
   // Measure vector kernel execution
   printf("Processing the vector benchmark\n");
@@ -317,8 +318,8 @@ int main() {
   // TSTEPS*5*N*N is the number of DPFLOP to compute
   //float performance = (2.0 * TSTEPS * 5.0 * (R - 1) * (C - 1) / runtime);
   //float utilization = 100.0 * performance / NR_LANES;
-  printf("Vector jacobi2d cycle count: %d\n", runtime);
-  printf("The execution took %d cycles.\n\n", runtime);
+  //printf("Vector jacobi2d cycle count: %d\n", runtime);
+  printf("[VECTOR] The execution took %d cycles.\n\n", runtime);
 
   //printf("The performance is %f DPFLOP/cycle (%f%% utilization).\n",
   //       performance, utilization);

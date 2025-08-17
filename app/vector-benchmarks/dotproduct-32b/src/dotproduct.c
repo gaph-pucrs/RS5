@@ -124,21 +124,22 @@ int main() {
   printf("==========\n");
   printf("=  32b   =\n");
   printf("==========\n");
-  printf("Calulating 32b dotp with vectors with length = %u\n", N);
+  printf("Calulating 32b dotp with vectors with length = %u\n\n", N);
   cycles_start = csr_read_mcycle();
   res32_v = dotp_v32b(v32a, v32b, N);
   cycles_end = csr_read_mcycle();
   cycles_v32 = cycles_end - cycles_start;
 
-  printf("\nThe execution took %d cycles.\n\n", (int)cycles_v32);
-  printf("VECTOR 32b - AVL = %u, cycles = %d\n", N, (int)cycles_v32);
+  printf("[VECTOR] The execution took %d cycles.\n\n", (int)cycles_v32);
+  //printf("VECTOR 32b - AVL = %u, cycles = %d\n", N, (int)cycles_v32);
 
   if (SCALAR) {
     cycles_start = csr_read_mcycle();
     res32_s = dotp_s32b(v32a, v32b, N);
     cycles_end = csr_read_mcycle();
     cycles_s32 = cycles_end - cycles_start;
-    printf("SCALAR 32b - AVL = %u, cycles = %d\n\n", N, (int)cycles_s32);
+    //printf("SCALAR 32b - AVL = %u, cycles = %d\n", N, (int)cycles_s32);
+    printf("[SCALAR] The execution took %d cycles.\n\n", (int)cycles_s32);
 
     if (CHECK) {
       if (res32_v != res32_s) {

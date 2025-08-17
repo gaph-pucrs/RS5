@@ -37,7 +37,7 @@ if len(sys.argv) == 5:
 else:
   print("Usage: python gen_data.py <dtype>, <M>, <N>, <P>")
   print("dtype in [float64, float32, float16, int64, int32, int16, int8]")
-  dtype = 'int32'
+  dtype = 'int8'
   M = 32
   N = 32
   P = 32
@@ -48,7 +48,7 @@ A = np.random.randint(0, 256, (M, N)).astype(dtype)
 B = np.random.randint(0, 256, (N, P)).astype(dtype)
 C = np.zeros([M, P], dtype=dtype)
 # Golden result matrix
-G = np.matmul(A, B).astype(dtype)
+G = np.zeros([M, P]).astype(dtype)
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 header_file_path = os.path.join(script_dir, "../src/data.h")

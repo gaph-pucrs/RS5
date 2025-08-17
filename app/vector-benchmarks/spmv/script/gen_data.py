@@ -137,6 +137,10 @@ def write_header_file(filepath, R, C, NZ, CSR_PROW, CSR_INDEX, CSR_DATA, CSR_IN_
         file.write(",\n".join(f"    {num}" for num in CSR_OUT_VECTOR))
         file.write("\n};\n\n")
 
+        file.write(f"int CSR_OUT_GOLDEN[{len(CSR_OUT_VECTOR)}] = {{\n")
+        file.write(",\n".join(f"    {num}" for num in CSR_OUT_VECTOR))
+        file.write("\n};\n\n")
+
         file.write("#endif\n")
 
 ############

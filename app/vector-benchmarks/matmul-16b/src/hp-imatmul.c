@@ -99,7 +99,7 @@ void hp_imatmul_vec_4x4_slice_init() {
 void hp_imatmul_vec_4x4(int16_t *c, const int16_t *a, const int16_t *b,
                         const unsigned int N, const unsigned int P) {
   // Temporary variables
-  int32_t t0, t1, t2, t3;
+  int16_t t0, t1, t2, t3;
 
   // Original pointer
   const int16_t *a_ = a;
@@ -238,7 +238,7 @@ void hp_imatmul_vec_8x8_slice_init() {
 void hp_imatmul_vec_8x8(int16_t *c, const int16_t *a, const int16_t *b,
                         const unsigned int N, const unsigned int P) {
   // Temporary variables
-  int32_t t0, t1, t2, t3, t4, t5, t6, t7;
+  int16_t t0, t1, t2, t3, t4, t5, t6, t7;
 
   // Original pointer
   const int16_t *a_ = a;
@@ -382,7 +382,7 @@ void hp_imatmul_16x16(int16_t *c, const int16_t *a, const int16_t *b,
   unsigned int block_size_p;
 
   // Set the vector configuration
-  __asm__ volatile("vsetvli %0, %1, e32, m1, ta, ma" : "=r"(block_size_p) : "r"(P));
+  __asm__ volatile("vsetvli %0, %1, e16, m1, ta, ma" : "=r"(block_size_p) : "r"(P));
 
   // Slice the matrix into a manageable number of columns p_
   for (unsigned int p = 0; p < P; p += block_size_p) {
@@ -393,7 +393,7 @@ void hp_imatmul_16x16(int16_t *c, const int16_t *a, const int16_t *b,
     const int16_t *b_ = b + p;
     int16_t *c_ = c + p;
 
-    __asm__ volatile("vsetvli zero, %0, e32, m1, ta, ma" ::"r"(p_));
+    __asm__ volatile("vsetvli zero, %0, e16, m1, ta, ma" ::"r"(p_));
 
     // Iterate over the rows
     for (unsigned int m = 0; m < M; m += block_size) {
@@ -435,7 +435,7 @@ void hp_imatmul_vec_16x16(int16_t *c, const int16_t *a, const int16_t *b,
   const int16_t *a_ = a;
 
   // Prefetch one row of matrix B
-  __asm__ volatile("vle32.v v16, (%0);" ::"r"(b));
+  __asm__ volatile("vle16.v v16, (%0);" ::"r"(b));
   b += P;
 
   // Prefetch one row of scalar values
@@ -492,7 +492,7 @@ void hp_imatmul_vec_16x16(int16_t *c, const int16_t *a, const int16_t *b,
     a += N;
 
     // Load one row of B
-    __asm__ volatile("vle32.v v17, (%0);" ::"r"(b));
+    __asm__ volatile("vle16.v v17, (%0);" ::"r"(b));
     b += P;
 
     __asm__ volatile("vmacc.vx v1, %0, v16" ::"r"(t1));
@@ -550,7 +550,7 @@ void hp_imatmul_vec_16x16(int16_t *c, const int16_t *a, const int16_t *b,
     a += N;
 
     // Load one row of B
-    __asm__ volatile("vle32.v v16, (%0);" ::"r"(b));
+    __asm__ volatile("vle16.v v16, (%0);" ::"r"(b));
     b += P;
 
     __asm__ volatile("vmacc.vx v1, %0, v17" ::"r"(t1));
@@ -601,50 +601,50 @@ void hp_imatmul_vec_16x16(int16_t *c, const int16_t *a, const int16_t *b,
 
   // Last iteration: store results
   __asm__ volatile("vmacc.vx v0, %0, v17" ::"r"(t0));
-  __asm__ volatile("vse32.v v0, (%0);" ::"r"(c));
+  __asm__ volatile("vse16.v v0, (%0);" ::"r"(c));
   c += P;
   __asm__ volatile("vmacc.vx v1, %0, v17" ::"r"(t1));
-  __asm__ volatile("vse32.v v1, (%0);" ::"r"(c));
+  __asm__ volatile("vse16.v v1, (%0);" ::"r"(c));
   c += P;
   __asm__ volatile("vmacc.vx v2, %0, v17" ::"r"(t2));
-  __asm__ volatile("vse32.v v2, (%0);" ::"r"(c));
+  __asm__ volatile("vse16.v v2, (%0);" ::"r"(c));
   c += P;
   __asm__ volatile("vmacc.vx v3, %0, v17" ::"r"(t3));
-  __asm__ volatile("vse32.v v3, (%0);" ::"r"(c));
+  __asm__ volatile("vse16.v v3, (%0);" ::"r"(c));
   c += P;
   __asm__ volatile("vmacc.vx v4, %0, v17" ::"r"(t4));
-  __asm__ volatile("vse32.v v4, (%0);" ::"r"(c));
+  __asm__ volatile("vse16.v v4, (%0);" ::"r"(c));
   c += P;
   __asm__ volatile("vmacc.vx v5, %0, v17" ::"r"(t5));
-  __asm__ volatile("vse32.v v5, (%0);" ::"r"(c));
+  __asm__ volatile("vse16.v v5, (%0);" ::"r"(c));
   c += P;
   __asm__ volatile("vmacc.vx v6, %0, v17" ::"r"(t6));
-  __asm__ volatile("vse32.v v6, (%0);" ::"r"(c));
+  __asm__ volatile("vse16.v v6, (%0);" ::"r"(c));
   c += P;
   __asm__ volatile("vmacc.vx v7, %0, v17" ::"r"(t7));
-  __asm__ volatile("vse32.v v7, (%0);" ::"r"(c));
+  __asm__ volatile("vse16.v v7, (%0);" ::"r"(c));
   c += P;
   __asm__ volatile("vmacc.vx v8, %0, v17" ::"r"(t8));
-  __asm__ volatile("vse32.v v8, (%0);" ::"r"(c));
+  __asm__ volatile("vse16.v v8, (%0);" ::"r"(c));
   c += P;
   __asm__ volatile("vmacc.vx v9, %0, v17" ::"r"(t9));
-  __asm__ volatile("vse32.v v9, (%0);" ::"r"(c));
+  __asm__ volatile("vse16.v v9, (%0);" ::"r"(c));
   c += P;
   __asm__ volatile("vmacc.vx v10, %0, v17" ::"r"(t10));
-  __asm__ volatile("vse32.v v10, (%0);" ::"r"(c));
+  __asm__ volatile("vse16.v v10, (%0);" ::"r"(c));
   c += P;
   __asm__ volatile("vmacc.vx v11, %0, v17" ::"r"(t11));
-  __asm__ volatile("vse32.v v11, (%0);" ::"r"(c));
+  __asm__ volatile("vse16.v v11, (%0);" ::"r"(c));
   c += P;
   __asm__ volatile("vmacc.vx v12, %0, v17" ::"r"(t12));
-  __asm__ volatile("vse32.v v12, (%0);" ::"r"(c));
+  __asm__ volatile("vse16.v v12, (%0);" ::"r"(c));
   c += P;
   __asm__ volatile("vmacc.vx v13, %0, v17" ::"r"(t13));
-  __asm__ volatile("vse32.v v13, (%0);" ::"r"(c));
+  __asm__ volatile("vse16.v v13, (%0);" ::"r"(c));
   c += P;
   __asm__ volatile("vmacc.vx v14, %0, v17" ::"r"(t14));
-  __asm__ volatile("vse32.v v14, (%0);" ::"r"(c));
+  __asm__ volatile("vse16.v v14, (%0);" ::"r"(c));
   c += P;
   __asm__ volatile("vmacc.vx v15, %0, v17" ::"r"(t15));
-  __asm__ volatile("vse32.v v15, (%0);" ::"r"(c));
+  __asm__ volatile("vse16.v v15, (%0);" ::"r"(c));
 }

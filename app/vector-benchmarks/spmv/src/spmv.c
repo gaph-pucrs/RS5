@@ -102,31 +102,34 @@ void spmv_csr_idx32(int32_t N_ROW, int32_t *CSR_PROW, int32_t *CSR_INDEX,
   }
 }
 
-int spmv_verify(int32_t N_ROW, int32_t *CSR_PROW, int32_t *CSR_INDEX,
-                int *CSR_DATA, int *IN_VEC, int *OUT_VEC) {
+int spmv_verify(int32_t N_ROW) {
   for (int32_t i = 0; i < N_ROW; ++i) {
-    int res = OUT_VEC[i];
-
-    int32_t len = CSR_PROW[i + 1] - CSR_PROW[i];
-    int *data = CSR_DATA + CSR_PROW[i];
-    int32_t *index = CSR_INDEX + CSR_PROW[i];
-
-    int golden = 0;
-    for (int32_t j = 0; j < len; ++j) {
-      int32_t idx = index[j] / DATA_BYTE;
-      golden = golden + data[j] * IN_VEC[idx];
-      //printf("index:%d, data: %d, in_vec: %d, golden: %d\n", idx, data[j], IN_VEC[idx], golden);
-    }
-    if ((int)golden != (int)res) {
+    if ((int)CSR_OUT_GOLDEN[i] != (int)CSR_OUT_VECTOR[i]) {
       printf("Fail\n");
       printf("Sorry, wrong value! at index %d, result = %d, golden = %d \n", (int)i,
-             res, golden);
+             CSR_OUT_VECTOR[i], CSR_OUT_GOLDEN[i]);
       return i;
     }
   }
-  return 0;
 }
 
+void spmv_scalar(int32_t N_ROW, int32_t *CSR_PROW, int32_t *CSR_INDEX,
+                int *CSR_DATA, int *IN_VEC, int *OUT_GOLDEN) {
+
+    for (int32_t i = 0; i < N_ROW; ++i) {
+        int32_t len = CSR_PROW[i + 1] - CSR_PROW[i];
+        int *data = CSR_DATA + CSR_PROW[i];
+        int32_t *index = CSR_INDEX + CSR_PROW[i];
+
+        int golden = 0;
+        for (int32_t j = 0; j < len; ++j) {
+            int32_t idx = index[j] / DATA_BYTE;
+            golden = golden + data[j] * IN_VEC[idx];
+            //printf("index:%d, data: %d, in_vec: %d, golden: %d\n", idx, data[j], IN_VEC[idx], golden);
+        }
+        OUT_GOLDEN[i] = golden;
+    }
+}
 
 
 uint64_t cycles_start;
@@ -171,7 +174,7 @@ int main() {
       "-------------------------------------------------------------------\n");
   printf("\n");
 
-  printf("\ncalculating ... \n");
+  printf("\ncalculating ... \n\n");
   cycles_start = csr_read_mcycle();
   spmv_csr_idx32(R, CSR_PROW, CSR_INDEX, CSR_DATA, CSR_IN_VECTOR,
                  CSR_OUT_VECTOR);
@@ -183,13 +186,20 @@ int main() {
   float performance = 2.0 * NZ / runtime;
   float utilization = 100 * performance / (2.0 * NR_LANES);
 
-  printf("\nThe execution took %d cycles.\n", (int)runtime);
+  printf("[VECTOR] The execution took %d cycles.\n", (int)runtime);
   //printf("The performance is %f FLOP/cycle (%f%% utilization) at %d lanes.\n",
   //       performance, utilization, NR_LANES);
 
+  cycles_start = csr_read_mcycle();
+  spmv_scalar(R, CSR_PROW, CSR_INDEX, CSR_DATA, CSR_IN_VECTOR,
+                 CSR_OUT_GOLDEN);
+  cycles_end = csr_read_mcycle();
+
+  runtime = cycles_end - cycles_start;
+  printf("[SCALAR] The execution took %d cycles.\n", (int)runtime);
+
   printf("\nVerifying ...\n");
-  if (spmv_verify(R, CSR_PROW, CSR_INDEX, CSR_DATA, CSR_IN_VECTOR,
-                  CSR_OUT_VECTOR)) {
+  if (spmv_verify(R)) {
     return 1;
   } else {
     printf("\nPassed.\n\n");

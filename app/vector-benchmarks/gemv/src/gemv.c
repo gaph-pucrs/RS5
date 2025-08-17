@@ -21,17 +21,17 @@
 #include <riscv-csr.h>
 
 void init_gemv_data(const unsigned long int m_row,
-                    const unsigned long int v_len, int *matrix,
+                    const unsigned long int VECTOR_LENGTH, int *matrix,
                     int *vector, int a, int b, int c) {
   // initialize matrix
   for (uint32_t i = 0; i < m_row; ++i) {
-    for (uint32_t j = 0; j < v_len; ++j) {
-      matrix[i * v_len + j] = a * (int)i + b * (int)j + c;
+    for (uint32_t j = 0; j < VECTOR_LENGTH; ++j) {
+      matrix[i * VECTOR_LENGTH + j] = a * (int)i + b * (int)j + c;
     }
   }
 
   // initialize vector
-  for (uint32_t i = 0; i < v_len; ++i) {
+  for (uint32_t i = 0; i < VECTOR_LENGTH; ++i) {
     vector[i] = a * (int)i + b;
   }
 }
@@ -59,7 +59,7 @@ void store_slice_results(int *dest, const unsigned long int slice_height) {
 }
 
 void gemv_rowwise_small_than_slice(const unsigned long int m_row,
-                                   const unsigned long int v_len,
+                                   const unsigned long int VECTOR_LENGTH,
                                    int *matrix, int *vector,
                                    int *dest) {
   // setup
@@ -67,12 +67,12 @@ void gemv_rowwise_small_than_slice(const unsigned long int m_row,
   __asm__ volatile("vmv.v.i v24,  0");
   __asm__ volatile("vmv.v.i v16,  0");
   // load vector
-  __asm__ volatile("vsetvli zero, %0, e32, m2, ta, ma" ::"r"(v_len));
+  __asm__ volatile("vsetvli zero, %0, e32, m2, ta, ma" ::"r"(VECTOR_LENGTH));
   __asm__ volatile("vle32.v v0, (%0);" ::"r"(vector));
   for (uint32_t i = 0; i < m_row; ++i) {
-    int *_mat_ = matrix + i * v_len;
+    int *_mat_ = matrix + i * VECTOR_LENGTH;
     int *_dst_ = dest + i - 1; // delayed store
-    __asm__ volatile("vsetvli zero, %0, e32, m2, ta, ma" ::"r"(v_len));
+    __asm__ volatile("vsetvli zero, %0, e32, m2, ta, ma" ::"r"(VECTOR_LENGTH));
 
     if (i % 2 == 0) {
       // load matrix slice row
@@ -124,7 +124,7 @@ void gemv_rowwise_small_than_slice(const unsigned long int m_row,
   }
 }
 
-void gemv_rowwise_kernel_slice(const unsigned long int v_len,
+void gemv_rowwise_kernel_slice(const unsigned long int VECTOR_LENGTH,
                                const unsigned long int slice_width,
                                const unsigned long int slice_height,
                                int *matrix, int *vector) {
@@ -134,7 +134,7 @@ void gemv_rowwise_kernel_slice(const unsigned long int v_len,
 
   // for each row in slice
   for (uint32_t i = 0; i < slice_height; ++i) {
-    int *_mat_ = matrix + i * v_len;
+    int *_mat_ = matrix + i * VECTOR_LENGTH;
     int tmp; // for round slice later
     __asm__ volatile("vsetvli zero, %0, e32, m2, ta, ma" ::"r"(slice_width));
     // load matrix slice row
@@ -166,20 +166,20 @@ void gemv_rowwise_kernel_slice(const unsigned long int v_len,
   }
 }
 
-void gemv_rowwise(const unsigned long int m_row, const unsigned long int v_len,
+void gemv_rowwise(const unsigned long int m_row, const unsigned long int VECTOR_LENGTH,
                   int *matrix, int *vector, int *dest) {
   // when matrix is samller than a slice
-  __asm__ volatile("vsetvli %0, %1, e32, m2, ta, ma" : "=r"(vl) :"r"(v_len));
+  __asm__ volatile("vsetvli %0, %1, e32, m2, ta, ma" : "=r"(vl) :"r"(VECTOR_LENGTH));
 
-  if (v_len <= vl) {
-    gemv_rowwise_small_than_slice(m_row, v_len, matrix, vector, dest);
+  if (VECTOR_LENGTH <= vl) {
+    gemv_rowwise_small_than_slice(m_row, VECTOR_LENGTH, matrix, vector, dest);
     return;
   }
 
   uint32_t num_slice_row = m_row / vl;
   uint32_t rest_row = m_row % vl;
-  uint32_t num_slice_col = v_len / vl;
-  uint32_t rest_col = v_len % vl;
+  uint32_t num_slice_col = VECTOR_LENGTH / vl;
+  uint32_t rest_col = VECTOR_LENGTH % vl;
 
   // each slice row
   for (uint32_t i = 0; i < num_slice_row; ++i) {
@@ -187,16 +187,16 @@ void gemv_rowwise(const unsigned long int m_row, const unsigned long int v_len,
     clear_reduction_register();
     // each full slice
     for (uint32_t j = 0; j < num_slice_col; ++j) {
-      int *_mat_ = matrix + i * vl * v_len + j * vl;
+      int *_mat_ = matrix + i * vl * VECTOR_LENGTH + j * vl;
       int *_vec_ = vector + j * vl;
-      gemv_rowwise_kernel_slice(v_len, vl, vl, _mat_, _vec_);
+      gemv_rowwise_kernel_slice(VECTOR_LENGTH, vl, vl, _mat_, _vec_);
     }
     // margin slice
     if (rest_col > 0) {
       int *_mat_ =
-          matrix + i * vl * v_len + num_slice_col * vl;
+          matrix + i * vl * VECTOR_LENGTH + num_slice_col * vl;
       int *_vec_ = vector + num_slice_col * vl;
-      gemv_rowwise_kernel_slice(v_len, rest_col, vl, _mat_, _vec_);
+      gemv_rowwise_kernel_slice(VECTOR_LENGTH, rest_col, vl, _mat_, _vec_);
     }
     // store dest vector value
     int *_dst_ = dest + i * vl;
@@ -210,16 +210,16 @@ void gemv_rowwise(const unsigned long int m_row, const unsigned long int v_len,
     // each bottom slice
     for (uint32_t j = 0; j < num_slice_col; ++j) {
       int *_mat_ =
-          matrix + num_slice_row * vl * v_len + j * vl;
+          matrix + num_slice_row * vl * VECTOR_LENGTH + j * vl;
       int *_vec_ = vector + j * vl;
-      gemv_rowwise_kernel_slice(v_len, vl, rest_row, _mat_, _vec_);
+      gemv_rowwise_kernel_slice(VECTOR_LENGTH, vl, rest_row, _mat_, _vec_);
     }
     // margin slice
     if (rest_col > 0) {
-      int *_mat_ = matrix + num_slice_row * vl * v_len +
+      int *_mat_ = matrix + num_slice_row * vl * VECTOR_LENGTH +
                       num_slice_col * vl;
       int *_vec_ = vector + num_slice_col * vl;
-      gemv_rowwise_kernel_slice(v_len, rest_col, rest_row, _mat_, _vec_);
+      gemv_rowwise_kernel_slice(VECTOR_LENGTH, rest_col, rest_row, _mat_, _vec_);
     }
     // store dest vector value
     int *_dst_ = dest + num_slice_row * vl;
@@ -227,17 +227,21 @@ void gemv_rowwise(const unsigned long int m_row, const unsigned long int v_len,
   }
 }
 
-int gemv_verify(const unsigned long int m_row, const unsigned long int v_len,
+void gemv_gold(const unsigned long int m_row, const unsigned long int VECTOR_LENGTH,
                 int *matrix, int *vector, int *dest) {
   for (uint32_t i = 0; i < m_row; ++i) {
-    int res = dest[i];
     int golden = 0;
-    for (uint32_t j = 0; j < v_len; ++j) {
-      golden = golden + matrix[i * v_len + j] * vector[j];
+    for (uint32_t j = 0; j < VECTOR_LENGTH; ++j) {
+      golden = golden + matrix[i * VECTOR_LENGTH + j] * vector[j];
     }
-    if (golden != res) {
-      printf("Fail, wrong value! at index %d, result = %d, golden = %d\n", (int)i,
-             res, golden);
+    dest[i] = golden;
+  }
+}
+
+int gemv_verify(const unsigned long int m_row, int *res_vector, int *res_golden) {
+  for (uint32_t i = 0; i < m_row; ++i) {
+    if (res_golden[i] != res_vector[i]) {
+      printf("Fail, wrong value! at index %d, result = %d, golden = %d\n", (int)i, res_vector[i], res_golden[i]);
       return i;
     }
   }
@@ -249,13 +253,14 @@ int gemv_verify(const unsigned long int m_row, const unsigned long int v_len,
 #define MAX_ONLY 1
 
 #define VERIFY 1
-#define V_LEN 128
+#define VECTOR_LENGTH 128
 #define NR_LANES 1
 
 
-int GEMV_M[V_LEN * V_LEN] __attribute__((aligned(4)));
-int GEMV_D[V_LEN] __attribute__((aligned(4)));
-int GEMV_V[V_LEN] __attribute__((aligned(4)));
+int GEMV_MATRIX[VECTOR_LENGTH * VECTOR_LENGTH] __attribute__((aligned(4)));
+int GEMV_VECTOR[VECTOR_LENGTH] __attribute__((aligned(4)));
+int GEMV_RES_V [VECTOR_LENGTH] __attribute__((aligned(4)));
+int GEMV_RES_S [VECTOR_LENGTH] __attribute__((aligned(4)));
 
 uint64_t cycles_start;
 uint64_t cycles_end;
@@ -269,41 +274,47 @@ int main() {
   printf("\n");
 
   #ifdef MAX_ONLY
-    int init_value = V_LEN;
+    int init_value = VECTOR_LENGTH;
   #else
     int init_value = 4;
   #endif
 
-  for (int s = init_value; s <= V_LEN; s *= 2) {
+  for (int size = init_value; size <= VECTOR_LENGTH; size *= 2) {
     printf("\n");
     printf("------------------------------------------------------------\n");
-    printf("Calculating a (%d x %d) x %d matrix vector multiplication...\n", s,
-           s, s);
+    printf("Calculating a (%d x %d) x %d matrix vector multiplication...\n", size,
+           size, size);
     printf("------------------------------------------------------------\n");
 
     // Initialize Matrices
     printf("Initializing matrix and vector...\n");
-    init_gemv_data(s, s, GEMV_M, GEMV_V, 1, 2, 3);
+    init_gemv_data(size, size, GEMV_MATRIX, GEMV_VECTOR, 1, 2, 3);
 
     // Start GEMV calculating
-    printf("calculating...\n");
+    printf("calculating...\n\n");
     cycles_start = csr_read_mcycle();
-    gemv_rowwise(s, s, GEMV_M, GEMV_V, GEMV_D);
+    gemv_rowwise(size, size, GEMV_MATRIX, GEMV_VECTOR, GEMV_RES_V);
     cycles_end = csr_read_mcycle();
 
     // Metrics
     int64_t runtime = cycles_end - cycles_start;
-    // float performance = 2.0 * s * s / runtime;
+    // float performance = 2.0 * size * size / runtime;
     // float utilization = 100 * performance / (2.0 * NR_LANES);
 
-    printf("\nThe execution took %d cycles.\n\n", (int)runtime);
+    printf("[VECTOR] The execution took %d cycles.\n\n", (int)runtime);
     //printf("The performance is %f FLOP/cycle (%f%% utilization) at %d lanes.\n",
     //       performance, utilization, NR_LANES);
+
+    cycles_start = csr_read_mcycle();
+    gemv_gold(size, size, GEMV_MATRIX, GEMV_VECTOR, GEMV_RES_S);
+    cycles_end = csr_read_mcycle();
+    runtime = cycles_end - cycles_start;
+    printf("[SCALAR] The execution took %d cycles.\n\n", (int)runtime);
 
     // Verify the result
     if (VERIFY) {
       printf("Verifying ...\n");
-      if (gemv_verify(s, s, GEMV_M, GEMV_V, GEMV_D)) {
+      if (gemv_verify(size, GEMV_RES_V, GEMV_RES_S)) {
         return 1;
       } else {
         printf("Passed.\n\n");

@@ -95,7 +95,7 @@ int main() {
 
   // Only count effective SPOP/cycle
   //int performance = N / runtime;
-  printf("The execution took %d cycles.\n\n", (int)runtime);
+  printf("[VECTOR] The execution took %d cycles.\n\n", (int)runtime);
   //printf("Max performance - %d\n", (int)runtime);
   //printf("Performance.    - %d\n", performance);
 /*
@@ -108,9 +108,13 @@ int main() {
          performance, max_perf, 100 * performance / max_perf, utilization);
 */
 
-  // Verify correctness
+  cycles_start = csr_read_mcycle();
   dropout_gold(N, I, SCALE, SEL, o_gold);
+  cycles_end = csr_read_mcycle();
+  runtime = cycles_end - cycles_start;
+  printf("\n[SCALAR] The execution took %d cycles.\n\n", (int)runtime);
 
+  // Verify correctness
   for (unsigned int k = 0; k < N; ++k) {
     if (o[k] != o_gold[k]) {
       printf("Fail - Error: o[%d] = %d != %d\n", k, o[k], o_gold[k]);

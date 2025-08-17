@@ -123,21 +123,22 @@ int main() {
   printf("==========\n");
   printf("=  16b   =\n");
   printf("==========\n");
-  printf("Calulating 16b dotp with vectors with length = %u\n", N);
+  printf("Calulating 16b dotp with vectors with length = %u\n\n", N);
   cycles_start = csr_read_mcycle();
   res16_v = dotp_v16b(v16a, v16b, N);
   cycles_end = csr_read_mcycle();
   cycles_v16 = cycles_end - cycles_start;
 
-  printf("\nThe execution took %d cycles.\n\n", (int)cycles_v16);
-  printf("VECTOR 16b - AVL = %u, cycles = %d\n", N, (int)cycles_v16);
+  printf("[VECTOR] The execution took %d cycles.\n\n", (int)cycles_v16);
+  //printf("VECTOR 16b - AVL = %u, cycles = %d\n", N, (int)cycles_v16);
 
   if (SCALAR) {
     cycles_start = csr_read_mcycle();
     res16_s = dotp_s16b(v16a, v16b, N);
     cycles_end = csr_read_mcycle();
     cycles_s16 = cycles_end - cycles_start;
-    printf("SCALAR 16b - AVL = %u, cycles = %d\n\n", N, (int)cycles_s16);
+    //printf("SCALAR 16b - AVL = %u, cycles = %d\n", N, (int)cycles_s16);
+    printf("[SCALAR] The execution took %d cycles.\n\n", (int)cycles_s16);
 
     if (CHECK) {
       if (res16_v != res16_s) {

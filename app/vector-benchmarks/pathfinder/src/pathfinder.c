@@ -253,13 +253,13 @@ int main() {
   cycles_start = csr_read_mcycle();
   s_ptr = run(wall, result_s, src, cols, rows, num_runs);
   cycles_end = csr_read_mcycle();
-  printf("Scalar code cycles: %d\n", (int)(cycles_end - cycles_start));
+  printf("[SCALAR] The execution took %d cycles.\n\n", (int)(cycles_end - cycles_start));
 #endif
 
   cycles_start = csr_read_mcycle();
   run_vector(wall, result_v, cols, rows, num_runs);
   cycles_end = csr_read_mcycle();
-  printf("Vector code cycles: %d\n\n", (int)(cycles_end - cycles_start));
+  printf("[VECTOR] The execution took %d cycles.\n\n", (int)(cycles_end - cycles_start));
 
 #ifdef CHECK
   error = verify_result(s_ptr, result_v, cols);

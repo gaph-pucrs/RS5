@@ -72,6 +72,39 @@ int bp_iconv3d_verify(int8_t *matrix, int8_t *golden_matrix, int32_t R,
   return 0;
 }
 
+void convolve2D(
+    int8_t *ooutput,   // output buffer
+    int8_t *image,     // input image with padding applied
+    int8_t *filter,    // filter kernel
+    int32_t ImageHeight,
+    int32_t ImageWidth,
+    int32_t Channels,
+    int32_t FilterSize
+) {
+    int32_t stride = 1;
+    int32_t outHeight = ImageHeight - FilterSize + 1;
+    int32_t outWidth  = ImageWidth  - FilterSize + 1;
+
+    for (int8_t ch = 0; ch < Channels; ch++) {
+        const int8_t *img_ch  = image  + ch * ImageHeight * ImageWidth;
+        const int8_t *filt_ch = filter + ch * FilterSize * FilterSize;
+
+        for (int8_t col = 0; col < outWidth; col += stride) {
+            for (int8_t row = 0; row < outHeight; row += stride) {
+                int8_t sum = 0;
+                for (int8_t ky = 0; ky < FilterSize; ky++) {
+                    for (int8_t kx = 0; kx < FilterSize; kx++) {
+                        int8_t imgVal = img_ch[(row + kx) * ImageWidth + (col + ky)];
+                        int8_t kerVal = filt_ch[kx * FilterSize + ky];
+                        sum += imgVal * kerVal;
+                    }
+                }
+                ooutput[row * outWidth + col] = ooutput[row * outWidth + col] + sum;
+            }
+        }
+    }
+}
+
 void bp_iconv3d_CHx7x7(int8_t *o, int8_t *i, int8_t *f, int32_t M, int32_t N,
                        int32_t C, int32_t F) {
 
@@ -89,9 +122,6 @@ void bp_iconv3d_CHx7x7(int8_t *o, int8_t *i, int8_t *f, int32_t M, int32_t N,
     int8_t *o_ = o + n;
 
     __asm__ volatile("vsetvli zero, %0, e8, m2, ta, ma" ::"r"(n_));
-
-    printf("block_size_n %d -  N %d  -  n %d -  n_ %d\n", block_size_n, N, n, n_);
-
 
     bp_iconv3d_CHx7x7_block(o_, i_, f, M, N, n_, C, F);
   }
@@ -222,10 +252,10 @@ void bp_iconv3d_CHx7x7_block(int8_t *o, int8_t *i, int8_t *f, int32_t M,
                  : "+&r"(i__)
                  : "r"(ldi_pad));
 
-    dump_vector_u8(0, "v0", n_);
-    dump_vector_u8(4, "v4", n_);
-    dump_vector_u8(8, "v8", n_);
-    dump_vector_u8(12, "v12", n_);
+    //dump_vector_u8(0, "v0", n_);
+    //dump_vector_u8(4, "v4", n_);
+    //dump_vector_u8(8, "v8", n_);
+    //dump_vector_u8(12, "v12", n_);
 
     // Main kernel, unrolled by 2
     // Unrolled because of double buffering

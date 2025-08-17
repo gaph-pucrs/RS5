@@ -72,6 +72,39 @@ int sp_iconv3d_verify(int32_t *matrix, int32_t *golden_matrix, int32_t R,
   return 0;
 }
 
+void convolve2D(
+    int32_t *ooutput,   // output buffer
+    int32_t *image,     // input image with padding applied
+    int32_t *filter,    // filter kernel
+    int32_t ImageHeight,
+    int32_t ImageWidth,
+    int32_t Channels,
+    int32_t FilterSize
+) {
+    int32_t stride = 1;
+    int32_t outHeight = ImageHeight - FilterSize + 1;
+    int32_t outWidth  = ImageWidth  - FilterSize + 1;
+
+    for (int32_t ch = 0; ch < Channels; ch++) {
+        const int32_t *img_ch  = image  + ch * ImageHeight * ImageWidth;
+        const int32_t *filt_ch = filter + ch * FilterSize * FilterSize;
+
+        for (int32_t col = 0; col < outWidth; col += stride) {
+            for (int32_t row = 0; row < outHeight; row += stride) {
+                int32_t sum = 0;
+                for (int32_t ky = 0; ky < FilterSize; ky++) {
+                    for (int32_t kx = 0; kx < FilterSize; kx++) {
+                        int32_t imgVal = img_ch[(row + kx) * ImageWidth + (col + ky)];
+                        int32_t kerVal = filt_ch[kx * FilterSize + ky];
+                        sum += imgVal * kerVal;
+                    }
+                }
+                ooutput[row * outWidth + col] = ooutput[row * outWidth + col] + sum;
+            }
+        }
+    }
+}
+
 void sp_iconv3d_CHx7x7(int32_t *o, int32_t *i, int32_t *f, int32_t M, int32_t N,
                        int32_t C, int32_t F) {
 

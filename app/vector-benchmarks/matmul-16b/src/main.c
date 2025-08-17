@@ -25,38 +25,23 @@
 
 #define MIN(a, b) ((a) <= (b) ? (a) : (b))
 
-// Define the different data types
-#define INT32 5
-#define INT16 6
-#define INT8 7
-
-#define DTYPE INT32
-
-// Map DTYPE to the actual data type
-#ifndef DTYPE
-#warning                                                                       \
-    "Please explicitly define DTYPE. Example command: make bin/dtype-matmul ENV_DEFINES='-DDTYPE=INT32' def_args_dtype-matmul='int32 128 128 128'. Compiling now under the assumption of DTYPE == INT32"
-#define DTYPE INT32
-#endif
-
-#if DTYPE == INT32
-typedef int32_t _DTYPE;
-#define _KERNEL sp_imatmul
-#define _VERIFY sp_imatmul_verify
-#include "sp-imatmul.h"
-#elif DTYPE == INT16
 typedef int16_t _DTYPE;
 #define _KERNEL hp_imatmul
 #define _VERIFY hp_imatmul_verify
 #include "hp-imatmul.h"
-#elif DTYPE == INT8
-typedef int8_t _DTYPE;
-#define _KERNEL bp_imatmul
-#define _VERIFY bp_imatmul_verify
-#include "bp-imatmul.h"
-#else
-#error "Unsupported data type"
-#endif
+
+void matmul(_DTYPE *C, _DTYPE *A, _DTYPE *B,
+            size_t m, size_t n, size_t p) {
+    for (size_t i = 0; i < m; i++) {
+        for (size_t j = 0; j < p; j++) {
+            _DTYPE sum = 0;
+            for (size_t k = 0; k < n; k++) {
+                sum += A[i*n + k] * B[k*p + j];
+            }
+            C[i*p + j] = sum;
+        }
+    }
+}
 
 // Define Matrix dimensions:
 // C = AB with A=[MxN], B=[NxP], C=[MxP]
@@ -89,10 +74,10 @@ int main() {
 
   // Matrices are initialized --> Start calculating
   printf("Calculating matmul...\n");
-  int unsigned loop_cont = 1;
-  do {
-    _KERNEL(c, a, b, M, N, P);
-  } while (--loop_cont != 0);
+  //int unsigned loop_cont = 1;
+  //do {
+  //  _KERNEL(c, a, b, M, N, P);
+  //} while (--loop_cont != 0);
 
   cycles_start = csr_read_mcycle();
   _KERNEL(c, a, b, M, N, P);
@@ -103,9 +88,16 @@ int main() {
   //float performance = 2.0 * M * N * P / runtime;
   //float utilization = 100 * performance / (2.0 * NR_LANES * DTYPE_FACTOR);
 
-  printf("The execution took %d cycles.\n\n", runtime);
+  printf("[VECTOR] The execution took %d cycles.\n\n", runtime);
   //printf("The performance is %f FLOP/cycle (%f%% utilization).\n", performance,
   //       utilization);
+
+  cycles_start = csr_read_mcycle();
+  matmul(g, a, b, M, N, P);
+  cycles_end = csr_read_mcycle();
+
+  runtime = (int)(cycles_end - cycles_start);
+  printf("[SCALAR] The execution took %d cycles.\n\n", runtime);
 
   // Verify the result
   printf("Verifying result...\n");

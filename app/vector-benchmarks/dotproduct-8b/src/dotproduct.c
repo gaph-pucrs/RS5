@@ -122,21 +122,22 @@ int main() {
   printf("==========\n");
   printf("=   8b   =\n");
   printf("==========\n");
-  printf("Calulating 8b dotp with vectors with length = %u\n", N);
+  printf("Calulating 8b dotp with vectors with length = %u\n\n", N);
   cycles_start = csr_read_mcycle();
   res8_v = dotp_v8b(v8a, v8b, N);
   cycles_end = csr_read_mcycle();
   cycles_v8 = cycles_end - cycles_start;
 
-  printf("\nThe execution took %d cycles.\n\n", (int)cycles_v8);
-  printf("VECTOR 8b - AVL = %u, cycles = %d\n", N, (int)cycles_v8);
+  printf("[VECTOR] The execution took %d cycles.\n\n", (int)cycles_v8);
+  //printf("VECTOR 8b - AVL = %u, cycles = %d\n", N, (int)cycles_v8);
 
   if (SCALAR) {
     cycles_start = csr_read_mcycle();
     res8_s = dotp_s8b(v8a, v8b, N);
     cycles_end = csr_read_mcycle();
     cycles_s8 = cycles_end - cycles_start;
-    printf("SCALAR 8b - AVL = %u, cycles = %d\n\n", N, (int)cycles_s8);
+    //printf("SCALAR 8b - AVL = %u, cycles = %d\n", N, (int)cycles_s8);
+    printf("[SCALAR] The execution took %d cycles.\n\n", (int)cycles_s8);
 
     if (CHECK) {
       if (res8_v != res8_s) {

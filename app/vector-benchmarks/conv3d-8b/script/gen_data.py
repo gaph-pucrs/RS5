@@ -124,6 +124,10 @@ with open(header_file_path, 'w') as file:
     file.write(",\n".join(f"    {num}" for num in empty_o.flatten()))
     file.write("\n};\n\n")
 
+    file.write(f"{dtype}_t o_g[{len(empty_o.flatten())}] = {{\n")
+    file.write(",\n".join(f"    {num}" for num in empty_o.flatten()))
+    file.write("\n};\n\n")
+
     file.write(f"{dtype}_t golden_o[{len(result.flatten())}] = {{\n")
     file.write(",\n".join(f"    {num}" for num in result.flatten()))
     file.write("\n};\n\n")
