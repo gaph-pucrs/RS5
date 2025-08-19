@@ -92,16 +92,6 @@ module plic
         endcase
     end
 
-    /* Byte access */
-    /* The number of bits used depends on i_cnt */
-    /* verilator lint_off UNUSEDSIGNAL */
-    logic [31:0] write_val;
-    /* verilator lint_on UNUSEDSIGNAL */
-    assign write_val[31:24] = we_i[3] ? data_i[31:24] : reg_val[31:24];
-    assign write_val[23:16] = we_i[2] ? data_i[23:16] : reg_val[23:16];
-    assign write_val[15: 8] = we_i[1] ? data_i[15: 8] : reg_val[15: 8];
-    assign write_val[ 7: 0] = we_i[0] ? data_i[ 7: 0] : reg_val[ 7: 0];
-
     /* Read */
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
@@ -112,12 +102,62 @@ module plic
         end
     end
 
+    logic en_r;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            en_r <= 1'b0;
+        else
+            en_r <= en_i;
+    end
+
+    logic [23:0] addr_r;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            addr_r <= '0;
+        else
+            addr_r <= addr_i;
+    end
+
+    logic [3:0] we_r;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            we_r <= '0;
+        else
+            we_r <= we_i;
+    end
+
+    logic [31:0] data_r;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            data_r <= '0;
+        else
+            data_r <= data_i;
+    end
+
+    logic [31:0] reg_val_r;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            reg_val_r <= '0;
+        else
+            reg_val_r <= reg_val;
+    end
+
+    /* Byte access */
+    /* The number of bits used depends on i_cnt */
+    /* verilator lint_off UNUSEDSIGNAL */
+    logic [31:0] write_val;
+    /* verilator lint_on UNUSEDSIGNAL */
+    assign write_val[31:24] = we_r[3] ? data_r[31:24] : reg_val_r[31:24];
+    assign write_val[23:16] = we_r[2] ? data_r[23:16] : reg_val_r[23:16];
+    assign write_val[15: 8] = we_r[1] ? data_r[15: 8] : reg_val_r[15: 8];
+    assign write_val[ 7: 0] = we_r[0] ? data_r[ 7: 0] : reg_val_r[ 7: 0];    
+
     /* Write */
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             ie      <= '0;
         end
-        else if (en_i == 1'b1 && we_i != '0 && addr_i == 24'h002000) begin
+        else if (en_r == 1'b1 && we_r != '0 && addr_r == 24'h002000) begin
             ie <= write_val[i_cnt:1];
         end 
     end
@@ -127,7 +167,7 @@ module plic
             iack_o <= '0;
         end
         else begin 
-            if (en_i == 1'b1 && we_i != '0 && addr_i == 24'h200004) 
+            if (en_r == 1'b1 && we_r != '0 && addr_r == 24'h200004) 
                 iack_o[write_val[$clog2(i_cnt+1):0]] <= 1'b1;
             else
                 iack_o <= '0;

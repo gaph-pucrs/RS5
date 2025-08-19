@@ -62,24 +62,64 @@ module rtc (
             data_o <= r_data_unaligned;
     end
 
+    logic en_r;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            en_r <= 1'b0;
+        else
+            en_r <= en_i;
+    end
+
+    logic [3:0] addr_r;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            addr_r <= '0;
+        else
+            addr_r <= addr_i;
+    end
+
+    logic [7:0] we_r;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            we_r <= '0;
+        else
+            we_r <= we_i;
+    end
+
+    logic [63:0] data_r;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            data_r <= '0;
+        else
+            data_r <= data_i;
+    end
+
+    logic [63:0] r_data_r;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            r_data_r <= '0;
+        else
+            r_data_r <= r_data;
+    end
+
     logic [63:0] w_data;
     always_comb begin
         if (addr_i[2]) begin
-            w_data[63:56] = we_i[3] ? data_i[31:24] : r_data[63:56];
-            w_data[55:48] = we_i[2] ? data_i[23:16] : r_data[55:48];
-            w_data[47:40] = we_i[1] ? data_i[15: 8] : r_data[47:40];
-            w_data[39:32] = we_i[0] ? data_i[ 7: 0] : r_data[39:32];
-            w_data[31: 0] =                           r_data[31: 0];
+            w_data[63:56] = we_r[3] ? data_r[31:24] : r_data_r[63:56];
+            w_data[55:48] = we_r[2] ? data_r[23:16] : r_data_r[55:48];
+            w_data[47:40] = we_r[1] ? data_r[15: 8] : r_data_r[47:40];
+            w_data[39:32] = we_r[0] ? data_r[ 7: 0] : r_data_r[39:32];
+            w_data[31: 0] =                           r_data_r[31: 0];
         end
         else begin
-            w_data[63:56] = we_i[7] ? data_i[63:56] : r_data[63:56];
-            w_data[55:48] = we_i[6] ? data_i[55:48] : r_data[55:48];
-            w_data[47:40] = we_i[5] ? data_i[47:40] : r_data[47:40];
-            w_data[39:32] = we_i[4] ? data_i[39:32] : r_data[39:32];
-            w_data[31:24] = we_i[3] ? data_i[31:24] : r_data[31:24];
-            w_data[23:16] = we_i[2] ? data_i[23:16] : r_data[23:16];
-            w_data[15: 8] = we_i[1] ? data_i[15: 8] : r_data[15: 8];
-            w_data[ 7: 0] = we_i[0] ? data_i[ 7: 0] : r_data[ 7: 0];
+            w_data[63:56] = we_r[7] ? data_r[63:56] : r_data_r[63:56];
+            w_data[55:48] = we_r[6] ? data_r[55:48] : r_data_r[55:48];
+            w_data[47:40] = we_r[5] ? data_r[47:40] : r_data_r[47:40];
+            w_data[39:32] = we_r[4] ? data_r[39:32] : r_data_r[39:32];
+            w_data[31:24] = we_r[3] ? data_r[31:24] : r_data_r[31:24];
+            w_data[23:16] = we_r[2] ? data_r[23:16] : r_data_r[23:16];
+            w_data[15: 8] = we_r[1] ? data_r[15: 8] : r_data_r[15: 8];
+            w_data[ 7: 0] = we_r[0] ? data_r[ 7: 0] : r_data_r[ 7: 0];
         end
     end
 
@@ -88,9 +128,10 @@ module rtc (
             mtime    <= '0;
         end
         else begin
-            mtime <= mtime + 1'b1;
-            if (en_i && we_i != '0 && !addr_i[3])
+            if (en_r && we_r != '0 && !addr_r[3])
                 mtime <= w_data;
+            else
+                mtime <= mtime + 1'b1;
         end
     end
 
@@ -99,7 +140,7 @@ module rtc (
             mtimecmp <= '0;
         end
         else begin
-            if (en_i && we_i != '0 && addr_i[3])
+            if (en_r && we_r != '0 && addr_r[3])
                 mtimecmp <= w_data;
         end
     end
