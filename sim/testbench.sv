@@ -30,6 +30,18 @@ module testbench
 );
     // timeunit 1ns; timeprecision 1ns;
 
+`ifndef VLEN_P
+  `define VLEN_P 64
+`endif
+
+`ifndef LLEN_P
+  `define LLEN_P 64
+`endif
+
+`ifndef BUS_WIDTH_P
+  `define BUS_WIDTH_P 32
+`endif
+
 //////////////////////////////////////////////////////////////////////////////
 // PARAMETERS FOR CORE INSTANTIATION
 //////////////////////////////////////////////////////////////////////////////
@@ -41,13 +53,13 @@ module testbench
     localparam bit           USE_ZKNE        = 1'b1;
     localparam bit           USE_ZICOND      = 1'b1;
     localparam bit           USE_ZCB         = 1'b1;
-    localparam int           BUS_WIDTH       = 32;
-    localparam bit           VEnable         = 1'b1;
-    localparam int           VLEN            = 512;
-    localparam int           LLEN            = 32;
     localparam bit           USE_HPMCOUNTER  = 1'b1;
     localparam bit           BRANCHPRED      = 1'b1;
     localparam bit           FORWARDING      = 1'b1;
+
+    localparam bit           VEnable         = 1'b1;
+    localparam int           VLEN            = `VLEN_P;
+    localparam int           LLEN            = `LLEN_P;
 
 `ifndef SYNTH
     localparam bit           PROFILING       = 1'b1;
@@ -56,8 +68,9 @@ module testbench
     localparam string        PROFILING_FILE  = "./results/Report.txt";
     localparam string        OUTPUT_FILE     = "./results/Output.txt";
 
-    localparam int           MEM_WIDTH       = 65_536;
-    localparam string        BIN_FILE        = "../app/vector-tests/test.bin";
+    localparam int           BUS_WIDTH       = `BUS_WIDTH_P;
+    localparam int           MEM_ADDR_BITS   = 28;
+    localparam string        BIN_FILE        = "../app/vector-benchmarks/benchmark.bin";
 
     localparam int           i_cnt = 1;
 
@@ -216,6 +229,7 @@ module testbench
 //////////////////////////////////////////////////////////////////////////////
 // RAM
 //////////////////////////////////////////////////////////////////////////////
+    localparam int MEM_WIDTH = 1 << MEM_ADDR_BITS;
 
     RAM_mem #(
     `ifndef SYNTH
@@ -230,13 +244,13 @@ module testbench
 
         .enA_i      (1'b1),
         .weA_i      ('0),
-        .addrA_i    (instruction_address[($clog2(MEM_WIDTH) - 1):0]),
+        .addrA_i    (instruction_address[(MEM_ADDR_BITS - 1):0]),
         .dataA_i    ('0),
         .dataA_o    (instruction),
 
         .enB_i      (enable_ram),
         .weB_i      (mem_write_enable),
-        .addrB_i    (mem_address[($clog2(MEM_WIDTH) - 1):0]),
+        .addrB_i    (mem_address[(MEM_ADDR_BITS - 1):0]),
         .dataB_i    (mem_data_write),
         .dataB_o    (data_ram)
     );

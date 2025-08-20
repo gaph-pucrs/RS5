@@ -9,8 +9,8 @@ import matplotlib.pyplot as plt
 # *********************************
 # PARAMS
 # *********************************
-BUS_WIDTHs = [32, 64]
-VLENs = [64, 128, 256]
+BUS_WIDTHs = [32]
+VLENs = [64]
 
 print(f'\nBenchmark Executions will consider:')
 print(f'\tBUS_WIDTHs = ', BUS_WIDTHs)
@@ -24,9 +24,8 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 
 benchmarks_dir = os.path.join(script_dir, "../app/vector-benchmarks/")
 
-benchmarks_list = [entry for entry in os.listdir(benchmarks_dir) if os.path.isdir(os.path.join(benchmarks_dir, entry)) and entry != "results"]
+benchmarks_list = [entry for entry in os.listdir(benchmarks_dir) if os.path.isdir(os.path.join(benchmarks_dir, entry)) and entry != "results" and 'conv3d-8b' in entry]
 benchmarks_list = sorted(benchmarks_list)
-benchmarks_list = ['dropout']
 
 print('Benchmarks that will be executed:')
 for i, benchmark in enumerate(benchmarks_list):
@@ -35,7 +34,6 @@ print()
 # *********************************
 # Execution
 # *********************************
-"""
 for benchmark in benchmarks_list:
     print("\n*********************************")
     print(f'Starting execution of {benchmark}.')
@@ -81,7 +79,6 @@ for benchmark in benchmarks_list:
     for bus_width in BUS_WIDTHs:
         for vlen in VLENs:
             LANES = [2**i for i in range((vlen//32).bit_length()) if 2**i <= (vlen//32)]
-            #LANES = [LANES[-1]]
             for lanes in LANES:
                 llen = lanes*32
                 print(f'Executing: BUS_WIDTH ={bus_width:3d}, VLEN ={vlen:3d}, LANES ={vlen//llen:2d}.')
@@ -101,7 +98,7 @@ for benchmark in benchmarks_list:
                     content = result_file.read()
                     if "fail" in content.lower():
                         os.rename(result_path, os.path.join(results_dir, f"[fail]bus{bus_width}_vlen{vlen}_lanes{vlen//llen}.txt"))
-"""
+
 # *********************************
 # Result extraction
 # *********************************
@@ -142,7 +139,7 @@ for benchmark in benchmarks_list:
     df = df.sort_values(by=["VLEN", "BUS_WIDTH", "LANES"])
     scalar_row = pd.DataFrame({"VLEN": [0], "BUS_WIDTH": [32], "LANES": [0], "CYCLES": scalar})
     df = pd.concat([scalar_row, df]).reset_index(drop=True)
-    df.to_csv(os.path.join(results_dir, f'{benchmark}.csv'), index=False)
+    df.to_csv(os.path.join(benchmarks_dir, 'results', 'charts', f'{benchmark}.csv'), index=False)
 
     print(f"✅ Succesful Data Extraction for {benchmark}!!!\n")
 
