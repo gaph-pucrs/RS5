@@ -35,9 +35,6 @@ print("*   Starting execution of LMFRNet.   *")
 print("**************************************")
 print()
 
-#--------------------------
-#      GENERATE DATA
-#--------------------------
 dataset_path = os.path.join(lmfrnet_dir, "data-cifar10/")
 if not os.path.exists(dataset_path):
     if not os.path.exists(os.path.join(lmfrnet_dir, "autodl-tmp/data-cifar10/")):
@@ -56,7 +53,7 @@ for lmul in LMULs:
         #if not os.path.exists(benchmark_dir):
         #    os.makedirs(benchmark_dir)
 
-benchmarks_list = [entry for entry in os.listdir(results_dir) if os.path.isdir(os.path.join(results_dir, entry))]
+benchmarks_list = [entry for entry in os.listdir(results_dir) if os.path.isdir(os.path.join(results_dir, entry)) and entry != "scalar"]
 benchmarks_list = sorted(benchmarks_list)
 
 print("LMFRNet will be executed with:")
@@ -64,6 +61,9 @@ for i, benchmark in enumerate(benchmarks_list):
     print(f"\t{i+1:2d})", benchmark)
 print()
 
+#--------------------------
+#      GENERATE DATA
+#--------------------------
 scripts_dir = os.path.join(lmfrnet_dir, "scripts/")
 if os.path.exists(scripts_dir) and os.path.isdir(scripts_dir):
      scripts_list = [entry for entry in os.listdir(scripts_dir)]
@@ -122,7 +122,6 @@ filename_pattern = re.compile(r"verilator_vlen(\d+)_m(\d+)\.txt")
 
 for benchmark in benchmarks_list:
     data = []
-    scalar = 0
     benchmark_dir = os.path.join(results_dir, benchmark+'/')
     #benchmark_dir = os.path.join(results_dir, "../backup/" + benchmark + '/')
     filename = "verilator_" + benchmark + ".txt"
@@ -146,4 +145,4 @@ for benchmark in benchmarks_list:
 print()
 
 cmd = ["python3", "lmfrnet_charts.py"]
-#subprocess.run(cmd, check=True)
+subprocess.run(cmd, check=True)
