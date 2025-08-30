@@ -44,7 +44,7 @@ module vectorSlide
         unique case (vsew)
             EW8: begin
                 for (int i = 0; i < (VLEN/8); i++) begin
-                    if (i < (vl-1)) begin
+                    if ((i < (vl-1)) && (i < (VLEN/8 - 1))) begin
                         result_slide1down[(8*i)+:8] = first_operand[(8*(i+1))+:8];
                     end
                     else if (i == (vl-1)) begin // last element
@@ -67,7 +67,7 @@ module vectorSlide
             end
             EW16: begin
                 for (int i = 0; i < (VLEN/16); i++) begin
-                    if (i < (vl-1)) begin
+                    if ((i < (vl-1)) && (i < (VLEN/16 - 1))) begin
                         result_slide1down[(16*i)+:16] = first_operand[(16*(i+1))+:16];
                     end
                     else if (i == (vl-1)) begin // last element
@@ -89,7 +89,7 @@ module vectorSlide
             end
             default: begin
                 for (int i = 0; i < (VLEN/32); i++) begin
-                    if (i < (vl-1)) begin
+                    if ((i < (vl-1)) && (i < (VLEN/32 - 1))) begin
                         result_slide1down[(32*i)+:32] = first_operand[(32*(i+1))+:32];
                     end
                     else if (i == (vl-1)) begin // last element

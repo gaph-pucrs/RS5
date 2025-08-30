@@ -271,6 +271,8 @@ module vectorALU
     logic [VLENB-1:0] result_mask;
 
     always_comb begin
+        result_mask = '0;
+
         unique case (vsew)
             EW8:
                 for (int i = 0; i < LANES; i++)
