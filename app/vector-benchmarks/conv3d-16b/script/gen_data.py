@@ -65,7 +65,7 @@ if len(sys.argv) > 1:
 	# Data type
 	CH = sys.argv[2]
 else:
-	matrix_width = 64
+	matrix_width = 16
 	CH = 3
 
 dtype = 'int16'
