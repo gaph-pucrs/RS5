@@ -9,8 +9,8 @@ import matplotlib.pyplot as plt
 # *********************************
 # PARAMS
 # *********************************
-BUS_WIDTHs = [32]
-VLENs = [64]
+BUS_WIDTHs = [32, 64]
+VLENs = [64, 128, 256]
 
 print(f'\nBenchmark Executions will consider:')
 print(f'\tBUS_WIDTHs = ', BUS_WIDTHs)
@@ -24,7 +24,7 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 
 benchmarks_dir = os.path.join(script_dir, "../app/vector-benchmarks/")
 
-benchmarks_list = [entry for entry in os.listdir(benchmarks_dir) if os.path.isdir(os.path.join(benchmarks_dir, entry)) and entry != "results" and 'conv3d-8b' in entry]
+benchmarks_list = [entry for entry in os.listdir(benchmarks_dir) if os.path.isdir(os.path.join(benchmarks_dir, entry)) and entry != "results"]
 benchmarks_list = sorted(benchmarks_list)
 
 print('Benchmarks that will be executed:')
@@ -107,16 +107,22 @@ print("\n*********************************")
 print(f'!!! Extracting Data !!!')
 print("*********************************\n")
 
-# Regex to find the cycle count line inside the file
-cycle_pattern = re.compile(r"\[VECTOR\] The execution took (\d+) cycles\.")
-scalar_pattern = re.compile(r"\[SCALAR\] The execution took (\d+) cycles\.")
 # Regex to parse bus, vlen, lanes from the filename
 filename_pattern = re.compile(r"bus(\d+)_vlen(\d+)_lanes(\d+)\.txt")
 
+# Regex to find the cycle count line inside the file
+cycle_pattern = re.compile(r"\[VECTOR\] The execution took (\d+) cycles\.")
+scalar_pattern = re.compile(r"\[SCALAR\] The execution took (\d+) cycles\.")
+scalar_loadstores_pattern = re.compile(r"Scalar LOAD-STORES\s*=\s*(\d+)")
+vector_instructions_pattern = re.compile(r"Vector Instructions\s*=\s*(\d+)")
+vector_loadstores_pattern = re.compile(r"Vector LOAD-STORES\s*=\s*(\d+)")
+inst_retired_pattern = re.compile(r"Cycles\[\s*2\] - Inst Retired:\s*(\d+)")
+
 for benchmark in benchmarks_list:
     data = []
-    scalar = 0
+    scalar_data = {}
     results_dir = os.path.join(benchmarks_dir, 'results', benchmark)
+
     for filename in os.listdir(results_dir):
         match = filename_pattern.match(filename)
         if not match:
@@ -127,17 +133,58 @@ for benchmark in benchmarks_list:
         file_path = os.path.join(results_dir, filename)
         with open(file_path, "r") as f:
             content = f.read()
-            cycle_match = cycle_pattern.search(content)
-            if cycle_match:
-                cycles = int(cycle_match.group(1))
-                data.append((vlen, bus, lanes, cycles))
-            scalar_match = scalar_pattern.search(content)
-            if scalar_match:
-                scalar = int(scalar_match.group(1))
 
-    df = pd.DataFrame(data, columns=["VLEN", "BUS_WIDTH", "LANES", "CYCLES"])
+            # Extract vector cycles
+            cycle_match = cycle_pattern.search(content)
+            vector_cycles = int(cycle_match.group(1)) if cycle_match else 0
+
+            scalar_match = scalar_pattern.search(content)
+            scalar_data['cycles'] = int(scalar_match.group(1)) if scalar_match else 0
+
+            # Split content into SCALAR and VECTOR sections for more precise extraction
+            sections = content.split("VECTOR:")
+            if len(sections) >= 2:
+                scalar_section = sections[0]
+                vector_section = sections[1]
+            else:
+                # Fallback: use entire content
+                scalar_section = content
+                vector_section = content
+
+            scalar_ls_match = scalar_loadstores_pattern.search(scalar_section)
+            scalar_data['loadstores'] = int(scalar_ls_match.group(1)) if scalar_ls_match else 0
+
+            scalar_inst_match = inst_retired_pattern.search(scalar_section)
+            scalar_data['inst_retired'] = int(scalar_inst_match.group(1)) if scalar_inst_match else 0
+
+            # Vector section
+            vector_inst_match = vector_instructions_pattern.search(vector_section)
+            vector_instructions = int(vector_inst_match.group(1)) if vector_inst_match else 0
+
+            vector_ls_match = vector_loadstores_pattern.search(vector_section)
+            vector_loadstores = int(vector_ls_match.group(1)) if vector_ls_match else 0
+
+            vector_inst_match = inst_retired_pattern.search(vector_section)
+            vector_inst_retired = int(vector_inst_match.group(1)) if vector_inst_match else 0
+
+            # Also extract scalar load-stores from vector section (the last occurrence)
+            scalar_ls_vector_match = scalar_loadstores_pattern.search(vector_section)
+            vector_scalar_loadstores = int(scalar_ls_vector_match.group(1)) if scalar_ls_vector_match else 0
+
+            data.append((vlen, bus, lanes, vector_cycles, vector_inst_retired, vector_scalar_loadstores, vector_instructions, vector_loadstores))
+
+    df = pd.DataFrame(data, columns=["VLEN", "BUS_WIDTH", "LANES", "CYCLES", "INST_RETIRED", "LOADSTORES", "VECTOR_INSTRUCTIONS", "VECTOR_LOADSTORES"])
     df = df.sort_values(by=["VLEN", "BUS_WIDTH", "LANES"])
-    scalar_row = pd.DataFrame({"VLEN": [0], "BUS_WIDTH": [32], "LANES": [0], "CYCLES": scalar})
+    scalar_row = pd.DataFrame({
+        "VLEN": [0],
+        "BUS_WIDTH": [32],
+        "LANES": [0],
+        "CYCLES": [scalar_data.get('cycles', 0)],
+        "INST_RETIRED": [scalar_data.get('inst_retired', 0)],
+        "LOADSTORES": [scalar_data.get('loadstores', 0)],
+        "VECTOR_INSTRUCTIONS": [0],  # Scalar has 0 vector instructions
+        "VECTOR_LOADSTORES": [0],    # Scalar has 0 vector load-stores
+    })
     df = pd.concat([scalar_row, df]).reset_index(drop=True)
     df.to_csv(os.path.join(benchmarks_dir, 'results', 'charts', f'{benchmark}.csv'), index=False)
 
