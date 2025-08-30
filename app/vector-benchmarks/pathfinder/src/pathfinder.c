@@ -12,10 +12,16 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <riscv-csr.h>
+#include <riscv-csr-hpm.h>
 
 #include "data.h"
 
 #define MIN(a, b) ((a) <= (b) ? (a) : (b))
+
+uint32_t hpm_0_s[32];
+uint32_t hpm_1_s[32];
+uint32_t hpm_0_v[32];
+uint32_t hpm_1_v[32];
 
 int *run(int *wall, int *result_s, int *src, uint32_t cols, uint32_t rows,
          uint32_t num_runs) {
@@ -199,12 +205,6 @@ void run_vector(int *wall, int *result_v, uint32_t cols, uint32_t rows, uint32_t
 
 
 
-
-
-
-
-
-
 int NR_LANES = 1;
 
 #define CHECK
@@ -237,6 +237,7 @@ uint64_t cycles_start;
 uint64_t cycles_end;
 
 int main() {
+  csr_write_mcountinhibit(-1);
   printf("\n");
   printf("================\n");
   printf("=  PATHFINDER  =\n");
@@ -250,15 +251,29 @@ int main() {
   printf("Number of runs: %d\n\n", (int)num_runs);
 
 #ifdef CHECK
+// ********************************
+//       !!!    SCALAR    !!!
+// ********************************
+  read_hpms(hpm_0_s);
   cycles_start = csr_read_mcycle();
+  csr_write_mcountinhibit(0);
   s_ptr = run(wall, result_s, src, cols, rows, num_runs);
+  csr_write_mcountinhibit(-1);
   cycles_end = csr_read_mcycle();
+  read_hpms(hpm_1_s);
   printf("[SCALAR] The execution took %d cycles.\n\n", (int)(cycles_end - cycles_start));
 #endif
 
+// ********************************
+//       !!!    VECTOR    !!!
+// ********************************
+  read_hpms(hpm_0_v);
   cycles_start = csr_read_mcycle();
+  csr_write_mcountinhibit(0);
   run_vector(wall, result_v, cols, rows, num_runs);
+  csr_write_mcountinhibit(-1);
   cycles_end = csr_read_mcycle();
+  read_hpms(hpm_1_v);
   printf("[VECTOR] The execution took %d cycles.\n\n", (int)(cycles_end - cycles_start));
 
 #ifdef CHECK
@@ -266,6 +281,12 @@ int main() {
 #else
   error = 0;
 #endif
+
+  printf("SCALAR:\n");
+  evaluate_hpms(hpm_0_s, hpm_1_s);
+
+  printf("VECTOR:\n");
+  evaluate_hpms(hpm_0_v, hpm_1_v);
 
   return error;
 }

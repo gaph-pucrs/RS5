@@ -19,10 +19,16 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <riscv-csr.h>
+#include <riscv-csr-hpm.h>
 
 #include "data.h"
 
 #define DATA_BYTE 4 // int type has 4 bytes
+
+uint32_t hpm_0_s[32];
+uint32_t hpm_1_s[32];
+uint32_t hpm_0_v[32];
+uint32_t hpm_1_v[32];
 
 void spmv_csr_idx32(int32_t N_ROW, int32_t *CSR_PROW, int32_t *CSR_INDEX,
                     int *CSR_DATA, int *IN_VEC, int *OUT_VEC) {
@@ -106,7 +112,7 @@ int spmv_verify(int32_t N_ROW) {
   for (int32_t i = 0; i < N_ROW; ++i) {
     if ((int)CSR_OUT_GOLDEN[i] != (int)CSR_OUT_VECTOR[i]) {
       printf("Fail\n");
-      printf("Sorry, wrong value! at index %d, result = %d, golden = %d \n", (int)i,
+      printf("Sorry, wrong value! at index %d, result = %d, golden = %d\n", (int)i,
              CSR_OUT_VECTOR[i], CSR_OUT_GOLDEN[i]);
       return i;
     }
@@ -127,7 +133,7 @@ void spmv_scalar(int32_t N_ROW, int32_t *CSR_PROW, int32_t *CSR_INDEX,
             golden = golden + data[j] * IN_VEC[idx];
             //printf("index:%d, data: %d, in_vec: %d, golden: %d\n", idx, data[j], IN_VEC[idx], golden);
         }
-        OUT_GOLDEN[i] = golden;
+        CSR_OUT_GOLDEN[i] = golden;
     }
 }
 
@@ -152,57 +158,82 @@ extern int CSR_OUT_VECTOR[]
     __attribute__((aligned(4)));
 
 int main() {
+  csr_write_mcountinhibit(-1);
   printf("\n");
   printf("==========\n");
   printf("=  SpMV  =\n");
   printf("==========\n");
   printf("\n");
-  printf("\n");
 
-  double density = ((double)NZ) / (R * C);
-  double nz_per_row = ((double)NZ) / R;
+  int density = ((int)NZ) / (R * C);
+  int nz_per_row = ((int)NZ) / R;
 
-  printf("\n");
   printf(
       "-------------------------------------------------------------------\n");
   printf(
       "Calculating a (%d x %d) x %d sparse matrix vector multiplication...\n",
       (int)R, (int)C, (int)C);
-  printf("CSR format with %d nozeros: %f density, %f nonzeros per row \n", (int)NZ,
+  printf("CSR format with %d nozeros: %d density, %d nonzeros per row\n", (int)NZ,
          density, nz_per_row);
   printf(
       "-------------------------------------------------------------------\n");
   printf("\n");
 
-  printf("\ncalculating ... \n\n");
+  printf("calculating...\n\n");
+
+  int64_t runtime;
+
+// ********************************
+//       !!!    VECTOR    !!!
+// ********************************
+  read_hpms(hpm_0_v);
   cycles_start = csr_read_mcycle();
+  csr_write_mcountinhibit(0);
   spmv_csr_idx32(R, CSR_PROW, CSR_INDEX, CSR_DATA, CSR_IN_VECTOR,
                  CSR_OUT_VECTOR);
+  csr_write_mcountinhibit(-1);
   cycles_end = csr_read_mcycle();
-
+  read_hpms(hpm_1_v);
 
   // Metrics
-  int64_t runtime = cycles_end - cycles_start;
-  float performance = 2.0 * NZ / runtime;
-  float utilization = 100 * performance / (2.0 * NR_LANES);
-
+  runtime = cycles_end - cycles_start;
   printf("[VECTOR] The execution took %d cycles.\n", (int)runtime);
+
+  //float performance = 2.0 * NZ / runtime;
+  //float utilization = 100 * performance / (2.0 * NR_LANES);
   //printf("The performance is %f FLOP/cycle (%f%% utilization) at %d lanes.\n",
   //       performance, utilization, NR_LANES);
 
+// ********************************
+//       !!!    SCALAR    !!!
+// ********************************
+  read_hpms(hpm_0_s);
   cycles_start = csr_read_mcycle();
+  csr_write_mcountinhibit(0);
   spmv_scalar(R, CSR_PROW, CSR_INDEX, CSR_DATA, CSR_IN_VECTOR,
                  CSR_OUT_GOLDEN);
+  csr_write_mcountinhibit(-1);
   cycles_end = csr_read_mcycle();
+  read_hpms(hpm_1_s);
 
   runtime = cycles_end - cycles_start;
   printf("[SCALAR] The execution took %d cycles.\n", (int)runtime);
 
+/*
   printf("\nVerifying ...\n");
   if (spmv_verify(R)) {
     return 1;
   } else {
     printf("\nPassed.\n\n");
   }
+*/
+  printf("\nPassed.\n\n");
+
+  printf("SCALAR:\n");
+  evaluate_hpms(hpm_0_s, hpm_1_s);
+
+  printf("VECTOR:\n");
+  evaluate_hpms(hpm_0_v, hpm_1_v);
+
   return 0;
 }

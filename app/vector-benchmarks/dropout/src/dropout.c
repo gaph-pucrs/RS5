@@ -19,8 +19,14 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <riscv-csr.h>
+#include <riscv-csr-hpm.h>
 
 #include "data.h"
+
+uint32_t hpm_0_s[32];
+uint32_t hpm_1_s[32];
+uint32_t hpm_0_v[32];
+uint32_t hpm_1_v[32];
 
 // Scalar dropout
 void dropout_gold(const unsigned int n, const int *i, const int scale,
@@ -77,6 +83,7 @@ uint64_t cycles_start;
 uint64_t cycles_end;
 
 int main() {
+  csr_write_mcountinhibit(-1);
   printf("\n");
   printf("=============\n");
   printf("=  DROPOUT  =\n");
@@ -84,18 +91,40 @@ int main() {
   printf("\n");
   printf("\n");
 
+  int64_t runtime;
+
   printf("Running Dropout with %d elements.\n\n", N);
 
-  // Call the main kernel, and measure cycles
+// ********************************
+//       !!!    SCALAR    !!!
+// ********************************
+  read_hpms(hpm_0_s);
   cycles_start = csr_read_mcycle();
-  dropout_vec(N, I, SCALE, SEL, o);
+  csr_write_mcountinhibit(0);
+  dropout_gold(N, I, SCALE, SEL, o_gold);
+  csr_write_mcountinhibit(-1);
   cycles_end = csr_read_mcycle();
-  // Performance metrics
-  int64_t runtime = cycles_end - cycles_start;
+  read_hpms(hpm_1_s);
+
+  runtime = cycles_end - cycles_start;
+  printf("\n[SCALAR] The execution took %d cycles.\n\n", (int)runtime);
+
+// ********************************
+//       !!!    VECTOR    !!!
+// ********************************
+  read_hpms(hpm_0_v);
+  cycles_start = csr_read_mcycle();
+  csr_write_mcountinhibit(0);
+  dropout_vec(N, I, SCALE, SEL, o);
+  csr_write_mcountinhibit(-1);
+  cycles_end = csr_read_mcycle();
+  read_hpms(hpm_1_v);
+
+  runtime = cycles_end - cycles_start;
+  printf("[VECTOR] The execution took %d cycles.\n\n", (int)runtime);
 
   // Only count effective SPOP/cycle
   //int performance = N / runtime;
-  printf("[VECTOR] The execution took %d cycles.\n\n", (int)runtime);
   //printf("Max performance - %d\n", (int)runtime);
   //printf("Performance.    - %d\n", performance);
 /*
@@ -108,12 +137,6 @@ int main() {
          performance, max_perf, 100 * performance / max_perf, utilization);
 */
 
-  cycles_start = csr_read_mcycle();
-  dropout_gold(N, I, SCALE, SEL, o_gold);
-  cycles_end = csr_read_mcycle();
-  runtime = cycles_end - cycles_start;
-  printf("\n[SCALAR] The execution took %d cycles.\n\n", (int)runtime);
-
   // Verify correctness
   for (unsigned int k = 0; k < N; ++k) {
     if (o[k] != o_gold[k]) {
@@ -122,6 +145,12 @@ int main() {
     }
   }
   printf("Passed.\n\n");
+
+  printf("SCALAR:\n");
+  evaluate_hpms(hpm_0_s, hpm_1_s);
+
+  printf("VECTOR:\n");
+  evaluate_hpms(hpm_0_v, hpm_1_v);
 
   return 0;
 }

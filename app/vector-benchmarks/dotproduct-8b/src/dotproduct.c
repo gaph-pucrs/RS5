@@ -19,6 +19,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <riscv-csr.h>
+#include <riscv-csr-hpm.h>
 
 #include "data.h"
 
@@ -27,6 +28,11 @@
 
 // Check the vector results against golden vectors
 #define CHECK 1
+
+uint32_t hpm_0_s[32];
+uint32_t hpm_1_s[32];
+uint32_t hpm_0_v[32];
+uint32_t hpm_1_v[32];
 
 int8_t dotp_v8b(int8_t *a, int8_t *b, uint32_t avl) {
   size_t orig_avl = avl;
@@ -108,6 +114,7 @@ int8_t res8_v, res8_s;
 extern const unsigned int N;
 
 int main() {
+  csr_write_mcountinhibit(-1);
   printf("\n");
   printf("======================================\n");
   printf("=                  DOTP              =\n");
@@ -123,19 +130,35 @@ int main() {
   printf("=   8b   =\n");
   printf("==========\n");
   printf("Calulating 8b dotp with vectors with length = %u\n\n", N);
+
+// ********************************
+//       !!!    VECTOR    !!!
+// ********************************
+  read_hpms(hpm_0_v);
   cycles_start = csr_read_mcycle();
+  csr_write_mcountinhibit(0);
   res8_v = dotp_v8b(v8a, v8b, N);
+  csr_write_mcountinhibit(-1);
   cycles_end = csr_read_mcycle();
+  read_hpms(hpm_1_v);
   cycles_v8 = cycles_end - cycles_start;
 
   printf("[VECTOR] The execution took %d cycles.\n\n", (int)cycles_v8);
   //printf("VECTOR 8b - AVL = %u, cycles = %d\n", N, (int)cycles_v8);
 
+// ********************************
+//       !!!    SCALAR    !!!
+// ********************************
   if (SCALAR) {
+    read_hpms(hpm_0_s);
     cycles_start = csr_read_mcycle();
+    csr_write_mcountinhibit(0);
     res8_s = dotp_s8b(v8a, v8b, N);
+    csr_write_mcountinhibit(-1);
     cycles_end = csr_read_mcycle();
+    read_hpms(hpm_1_s);
     cycles_s8 = cycles_end - cycles_start;
+
     //printf("SCALAR 8b - AVL = %u, cycles = %d\n", N, (int)cycles_s8);
     printf("[SCALAR] The execution took %d cycles.\n\n", (int)cycles_s8);
 
@@ -148,6 +171,12 @@ int main() {
   }
 
   printf("\nSUCCESS.\n\n");
+
+  printf("SCALAR:\n");
+  evaluate_hpms(hpm_0_s, hpm_1_s);
+
+  printf("VECTOR:\n");
+  evaluate_hpms(hpm_0_v, hpm_1_v);
 
   return 0;
 }

@@ -76,6 +76,7 @@ WITH ACCESS OR USE OF THE SOFTWARE.
 #include <stdint.h>
 #include <stdio.h>
 #include <riscv-csr.h>
+#include <riscv-csr-hpm.h>
 
 #include "data.h"
 
@@ -83,6 +84,11 @@ WITH ACCESS OR USE OF THE SOFTWARE.
 
 // DOUBLE_BUFFERING WITH PROBLEMS -- 09/08/25
 //#define DOUBLE_BUFFERING
+
+uint32_t hpm_0_s[32];
+uint32_t hpm_1_s[32];
+uint32_t hpm_0_v[32];
+uint32_t hpm_1_v[32];
 
 void j2d_s(uint32_t r, uint32_t c, DATA_TYPE *A, DATA_TYPE *B,
            uint32_t tsteps) {
@@ -275,6 +281,7 @@ uint64_t cycles_start;
 uint64_t cycles_end;
 
 int main() {
+  csr_write_mcountinhibit(-1);
   printf("\n");
   printf("==============\n");
   printf("=  JACOBI2D  =\n");
@@ -300,26 +307,39 @@ int main() {
            (uint32_t)(B_fixed_v + 1));
   }
 
+// ********************************
+//       !!!    SCALAR    !!!
+// ********************************
   // Measure scalar kernel execution
   printf("Processing the scalar benchmark\n");
+  read_hpms(hpm_0_s);
   cycles_start = csr_read_mcycle();
+  csr_write_mcountinhibit(0);
   j2d_s(R, C, A_fixed_s, B_fixed_s, TSTEPS);
+  csr_write_mcountinhibit(-1);
   cycles_end = csr_read_mcycle();
+  read_hpms(hpm_1_s);
   //printf("Scalar jacobi2d cycle count: %d\n\n", (int)(cycles_end - cycles_start));
   printf("[SCALAR] The execution took %d cycles.\n\n", (int)(cycles_end - cycles_start));
 
+// ********************************
+//       !!!    VECTOR    !!!
+// ********************************
   // Measure vector kernel execution
   printf("Processing the vector benchmark\n");
+  read_hpms(hpm_0_v);
   cycles_start = csr_read_mcycle();
+  csr_write_mcountinhibit(0);
   j2d_v(R, C, A_fixed_v, B_fixed_v, TSTEPS);
+  csr_write_mcountinhibit(-1);
   cycles_end = csr_read_mcycle();
-  int runtime = (int)(cycles_end - cycles_start);
+  read_hpms(hpm_1_v);
   // 2* since we have 2 jacobi kernels, one on A_fixed_v, one on B_fixed_v
   // TSTEPS*5*N*N is the number of DPFLOP to compute
   //float performance = (2.0 * TSTEPS * 5.0 * (R - 1) * (C - 1) / runtime);
   //float utilization = 100.0 * performance / NR_LANES;
   //printf("Vector jacobi2d cycle count: %d\n", runtime);
-  printf("[VECTOR] The execution took %d cycles.\n\n", runtime);
+  printf("[VECTOR] The execution took %d cycles.\n\n", (int)(cycles_end - cycles_start));
 
   //printf("The performance is %f DPFLOP/cycle (%f%% utilization).\n",
   //       performance, utilization);
@@ -346,6 +366,12 @@ int main() {
       }
   if (!error)
     printf("Passed.\n\n");
+
+  printf("SCALAR:\n");
+  evaluate_hpms(hpm_0_s, hpm_1_s);
+
+  printf("VECTOR:\n");
+  evaluate_hpms(hpm_0_v, hpm_1_v);
 
   return error;
 }

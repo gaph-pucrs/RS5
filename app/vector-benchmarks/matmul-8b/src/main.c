@@ -21,6 +21,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <riscv-csr.h>
+#include <riscv-csr-hpm.h>
 #include "data.h"
 
 #define MIN(a, b) ((a) <= (b) ? (a) : (b))
@@ -29,6 +30,11 @@ typedef int8_t _DTYPE;
 #define _KERNEL bp_imatmul
 #define _VERIFY bp_imatmul_verify
 #include "bp-imatmul.h"
+
+uint32_t hpm_0_s[32];
+uint32_t hpm_1_s[32];
+uint32_t hpm_0_v[32];
+uint32_t hpm_1_v[32];
 
 void matmul(_DTYPE *C, _DTYPE *A, _DTYPE *B,
             size_t m, size_t n, size_t p) {
@@ -58,6 +64,7 @@ uint64_t cycles_start;
 uint64_t cycles_end;
 
 int main() {
+  csr_write_mcountinhibit(-1);
   printf("\n");
   printf("============\n");
   printf("=  MATMUL  =\n");
@@ -78,23 +85,38 @@ int main() {
   //do {
   //  _KERNEL(c, a, b, M, N, P);
   //} while (--loop_cont != 0);
+  int runtime;
 
+// ********************************
+//       !!!    VECTOR    !!!
+// ********************************
+  read_hpms(hpm_0_v);
   cycles_start = csr_read_mcycle();
+  csr_write_mcountinhibit(0);
   _KERNEL(c, a, b, M, N, P);
+  csr_write_mcountinhibit(-1);
   cycles_end = csr_read_mcycle();
+  read_hpms(hpm_1_v);
 
   // Metrics
-  int runtime = (int)(cycles_end - cycles_start);
-  //float performance = 2.0 * M * N * P / runtime;
-  //float utilization = 100 * performance / (2.0 * NR_LANES * DTYPE_FACTOR);
-
+  runtime = (int)(cycles_end - cycles_start);
   printf("[VECTOR] The execution took %d cycles.\n\n", runtime);
+
+  //float utilization = 100 * performance / (2.0 * NR_LANES * DTYPE_FACTOR);
+  //float performance = 2.0 * M * N * P / runtime;
   //printf("The performance is %f FLOP/cycle (%f%% utilization).\n", performance,
   //       utilization);
 
+// ********************************
+//       !!!    SCALAR    !!!
+// ********************************
+  read_hpms(hpm_0_s);
   cycles_start = csr_read_mcycle();
+  csr_write_mcountinhibit(0);
   matmul(g, a, b, M, N, P);
+  csr_write_mcountinhibit(-1);
   cycles_end = csr_read_mcycle();
+  read_hpms(hpm_1_s);
 
   runtime = (int)(cycles_end - cycles_start);
   printf("[SCALAR] The execution took %d cycles.\n\n", runtime);
@@ -111,6 +133,12 @@ int main() {
   } else {
     printf("Passed.\n\n");
   }
+
+  printf("SCALAR:\n");
+  evaluate_hpms(hpm_0_s, hpm_1_s);
+
+  printf("VECTOR:\n");
+  evaluate_hpms(hpm_0_v, hpm_1_v);
 
   return 0;
 }

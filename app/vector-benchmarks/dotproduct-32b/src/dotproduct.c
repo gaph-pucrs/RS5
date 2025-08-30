@@ -19,6 +19,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <riscv-csr.h>
+#include <riscv-csr-hpm.h>
 
 #include "data.h"
 
@@ -27,6 +28,11 @@
 
 // Check the vector results against golden vectors
 #define CHECK 1
+
+uint32_t hpm_0_s[32];
+uint32_t hpm_1_s[32];
+uint32_t hpm_0_v[32];
+uint32_t hpm_1_v[32];
 
 int32_t dotp_v32b(int32_t *a, int32_t *b, uint32_t avl) {
   size_t orig_avl = avl;
@@ -110,6 +116,7 @@ int32_t res32_v, res32_s;
 extern const unsigned int N;
 
 int main() {
+  csr_write_mcountinhibit(-1);
   printf("\n");
   printf("======================================\n");
   printf("=                  DOTP              =\n");
@@ -125,18 +132,33 @@ int main() {
   printf("=  32b   =\n");
   printf("==========\n");
   printf("Calulating 32b dotp with vectors with length = %u\n\n", N);
+
+// ********************************
+//       !!!    VECTOR    !!!
+// ********************************
+  read_hpms(hpm_0_v);
   cycles_start = csr_read_mcycle();
+  csr_write_mcountinhibit(0);
   res32_v = dotp_v32b(v32a, v32b, N);
+  csr_write_mcountinhibit(-1);
   cycles_end = csr_read_mcycle();
+  read_hpms(hpm_1_v);
   cycles_v32 = cycles_end - cycles_start;
 
   printf("[VECTOR] The execution took %d cycles.\n\n", (int)cycles_v32);
   //printf("VECTOR 32b - AVL = %u, cycles = %d\n", N, (int)cycles_v32);
 
+// ********************************
+//       !!!    SCALAR    !!!
+// ********************************
   if (SCALAR) {
+    read_hpms(hpm_0_s);
     cycles_start = csr_read_mcycle();
+    csr_write_mcountinhibit(0);
     res32_s = dotp_s32b(v32a, v32b, N);
+    csr_write_mcountinhibit(-1);
     cycles_end = csr_read_mcycle();
+    read_hpms(hpm_1_s);
     cycles_s32 = cycles_end - cycles_start;
     //printf("SCALAR 32b - AVL = %u, cycles = %d\n", N, (int)cycles_s32);
     printf("[SCALAR] The execution took %d cycles.\n\n", (int)cycles_s32);
@@ -150,6 +172,12 @@ int main() {
   }
 
   printf("\nSUCCESS.\n\n");
+
+  printf("SCALAR:\n");
+  evaluate_hpms(hpm_0_s, hpm_1_s);
+
+  printf("VECTOR:\n");
+  evaluate_hpms(hpm_0_v, hpm_1_v);
 
   return 0;
 }

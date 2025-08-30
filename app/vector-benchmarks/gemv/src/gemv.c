@@ -19,6 +19,12 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <riscv-csr.h>
+#include <riscv-csr-hpm.h>
+
+uint32_t hpm_0_s[32];
+uint32_t hpm_1_s[32];
+uint32_t hpm_0_v[32];
+uint32_t hpm_1_v[32];
 
 void init_gemv_data(const unsigned long int m_row,
                     const unsigned long int VECTOR_LENGTH, int *matrix,
@@ -266,12 +272,15 @@ uint64_t cycles_start;
 uint64_t cycles_end;
 
 int main() {
+  csr_write_mcountinhibit(-1);
   printf("\n");
   printf("==========\n");
   printf("=  GEMV  =\n");
   printf("==========\n");
   printf("\n");
   printf("\n");
+
+  int64_t runtime;
 
   #ifdef MAX_ONLY
     int init_value = VECTOR_LENGTH;
@@ -292,24 +301,40 @@ int main() {
 
     // Start GEMV calculating
     printf("calculating...\n\n");
+
+// ********************************
+//       !!!    SCALAR    !!!
+// ********************************
+    read_hpms(hpm_0_s);
     cycles_start = csr_read_mcycle();
-    gemv_rowwise(size, size, GEMV_MATRIX, GEMV_VECTOR, GEMV_RES_V);
+    csr_write_mcountinhibit(0);
+    gemv_gold(size, size, GEMV_MATRIX, GEMV_VECTOR, GEMV_RES_S);
+    csr_write_mcountinhibit(-1);
     cycles_end = csr_read_mcycle();
+    read_hpms(hpm_1_s);
+
+    runtime = cycles_end - cycles_start;
+    printf("[SCALAR] The execution took %d cycles.\n\n", (int)runtime);
+
+// ********************************
+//       !!!    VECTOR    !!!
+// ********************************
+    read_hpms(hpm_0_v);
+    cycles_start = csr_read_mcycle();
+    csr_write_mcountinhibit(0);
+    gemv_rowwise(size, size, GEMV_MATRIX, GEMV_VECTOR, GEMV_RES_V);
+    csr_write_mcountinhibit(-1);
+    cycles_end = csr_read_mcycle();
+    read_hpms(hpm_1_v);
 
     // Metrics
-    int64_t runtime = cycles_end - cycles_start;
+    runtime = cycles_end - cycles_start;
     // float performance = 2.0 * size * size / runtime;
     // float utilization = 100 * performance / (2.0 * NR_LANES);
 
     printf("[VECTOR] The execution took %d cycles.\n\n", (int)runtime);
     //printf("The performance is %f FLOP/cycle (%f%% utilization) at %d lanes.\n",
     //       performance, utilization, NR_LANES);
-
-    cycles_start = csr_read_mcycle();
-    gemv_gold(size, size, GEMV_MATRIX, GEMV_VECTOR, GEMV_RES_S);
-    cycles_end = csr_read_mcycle();
-    runtime = cycles_end - cycles_start;
-    printf("[SCALAR] The execution took %d cycles.\n\n", (int)runtime);
 
     // Verify the result
     if (VERIFY) {
@@ -322,6 +347,13 @@ int main() {
     }
   }
 
-  printf("Done!\n");
+  printf("Done!\n\n");
+
+  printf("SCALAR:\n");
+  evaluate_hpms(hpm_0_s, hpm_1_s);
+
+  printf("VECTOR:\n");
+  evaluate_hpms(hpm_0_v, hpm_1_v);
+
   return 0;
 }

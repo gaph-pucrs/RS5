@@ -21,6 +21,7 @@
 #include <string.h>
 #include "data.h"
 #include <riscv-csr.h>
+#include <riscv-csr-hpm.h>
 
 int NR_LANES = 1;
 
@@ -32,6 +33,11 @@ typedef int8_t _DTYPE;
 // Define Matrix dimensions:
 // o = i ° f, with i=[(M+F-1)x(N+f-1)xCH], f=[FxFxCH], o=[MxN]
 // The filter is a square matrix, and F is odd
+
+uint32_t hpm_0_s[32];
+uint32_t hpm_1_s[32];
+uint32_t hpm_0_v[32];
+uint32_t hpm_1_v[32];
 
 // Matrices defined in data.S
 extern _DTYPE i[] __attribute__((aligned(4))); // [ (M+floor(F/2)) * (N+floor(F/2)) * CH ]
@@ -46,6 +52,7 @@ extern int32_t CH;
 extern int32_t F;
 
 int main() {
+  csr_write_mcountinhibit(-1);
   printf("\n");
   printf("============\n");
   printf("=  CONV3D  =\n");
@@ -63,10 +70,31 @@ int main() {
   uint64_t cycles_end;
   int runtime;
 
-  // Call the main kernel, and measure cycles
+// ********************************
+//       !!!    SCALAR    !!!
+// ********************************
+  read_hpms(hpm_0_s);
   cycles_start = csr_read_mcycle();
-  _KERNEL(o, i, f, M, N, CH, F);
+  csr_write_mcountinhibit(0);
+  convolve2D(o_g, i, f, (int)(M + F - 1), (int)(N + F - 1), CH, F);
+  csr_write_mcountinhibit(-1);
   cycles_end = csr_read_mcycle();
+  read_hpms(hpm_1_s);
+
+  runtime = (int)(cycles_end - cycles_start);
+  printf("[SCALAR] The execution took %d cycles.\n\n", runtime);
+
+// ********************************
+//       !!!    VECTOR    !!!
+// ********************************
+  // Call the main kernel, and measure cycles
+  read_hpms(hpm_0_v);
+  cycles_start = csr_read_mcycle();
+  csr_write_mcountinhibit(0);
+  _KERNEL(o, i, f, M, N, CH, F);
+  csr_write_mcountinhibit(-1);
+  cycles_end = csr_read_mcycle();
+  read_hpms(hpm_1_v);
 
   // Performance metrics
   runtime = (int)(cycles_end - cycles_start);
@@ -77,13 +105,6 @@ int main() {
   //printf("The performance is %f %s-OP/cycle (%f%% utilization).\n", performance,
   //       DTYPE_PREFIX, utilization);
 
-  cycles_start = csr_read_mcycle();
-  convolve2D(o_g, i, f, (int)(M + F - 1), (int)(N + F - 1), CH, F);
-  cycles_end = csr_read_mcycle();
-
-  runtime = (int)(cycles_end - cycles_start);
-  printf("[SCALAR] The execution took %d cycles.\n\n", runtime);
-
   // Verify correctness
   printf("Verifying result...\n");
   int error = _VERIFY(o, golden_o, M, N, THRESHOLD);
@@ -93,6 +114,12 @@ int main() {
   } else {
     printf("Passed.\n\n");
   }
+
+  printf("SCALAR:\n");
+  evaluate_hpms(hpm_0_s, hpm_1_s);
+
+  printf("VECTOR:\n");
+  evaluate_hpms(hpm_0_v, hpm_1_v);
 
   return error;
 }
