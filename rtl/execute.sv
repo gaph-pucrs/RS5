@@ -235,19 +235,6 @@ module execute
     logic mem_read_enable_vector_inst;
     assign mem_read_enable_vector_inst = mem_read_enable_vector && (instruction_operation_i inside {VLOAD, VSTORE});
 
-    assign mem_read_enable_o  = (mem_read_enable || atomic_mem_read_enable || mem_read_enable_vector_inst);
-    assign mem_write_enable_o = (mem_write_enable | {4{atomic_mem_write_enable}} | mem_write_enable_vector);
-
-    always_comb begin
-        unique case (instruction_operation_i)
-            VLOAD,
-            VSTORE:  mem_write_data_o = VEnable ? mem_write_data_vector : mem_write_data;
-            AMO_W:   mem_write_data_o = (AMOEXT inside {AMO_ZAAMO, AMO_A}) ? amo_operand : mem_write_data;
-            default: mem_write_data_o = mem_write_data;
-        endcase
-    end
-
-    assign mem_address_o   = mem_address;
     assign mem_read_enable = instruction_operation_i inside {LB, LBU, LH, LHU, LW, LR_W};
 
     always_comb begin
@@ -261,11 +248,32 @@ module execute
     always_comb begin
         mem_write_enable = '0;
         unique case (instruction_operation_i)
-            SB: mem_write_enable[sum_result[1:0]]      = 1'b1;
-            SH: mem_write_enable[sum_result[1:0]+1-:2] = 2'b11;
-            SW: mem_write_enable                       = 4'b1111;
-            default: mem_write_enable                  = '0;
+            SB:      mem_write_enable[sum_result[1:0]]      = 1'b1;
+            SH:      mem_write_enable[sum_result[1:0]+1-:2] = 2'b11;
+            SW:      mem_write_enable                       = 4'b1111;
+            default: mem_write_enable                       = '0;
         endcase
+    end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            mem_address_o       <= '0;
+            mem_read_enable_o   <= '0;
+            mem_write_enable_o  <= '0;
+            mem_write_data_o    <= '0;
+        end
+        else if (!stall) begin
+            mem_address_o       <= mem_address;
+            mem_read_enable_o   <= (mem_read_enable || atomic_mem_read_enable || mem_read_enable_vector_inst);
+            mem_write_enable_o  <= (mem_write_enable | {4{atomic_mem_write_enable}} | mem_write_enable_vector);
+
+            unique case (instruction_operation_i)
+                VLOAD,
+                VSTORE:  mem_write_data_o <= VEnable ? mem_write_data_vector : mem_write_data;
+                AMO_W:   mem_write_data_o <= (AMOEXT inside {AMO_ZAAMO, AMO_A}) ? amo_operand : mem_write_data;
+                default: mem_write_data_o <= mem_write_data;
+            endcase
+        end
     end
 
 //////////////////////////////////////////////////////////////////////////////

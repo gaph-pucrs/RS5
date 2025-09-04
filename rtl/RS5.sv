@@ -127,6 +127,15 @@ module RS5
     logic           instruction_compressed_execute;
     logic   [31:0]  vtype, vlen;
 
+//////////////////////////////////////////////////////////////////////////////
+// Mem Access Signals
+//////////////////////////////////////////////////////////////////////////////
+
+    iType_e         instruction_operation_mem_access;
+    logic   [31:0]  result_mem_access;
+    logic    [4:0]  rd_mem_access;
+    logic           write_enable_mem_access;
+
 
 //////////////////////////////////////////////////////////////////////////////
 // Retire signals
@@ -206,7 +215,7 @@ module RS5
         .bp_rollback_o        (bp_rollback        ),
         .jump_misaligned_o    (jump_misaligned    ),
         .compressed_o         (compressed_decode  ),
-        .instruction_address_o(instruction_address), 
+        .instruction_address_o(instruction_address),
         .instruction_data_i   (instruction_i      ),
         .instruction_o        (instruction_decode ),
         .pc_o                 (pc_decode          )
@@ -256,9 +265,12 @@ module RS5
         .pc_i                       (pc_decode),
         .rs1_data_read_i            (regbank_data1),
         .rs2_data_read_i            (regbank_data2),
+        .rd_mem_access_i            (rd_mem_access),
         .rd_retire_i                (rd_retire),
+        .mem_access_result_i        (result_mem_access),
         .writeback_i                (regbank_data_writeback),
         .result_i                   (result_exec),
+        .mem_access_we_i            (write_enable_mem_access),
         .regbank_we_i               (regbank_write_enable),
         .execute_we_i               (write_enable_exec),
         .rs1_o                      (rs1),
@@ -371,12 +383,12 @@ module RS5
         .exc_inst_access_fault_i (exc_inst_access_fault_execute),
         .exc_load_access_fault_i (mmu_data_fault),
         .hold_o                  (hold),
-        .write_enable_o          (regbank_write_enable),
+        .write_enable_o          (write_enable_mem_access),
         .write_enable_fwd_o      (write_enable_exec),
-        .instruction_operation_o (instruction_operation_retire),
-        .result_o                (result_retire),
+        .instruction_operation_o (instruction_operation_mem_access),
+        .result_o                (result_mem_access),
         .result_fwd_o            (result_exec),
-        .rd_o                    (rd_retire),
+        .rd_o                    (rd_mem_access),
         .mem_address_o           (mem_address),
         .mem_read_enable_o       (mem_read_enable),
         .mem_write_enable_o      (mem_write_enable),
@@ -407,6 +419,25 @@ module RS5
         .raise_exception_o       (RAISE_EXCEPTION),
         .exception_code_o        (Exception_Code)
     );
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////// MEMORY ACCESS ///////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            instruction_operation_retire <= NOP;
+            regbank_write_enable <= '0;
+            result_retire        <= '0;
+            rd_retire            <= '0;
+        end
+        else if (!stall) begin
+            instruction_operation_retire <= instruction_operation_mem_access;
+            regbank_write_enable <= write_enable_mem_access;
+            result_retire        <= result_mem_access;
+            rd_retire            <= rd_mem_access;
+        end
+    end
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// RETIRE //////////////////////////////////////////////////////////////////////////////////
