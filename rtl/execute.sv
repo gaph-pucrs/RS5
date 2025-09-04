@@ -160,23 +160,24 @@ module execute
 
     // Can be assigned by atomic instructions or rs1_data_i
     logic [31:0] first_operand;
+    logic [31:0] equal_opA;
+    logic [31:0] equal_opB;
 
-    /* "Unmuxable" operators */
-    assign equal                   = rs1_data_i == second_operand_i;
+    /* Unmuxed operators */
     assign less_than_unsigned      = rs1_data_i <  second_operand_i;
     assign greater_equal_unsigned  = rs1_data_i >= second_operand_i;
     assign less_than               = $signed(rs1_data_i) <  $signed(second_operand_i);
     assign greater_equal           = $signed(rs1_data_i) >= $signed(second_operand_i);
-
     assign sll_result              = rs1_data_i << second_operand_i[4:0];
     assign srl_result              = rs1_data_i >> second_operand_i[4:0];
     assign sra_result              = $signed(rs1_data_i) >>> second_operand_i[4:0];
 
-    /* "Muxable" operators */
+    /* Muxed operators */
     assign sum_result              = first_operand + sum2_opB;
     assign and_result              = first_operand & second_operand_i;
     assign or_result               = first_operand | second_operand_i;
     assign xor_result              = first_operand ^ second_operand_i;
+    assign equal                   = equal_opA == equal_opB;
 
 //////////////////////////////////////////////////////////////////////////////
 // Load/Store signals
@@ -518,10 +519,14 @@ module execute
             logic lrsc_enable;
             assign lrsc_enable = (instruction_operation_i == SC_W);
 
+            logic [31:0] cmp_opA;
+            logic [31:0] cmp_opB;
+
             lrsc lrsc_m (
                 .clk               (clk                  ),
                 .reset_n           (reset_n              ),
                 .stall             (stall                ),
+                .equal_i           (equal                ),
                 .enable_i          (lrsc_enable          ),
                 .rs1_data_i        (rs1_data_i           ),
                 .data_i            (mem_read_data_i      ),
@@ -531,8 +536,13 @@ module execute
                 .write_enable_o    (lrsc_write_enable    ),
                 .mem_read_enable_o (lrsc_mem_read_enable ),
                 .mem_write_enable_o(lrsc_mem_write_enable),
-                .result_o          (lrsc_result          )
+                .result_o          (lrsc_result          ),
+                .cmp_opA_o         (cmp_opA              ),
+                .cmp_opB_o         (cmp_opB              )
             );
+
+            assign equal_opA = lrsc_enable ? cmp_opA : rs1_data_i;
+            assign equal_opB = lrsc_enable ? cmp_opB : second_operand_i;
         end
         else begin : gen_zalrsc_off
             assign lrsc_result           = 1'b0;
@@ -540,6 +550,8 @@ module execute
             assign lrsc_mem_read_enable  = 1'b0;
             assign lrsc_mem_write_enable = 1'b0;
             assign lrsc_write_enable     = 1'b0;
+            assign equal_opA             = rs1_data_i;
+            assign equal_opB             = second_operand_i;
         end
 
         logic amo_write_enable;
