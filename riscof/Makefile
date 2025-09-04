@@ -37,6 +37,6 @@ $(WORK_DIR)/extensions_work/report.html:
 
 clean:
 	@echo "Cleaning..."
-	@rm -rf $(WORK_DIR) riscv-arch-test
+	@rm -rf $(WORK_DIR)/baseline_work $(WORK_DIR)/extensions_work riscv-arch-test
 
 .PHONY: all default baseline extensions arch-test-update clean
