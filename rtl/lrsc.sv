@@ -32,11 +32,12 @@ module lrsc
     output logic        result_o
 );
 
-    typedef enum logic [3:0] {
-        LOAD     = 4'b0001,
-        CMP_ADDR = 4'b0010,
-        CMP_DATA = 4'b0100,
-        STORE    = 4'b1000
+    typedef enum logic [4:0] {
+        LOAD     = 5'b00001,
+        CMP_ADDR = 5'b00010,
+        REGISTER = 5'b00100,
+        CMP_DATA = 5'b01000,
+        STORE    = 5'b10000
     } state_t;
 
     state_t current_state;
@@ -47,7 +48,8 @@ module lrsc
     always_comb begin
         unique case (current_state)
             LOAD:     next_state = enable_i ? CMP_ADDR : LOAD;
-            CMP_ADDR: next_state = equal    ? CMP_DATA : STORE;
+            CMP_ADDR: next_state = equal    ? REGISTER : STORE;
+            REGISTER: next_state = CMP_DATA;
             CMP_DATA: next_state = STORE;
             default:  next_state = LOAD;    /* STORE */
         endcase
@@ -68,7 +70,7 @@ module lrsc
         else if (!stall) begin
             unique case (current_state)
                 LOAD:     cmp_opA <= rs1_data_i;
-                CMP_ADDR: cmp_opA <= data_i;
+                REGISTER: cmp_opA <= data_i;
                 default: ;
             endcase
         end
@@ -82,7 +84,7 @@ module lrsc
         else if (!stall) begin
             unique case (current_state)
                 LOAD:     cmp_opB <= reservation_addr_i;
-                CMP_ADDR: cmp_opB <= reservation_data_i;
+                REGISTER: cmp_opB <= reservation_data_i;
                 default: ;
             endcase
         end
