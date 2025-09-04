@@ -137,7 +137,6 @@ module execute
 //////////////////////////////////////////////////////////////////////////////
 
     logic [31:0]    sum_result;
-    logic [31:0]    sum2_result;
     logic [31:0]    and_result;
     logic [31:0]    or_result;
     logic [31:0]    xor_result;
@@ -163,7 +162,6 @@ module execute
     logic [31:0] first_operand;
 
     /* "Unmuxable" operators */
-    assign sum_result              = rs1_data_i +  second_operand_i;
     assign equal                   = rs1_data_i == second_operand_i;
     assign less_than_unsigned      = rs1_data_i <  second_operand_i;
     assign greater_equal_unsigned  = rs1_data_i >= second_operand_i;
@@ -175,7 +173,7 @@ module execute
     assign sra_result              = $signed(rs1_data_i) >>> second_operand_i[4:0];
 
     /* "Muxable" operators */
-    assign sum2_result             = first_operand + sum2_opB;
+    assign sum_result              = first_operand + sum2_opB;
     assign and_result              = first_operand & second_operand_i;
     assign or_result               = first_operand | second_operand_i;
     assign xor_result              = first_operand ^ second_operand_i;
@@ -562,7 +560,7 @@ module execute
             logic [31:0] amo_result;
             always_comb begin
                 unique case (atomic_operation_i)
-                    AMOADD:  amo_result = sum2_result;
+                    AMOADD:  amo_result = sum_result;
                     AMOAND:  amo_result = and_result;
                     AMOXOR:  amo_result = xor_result;
                     AMOOR:   amo_result = or_result;
@@ -641,7 +639,6 @@ module execute
         unique case (instruction_operation_i)
             CSRRW, CSRRS, CSRRC,
             CSRRWI,CSRRSI,CSRRCI:   result = csr_data_read_i;
-            SUB:                    result = sum2_result;
             JAL,JALR:               result = pc_next_i;
             SLT:                    result = {31'b0, less_than};
             SLTU:                   result = {31'b0, less_than_unsigned};
