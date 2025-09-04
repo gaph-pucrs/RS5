@@ -82,7 +82,6 @@ void _fc (
     
     // int handler
     for (int n=0; n<NEURONS; n++) {
-        // out[n] /= (MULTIPLIER);
         out[n] >>= 13;
     }
 
@@ -186,19 +185,63 @@ void batch_normalization (
     const type mean[],
     const type deviation[]
 ) {
-    for (int i=0; i<HEIGHT; i++) 
-    {
-        for (int j=0; j<WIDTH; j++) 
-        {
-            for (int n=0; n<CHANNELS; n++) 
-            {
-                int id = (n) + (j*CHANNELS) + (i*CHANNELS*WIDTH);
+    // for (int i=0; i<CHANNELS*HEIGHT*WIDTH; i++)
+    // {
+    //     printf("%x\n", in[i]);
+    // }
+
+    // for (int i=0; i<HEIGHT; i++) 
+    // {
+    //     for (int j=0; j<WIDTH; j++) 
+    //     {
+    //         for (int n=0; n<CHANNELS; n++) 
+    //         {
+    //             int id = (n) + (j*CHANNELS) + (i*CHANNELS*WIDTH);
                 
-                in[id] -= mean[n];
-                in[id] /= deviation[n];
-                in[id] *= gamma[n];
-                in[id] += beta[n];
-            }
+    //             in[id] -= mean[n];
+    //             in[id] /= deviation[n];
+    //             in[id] *= gamma[n];
+    //             in[id] += beta[n];
+    //         }
+    //     }
+    // }
+
+    size_t vl;
+    int total;
+    int ch_cnt;
+    int *in_addr = (int *) in;
+    int *gamma_addr;
+    int *beta_addr;
+    int *mean_addr;
+    int *deviation_addr;
+
+    for (total = HEIGHT*WIDTH*CHANNELS; total > 0; total -= CHANNELS)
+    {
+        mean_addr = (int *) mean;
+        deviation_addr = (int *) deviation;
+        gamma_addr = (int *) gamma;
+        beta_addr = (int *) beta;
+
+        for (ch_cnt = CHANNELS; ch_cnt > 0; ch_cnt -= vl)
+        {
+            __asm__ volatile("vsetvli %0, %1, e32, m8, ta, ma" : "=r"(vl) : "r"(ch_cnt));
+            __asm__ volatile("vle32.v v24, (%0)" ::"r"(in_addr));
+            __asm__ volatile("vle32.v v16, (%0)" ::"r"(mean_addr));
+            __asm__ volatile("vsub.vv v24, v24, v16");
+            mean_addr += vl;
+            __asm__ volatile("vle32.v v16, (%0)" ::"r"(deviation_addr));
+            __asm__ volatile("vdiv.vv v24, v24, v16");
+            deviation_addr += vl;
+            __asm__ volatile("vle32.v v16, (%0)" ::"r"(gamma_addr));
+            __asm__ volatile("vmul.vv v24, v24, v16");
+            gamma_addr += vl;
+            __asm__ volatile("vle32.v v16, (%0)" ::"r"(beta_addr));
+            __asm__ volatile("vadd.vv v24, v24, v16");
+            beta_addr += vl;
+            __asm__ volatile("vmslt.vi v0, v24, 0"); // ReLU
+            __asm__ volatile("vmerge.vim v24, v24, 0, v0");
+            __asm__ volatile("vse32.v v24, (%0)" ::"r"(in_addr));
+            in_addr += vl;
         }
     }
 }
@@ -296,7 +339,7 @@ void _conv_block (
         deviation
     );
 
-    relu(out, OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS);
+    // relu(out, OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS);
 
     free(in_pd);
 }
@@ -352,100 +395,51 @@ void concat4 (
     size_t vl;
     int total;
     int v0_processed_elements;
+    int v1_processed_elements;
+    int v2_processed_elements;
+    int v3_processed_elements;
 
     for (total = H*W*C; total > 0; total -= (CH0+CH1+CH2+CH3))
     {
         for (v0_processed_elements = CH0; v0_processed_elements > 0; v0_processed_elements -= vl)
         {
-            __asm__ volatile("vsetvli %0, %1, e32, m1, ta, ma" : "=r"(vl) : "r"(CH0));
+            __asm__ volatile("vsetvli %0, %1, e32, m8, ta, ma" : "=r"(vl) : "r"(v0_processed_elements));
             __asm__ volatile("vle32.v v24, (%0)" ::"r"(v0_addr));
             __asm__ volatile("vse32.v v24, (%0)" ::"r"(out_addr));
             v0_addr += vl;
             out_addr += vl;
         }
 
-        __asm__ volatile("vsetivli zero, 8, e32, m1, ta, ma");
-        __asm__ volatile("vle32.v v24, (%0)" ::"r"(v1_addr));
-        __asm__ volatile("vse32.v v24, (%0)" ::"r"(out_addr));
-        v1_addr += 8;
-        out_addr += 8;
-        __asm__ volatile("vsetivli zero, 4, e32, m1, ta, ma");
-        __asm__ volatile("vle32.v v24, (%0)" ::"r"(v1_addr));
-        __asm__ volatile("vse32.v v24, (%0)" ::"r"(out_addr));
-        v1_addr += 4;
-        out_addr += 4;
+        for (v1_processed_elements = CH1; v1_processed_elements > 0; v1_processed_elements -= vl)
+        {
+            __asm__ volatile("vsetvli %0, %1, e32, m2, ta, ma" : "=r"(vl) : "r"(v1_processed_elements));
+            __asm__ volatile("vle32.v v24, (%0)" ::"r"(v1_addr));
+            __asm__ volatile("vse32.v v24, (%0)" ::"r"(out_addr));
+            v1_addr += vl;
+            out_addr += vl;
+        }
 
-        __asm__ volatile("vsetivli zero, 6, e32, m1, ta, ma");
-        __asm__ volatile("vle32.v v24, (%0)" ::"r"(v2_addr));
-        __asm__ volatile("vse32.v v24, (%0)" ::"r"(out_addr));
-        v2_addr += 6;
-        out_addr += 6;
+        for (v2_processed_elements = CH2; v2_processed_elements > 0; v2_processed_elements -= vl)
+        {
+            __asm__ volatile("vsetvli %0, %1, e32, m1, ta, ma" : "=r"(vl) : "r"(v2_processed_elements));
+            __asm__ volatile("vle32.v v24, (%0)" ::"r"(v2_addr));
+            __asm__ volatile("vse32.v v24, (%0)" ::"r"(out_addr));
+            v2_addr += vl;
+            out_addr += vl;
+        }
 
-        __asm__ volatile("vsetivli zero, 6, e32, m1, ta, ma");
-        __asm__ volatile("vle32.v v24, (%0)" ::"r"(v3_addr));
-        __asm__ volatile("vse32.v v24, (%0)" ::"r"(out_addr));
-        v3_addr += 6;
-        out_addr += 6;
+        for (v3_processed_elements = CH3; v3_processed_elements > 0; v3_processed_elements -= vl)
+        {
+            __asm__ volatile("vsetvli %0, %1, e32, m1, ta, ma" : "=r"(vl) : "r"(v3_processed_elements));
+            __asm__ volatile("vle32.v v24, (%0)" ::"r"(v3_addr));
+            __asm__ volatile("vse32.v v24, (%0)" ::"r"(out_addr));
+            v3_addr += vl;
+            out_addr += vl;
+        }
     }
 }
 //}}}
 
-// {{{
-void print(const type v[], const int size) {
-    for (int i=0; i<size; i++) {
-        printf("%x\n", v[i]);
-    }
-}
-// }}}
-
-// // {{{
-// void read_bin_file(const char *filename, type *out, const int size)
-// {
-//     FILE *file = fopen(filename, "rb");
-//     fread(out, sizeof(type), size, file);
-//     fclose(file);
-// }
-// // }}}
-
-// void load_confusion_matrix()
-// {
-//     FILE *confusion_matrix_state = fopen("confusion_matrix_state.txt", "r");
-
-//     for (int i=0; i<STAGE_6_CLASSES; i++)
-//     {
-//         for (int j=0; j<STAGE_6_CLASSES; j++)
-//         {
-//             confusion_matrix[i][j] = 0;
-//         }
-//     }
-
-//     fclose(confusion_matrix_state);
-// }
-
-// void save_confusion_matrix()
-// {
-//     FILE *confusion_matrix_state = fopen("confusion_matrix_state.txt", "w");
-//     int correct = 0, total = 0;
-
-//     for (int i=0; i<STAGE_6_CLASSES; i++)
-//     {
-//         for (int j=0; j<STAGE_6_CLASSES; j++)
-//         {
-//             fprintf(confusion_matrix_state, "%4d ", confusion_matrix[i][j]);
-//             total += confusion_matrix[i][j];
-//         }
-
-//         fprintf(confusion_matrix_state, "\n");
-//     }
-
-//     for (int i=0; i<STAGE_6_CLASSES; i++) {
-//         correct += confusion_matrix[i][i];
-//     }
-
-//     fprintf(confusion_matrix_state, "\n%d/%d = %.2f%%\n", correct, total, (1.0*correct/total*100));
-
-//     fclose(confusion_matrix_state);
-// }
 
 int main()
 {   
@@ -489,6 +483,8 @@ int main()
         );
 
         free(image);
+
+        // return 0;
     //}}}
 
     type *y0 = calloc(MMCBlock1_mmLayer1_branch11_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH , sizeof(type));
@@ -2500,7 +2496,9 @@ int main()
         cycles_end = csr_read_mcycle();
         cycles[n_sample] = cycles_end - cycles_start;
         // printf("[!] Scalar LMFRNet: %lu cycles!\n", cycles[n_sample]);
-        printf("[!] Vectorized LMFRNet (256b): %lu cycles!\n", cycles[n_sample]);
+        // printf("[!] Vectorized LMFRNet (256b): %lu cycles!\n", cycles[n_sample]);
+        printf("[VECTOR] The execution took %ld cycles.\n", cycles[n_sample]);
+        // printf("[SCALAR] The execution took %ld cycles.\n", cycles[n_sample]);
 
         free(y0);
         free(y1);
