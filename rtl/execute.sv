@@ -623,6 +623,8 @@ module execute
         assign atomic_mem_write_enable = 1'b0;
         assign lrsc_result             = 1'b0;
         assign atomic_write_enable     = 1'b0;
+        assign equal_opA               = rs1_data_i;
+        assign equal_opB               = second_operand_i;
     end
 
 //////////////////////////////////////////////////////////////////////////////
