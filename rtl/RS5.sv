@@ -154,7 +154,7 @@ module RS5
     logic   [11:0]  csr_addr;
     logic   [31:0]  csr_data_to_write, csr_data_read;
     logic   [31:0]  mepc, mtvec;
-    logic           RAISE_EXCEPTION, MACHINE_RETURN;
+    logic           RAISE_EXCEPTION, MACHINE_RETURN, RAISE_EXCEPTION_r;
     logic           interrupt_pending;
     exceptionCode_e Exception_Code;
 
@@ -430,12 +430,14 @@ module RS5
             regbank_write_enable <= '0;
             result_retire        <= '0;
             rd_retire            <= '0;
+            RAISE_EXCEPTION_r    <= '0;
         end
         else if (!stall) begin
             instruction_operation_retire <= instruction_operation_mem_access;
             regbank_write_enable <= write_enable_mem_access;
             result_retire        <= result_mem_access;
             rd_retire            <= rd_mem_access;
+            RAISE_EXCEPTION_r    <= RAISE_EXCEPTION;
         end
     end
 
@@ -536,7 +538,7 @@ module RS5
     end
 
     always_comb begin
-        if ((mem_write_enable != '0 || mem_read_enable) && !mmu_data_fault && !RAISE_EXCEPTION)
+        if ((mem_write_enable != '0 || mem_read_enable) && !mmu_data_fault && !RAISE_EXCEPTION_r)
             mem_operation_enable_o = 1'b1;
         else
             mem_operation_enable_o = 1'b0;
