@@ -1,5 +1,14 @@
 # RS5
 
+## Tutorials (in Portuguese)
+
+[![Tutorial 1 - understanding the RS5 processor](imgs/rs5_1.png)](docs/RIS5_1.pdf){:download="docs/RIS5_1.pdf"}
+
+[![Tutorial 2 - understanding how to add a new instruction](imgs/rs5_2.png)](docs/RIS5_1.pdf){:download="docs/RIS5_2.pdf"}
+
+[![Tutorial 3 - understanding interruptions and adding a peripheral](imgs/rs5_3.png)](docs/RIS5_1.pdf){:download="docs/RIS5_3.pdf"}
+
+
 ## Description
 
 RS5 is a processor that implements the RISC-V 32 bits integer Module (RV32I) alongside the Zicsr Extension and the Machine Mode of the RISC-V Privileged Architecture. It is written in the SystemVerilog Hardware Description Language (HDL) and implements the following interface:
