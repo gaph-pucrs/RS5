@@ -1,13 +1,13 @@
 # RS5
 
 ## Tutorials (in Portuguese)
-<a href="docs/RIS5_1.pdf" download=RS5_1.pdf>
+<a href="docs/RIS5_1.pdf" download=docs/RS5_1.pdf>
     <img src="imgs/rs5_1.png" height="100"/>
 </a>
-<a href="docs/RIS5_2.pdf" download=RS5_2.pdf>
+<a href="docs/RIS5_2.pdf" download=docs/RS5_2.pdf>
     <img src="imgs/rs5_2.png" height="100"/>
 </a>
-<a href="docs/RIS5_3.pdf" download=RS5_3.pdf>
+<a href="docs/RIS5_3.pdf" download=docs/RS5_3.pdf>
     <img src="imgs/rs5_3.png" height="100"/>
 </a>
 
