@@ -447,6 +447,16 @@ module RS5
         end
     end
 
+    logic mmu_en_r;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            mmu_en_r <= 1'b0;
+        end
+        else if (!stall) begin
+            mmu_en_r <= mmu_en;
+        end
+    end
+
     /**
      * @todo
      * Move DMMU to inside exec stage, so memory address is registered before
@@ -454,7 +464,7 @@ module RS5
      */
     if (XOSVMEnable == 1'b1) begin : gen_d_mmu_on
         mmu d_mmu (
-            .en_i           (mmu_en                    ),
+            .en_i           (mmu_en_r                  ),
             .mask_i         (mvmdm                     ),
             .offset_i       (mvmdo                     ),
             .size_i         (mvmds                     ),
