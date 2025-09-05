@@ -78,6 +78,7 @@ module execute
     output  logic   [31:0]      result_fwd_o,
     output  logic   [ 4:0]      rd_o,
 
+    output  logic [31:0]        mem_address_exec_o,
     output  logic [31:0]        mem_address_o,
     output  logic               mem_read_enable_o,
     output  logic  [3:0]        mem_write_enable_o,
@@ -254,7 +255,7 @@ module execute
         endcase
     end
 
-        always_ff @(posedge clk or negedge reset_n) begin
+    always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             mem_address_o       <= '0;
             mem_read_enable_o   <= '0;
@@ -274,6 +275,8 @@ module execute
             endcase
         end
     end
+
+    assign mem_address_exec_o = mem_address;
 
 //////////////////////////////////////////////////////////////////////////////
 // CSR access signals

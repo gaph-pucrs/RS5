@@ -83,8 +83,13 @@ module RS5
 
     logic            mem_read_enable;
     logic    [3:0]   mem_write_enable;
-    logic   [31:0]   mem_address;
+    logic   [31:0]   mem_address_exec;
     logic   [31:0]   instruction_address;
+
+    /* We always mask the two lsbs */
+    /* verilator lint_off UNUSEDSIGNAL */
+    logic   [31:0]   mem_address;
+    /* verilator lint_on UNUSEDSIGNAL */
 
 //////////////////////////////////////////////////////////////////////////////
 // Fetch signals
@@ -389,6 +394,7 @@ module RS5
         .result_o                (result_mem_access),
         .result_fwd_o            (result_exec),
         .rd_o                    (rd_mem_access),
+        .mem_address_exec_o      (mem_address_exec),
         .mem_address_o           (mem_address),
         .mem_read_enable_o       (mem_read_enable),
         .mem_write_enable_o      (mem_write_enable),
@@ -441,6 +447,30 @@ module RS5
         end
     end
 
+    /**
+     * @todo
+     * Move DMMU to inside exec stage, so memory address is registered before
+     * address translation.
+     */
+    if (XOSVMEnable == 1'b1) begin : gen_d_mmu_on
+        mmu d_mmu (
+            .en_i           (mmu_en                    ),
+            .mask_i         (mvmdm                     ),
+            .offset_i       (mvmdo                     ),
+            .size_i         (mvmds                     ),
+            .address_i      ({mem_address[31:2], 2'b00}),
+            .exception_o    (mmu_data_fault            ),
+            .address_o      (mem_address_o             )
+        );
+    end
+    else begin : gen_d_mmu_off
+        assign mmu_data_fault = 1'b0;
+        assign mem_address_o  = {mem_address[31:2], 2'b00};
+    end
+
+    assign mem_operation_enable_o = (mem_write_enable != '0 || mem_read_enable) && !mmu_data_fault && !RAISE_EXCEPTION_r;
+    assign mem_write_enable_o = mem_write_enable;
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// RETIRE //////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -459,6 +489,7 @@ module RS5
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// CSRs BANK ///////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    
     CSRBank #(
     `ifndef SYNTH
         .PROFILING     (PROFILING     ),
@@ -492,7 +523,7 @@ module RS5
         .machine_return_i           (MACHINE_RETURN),
         .exception_code_i           (Exception_Code),
         .pc_i                       (pc_execute),
-        .mem_address_i              (mem_address),
+        .mem_address_exec_i         (mem_address_exec),
         .next_pc_i                  (pc_decode),
         .instruction_i              (instruction_execute),
         .instruction_compressed_i   (instruction_compressed_execute),
@@ -515,35 +546,6 @@ module RS5
         .mvmio_o                    (mvmio),
         .mvmis_o                    (mvmis),
         .mvmim_o                    (mvmim)
-    );
-
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////// MEMORY SIGNALS //////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-    if (XOSVMEnable == 1'b1) begin : gen_d_mmu_on
-        mmu d_mmu (
-            .en_i           (mmu_en                    ),
-            .mask_i         (mvmdm                     ),
-            .offset_i       (mvmdo                     ),
-            .size_i         (mvmds                     ),
-            .address_i      ({mem_address[31:2], 2'b00}),
-            .exception_o    (mmu_data_fault            ),
-            .address_o      (mem_address_o             )
-        );
-    end
-    else begin : gen_d_mmu_off
-        assign mmu_data_fault = 1'b0;
-        assign mem_address_o  = {mem_address[31:2], 2'b00};
-    end
-
-    always_comb begin
-        if ((mem_write_enable != '0 || mem_read_enable) && !mmu_data_fault && !RAISE_EXCEPTION_r)
-            mem_operation_enable_o = 1'b1;
-        else
-            mem_operation_enable_o = 1'b0;
-    end
-
-    assign mem_write_enable_o = mem_write_enable;
+    );    
 
 endmodule
