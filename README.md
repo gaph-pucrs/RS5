@@ -1,7 +1,7 @@
 # RS5
 
 ## Tutorials (in Portuguese)
-<a href="docs/RS5_1.pdf" download=docs/RS5_1.pdf>
+<a href="docs/RIS5_1.pdf" download=docs/RIS5_1.pdf>
     <img src="imgs/rs5_1.png" height="100"/>
 </a>
 <a href="docs/RS5_2.pdf" download=docs/RS5_2.pdf>
