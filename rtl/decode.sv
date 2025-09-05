@@ -508,6 +508,11 @@ module decode
     logic is_load;
     assign is_load  = (opcode == 5'b00000) || (instruction_operation == LR_W);
 
+    logic is_store;
+    assign is_store = (opcode == 5'b01000) || (instruction_operation inside {SC_W, AMO_W});
+
+    logic           locked_memory;
+
     logic  [4:0]    locked_register;
     logic  [4:0]    locked_register_r;
     logic  [4:0]    rd;
@@ -532,6 +537,18 @@ module decode
         end
         else begin
             locked_register_r <= locked_register;
+        end
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            locked_memory   <= '0;
+        end
+        else if (enable) begin
+            if (hazard_o || killed)
+                locked_memory <= '0;
+            else    // Read-after-write on STORE
+                locked_memory <= is_store;
         end
     end
 
@@ -578,6 +595,7 @@ module decode
     logic locked_rs1;
     logic locked_rs2;
 
+    logic hazard_mem;
     logic hazard_rs1;
     logic hazard_rs2;
 
@@ -604,6 +622,11 @@ module decode
         endcase
     end
 
+    /* I don't know why we should have this hazard                  */
+    /* But removing this breaks the processor                       */
+    /* It also breaks if we limit the hazard to same address access */
+    assign hazard_mem = locked_memory && is_load;
+
     assign locked_rs1 = (locked_register != '0 && locked_register == rs1_o) || ( locked_register_r != '0 && locked_register_r == rs1_o);
     assign locked_rs2 = (locked_register != '0 && locked_register == rs2_o) || ( locked_register_r != '0 && locked_register_r == rs2_o);
 
@@ -611,7 +634,7 @@ module decode
     assign hazard_rs2 = locked_rs2 && use_rs2;
 
     assign killed   = jump_confirmed || jump_misaligned_i || rollback_i;
-    assign hazard_o = (hazard_rs1 || hazard_rs2) && !killed && !exception;
+    assign hazard_o = (hazard_mem || hazard_rs1 || hazard_rs2) && !killed && !exception;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
