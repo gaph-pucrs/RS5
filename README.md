@@ -1,13 +1,15 @@
 # RS5
 
 ## Tutorials (in Portuguese)
-
-[![Tutorial 1 - understanding the RS5 processor](imgs/rs5_1.png)](docs/RIS5_1.pdf){:download="docs/RIS5_1.pdf"}
-
-[![Tutorial 2 - understanding how to add a new instruction](imgs/rs5_2.png)](docs/RIS5_1.pdf){:download="docs/RIS5_2.pdf"}
-
-[![Tutorial 3 - understanding interruptions and adding a peripheral](imgs/rs5_3.png)](docs/RIS5_1.pdf){:download="docs/RIS5_3.pdf"}
-
+<a href="docs/RIS5_1.pdf" download=RS5_1.pdf>
+    <img src="imgs/rs5_1.png" height="160"/>
+</a>
+<a href="docs/RIS5_2.pdf" download=RS5_2.pdf>
+    <img src="imgs/rs5_2.png" height="160"/>
+</a>
+<a href="docs/RIS5_3.pdf" download=RS5_3.pdf>
+    <img src="imgs/rs5_3.png" height="160"/>
+</a>
 
 ## Description
 
