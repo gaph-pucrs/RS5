@@ -47,8 +47,11 @@ module decode
     input   logic [31:0]    pc_i,
     input   logic [31:0]    rs1_data_read_i,
     input   logic [31:0]    rs2_data_read_i,
+    input   logic [31:0]    mem_access_result_i,
     input   logic [31:0]    writeback_i,
+    input   logic [ 4:0]    rd_mem_access_i,
     input   logic [ 4:0]    rd_retire_i,
+    input   logic           mem_access_we_i,
     input   logic           regbank_we_i,
     input   logic           rollback_i,
     input   logic           compressed_i,
@@ -503,13 +506,15 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     logic is_load;
-    logic is_store;
-
     assign is_load  = (opcode == 5'b00000) || (instruction_operation == LR_W);
+
+    logic is_store;
     assign is_store = (opcode == 5'b01000) || (instruction_operation inside {SC_W, AMO_W});
-    
+
     logic           locked_memory;
+
     logic  [4:0]    locked_register;
+    logic  [4:0]    locked_register_r;
     logic  [4:0]    rd;
 
     assign rd = instruction_i[11:7];
@@ -528,10 +533,19 @@ module decode
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
-            locked_memory <= '0;
+            locked_register_r <= '0;
+        end
+        else begin
+            locked_register_r <= locked_register;
+        end
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            locked_memory   <= '0;
         end
         else if (enable) begin
-            if (hazard_o || killed) 
+            if (hazard_o || killed)
                 locked_memory <= '0;
             else    // Read-after-write on STORE
                 locked_memory <= is_store;
@@ -608,16 +622,16 @@ module decode
         endcase
     end
 
-    assign locked_rs1 = (locked_register != '0 && locked_register == rs1_o);
-    assign locked_rs2 = (locked_register != '0 && locked_register == rs2_o);
-
     /* I don't know why we should have this hazard                  */
     /* But removing this breaks the processor                       */
     /* It also breaks if we limit the hazard to same address access */
-    assign hazard_mem = locked_memory   && is_load;
+    assign hazard_mem = locked_memory && is_load;
 
-    assign hazard_rs1 = locked_rs1      && use_rs1;
-    assign hazard_rs2 = locked_rs2      && use_rs2;
+    assign locked_rs1 = (locked_register != '0 && locked_register == rs1_o) || ( locked_register_r != '0 && locked_register_r == rs1_o);
+    assign locked_rs2 = (locked_register != '0 && locked_register == rs2_o) || ( locked_register_r != '0 && locked_register_r == rs2_o);
+
+    assign hazard_rs1 = locked_rs1 && use_rs1;
+    assign hazard_rs2 = locked_rs2 && use_rs2;
 
     assign killed   = jump_confirmed || jump_misaligned_i || rollback_i;
     assign hazard_o = (hazard_mem || hazard_rs1 || hazard_rs2) && !killed && !exception;
@@ -667,6 +681,8 @@ module decode
         always_comb begin
             if (rs1_o == rd_o && execute_we_i)  // Forwarding from execute
                 rs1_data = result_i;
+            else if (rs1_o == rd_mem_access_i && mem_access_we_i) // Forwarding from mem access
+                rs1_data = mem_access_result_i;
             else if (rs1_o == rd_retire_i && regbank_we_i)  // Forwarding from retire on LOAD
                 rs1_data = writeback_i;
             else
@@ -676,6 +692,8 @@ module decode
         always_comb begin
             if (rs2_o == rd_o && execute_we_i)  // Forwarding from execute
                 rs2_data = result_i;
+            else if (rs2_o == rd_mem_access_i && mem_access_we_i) // Forwarding from mem access
+                rs2_data = mem_access_result_i;
             else if (rs2_o == rd_retire_i && regbank_we_i)  // Forwarding from retire on LOAD
                 rs2_data = writeback_i;
             else

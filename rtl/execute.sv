@@ -78,6 +78,7 @@ module execute
     output  logic   [31:0]      result_fwd_o,
     output  logic   [ 4:0]      rd_o,
 
+    output  logic [31:0]        mem_address_exec_o,
     output  logic [31:0]        mem_address_o,
     output  logic               mem_read_enable_o,
     output  logic  [3:0]        mem_write_enable_o,
@@ -137,7 +138,6 @@ module execute
 //////////////////////////////////////////////////////////////////////////////
 
     logic [31:0]    sum_result;
-    logic [31:0]    sum2_result;
     logic [31:0]    and_result;
     logic [31:0]    or_result;
     logic [31:0]    xor_result;
@@ -161,24 +161,24 @@ module execute
 
     // Can be assigned by atomic instructions or rs1_data_i
     logic [31:0] first_operand;
+    logic [31:0] equal_opA;
+    logic [31:0] equal_opB;
 
-    /* "Unmuxable" operators */
-    assign sum_result              = rs1_data_i +  second_operand_i;
-    assign equal                   = rs1_data_i == second_operand_i;
+    /* Unmuxed operators */
     assign less_than_unsigned      = rs1_data_i <  second_operand_i;
     assign greater_equal_unsigned  = rs1_data_i >= second_operand_i;
     assign less_than               = $signed(rs1_data_i) <  $signed(second_operand_i);
     assign greater_equal           = $signed(rs1_data_i) >= $signed(second_operand_i);
-
     assign sll_result              = rs1_data_i << second_operand_i[4:0];
     assign srl_result              = rs1_data_i >> second_operand_i[4:0];
     assign sra_result              = $signed(rs1_data_i) >>> second_operand_i[4:0];
 
-    /* "Muxable" operators */
-    assign sum2_result             = first_operand + sum2_opB;
+    /* Muxed operators */
+    assign sum_result              = first_operand + sum2_opB;
     assign and_result              = first_operand & second_operand_i;
     assign or_result               = first_operand | second_operand_i;
     assign xor_result              = first_operand ^ second_operand_i;
+    assign equal                   = equal_opA == equal_opB;
 
 //////////////////////////////////////////////////////////////////////////////
 // Load/Store signals
@@ -235,19 +235,6 @@ module execute
     logic mem_read_enable_vector_inst;
     assign mem_read_enable_vector_inst = mem_read_enable_vector && (instruction_operation_i inside {VLOAD, VSTORE});
 
-    assign mem_read_enable_o  = (mem_read_enable || atomic_mem_read_enable || mem_read_enable_vector_inst);
-    assign mem_write_enable_o = (mem_write_enable | {4{atomic_mem_write_enable}} | mem_write_enable_vector);
-
-    always_comb begin
-        unique case (instruction_operation_i)
-            VLOAD,
-            VSTORE:  mem_write_data_o = VEnable ? mem_write_data_vector : mem_write_data;
-            AMO_W:   mem_write_data_o = (AMOEXT inside {AMO_ZAAMO, AMO_A}) ? amo_operand : mem_write_data;
-            default: mem_write_data_o = mem_write_data;
-        endcase
-    end
-
-    assign mem_address_o   = mem_address;
     assign mem_read_enable = instruction_operation_i inside {LB, LBU, LH, LHU, LW, LR_W};
 
     always_comb begin
@@ -261,12 +248,35 @@ module execute
     always_comb begin
         mem_write_enable = '0;
         unique case (instruction_operation_i)
-            SB: mem_write_enable[sum_result[1:0]]      = 1'b1;
-            SH: mem_write_enable[sum_result[1:0]+1-:2] = 2'b11;
-            SW: mem_write_enable                       = 4'b1111;
-            default: mem_write_enable                  = '0;
+            SB:      mem_write_enable[sum_result[1:0]]      = 1'b1;
+            SH:      mem_write_enable[sum_result[1:0]+1-:2] = 2'b11;
+            SW:      mem_write_enable                       = 4'b1111;
+            default: mem_write_enable                       = '0;
         endcase
     end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            mem_address_o       <= '0;
+            mem_read_enable_o   <= '0;
+            mem_write_enable_o  <= '0;
+            mem_write_data_o    <= '0;
+        end
+        else if (!stall) begin
+            mem_address_o       <= mem_address;
+            mem_read_enable_o   <= (mem_read_enable || atomic_mem_read_enable || mem_read_enable_vector_inst);
+            mem_write_enable_o  <= (mem_write_enable | {4{atomic_mem_write_enable}} | mem_write_enable_vector);
+
+            unique case (instruction_operation_i)
+                VLOAD,
+                VSTORE:  mem_write_data_o <= VEnable ? mem_write_data_vector : mem_write_data;
+                AMO_W:   mem_write_data_o <= (AMOEXT inside {AMO_ZAAMO, AMO_A}) ? amo_operand : mem_write_data;
+                default: mem_write_data_o <= mem_write_data;
+            endcase
+        end
+    end
+
+    assign mem_address_exec_o = mem_address;
 
 //////////////////////////////////////////////////////////////////////////////
 // CSR access signals
@@ -512,10 +522,14 @@ module execute
             logic lrsc_enable;
             assign lrsc_enable = (instruction_operation_i == SC_W);
 
+            logic [31:0] cmp_opA;
+            logic [31:0] cmp_opB;
+
             lrsc lrsc_m (
                 .clk               (clk                  ),
                 .reset_n           (reset_n              ),
                 .stall             (stall                ),
+                .equal_i           (equal                ),
                 .enable_i          (lrsc_enable          ),
                 .rs1_data_i        (rs1_data_i           ),
                 .data_i            (mem_read_data_i      ),
@@ -525,8 +539,13 @@ module execute
                 .write_enable_o    (lrsc_write_enable    ),
                 .mem_read_enable_o (lrsc_mem_read_enable ),
                 .mem_write_enable_o(lrsc_mem_write_enable),
-                .result_o          (lrsc_result          )
+                .result_o          (lrsc_result          ),
+                .cmp_opA_o         (cmp_opA              ),
+                .cmp_opB_o         (cmp_opB              )
             );
+
+            assign equal_opA = lrsc_enable ? cmp_opA : rs1_data_i;
+            assign equal_opB = lrsc_enable ? cmp_opB : second_operand_i;
         end
         else begin : gen_zalrsc_off
             assign lrsc_result           = 1'b0;
@@ -534,6 +553,8 @@ module execute
             assign lrsc_mem_read_enable  = 1'b0;
             assign lrsc_mem_write_enable = 1'b0;
             assign lrsc_write_enable     = 1'b0;
+            assign equal_opA             = rs1_data_i;
+            assign equal_opB             = second_operand_i;
         end
 
         logic amo_write_enable;
@@ -554,7 +575,7 @@ module execute
             logic [31:0] amo_result;
             always_comb begin
                 unique case (atomic_operation_i)
-                    AMOADD:  amo_result = sum2_result;
+                    AMOADD:  amo_result = sum_result;
                     AMOAND:  amo_result = and_result;
                     AMOXOR:  amo_result = xor_result;
                     AMOOR:   amo_result = or_result;
@@ -605,6 +626,8 @@ module execute
         assign atomic_mem_write_enable = 1'b0;
         assign lrsc_result             = 1'b0;
         assign atomic_write_enable     = 1'b0;
+        assign equal_opA               = rs1_data_i;
+        assign equal_opB               = second_operand_i;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -633,7 +656,6 @@ module execute
         unique case (instruction_operation_i)
             CSRRW, CSRRS, CSRRC,
             CSRRWI,CSRRSI,CSRRCI:   result = csr_data_read_i;
-            SUB:                    result = sum2_result;
             JAL,JALR:               result = pc_next_i;
             SLT:                    result = {31'b0, less_than};
             SLTU:                   result = {31'b0, less_than_unsigned};

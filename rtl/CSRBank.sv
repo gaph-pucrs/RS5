@@ -73,7 +73,7 @@ module CSRBank
     input   logic               machine_return_i,
     input   exceptionCode_e     exception_code_i,
     input   logic [31:0]        pc_i,
-    input   logic [31:0]        mem_address_i,
+    input   logic [31:0]        mem_address_exec_i,
     input   logic [31:0]        next_pc_i,
     input   logic [31:0]        instruction_i,
 
@@ -1117,7 +1117,7 @@ module CSRBank
                     STORE_AMO_PAGE_FAULT,
                     STORE_AMO_ACCESS_FAULT,
                     LOAD_ADDRESS_MISALIGNED,
-                    STORE_AMO_ADDRESS_MISALIGNED:   mtval <= mem_address_i;
+                    STORE_AMO_ADDRESS_MISALIGNED:   mtval <= mem_address_exec_i;
                     INSTRUCTION_ADDRESS_MISALIGNED: mtval <= jump_target_i;
                     BREAKPOINT,
                     INSTRUCTION_PAGE_FAULT,
