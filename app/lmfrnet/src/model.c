@@ -279,34 +279,83 @@ void _conv_block (
         }
     }
 
-    // "(0,0)" of the 3x3 image
-    int base_y=0, base_x=0;
+    // // "(0,0)" of the 3x3 image
+    // int base_y=0, base_x=0;
+
+    // for (int k=0; k<OUTPUT_HEIGHT; k++)
+    // {
+    //     base_x = 0;
+    //     for (int l=0; l<OUTPUT_WIDTH; l++)
+    //     {
+    //         for (int i=0; i<kernel_size; i++)
+    //         {
+    //             for (int j=0; j<kernel_size; j++)
+    //             {
+    //                 for (int m=0; m<INPUT_CHANNELS; m++)
+    //                 {
+    //                     int idx_i = (m)+(base_x)+(base_y)+(j*INPUT_CHANNELS)+(i*INPUT_CHANNELS*(INPUT_WIDTH+p));
+    //                     for (int n=0; n<OUTPUT_CHANNELS; n++)
+    //                     {
+    //                         int idx_w = (n)+(m*OUTPUT_CHANNELS)+(j*OUTPUT_CHANNELS*INPUT_CHANNELS)+(i*OUTPUT_CHANNELS*INPUT_CHANNELS*kernel_size);
+    //                         int idx_out = (n)+(l*OUTPUT_CHANNELS)+(k*OUTPUT_CHANNELS*OUTPUT_WIDTH);
+
+    //                         out[idx_out] += in_pd[idx_i]*weights[idx_w];
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //         base_x += stride*INPUT_CHANNELS;
+    //     }
+    //     base_y += stride*INPUT_CHANNELS*(INPUT_WIDTH+p);
+    // }
+
+    size_t vl;
+    int *in_addr  = (int *) in_pd;
+    int *out_addr = (int *) out;
+    int *base_out = (int *) out;
+    int *k_addr   = (int *) weights;
+    int base_x = 0, base_y = 0;
+    int ch_out;
+    int pixel;
+    int width_padded = INPUT_WIDTH + p;
+
 
     for (int k=0; k<OUTPUT_HEIGHT; k++)
     {
         base_x = 0;
         for (int l=0; l<OUTPUT_WIDTH; l++)
         {
+            in_addr = (int *) in_pd + base_x + base_y;
+            k_addr = (int *) weights;
             for (int i=0; i<kernel_size; i++)
             {
                 for (int j=0; j<kernel_size; j++)
                 {
                     for (int m=0; m<INPUT_CHANNELS; m++)
                     {
-                        int idx_i = (m)+(base_x)+(base_y)+(j*INPUT_CHANNELS)+(i*INPUT_CHANNELS*(INPUT_WIDTH+p));
-                        for (int n=0; n<OUTPUT_CHANNELS; n++)
+                        pixel = *in_addr;
+                        in_addr++;
+                        out_addr = (int *) base_out;   
+                        
+                        for (ch_out = OUTPUT_CHANNELS; ch_out > 0; ch_out -= vl)
                         {
-                            int idx_w = (n)+(m*OUTPUT_CHANNELS)+(j*OUTPUT_CHANNELS*INPUT_CHANNELS)+(i*OUTPUT_CHANNELS*INPUT_CHANNELS*kernel_size);
-                            int idx_out = (n)+(l*OUTPUT_CHANNELS)+(k*OUTPUT_CHANNELS*OUTPUT_WIDTH);
-
-                            out[idx_out] += in_pd[idx_i]*weights[idx_w];
+                            __asm__ volatile("vsetvli %0, %1, e32, m8, ta, ma" : "=r"(vl) : "r"(ch_out));
+                            __asm__ volatile("vle32.v v16, (%0)" :: "r"(k_addr));
+                            __asm__ volatile("vle32.v v24, (%0)" :: "r"(out_addr));
+                            __asm__ volatile("vmacc.vx v24, %0, v16" :: "r"(pixel));
+                            __asm__ volatile("vse32.v v24, (%0)" :: "r"(out_addr));
+                            k_addr += vl;
+                            out_addr += vl;
                         }
                     }
                 }
+                in_addr -= kernel_size*INPUT_CHANNELS;
+                in_addr += INPUT_CHANNELS*width_padded;
             }
-            base_x += stride*INPUT_CHANNELS;
+            base_out += OUTPUT_CHANNELS;
+            base_x += stride*INPUT_CHANNELS; 
         }
-        base_y += stride*INPUT_CHANNELS*(INPUT_WIDTH+p);
+        base_y += stride*INPUT_CHANNELS*width_padded;
     }
 
     // int handler
@@ -440,6 +489,19 @@ void concat4 (
 }
 //}}}
 
+void vector_memset0(type v[], const int size) {
+    int total;
+    size_t vl;
+    int *addr = (int *) v;
+
+    for (total = size; total > 0; total -= vl)
+    {
+        __asm__ volatile("vsetvli %0, %1, e32, m8, ta, ma" : "=r"(vl) : "r"(total));
+        __asm__ volatile("vmv.v.i v24, 0");
+        __asm__ volatile("vse32.v v24, (%0)" ::"r"(addr));
+        addr += vl;
+    }
+}
 
 int main()
 {   
@@ -483,6 +545,10 @@ int main()
         );
 
         free(image);
+
+        // for (int i=0; i<STAGE_1_HEIGHT*STAGE_1_WIDTH*STAGE_1_CHANNELS; i++) {
+        //     printf("%x\n", stage_1_out[i]);
+        // }
 
         // return 0;
     //}}}
@@ -598,10 +664,10 @@ int main()
         //                  Layer2
         //-----------------------------------------------
         //{{{
-            memset(y0, 0, MMCBlock1_mmLayer2_branch11_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH*sizeof(type));
-            memset(y1, 0, MMCBlock1_mmLayer2_branch33a_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH*sizeof(type));
-            memset(y2, 0, MMCBlock1_mmLayer2_branch33b_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH*sizeof(type));
-            memset(y3, 0, MMCBlock1_mmLayer2_branch33c_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH*sizeof(type));
+            vector_memset0(y0, MMCBlock1_mmLayer2_branch11_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH);
+            vector_memset0(y1, MMCBlock1_mmLayer2_branch33a_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH);
+            vector_memset0(y2, MMCBlock1_mmLayer2_branch33b_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH);
+            vector_memset0(y3, MMCBlock1_mmLayer2_branch33c_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH);
 
             _conv_block (
                 STAGE_1_HEIGHT,
@@ -697,10 +763,10 @@ int main()
         //                  Layer3
         //-----------------------------------------------
         //{{{
-            memset(y0, 0, MMCBlock1_mmLayer3_branch11_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH*sizeof(type));
-            memset(y1, 0, MMCBlock1_mmLayer3_branch33a_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH*sizeof(type));
-            memset(y2, 0, MMCBlock1_mmLayer3_branch33b_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH*sizeof(type));
-            memset(y3, 0, MMCBlock1_mmLayer3_branch33c_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH*sizeof(type));
+            vector_memset0(y0, MMCBlock1_mmLayer3_branch11_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH);
+            vector_memset0(y1, MMCBlock1_mmLayer3_branch33a_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH);
+            vector_memset0(y2, MMCBlock1_mmLayer3_branch33b_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH);
+            vector_memset0(y3, MMCBlock1_mmLayer3_branch33c_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH);
 
             _conv_block (
                 STAGE_1_HEIGHT,
@@ -796,7 +862,7 @@ int main()
         //                  Conv1
         //-----------------------------------------------
         //{{{
-            memset(tmp2, 0, STAGE_2_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH*sizeof(type));
+            vector_memset0(tmp2, STAGE_2_CHANNELS*STAGE_1_HEIGHT*STAGE_1_WIDTH);
 
             _conv_block (
                 STAGE_1_HEIGHT,
@@ -821,7 +887,7 @@ int main()
         //                 Pooling1 
         //-----------------------------------------------
         //{{{
-            memset(tmp1, 0, STAGE_2_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH*sizeof(type));
+            vector_memset0(tmp1, STAGE_2_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH);
 
             avg_pool (
                 STAGE_1_HEIGHT,
@@ -843,10 +909,10 @@ int main()
         //                  Layer1
         //-----------------------------------------------
         //{{{
-            memset(y0, 0, MMCBlock2_mmLayer1_branch11_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH*sizeof(type));
-            memset(y1, 0, MMCBlock2_mmLayer1_branch33a_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH*sizeof(type));
-            memset(y2, 0, MMCBlock2_mmLayer1_branch33b_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH*sizeof(type));
-            memset(y3, 0, MMCBlock2_mmLayer1_branch33c_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH*sizeof(type));
+            vector_memset0(y0, MMCBlock2_mmLayer1_branch11_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH);
+            vector_memset0(y1, MMCBlock2_mmLayer1_branch33a_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH);
+            vector_memset0(y2, MMCBlock2_mmLayer1_branch33b_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH);
+            vector_memset0(y3, MMCBlock2_mmLayer1_branch33c_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH);
 
             _conv_block (
                 STAGE_2_HEIGHT,
@@ -942,10 +1008,10 @@ int main()
         //                  Layer2
         //-----------------------------------------------
         //{{{
-            memset(y0, 0, MMCBlock2_mmLayer2_branch11_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH*sizeof(type));
-            memset(y1, 0, MMCBlock2_mmLayer2_branch33a_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH*sizeof(type));
-            memset(y2, 0, MMCBlock2_mmLayer2_branch33b_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH*sizeof(type));
-            memset(y3, 0, MMCBlock2_mmLayer2_branch33c_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH*sizeof(type));
+            vector_memset0(y0, MMCBlock2_mmLayer2_branch11_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH);
+            vector_memset0(y1, MMCBlock2_mmLayer2_branch33a_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH);
+            vector_memset0(y2, MMCBlock2_mmLayer2_branch33b_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH);
+            vector_memset0(y3, MMCBlock2_mmLayer2_branch33c_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH);
 
             _conv_block (
                 STAGE_2_HEIGHT,
@@ -1041,10 +1107,10 @@ int main()
         //                  Layer3
         //-----------------------------------------------
         //{{{
-            memset(y0, 0, MMCBlock2_mmLayer3_branch11_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH*sizeof(type));
-            memset(y1, 0, MMCBlock2_mmLayer3_branch33a_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH*sizeof(type));
-            memset(y2, 0, MMCBlock2_mmLayer3_branch33b_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH*sizeof(type));
-            memset(y3, 0, MMCBlock2_mmLayer3_branch33c_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH*sizeof(type));
+            vector_memset0(y0, MMCBlock2_mmLayer3_branch11_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH);
+            vector_memset0(y1, MMCBlock2_mmLayer3_branch33a_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH);
+            vector_memset0(y2, MMCBlock2_mmLayer3_branch33b_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH);
+            vector_memset0(y3, MMCBlock2_mmLayer3_branch33c_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH);
 
             _conv_block (
                 STAGE_2_HEIGHT,
@@ -1140,10 +1206,10 @@ int main()
         //                  Layer4
         //-----------------------------------------------
         //{{{
-            memset(y0, 0, MMCBlock2_mmLayer4_branch11_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH*sizeof(type));
-            memset(y1, 0, MMCBlock2_mmLayer4_branch33a_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH*sizeof(type));
-            memset(y2, 0, MMCBlock2_mmLayer4_branch33b_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH*sizeof(type));
-            memset(y3, 0, MMCBlock2_mmLayer4_branch33c_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH*sizeof(type));
+            vector_memset0(y0, MMCBlock2_mmLayer4_branch11_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH);
+            vector_memset0(y1, MMCBlock2_mmLayer4_branch33a_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH);
+            vector_memset0(y2, MMCBlock2_mmLayer4_branch33b_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH);
+            vector_memset0(y3, MMCBlock2_mmLayer4_branch33c_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH);
 
             _conv_block (
                 STAGE_2_HEIGHT,
@@ -1239,7 +1305,7 @@ int main()
         //                  Conv2
         //-----------------------------------------------
         //{{{
-            memset(tmp2, 0, STAGE_3_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH*sizeof(type));
+            vector_memset0(tmp2, STAGE_3_CHANNELS*STAGE_2_HEIGHT*STAGE_2_WIDTH);
 
             _conv_block (
                 STAGE_2_HEIGHT,
@@ -1264,7 +1330,7 @@ int main()
         //                 Pooling2 
         //-----------------------------------------------
         //{{{
-            memset(tmp1, 0, STAGE_3_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+            vector_memset0(tmp1, STAGE_3_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
 
             avg_pool (
                 STAGE_2_HEIGHT,
@@ -1286,10 +1352,10 @@ int main()
         //                  Layer1
         //-----------------------------------------------
         //{{{
-            memset(y0, 0, MMCBlock3_mmLayer1_branch11_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
-            memset(y1, 0, MMCBlock3_mmLayer1_branch33a_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
-            memset(y2, 0, MMCBlock3_mmLayer1_branch33b_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
-            memset(y3, 0, MMCBlock3_mmLayer1_branch33c_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+            vector_memset0(y0, MMCBlock3_mmLayer1_branch11_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
+            vector_memset0(y1, MMCBlock3_mmLayer1_branch33a_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
+            vector_memset0(y2, MMCBlock3_mmLayer1_branch33b_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
+            vector_memset0(y3, MMCBlock3_mmLayer1_branch33c_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
 
             _conv_block (
                 STAGE_3_HEIGHT,
@@ -1385,10 +1451,10 @@ int main()
         //                  Layer2
         //-----------------------------------------------
         //{{{
-            memset(y0, 0, MMCBlock3_mmLayer2_branch11_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
-            memset(y1, 0, MMCBlock3_mmLayer2_branch33a_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
-            memset(y2, 0, MMCBlock3_mmLayer2_branch33b_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
-            memset(y3, 0, MMCBlock3_mmLayer2_branch33c_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+            vector_memset0(y0, MMCBlock3_mmLayer2_branch11_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
+            vector_memset0(y1, MMCBlock3_mmLayer2_branch33a_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
+            vector_memset0(y2, MMCBlock3_mmLayer2_branch33b_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
+            vector_memset0(y3, MMCBlock3_mmLayer2_branch33c_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
 
             _conv_block (
                 STAGE_3_HEIGHT,
@@ -1484,10 +1550,10 @@ int main()
         //                  Layer3
         //-----------------------------------------------
         //{{{
-            memset(y0, 0, MMCBlock3_mmLayer3_branch11_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
-            memset(y1, 0, MMCBlock3_mmLayer3_branch33a_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
-            memset(y2, 0, MMCBlock3_mmLayer3_branch33b_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
-            memset(y3, 0, MMCBlock3_mmLayer3_branch33c_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+            vector_memset0(y0, MMCBlock3_mmLayer3_branch11_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
+            vector_memset0(y1, MMCBlock3_mmLayer3_branch33a_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
+            vector_memset0(y2, MMCBlock3_mmLayer3_branch33b_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
+            vector_memset0(y3, MMCBlock3_mmLayer3_branch33c_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
 
             _conv_block (
                 STAGE_3_HEIGHT,
@@ -1583,10 +1649,10 @@ int main()
         //                  Layer4
         //-----------------------------------------------
         //{{{
-            memset(y0, 0, MMCBlock3_mmLayer4_branch11_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
-            memset(y1, 0, MMCBlock3_mmLayer4_branch33a_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
-            memset(y2, 0, MMCBlock3_mmLayer4_branch33b_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
-            memset(y3, 0, MMCBlock3_mmLayer4_branch33c_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+            vector_memset0(y0, MMCBlock3_mmLayer4_branch11_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
+            vector_memset0(y1, MMCBlock3_mmLayer4_branch33a_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
+            vector_memset0(y2, MMCBlock3_mmLayer4_branch33b_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
+            vector_memset0(y3, MMCBlock3_mmLayer4_branch33c_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
 
             _conv_block (
                 STAGE_3_HEIGHT,
@@ -1682,10 +1748,10 @@ int main()
         //                  Layer5
         //-----------------------------------------------
         //{{{
-            memset(y0, 0, MMCBlock3_mmLayer5_branch11_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
-            memset(y1, 0, MMCBlock3_mmLayer5_branch33a_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
-            memset(y2, 0, MMCBlock3_mmLayer5_branch33b_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
-            memset(y3, 0, MMCBlock3_mmLayer5_branch33c_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+            vector_memset0(y0, MMCBlock3_mmLayer5_branch11_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
+            vector_memset0(y1, MMCBlock3_mmLayer5_branch33a_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
+            vector_memset0(y2, MMCBlock3_mmLayer5_branch33b_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
+            vector_memset0(y3, MMCBlock3_mmLayer5_branch33c_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
 
             _conv_block (
                 STAGE_3_HEIGHT,
@@ -1781,10 +1847,10 @@ int main()
         //                  Layer6
         //-----------------------------------------------
         //{{{
-            memset(y0, 0, MMCBlock3_mmLayer6_branch11_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
-            memset(y1, 0, MMCBlock3_mmLayer6_branch33a_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
-            memset(y2, 0, MMCBlock3_mmLayer6_branch33b_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
-            memset(y3, 0, MMCBlock3_mmLayer6_branch33c_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+            vector_memset0(y0, MMCBlock3_mmLayer6_branch11_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
+            vector_memset0(y1, MMCBlock3_mmLayer6_branch33a_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
+            vector_memset0(y2, MMCBlock3_mmLayer6_branch33b_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
+            vector_memset0(y3, MMCBlock3_mmLayer6_branch33c_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
 
             _conv_block (
                 STAGE_3_HEIGHT,
@@ -1880,10 +1946,10 @@ int main()
         //                  Layer7
         //-----------------------------------------------
         //{{{
-            memset(y0, 0, MMCBlock3_mmLayer7_branch11_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
-            memset(y1, 0, MMCBlock3_mmLayer7_branch33a_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
-            memset(y2, 0, MMCBlock3_mmLayer7_branch33b_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
-            memset(y3, 0, MMCBlock3_mmLayer7_branch33c_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+            vector_memset0(y0, MMCBlock3_mmLayer7_branch11_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
+            vector_memset0(y1, MMCBlock3_mmLayer7_branch33a_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
+            vector_memset0(y2, MMCBlock3_mmLayer7_branch33b_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
+            vector_memset0(y3, MMCBlock3_mmLayer7_branch33c_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
 
             _conv_block (
                 STAGE_3_HEIGHT,
@@ -1979,10 +2045,10 @@ int main()
         //                  Layer8
         //-----------------------------------------------
         //{{{
-            memset(y0, 0, MMCBlock3_mmLayer8_branch11_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
-            memset(y1, 0, MMCBlock3_mmLayer8_branch33a_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
-            memset(y2, 0, MMCBlock3_mmLayer8_branch33b_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
-            memset(y3, 0, MMCBlock3_mmLayer8_branch33c_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+            vector_memset0(y0, MMCBlock3_mmLayer8_branch11_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
+            vector_memset0(y1, MMCBlock3_mmLayer8_branch33a_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
+            vector_memset0(y2, MMCBlock3_mmLayer8_branch33b_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
+            vector_memset0(y3, MMCBlock3_mmLayer8_branch33c_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
 
             _conv_block (
                 STAGE_3_HEIGHT,
@@ -2078,7 +2144,7 @@ int main()
         //                  Conv3
         //-----------------------------------------------
         //{{{
-            memset(tmp2, 0, STAGE_4_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+            vector_memset0(tmp2, STAGE_4_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
 
             _conv_block (
                 STAGE_3_HEIGHT,
@@ -2103,7 +2169,7 @@ int main()
         //                 Pooling3 
         //-----------------------------------------------
         //{{{
-            memset(tmp1, 0, STAGE_4_CHANNELS*STAGE_4_HEIGHT*STAGE_4_WIDTH*sizeof(type));
+            vector_memset0(tmp1, STAGE_4_CHANNELS*STAGE_4_HEIGHT*STAGE_4_WIDTH);
 
             avg_pool (
                 STAGE_3_HEIGHT,
@@ -2125,10 +2191,10 @@ int main()
         //                  Layer1
         //-----------------------------------------------
         //{{{
-            memset(y0, 0, MMCBlock4_mmLayer1_branch11_CHANNELS*STAGE_4_HEIGHT*STAGE_4_WIDTH*sizeof(type));
-            memset(y1, 0, MMCBlock4_mmLayer1_branch33a_CHANNELS*STAGE_4_HEIGHT*STAGE_4_WIDTH*sizeof(type));
-            memset(y2, 0, MMCBlock4_mmLayer1_branch33b_CHANNELS*STAGE_4_HEIGHT*STAGE_4_WIDTH*sizeof(type));
-            memset(y3, 0, MMCBlock4_mmLayer1_branch33c_CHANNELS*STAGE_4_HEIGHT*STAGE_4_WIDTH*sizeof(type));
+            vector_memset0(y0, MMCBlock4_mmLayer1_branch11_CHANNELS*STAGE_4_HEIGHT*STAGE_4_WIDTH);
+            vector_memset0(y1, MMCBlock4_mmLayer1_branch33a_CHANNELS*STAGE_4_HEIGHT*STAGE_4_WIDTH);
+            vector_memset0(y2, MMCBlock4_mmLayer1_branch33b_CHANNELS*STAGE_4_HEIGHT*STAGE_4_WIDTH);
+            vector_memset0(y3, MMCBlock4_mmLayer1_branch33c_CHANNELS*STAGE_4_HEIGHT*STAGE_4_WIDTH);
 
             _conv_block (
                 STAGE_4_HEIGHT,
@@ -2224,10 +2290,10 @@ int main()
         //                  Layer2
         //-----------------------------------------------
         //{{{
-            memset(y0, 0, MMCBlock4_mmLayer2_branch11_CHANNELS*STAGE_4_HEIGHT*STAGE_4_WIDTH*sizeof(type));
-            memset(y1, 0, MMCBlock4_mmLayer2_branch33a_CHANNELS*STAGE_4_HEIGHT*STAGE_4_WIDTH*sizeof(type));
-            memset(y2, 0, MMCBlock4_mmLayer2_branch33b_CHANNELS*STAGE_4_HEIGHT*STAGE_4_WIDTH*sizeof(type));
-            memset(y3, 0, MMCBlock4_mmLayer2_branch33c_CHANNELS*STAGE_4_HEIGHT*STAGE_4_WIDTH*sizeof(type));
+            vector_memset0(y0, MMCBlock4_mmLayer2_branch11_CHANNELS*STAGE_4_HEIGHT*STAGE_4_WIDTH);
+            vector_memset0(y1, MMCBlock4_mmLayer2_branch33a_CHANNELS*STAGE_4_HEIGHT*STAGE_4_WIDTH);
+            vector_memset0(y2, MMCBlock4_mmLayer2_branch33b_CHANNELS*STAGE_4_HEIGHT*STAGE_4_WIDTH);
+            vector_memset0(y3, MMCBlock4_mmLayer2_branch33c_CHANNELS*STAGE_4_HEIGHT*STAGE_4_WIDTH);
 
             _conv_block (
                 STAGE_4_HEIGHT,
@@ -2323,10 +2389,10 @@ int main()
         //                  Layer3
         //-----------------------------------------------
         //{{{
-            memset(y0, 0, MMCBlock4_mmLayer3_branch11_CHANNELS*STAGE_4_HEIGHT*STAGE_4_WIDTH*sizeof(type));
-            memset(y1, 0, MMCBlock4_mmLayer3_branch33a_CHANNELS*STAGE_4_HEIGHT*STAGE_4_WIDTH*sizeof(type));
-            memset(y2, 0, MMCBlock4_mmLayer3_branch33b_CHANNELS*STAGE_4_HEIGHT*STAGE_4_WIDTH*sizeof(type));
-            memset(y3, 0, MMCBlock4_mmLayer3_branch33c_CHANNELS*STAGE_4_HEIGHT*STAGE_4_WIDTH*sizeof(type));
+            vector_memset0(y0, MMCBlock4_mmLayer3_branch11_CHANNELS*STAGE_4_HEIGHT*STAGE_4_WIDTH);
+            vector_memset0(y1, MMCBlock4_mmLayer3_branch33a_CHANNELS*STAGE_4_HEIGHT*STAGE_4_WIDTH);
+            vector_memset0(y2, MMCBlock4_mmLayer3_branch33b_CHANNELS*STAGE_4_HEIGHT*STAGE_4_WIDTH);
+            vector_memset0(y3, MMCBlock4_mmLayer3_branch33c_CHANNELS*STAGE_4_HEIGHT*STAGE_4_WIDTH);
 
             _conv_block (
                 STAGE_4_HEIGHT,
@@ -2422,7 +2488,7 @@ int main()
         //                  Conv4
         //-----------------------------------------------
         //{{{
-            memset(tmp1, 0, STAGE_4_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH*sizeof(type));
+            vector_memset0(tmp1, STAGE_4_CHANNELS*STAGE_3_HEIGHT*STAGE_3_WIDTH);
 
             _conv_block (
                 STAGE_4_HEIGHT,
@@ -2448,7 +2514,7 @@ int main()
         //            Global Average Pool 
         //-----------------------------------------------
         //{{{
-            memset(tmp2, 0, STAGE_5_CHANNELS*sizeof(type));
+            vector_memset0(tmp2, STAGE_5_CHANNELS);
 
             global_avg_pool (
                 STAGE_5_HEIGHT,
@@ -2463,7 +2529,7 @@ int main()
     //              STAGE_6
     //-------------------------------------------
     //{{{
-            memset(tmp1, 0, STAGE_6_CLASSES*sizeof(type));
+            vector_memset0(tmp1, STAGE_6_CLASSES);
 
             _fc (
                 STAGE_5_CHANNELS,
