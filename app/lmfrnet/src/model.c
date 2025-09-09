@@ -134,42 +134,86 @@ void avg_pool (
     const int OUTPUT_CHANNELS,
     type out[]
 ) {
+    // const int kernel_size = 2;
+    // const int stride = 2;
+    // int base_y=0, base_x=0;
+
+    // for (int k=0; k<OUTPUT_HEIGHT; k++)
+    // {
+    //     base_x = 0;
+    //     for (int l=0; l<OUTPUT_WIDTH; l++)
+    //     {
+    //         for (int i=0; i<kernel_size; i++)
+    //         {
+    //             for (int j=0; j<kernel_size; j++)
+    //             {
+    //                 for (int n=0; n<OUTPUT_CHANNELS; n++)
+    //                 {
+    //                     int idx_in = (n)+(base_x)+(base_y)+(j*INPUT_CHANNELS)+(i*INPUT_CHANNELS*(INPUT_WIDTH));
+    //                     int idx_out = (n)+(l*OUTPUT_CHANNELS)+(k*OUTPUT_CHANNELS*OUTPUT_WIDTH);
+    //                     out[idx_out] += in[idx_in];
+    //                 }
+    //             }
+    //         }
+    //         base_x += stride*INPUT_CHANNELS;
+    //     }
+    //     base_y += stride*INPUT_CHANNELS*(INPUT_WIDTH);
+    // }
+
+    // for (int k=0; k<OUTPUT_HEIGHT; k++)
+    // {
+    //     for (int l=0; l<OUTPUT_WIDTH; l++)
+    //     {
+    //         for (int n=0; n<OUTPUT_CHANNELS; n++)
+    //         {
+    //             int idx_out = (n) + (l*OUTPUT_CHANNELS) + (k*OUTPUT_CHANNELS*OUTPUT_WIDTH);
+    //             out[idx_out] >>= 2;
+    //         }
+    //     }
+    // }
+
     const int kernel_size = 2;
     const int stride = 2;
-    int base_y=0, base_x=0;
+    size_t vl;
+    int base_y = 0, base_x = 0;
+    int ch_out;
+    int *in_addr  = (int *) in;
+    int *out_addr = (int *) out;
+    int *base_out = (int *) out;
 
     for (int k=0; k<OUTPUT_HEIGHT; k++)
     {
         base_x = 0;
         for (int l=0; l<OUTPUT_WIDTH; l++)
         {
+            in_addr = (int *) in + base_x + base_y;
             for (int i=0; i<kernel_size; i++)
             {
                 for (int j=0; j<kernel_size; j++)
                 {
-                    for (int n=0; n<OUTPUT_CHANNELS; n++)
+                    out_addr = (int *) base_out;
+                    for (ch_out = OUTPUT_CHANNELS; ch_out > 0; ch_out -= vl)
                     {
-                        int idx_in = (n)+(base_x)+(base_y)+(j*INPUT_CHANNELS)+(i*INPUT_CHANNELS*(INPUT_WIDTH));
-                        int idx_out = (n)+(l*OUTPUT_CHANNELS)+(k*OUTPUT_CHANNELS*OUTPUT_WIDTH);
-                        out[idx_out] += in[idx_in];
+                        __asm__ volatile("vsetvli %0, %1, e32, m8, ta, ma" : "=r"(vl) : "r"(ch_out));
+                        __asm__ volatile("vle32.v v16, (%0)" ::"r"(in_addr));
+                        __asm__ volatile("vle32.v v24, (%0)" ::"r"(out_addr));
+                        __asm__ volatile("vadd.vv v24, v24, v16");
+                        __asm__ volatile("vse32.v v24, (%0)" ::"r"(out_addr));
+                        in_addr  += vl;
+                        out_addr += vl;
                     }
                 }
+                in_addr -= kernel_size*INPUT_CHANNELS;
+                in_addr += INPUT_CHANNELS*INPUT_WIDTH;
             }
+            base_out += OUTPUT_CHANNELS;
             base_x += stride*INPUT_CHANNELS;
         }
-        base_y += stride*INPUT_CHANNELS*(INPUT_WIDTH);
+        base_y += stride*INPUT_CHANNELS*INPUT_WIDTH;
     }
 
-    for (int k=0; k<OUTPUT_HEIGHT; k++)
-    {
-        for (int l=0; l<OUTPUT_WIDTH; l++)
-        {
-            for (int n=0; n<OUTPUT_CHANNELS; n++)
-            {
-                int idx_out = (n) + (l*OUTPUT_CHANNELS) + (k*OUTPUT_CHANNELS*OUTPUT_WIDTH);
-                out[idx_out] >>= 2;
-            }
-        }
+    for (int i=0; i<OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS; i++) {
+        out[i] >>= 2;
     }
 }
 //}}}
@@ -300,6 +344,7 @@ void _conv_block (
     //                         int idx_out = (n)+(l*OUTPUT_CHANNELS)+(k*OUTPUT_CHANNELS*OUTPUT_WIDTH);
 
     //                         out[idx_out] += in_pd[idx_i]*weights[idx_w];
+    //                         // printf("w: %d o: %d\n", idx_w, idx_out);
     //                     }
     //                 }
     //             }
