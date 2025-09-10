@@ -33,6 +33,16 @@
 #define DTYPE_PREFIX "HP"
 #define DATA_WIDTH "int16"
 
+void convolve2D(
+    int16_t *ooutput,   // output buffer
+    int16_t *image,     // input image with padding applied
+    int16_t *filter,    // filter kernel
+    int32_t ImageHeight,
+    int32_t ImageWidth,
+    int32_t Channels,
+    int32_t FilterSize
+);
+
 void hp_iconv3d_CHx7x7(int16_t *o, int16_t *i, int16_t *f, int32_t M, int32_t N,
                        int32_t C, int32_t F);
 

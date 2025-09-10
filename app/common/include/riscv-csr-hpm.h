@@ -711,7 +711,7 @@ static inline uint64_t csr_read_write_mhpmcounter30(uint64_t new_value) {
  * Utils
  */
 
-static void read_hpms(int *hpm_values) {
+static void read_hpms(uint32_t *hpm_values) {
   hpm_values[ 0] = csr_read_mcycle();
   //hpm_values[ 1] = ();
   hpm_values[ 2] = csr_read_minstret();
@@ -746,7 +746,7 @@ static void read_hpms(int *hpm_values) {
   hpm_values[31] = csr_read_mhpmcounter31();
 }
 
-static void evaluate_hpms(int *hpm_values_0, int *hpm_values_1) {
+static void evaluate_hpms(uint32_t *hpm_values_0, uint32_t *hpm_values_1) {
   int hpms[32];
 
   hpms[ 0] = (int)(hpm_values_1[ 0] - hpm_values_0[ 0]);

@@ -33,6 +33,16 @@
 #define DTYPE_PREFIX "SP"
 #define DATA_WIDTH "int32"
 
+void convolve2D(
+    int32_t *ooutput,   // output buffer
+    int32_t *image,     // input image with padding applied
+    int32_t *filter,    // filter kernel
+    int32_t ImageHeight,
+    int32_t ImageWidth,
+    int32_t Channels,
+    int32_t FilterSize
+);
+
 void sp_iconv3d_CHx7x7(int32_t *o, int32_t *i, int32_t *f, int32_t M, int32_t N,
                        int32_t C, int32_t F);
 

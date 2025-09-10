@@ -83,7 +83,7 @@ for benchmark in benchmarks_list:
                 llen = lanes*32
                 print(f'Executing: BUS_WIDTH ={bus_width:3d}, VLEN ={vlen:3d}, LANES ={vlen//llen:2d}.')
 
-                xcelium = ['xrun', '-f', 'sim.xrun']
+                xcelium = ['xrun', '-f', 'sim.xrun', '-timescale 1ns/1ps']
                 defines = [f'+define+BUS_WIDTH_P={bus_width}', f'+define+VLEN_P={vlen}', f'+define+LLEN_P={llen}']
                 command = xcelium + defines
 

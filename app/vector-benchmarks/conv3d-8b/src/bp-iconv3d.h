@@ -34,6 +34,16 @@
 #define DTYPE_PREFIX "BP"
 #define DATA_WIDTH "int8"
 
+void convolve2D(
+    int8_t *ooutput,   // output buffer
+    int8_t *image,     // input image with padding applied
+    int8_t *filter,    // filter kernel
+    int32_t ImageHeight,
+    int32_t ImageWidth,
+    int32_t Channels,
+    int32_t FilterSize
+);
+
 void bp_iconv3d_CHx7x7(int8_t *o, int8_t *i, int8_t *f, int32_t M, int32_t N,
                        int32_t C, int32_t F);
 
