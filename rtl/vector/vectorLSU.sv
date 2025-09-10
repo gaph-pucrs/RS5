@@ -515,24 +515,20 @@ module vectorLSU
     logic [VLEN-1:0]  read_data;
 
     always_comb begin
-        // default assignment avoids latch
-        for (int i = 0; i < ELEMENTS_PER_ACCESS_EW8; i++) begin
-            read_data_8b[i] = '0;
-        end
         if (addrMode != UNIT_STRIDED || (addrMode == UNIT_STRIDED && state_r == VLSU_FIRST_CYCLE)) begin
             case (address_r[1:0])
                 2'b11: begin
-                    for (int i = 0; i < ELEMENTS_PER_ACCESS_EW8-3; i++) begin
+                    for (int i = 0; i < ELEMENTS_PER_ACCESS_EW8; i++) begin
                         read_data_8b[i] = mem_read_data_i[24+(8*i)+:8];
                     end
                 end
                 2'b10: begin
-                    for (int i = 0; i < ELEMENTS_PER_ACCESS_EW8-2; i++) begin
+                    for (int i = 0; i < ELEMENTS_PER_ACCESS_EW8; i++) begin
                         read_data_8b[i] = mem_read_data_i[16+(8*i)+:8];
                     end
                 end
                 2'b01: begin
-                    for (int i = 0; i < ELEMENTS_PER_ACCESS_EW8-1; i++) begin
+                    for (int i = 0; i < ELEMENTS_PER_ACCESS_EW8; i++) begin
                         read_data_8b[i] = mem_read_data_i[8+(8*i)+:8];
                     end
                 end
@@ -551,13 +547,10 @@ module vectorLSU
     end
 
     always_comb begin
-        for (int i = 0; i < ELEMENTS_PER_ACCESS_EW16; i++)
-            read_data_16b[i] = '0;
-
         if (addrMode != UNIT_STRIDED || (addrMode == UNIT_STRIDED && state_r == VLSU_FIRST_CYCLE)) begin
             case (address_r[1])
                 1'b1:
-                    for (int i = 0; i < ELEMENTS_PER_ACCESS_EW16-1; i++) begin
+                    for (int i = 0; i < ELEMENTS_PER_ACCESS_EW16; i++) begin
                         read_data_16b[i] = mem_read_data_i[16+(16*i)+:16];
                     end
                 default: begin
@@ -580,8 +573,6 @@ module vectorLSU
     end
 
     always_comb begin
-        read_data = '0;
-
         unique case (width)
             EW8: begin
                 for (int i = 0; i < ELEMENTS_PER_ACCESS_EW8;  i++) begin
