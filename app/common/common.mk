@@ -16,7 +16,7 @@ INCDIR  = $(SRCDIR)/include
 HEADERS = $(wildcard $(INCDIR)/*.h) $(wildcard $(COMMON_DIR)/include/*.h)
 
 CFLAGS  = -march=$(ARCH) -mabi=ilp32 -Os -Wall -std=c23 -I$(INCDIR) -I$(COMMON_DIR)/include
-LDFLAGS = --specs=nano.specs -T $(COMMON_DIR)/link.ld -march=$(ARCH) -mabi=ilp32 -nostartfiles -lm
+LDFLAGS = --specs=nano.specs -T $(COMMON_DIR)/link.ld -march=$(ARCH) -mabi=ilp32 -nostartfiles -lm -u _printf_float
 
 CCSRC = $(wildcard $(SRCDIR)/*.c) $(wildcard $(COMMON_DIR)/*.c)
 CCOBJ = $(patsubst %.c, %.o, $(CCSRC))

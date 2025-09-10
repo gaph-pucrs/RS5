@@ -134,8 +134,8 @@ package RS5_pkg;
         V_IDLE, V_EXEC
     } vector_states_e;
 
-    typedef enum logic [1:0] {
-        VLSU_IDLE, VLSU_FIRST_CYCLE, VLSU_EXEC, VLSU_LAST_CYCLE
+    typedef enum logic [2:0] {
+        VLSU_IDLE, VLSU_FIRST_CYCLE, VLSU_EXEC, VLSU_LAST_CYCLE, VLSU_DELAY
     } vector_lsu_states_e;
 
     typedef enum  logic[1:0] {DIRECT, VECTORED} trapMode_e;
