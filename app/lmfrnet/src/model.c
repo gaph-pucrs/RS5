@@ -31,6 +31,7 @@
 //}}}
 
 // [!] (sample, class, pred) = (1, 3, 156019)
+// [!] (sample, class, pred) = (1, 3, 154876)
 
 // #define PREDS_FILE "targets.txt"
 // int confusion_matrix[STAGE_6_CLASSES][STAGE_6_CLASSES];
@@ -44,17 +45,38 @@ void pad (
     const type in[],
     type out[]
 ) {
-    for (int i=0; i<HEIGHT; i++)
+    // for (int i=0; i<HEIGHT; i++)
+    // {
+    //     for (int j=0; j<WIDTH; j++)
+    //     {
+    //         for (int k=0; k<CHANNELS; k++)
+    //         {
+    //             int idx_in = (k)+(j*CHANNELS)+(i*CHANNELS*WIDTH);
+    //             int idx_out = (k)+((j+1)*CHANNELS)+((i+1)*CHANNELS*(WIDTH+2));
+    //             out[idx_out] = in[idx_in];
+    //         }
+    //     }
+    // }
+
+    size_t vl;
+    int ch;
+    int *in_addr  = (int *) in;
+    int *out_addr = (int *) out + CHANNELS*(WIDTH+3);
+
+    for (int i = 0; i < HEIGHT; i++)
     {
-        for (int j=0; j<WIDTH; j++)
+        for (int j = 0; j < WIDTH; j++)
         {
-            for (int k=0; k<CHANNELS; k++)
+            for (ch = CHANNELS; ch > 0; ch -= vl)
             {
-                int idx_in = (k)+(j*CHANNELS)+(i*CHANNELS*WIDTH);
-                int idx_out = (k)+((j+1)*CHANNELS)+((i+1)*CHANNELS*(WIDTH+2));
-                out[idx_out] = in[idx_in];
+                __asm__ volatile("vsetvli %0, %1, e32, m8, ta, ma" : "=r"(vl) : "r"(ch));
+                __asm__ volatile("vle32.v v16, (%0)" :: "r"(in_addr));
+                __asm__ volatile("vse32.v v16, (%0)" :: "r"(out_addr));
+                in_addr += vl;
+                out_addr += vl;
             }
         }
+        out_addr += 2*CHANNELS;
     }
 }
 // }}}
@@ -72,21 +94,59 @@ void _fc (
     const int NEURONS,
     type out[]
 ) {
-    for (int ch=0; ch<INPUT_CHANNELS; ch++)
+    // for (int ch=0; ch<INPUT_CHANNELS; ch++)
+    // {
+    //     for (int n=0; n<NEURONS; n++)
+    //     {
+    //         out[n] += in[ch]*weights[(n)+(ch*NEURONS)];
+    //     }
+    // }
+    
+    // // int handler
+    // for (int n=0; n<NEURONS; n++) {
+    //     out[n] >>= 13;
+    // }
+
+    // for (int n=0; n<NEURONS; n++) {
+    //     out[n] += bias[n];
+    // }
+
+    size_t vl;
+    int pixel;
+    int *in_addr   = (int *) in;
+    int *out_addr  = (int *) out;
+    int *k_addr    = (int *) weights;
+    int *bias_addr = (int *) bias;
+
+    for (int ch = 0; ch < INPUT_CHANNELS; ch++)
     {
-        for (int n=0; n<NEURONS; n++)
+        pixel = *in_addr;
+        out_addr = (int *) out;
+        in_addr++;
+        for (int n = NEURONS; n > 0; n -= vl)
         {
-            out[n] += in[ch]*weights[(n)+(ch*NEURONS)];
+            __asm__ volatile("vsetvli %0, %1, e32, m8, ta, ma" : "=r"(vl) : "r"(n));
+            __asm__ volatile("vle32.v v8, (%0)" :: "r"(k_addr));
+            __asm__ volatile("vle32.v v16, (%0)" :: "r"(out_addr));
+            __asm__ volatile("vmacc.vx v16, %0, v8" :: "r"(pixel));
+            __asm__ volatile("vse32.v v16, (%0)" :: "r"(out_addr));
+            out_addr += vl;
+            k_addr   += vl;
         }
     }
-    
-    // int handler
-    for (int n=0; n<NEURONS; n++) {
-        out[n] >>= 13;
-    }
 
-    for (int n=0; n<NEURONS; n++) {
-        out[n] += bias[n];
+    // int handler + bias
+    out_addr = (int *) out;
+    for (int total = NEURONS; total > 0; total -= vl)
+    {
+        __asm__ volatile("vsetvli %0, %1, e32, m8, ta, ma" : "=r"(vl) : "r"(total));
+        __asm__ volatile("vle32.v v16, (%0)" :: "r"(out_addr));
+        __asm__ volatile("vle32.v v8, (%0)" :: "r"(bias_addr));
+        __asm__ volatile("vsra.vi v16, v16, 13"); // int_handler
+        __asm__ volatile("vadd.vv v16, v16, v8"); // bias
+        __asm__ volatile("vse32.v v16, (%0)" :: "r"(out_addr));
+        out_addr  += vl;
+        bias_addr += vl;
     }
 }
 //}}}
@@ -105,20 +165,50 @@ void global_avg_pool (
     const type in[],
     type out[]
 ) {
-    for (int i=0; i<INPUT_HEIGHT; i++)
+    // for (int i=0; i<INPUT_HEIGHT; i++)
+    // {
+    //     for (int j=0; j<INPUT_WIDTH; j++)
+    //     {
+    //         for (int k=0; k<INPUT_CHANNELS; k++)
+    //         {
+    //             out[k] += in[(k) + (j*INPUT_CHANNELS) + (i*INPUT_CHANNELS*INPUT_WIDTH)];
+    //         }
+    //     }
+    // }
+
+    // for (int i=0; i<INPUT_CHANNELS; i++)
+    // {
+    //     out[i] /= (INPUT_HEIGHT*INPUT_WIDTH);
+    // }
+
+    size_t vl;
+    const int tmp = INPUT_HEIGHT*INPUT_WIDTH;
+    int *in_addr  = (int *) in;
+    int *out_addr = (int *) out;
+
+    for (int total = (INPUT_HEIGHT*INPUT_WIDTH*INPUT_CHANNELS); total > 0; total -= INPUT_CHANNELS)
     {
-        for (int j=0; j<INPUT_WIDTH; j++)
+        out_addr = (int *) out;
+        for (int ch_out = INPUT_CHANNELS; ch_out > 0; ch_out -= vl)
         {
-            for (int k=0; k<INPUT_CHANNELS; k++)
-            {
-                out[k] += in[(k) + (j*INPUT_CHANNELS) + (i*INPUT_CHANNELS*INPUT_WIDTH)];
-            }
+            __asm__ volatile("vsetvli %0, %1, e32, m8, ta, ma" : "=r"(vl) : "r"(ch_out));
+            __asm__ volatile("vle32.v v16, (%0)" :: "r"(in_addr));
+            __asm__ volatile("vle32.v v24, (%0)" :: "r"(out_addr));
+            __asm__ volatile("vadd.vv v24, v24, v16");
+            __asm__ volatile("vse32.v v24, (%0)" :: "r"(out_addr));
+            in_addr += vl;
+            out_addr += vl;
         }
     }
-
-    for (int i=0; i<INPUT_CHANNELS; i++)
+    
+    out_addr = (int *) out;
+    for (int total = INPUT_CHANNELS; total > 0; total -= vl)
     {
-        out[i] /= (INPUT_HEIGHT*INPUT_WIDTH);
+        __asm__ volatile("vsetvli %0, %1, e32, m8, ta, ma" : "=r"(vl) : "r"(total));
+        __asm__ volatile("vle32.v v16, (%0)" :: "r"(out_addr));
+        __asm__ volatile("vdiv.vx v16, v16, %0" ::"r"(tmp));
+        __asm__ volatile("vse32.v v16, (%0)" :: "r"(out_addr));
+        out_addr += vl;
     }
 }
 //}}}
@@ -172,33 +262,37 @@ void avg_pool (
     //     }
     // }
 
+    // for (int i=0; i<OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS; i++) {
+    //     out[i] >>= 2;
+    // }
+
     const int kernel_size = 2;
     const int stride = 2;
     size_t vl;
     int base_y = 0, base_x = 0;
-    int ch_out;
+    int ch;
     int *in_addr  = (int *) in;
     int *out_addr = (int *) out;
     int *base_out = (int *) out;
 
-    for (int k=0; k<OUTPUT_HEIGHT; k++)
+    for (int k = 0; k < OUTPUT_HEIGHT; k++)
     {
         base_x = 0;
-        for (int l=0; l<OUTPUT_WIDTH; l++)
+        for (int l = 0; l < OUTPUT_WIDTH; l++)
         {
             in_addr = (int *) in + base_x + base_y;
-            for (int i=0; i<kernel_size; i++)
+            for (int i = 0; i < kernel_size; i++)
             {
-                for (int j=0; j<kernel_size; j++)
+                for (int j = 0; j < kernel_size; j++)
                 {
                     out_addr = (int *) base_out;
-                    for (ch_out = OUTPUT_CHANNELS; ch_out > 0; ch_out -= vl)
+                    for (ch = OUTPUT_CHANNELS; ch > 0; ch -= vl)
                     {
-                        __asm__ volatile("vsetvli %0, %1, e32, m8, ta, ma" : "=r"(vl) : "r"(ch_out));
-                        __asm__ volatile("vle32.v v16, (%0)" ::"r"(in_addr));
-                        __asm__ volatile("vle32.v v24, (%0)" ::"r"(out_addr));
+                        __asm__ volatile("vsetvli %0, %1, e32, m8, ta, ma" : "=r"(vl) : "r"(ch));
+                        __asm__ volatile("vle32.v v16, (%0)" :: "r"(in_addr));
+                        __asm__ volatile("vle32.v v24, (%0)" :: "r"(out_addr));
                         __asm__ volatile("vadd.vv v24, v24, v16");
-                        __asm__ volatile("vse32.v v24, (%0)" ::"r"(out_addr));
+                        __asm__ volatile("vse32.v v24, (%0)" :: "r"(out_addr));
                         in_addr  += vl;
                         out_addr += vl;
                     }
@@ -210,10 +304,16 @@ void avg_pool (
             base_x += stride*INPUT_CHANNELS;
         }
         base_y += stride*INPUT_CHANNELS*INPUT_WIDTH;
-    }
-
-    for (int i=0; i<OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS; i++) {
-        out[i] >>= 2;
+    }   
+    
+    out_addr = (int *) out;
+    for (int total = OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS; total > 0; total -= vl)
+    {
+        __asm__ volatile("vsetvli %0, %1, e32, m8, ta, ma" : "=r"(vl) : "r"(total));
+        __asm__ volatile("vle32.v v16, (%0)" :: "r"(out_addr));
+        __asm__ volatile("vsra.vi v16, v16, 2");
+        __asm__ volatile("vse32.v v16, (%0)" :: "r"(out_addr));
+        out_addr += vl;
     }
 }
 //}}}
@@ -252,7 +352,7 @@ void batch_normalization (
 
     size_t vl;
     int total;
-    int ch_cnt;
+    int ch;
     int *in_addr = (int *) in;
     int *gamma_addr;
     int *beta_addr;
@@ -261,30 +361,30 @@ void batch_normalization (
 
     for (total = HEIGHT*WIDTH*CHANNELS; total > 0; total -= CHANNELS)
     {
-        mean_addr = (int *) mean;
-        deviation_addr = (int *) deviation;
-        gamma_addr = (int *) gamma;
-        beta_addr = (int *) beta;
+        mean_addr       = (int *) mean;
+        deviation_addr  = (int *) deviation;
+        gamma_addr      = (int *) gamma;
+        beta_addr       = (int *) beta;
 
-        for (ch_cnt = CHANNELS; ch_cnt > 0; ch_cnt -= vl)
+        for (ch = CHANNELS; ch > 0; ch -= vl)
         {
-            __asm__ volatile("vsetvli %0, %1, e32, m8, ta, ma" : "=r"(vl) : "r"(ch_cnt));
-            __asm__ volatile("vle32.v v24, (%0)" ::"r"(in_addr));
-            __asm__ volatile("vle32.v v16, (%0)" ::"r"(mean_addr));
+            __asm__ volatile("vsetvli %0, %1, e32, m8, ta, ma" : "=r"(vl) : "r"(ch));
+            __asm__ volatile("vle32.v v24, (%0)" :: "r"(in_addr));
+            __asm__ volatile("vle32.v v16, (%0)" :: "r"(mean_addr));
             __asm__ volatile("vsub.vv v24, v24, v16");
             mean_addr += vl;
-            __asm__ volatile("vle32.v v16, (%0)" ::"r"(deviation_addr));
+            __asm__ volatile("vle32.v v16, (%0)" :: "r"(deviation_addr));
             __asm__ volatile("vdiv.vv v24, v24, v16");
             deviation_addr += vl;
-            __asm__ volatile("vle32.v v16, (%0)" ::"r"(gamma_addr));
+            __asm__ volatile("vle32.v v16, (%0)" :: "r"(gamma_addr));
             __asm__ volatile("vmul.vv v24, v24, v16");
             gamma_addr += vl;
-            __asm__ volatile("vle32.v v16, (%0)" ::"r"(beta_addr));
+            __asm__ volatile("vle32.v v16, (%0)" :: "r"(beta_addr));
             __asm__ volatile("vadd.vv v24, v24, v16");
             beta_addr += vl;
             __asm__ volatile("vmslt.vi v0, v24, 0"); // ReLU
             __asm__ volatile("vmerge.vim v24, v24, 0, v0");
-            __asm__ volatile("vse32.v v24, (%0)" ::"r"(in_addr));
+            __asm__ volatile("vse32.v v24, (%0)" :: "r"(in_addr));
             in_addr += vl;
         }
     }
@@ -317,9 +417,24 @@ void _conv_block (
         pad (INPUT_HEIGHT, INPUT_WIDTH, INPUT_CHANNELS, in, in_pd);
     }
     else {
+        // // no padding
+        // for (int i=0; i<INPUT_HEIGHT*INPUT_WIDTH*INPUT_CHANNELS; i++) {
+        //     in_pd[i] = in[i];
+        // }
+        
         // no padding
-        for (int i=0; i<INPUT_HEIGHT*INPUT_WIDTH*INPUT_CHANNELS; i++) {
-            in_pd[i] = in[i];
+        size_t vl;
+        int total;
+        int *in_addr    = (int *) in;
+        int *in_pd_addr = (int *) in_pd;
+
+        for (total = INPUT_HEIGHT*INPUT_WIDTH*INPUT_CHANNELS; total > 0; total -= vl)
+        {   
+            __asm__ volatile("vsetvli %0, %1, e32, m8, ta, ma" : "=r"(vl) : "r"(total));
+            __asm__ volatile("vle32.v v16, (%0)" :: "r"(in_addr));
+            __asm__ volatile("vse32.v v16, (%0)" :: "r"(in_pd_addr));
+            in_addr    += vl;
+            in_pd_addr += vl;
         }
     }
 
@@ -354,12 +469,31 @@ void _conv_block (
     //     base_y += stride*INPUT_CHANNELS*(INPUT_WIDTH+p);
     // }
 
+    // int handler
+    // for (int i=0; i<OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS; i++) {
+    //     out[i] >>= 13;
+    // }
+
+    // if (bias != NULL)
+    // {
+    //     for (int k=0; k<OUTPUT_HEIGHT; k++)
+    //     {
+    //         for (int l=0; l<OUTPUT_WIDTH; l++)
+    //         {
+    //             for (int n=0; n<OUTPUT_CHANNELS; n++)
+    //             {
+    //                 out[(n)+(l*OUTPUT_CHANNELS)+(k*OUTPUT_CHANNELS*OUTPUT_WIDTH)] += bias[n];
+    //             }
+    //         }
+    //     }
+    // }
+
     size_t vl;
     int *in_addr  = (int *) in_pd;
     int *out_addr = (int *) out;
     int *base_out = (int *) out;
     int *k_addr   = (int *) weights;
-    int base_x = 0, base_y = 0;
+    int base_x = 0, base_y = 0;     // "(0,0)" of the image
     int ch_out;
     int pixel;
     int width_padded = INPUT_WIDTH + p;
@@ -389,7 +523,7 @@ void _conv_block (
                             __asm__ volatile("vle32.v v24, (%0)" :: "r"(out_addr));
                             __asm__ volatile("vmacc.vx v24, %0, v16" :: "r"(pixel));
                             __asm__ volatile("vse32.v v24, (%0)" :: "r"(out_addr));
-                            k_addr += vl;
+                            k_addr   += vl;
                             out_addr += vl;
                         }
                     }
@@ -404,20 +538,35 @@ void _conv_block (
     }
 
     // int handler
-    for (int i=0; i<OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS; i++) {
-        out[i] >>= 13;
+    out_addr = (int *) out;
+    for (int total = OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS; total > 0; total -= vl)
+    {
+        __asm__ volatile("vsetvli %0, %1, e32, m8, ta, ma" : "=r"(vl) : "r"(total));
+        __asm__ volatile("vle32.v v16, (%0)" :: "r"(out_addr));
+        __asm__ volatile("vsra.vi v16, v16, 13");
+        __asm__ volatile("vse32.v v16, (%0)" :: "r"(out_addr));
+        out_addr += vl;
     }
 
     if (bias != NULL)
     {
-        for (int k=0; k<OUTPUT_HEIGHT; k++)
+        int *bias_addr = (int *) bias;
+        int total, ch_out;
+        out_addr = (int *) out;
+
+        for (total = OUTPUT_HEIGHT*OUTPUT_WIDTH*OUTPUT_CHANNELS; total > 0; total -= OUTPUT_CHANNELS)
         {
-            for (int l=0; l<OUTPUT_WIDTH; l++)
+            bias_addr = (int *) bias;
+            for (ch_out = OUTPUT_CHANNELS; ch_out > 0; ch_out -= vl)
             {
-                for (int n=0; n<OUTPUT_CHANNELS; n++)
-                {
-                    out[(n)+(l*OUTPUT_CHANNELS)+(k*OUTPUT_CHANNELS*OUTPUT_WIDTH)] += bias[n];
-                }
+                __asm__ volatile("vsetvli %0, %1, e32, m8, ta, ma" : "=r"(vl) : "r"(ch_out));
+                __asm__ volatile("vle32.v v16, (%0)" :: "r"(out_addr));
+                __asm__ volatile("vle32.v v8, (%0)" :: "r"(bias_addr));
+                __asm__ volatile("vadd.vv v16, v16, v8");
+                __asm__ volatile("vse32.v v16, (%0)" :: "r"(out_addr));
+
+                bias_addr += vl;
+                out_addr += vl;
             }
         }
     }
@@ -498,36 +647,36 @@ void concat4 (
         for (v0_processed_elements = CH0; v0_processed_elements > 0; v0_processed_elements -= vl)
         {
             __asm__ volatile("vsetvli %0, %1, e32, m8, ta, ma" : "=r"(vl) : "r"(v0_processed_elements));
-            __asm__ volatile("vle32.v v24, (%0)" ::"r"(v0_addr));
-            __asm__ volatile("vse32.v v24, (%0)" ::"r"(out_addr));
-            v0_addr += vl;
+            __asm__ volatile("vle32.v v24, (%0)" :: "r"(v0_addr));
+            __asm__ volatile("vse32.v v24, (%0)" :: "r"(out_addr));
+            v0_addr  += vl;
             out_addr += vl;
         }
 
         for (v1_processed_elements = CH1; v1_processed_elements > 0; v1_processed_elements -= vl)
         {
             __asm__ volatile("vsetvli %0, %1, e32, m2, ta, ma" : "=r"(vl) : "r"(v1_processed_elements));
-            __asm__ volatile("vle32.v v24, (%0)" ::"r"(v1_addr));
-            __asm__ volatile("vse32.v v24, (%0)" ::"r"(out_addr));
-            v1_addr += vl;
+            __asm__ volatile("vle32.v v24, (%0)" :: "r"(v1_addr));
+            __asm__ volatile("vse32.v v24, (%0)" :: "r"(out_addr));
+            v1_addr  += vl;
             out_addr += vl;
         }
 
         for (v2_processed_elements = CH2; v2_processed_elements > 0; v2_processed_elements -= vl)
         {
             __asm__ volatile("vsetvli %0, %1, e32, m1, ta, ma" : "=r"(vl) : "r"(v2_processed_elements));
-            __asm__ volatile("vle32.v v24, (%0)" ::"r"(v2_addr));
-            __asm__ volatile("vse32.v v24, (%0)" ::"r"(out_addr));
-            v2_addr += vl;
+            __asm__ volatile("vle32.v v24, (%0)" :: "r"(v2_addr));
+            __asm__ volatile("vse32.v v24, (%0)" :: "r"(out_addr));
+            v2_addr  += vl;
             out_addr += vl;
         }
 
         for (v3_processed_elements = CH3; v3_processed_elements > 0; v3_processed_elements -= vl)
         {
             __asm__ volatile("vsetvli %0, %1, e32, m1, ta, ma" : "=r"(vl) : "r"(v3_processed_elements));
-            __asm__ volatile("vle32.v v24, (%0)" ::"r"(v3_addr));
-            __asm__ volatile("vse32.v v24, (%0)" ::"r"(out_addr));
-            v3_addr += vl;
+            __asm__ volatile("vle32.v v24, (%0)" :: "r"(v3_addr));
+            __asm__ volatile("vse32.v v24, (%0)" :: "r"(out_addr));
+            v3_addr  += vl;
             out_addr += vl;
         }
     }
@@ -543,7 +692,7 @@ void vector_memset0(type v[], const int size) {
     {
         __asm__ volatile("vsetvli %0, %1, e32, m8, ta, ma" : "=r"(vl) : "r"(total));
         __asm__ volatile("vmv.v.i v24, 0");
-        __asm__ volatile("vse32.v v24, (%0)" ::"r"(addr));
+        __asm__ volatile("vse32.v v24, (%0)" :: "r"(addr));
         addr += vl;
     }
 }
