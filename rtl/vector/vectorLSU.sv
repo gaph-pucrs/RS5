@@ -156,6 +156,9 @@ module vectorLSU
                     next_state = VLSU_EXEC;
 
             VLSU_LAST_CYCLE:
+                    next_state = VLSU_DELAY;
+
+            VLSU_DELAY:
                 if ((
                     (vlmul inside {LMUL_1, LMUL_1_2, LMUL_1_4, LMUL_1_8}  && reg_count < 1)
                 ||  (vlmul == LMUL_2  && reg_count < 2)
@@ -193,11 +196,11 @@ module vectorLSU
         else if (state == VLSU_IDLE) begin
             offset_strided <= '0;
         end
-        else if (addrMode == UNIT_STRIDED) begin
+        else if (addrMode == UNIT_STRIDED && state != VLSU_DELAY) begin
             offset_strided <= offset_strided + 32'h4;
         end
         else if (addrMode == STRIDED) begin
-            if (state != VLSU_LAST_CYCLE)
+            if (!(state inside {VLSU_LAST_CYCLE, VLSU_DELAY}))
                 offset_strided <= offset_strided + stride_i;
         end
     end
@@ -215,7 +218,7 @@ module vectorLSU
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb
-        if (state inside {VLSU_IDLE, VLSU_LAST_CYCLE})
+        if (state inside {VLSU_IDLE, VLSU_LAST_CYCLE, VLSU_DELAY})
             nextElementsProcessedRegister = '0;
         else
             nextElementsProcessedRegister = elementsProcessedRegister + elementsProcessedCycle;
@@ -232,7 +235,7 @@ module vectorLSU
             elementsProcessedTotal <= 0;
         else if (state == VLSU_IDLE)
             elementsProcessedTotal <= 0;
-        else if (!indexed_wait_update_index_reg)
+        else if (!indexed_wait_update_index_reg && state != VLSU_DELAY)
             elementsProcessedTotal <= elementsProcessedTotal + elementsProcessedCycle;
     end
 
@@ -276,7 +279,7 @@ module vectorLSU
             reg_count <= '0;
         else if (next_state == VLSU_IDLE)
             reg_count <= '0;
-        else if (next_state == VLSU_LAST_CYCLE)
+        else if (next_state == VLSU_DELAY)
             reg_count <= reg_count + 1;
     end
 
@@ -432,21 +435,30 @@ module vectorLSU
 // Temporal barrier
 //////////////////////////////////////////////////////////////////////////////
 
+    addrModes_e              addrMode_r;
     logic [1:0]              address_r;
+    logic [1:0]              address_2r;
     vector_lsu_states_e      state_r;
+    vector_lsu_states_e      state_2r;
     logic [$bits(VLENB)-1:0] elementsProcessedCycle_r;
+    logic [$bits(VLENB)-1:0] elementsProcessedCycle_2r;
     logic [$bits(VLENB)-1:0] elementsProcessedRegister_r;
+    logic [$bits(VLENB)-1:0] elementsProcessedRegister_2r;
 
     always @(posedge clk) begin
-        address_r <= address[1:0];
+        address_r  <= address[1:0];
+        address_2r <= address_r;
+        addrMode_r <= addrMode;
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
-            state_r <= VLSU_IDLE;
+            state_r  <= VLSU_IDLE;
+            state_2r <= VLSU_IDLE;
         end
         else begin
-            state_r <= state;
+            state_r  <= state;
+            state_2r <= state_r;
         end
     end
 
@@ -465,6 +477,17 @@ module vectorLSU
         end
     end
 
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            elementsProcessedCycle_2r    <= '0;
+            elementsProcessedRegister_2r <= '0;
+        end
+        else begin
+            elementsProcessedCycle_2r    <= elementsProcessedCycle_r;
+            elementsProcessedRegister_2r <= elementsProcessedRegister_r;
+        end
+    end
+
 //////////////////////////////////////////////////////////////////////////////
 // STAGE 2 - Read Data Control
 //////////////////////////////////////////////////////////////////////////////
@@ -474,8 +497,8 @@ module vectorLSU
     logic [VLEN-1:0]  read_data;
 
     always_comb begin
-        if (addrMode != UNIT_STRIDED || (addrMode == UNIT_STRIDED && state_r == VLSU_FIRST_CYCLE)) begin
-            case (address_r[1:0])
+        if (addrMode_r != UNIT_STRIDED || (addrMode_r == UNIT_STRIDED && state_2r == VLSU_FIRST_CYCLE)) begin
+            case (address_2r[1:0])
                 2'b11: begin
                     read_data_8b[0] = mem_read_data_i[31:24];
                     read_data_8b[1] = mem_read_data_i[31:24];
@@ -509,8 +532,8 @@ module vectorLSU
     assign read_data_16b[1] = mem_read_data_i[31:16];
 
     always_comb begin
-        if (addrMode != UNIT_STRIDED || (addrMode == UNIT_STRIDED && state_r == VLSU_FIRST_CYCLE)) begin
-            case (address_r[1])
+        if (addrMode_r != UNIT_STRIDED || (addrMode_r == UNIT_STRIDED && state_2r == VLSU_FIRST_CYCLE)) begin
+            case (address_2r[1])
                 1'b1:
                     read_data_16b[0] = mem_read_data_i[31:16];
                 default:
@@ -523,41 +546,47 @@ module vectorLSU
     end
 
     always_comb begin
-        unique case (width)
-            EW8: begin
-                read_data[(8*elementsProcessedRegister_r)+:8] = read_data_8b[0];
-                if (elementsProcessedCycle_r > 1)
-                    read_data[(8*(elementsProcessedRegister_r+1))+:8] = read_data_8b[1];
-                if (elementsProcessedCycle_r > 2)
-                    read_data[(8*(elementsProcessedRegister_r+2))+:8] = read_data_8b[2];
-                if (elementsProcessedCycle_r > 3)
-                    read_data[(8*(elementsProcessedRegister_r+3))+:8] = read_data_8b[3];
-            end
-            EW16: begin
-                read_data[(16*elementsProcessedRegister_r)+:16] = read_data_16b[0];
-                if (elementsProcessedCycle_r > 1)
-                    read_data[(16*(elementsProcessedRegister_r+1))+:16] = read_data_16b[1];
-            end
-            default: begin
-                read_data[(32*elementsProcessedRegister_r)+:32] = mem_read_data_i;
-            end
-        endcase
+        if (state_2r != VLSU_IDLE) begin
+            unique case (width)
+                EW8: begin
+                    read_data[(8*elementsProcessedRegister_2r)+:8] <= read_data_8b[0];
+                    if (elementsProcessedCycle_2r > 1)
+                        read_data[(8*(elementsProcessedRegister_2r+1))+:8] <= read_data_8b[1];
+                    if (elementsProcessedCycle_2r > 2)
+                        read_data[(8*(elementsProcessedRegister_2r+2))+:8] <= read_data_8b[2];
+                    if (elementsProcessedCycle_2r > 3)
+                        read_data[(8*(elementsProcessedRegister_2r+3))+:8] <= read_data_8b[3];
+                end
+                EW16: begin
+                    read_data[(16*elementsProcessedRegister_2r)+:16] <= read_data_16b[0];
+                    if (elementsProcessedCycle_2r > 1)
+                        read_data[(16*(elementsProcessedRegister_2r+1))+:16] <= read_data_16b[1];
+                end
+                default: begin
+                    read_data[(32*elementsProcessedRegister_2r)+:32] <= mem_read_data_i;
+                end
+            endcase
+        end
+        else begin
+            read_data = '0;
+        end
     end
 
     always @(posedge clk) begin
-        if (state_r != VLSU_IDLE)
+        if (state_2r != VLSU_IDLE)
             read_data_o <= read_data;
         else
             read_data_o <= '0;
     end
+    //assign read_data_o = read_data;
 
 //////////////////////////////////////////////////////////////////////////////
 // Output Control
 //////////////////////////////////////////////////////////////////////////////
 
     assign hold_o = (instruction_operation_i == VSTORE)
-                    ? (state inside {VLSU_FIRST_CYCLE, VLSU_EXEC})
-                    : ((state == VLSU_FIRST_CYCLE && state_r == VLSU_IDLE) || (state_r inside {VLSU_FIRST_CYCLE, VLSU_EXEC}));
+                    ? (state inside {VLSU_FIRST_CYCLE, VLSU_EXEC, VLSU_LAST_CYCLE})
+                    : ((state == VLSU_FIRST_CYCLE && state_r == VLSU_IDLE) || (state_r inside {VLSU_FIRST_CYCLE, VLSU_EXEC, VLSU_LAST_CYCLE}));
 
     assign mem_address_o      = address;
     assign mem_read_enable_o  = 1'b1;
