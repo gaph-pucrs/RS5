@@ -31,11 +31,11 @@ module testbench
     // timeunit 1ns; timeprecision 1ns;
 
 `ifndef VLEN_P
-  `define VLEN_P 64
+  `define VLEN_P 512
 `endif
 
 `ifndef LLEN_P
-  `define LLEN_P 64
+  `define LLEN_P 32
 `endif
 
 `ifndef BUS_WIDTH_P
@@ -70,7 +70,7 @@ module testbench
 
     localparam int           BUS_WIDTH       = `BUS_WIDTH_P;
     localparam int           MEM_ADDR_BITS   = 28;
-    localparam string        BIN_FILE        = "../app/vector-benchmarks/benchmark.bin";
+    localparam string        BIN_FILE        = "../app/vector-tests/test.bin";
 
     localparam int           i_cnt = 1;
 
@@ -173,10 +173,14 @@ module testbench
             mem_data_read = data_tb;
         end
         else if (enable_rtc_r) begin
+        /* verilator lint_off WIDTHTRUNC */
             mem_data_read = {'0, data_rtc[31:0]};
+        /* verilator lint_on  WIDTHTRUNC */
         end
         else if (enable_plic_r) begin
+        /* verilator lint_off WIDTHTRUNC */
             mem_data_read = {'0, data_plic};
+        /* verilator lint_on  WIDTHTRUNC */
         end
         else begin
             mem_data_read = data_ram;

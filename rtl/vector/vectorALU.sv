@@ -310,7 +310,6 @@ module vectorALU
 //////////////////////////////////////////////////////////////////////////////
 // Hold generation
 //////////////////////////////////////////////////////////////////////////////
-    logic ended_acc_r;
 
     assign hold = |hold_lanes;
 
@@ -330,7 +329,6 @@ module vectorALU
         second_operand_r   <= second_operand;
         vector_operation_r <= vector_operation_i;
         hold_widening_2r   <= hold_widening_r;
-        ended_acc_r        <= ended_acc;
     end
 
     always_comb begin

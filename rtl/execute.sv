@@ -265,13 +265,21 @@ module execute
         else if (!stall) begin
             mem_address_o       <= mem_address;
             mem_read_enable_o   <= (mem_read_enable || atomic_mem_read_enable || mem_read_enable_vector_inst);
+            /* verilator lint_off WIDTHEXPAND */
+            /* verilator lint_off WIDTHTRUNC */
             mem_write_enable_o  <= ({'0, mem_write_enable} | {'0, {4{atomic_mem_write_enable}}} | mem_write_enable_vector);
+            /* verilator lint_on WIDTHTRUNC */
+            /* verilator lint_on WIDTHEXPAND */
 
             unique case (instruction_operation_i)
+            /* verilator lint_off WIDTHEXPAND */
+            /* verilator lint_off WIDTHTRUNC */
                 VLOAD,
                 VSTORE:  mem_write_data_o <= VEnable ? mem_write_data_vector : {'0, mem_write_data};
                 AMO_W:   mem_write_data_o <= (AMOEXT inside {AMO_ZAAMO, AMO_A}) ? {'0, amo_operand} : {'0, mem_write_data};
                 default: mem_write_data_o <= {'0, mem_write_data};
+            /* verilator lint_on WIDTHTRUNC */
+            /* verilator lint_on WIDTHEXPAND */
             endcase
         end
     end

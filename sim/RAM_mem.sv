@@ -81,7 +81,9 @@ module RAM_mem
         if (enA_i == 1'b1) begin
             for (int i = 0; i < (BUS_WIDTH/8); i++) begin
                 if (weA_i[i] == 1'b1) begin                                 // Store Word(4 bytes)
+            /* verilator lint_off WIDTHEXPAND */
                     RAM[addrA_i+i] <= dataA_i[(8*i)+:8];
+            /* verilator lint_on  WIDTHEXPAND */
                 end
             end
 
@@ -106,7 +108,9 @@ module RAM_mem
         if (enB_i == 1'b1) begin
             for (int i = 0; i < (BUS_WIDTH/8); i++) begin
                 if (weB_i[i] == 1'b1) begin                                 // Store Word(4 bytes)
+                /* verilator lint_off WIDTHEXPAND */
                     RAM[addrB_i+i] <= dataB_i[(8*i)+:8];
+                /* verilator lint_on  WIDTHEXPAND */
                 end
             end
 
@@ -134,7 +138,9 @@ module RAM_mem
         if (enA_i == 1'b1) begin
             if (weA_i == '0) begin
                 for (int i = 0; i < (BUS_WIDTH/8); i++) begin
+                /* verilator lint_off WIDTHEXPAND */
                     dataA_o[(8*i)+:8] <= RAM[addrA_i+i];
+                /* verilator lint_on  WIDTHEXPAND */
                 end
 
             `ifndef SYNTH
@@ -142,7 +148,9 @@ module RAM_mem
                     if (addrA_i != '0) begin
                         $fwrite(fd_r_a,"[%0d] ", $time);
                         for (int i = (BUS_WIDTH/8)-1; i >= 0; i--) begin
+                        /* verilator lint_off WIDTHEXPAND */
                             $fwrite(fd_r_a,"%h ", RAM[addrA_i+i]);
+                        /* verilator lint_on  WIDTHEXPAND */
                         end
                         $fwrite(fd_r_a," <-- 0x%4h\n", addrA_i);
                     end
@@ -154,7 +162,9 @@ module RAM_mem
         if (enB_i == 1'b1) begin
             if (weB_i == '0) begin
                 for (int i = 0; i < (BUS_WIDTH/8); i++) begin
+                /* verilator lint_off WIDTHEXPAND */
                     dataB_o[(8*i)+:8] <= RAM[addrB_i+i];
+                /* verilator lint_on  WIDTHEXPAND */
                 end
 
             `ifndef SYNTH
@@ -162,7 +172,9 @@ module RAM_mem
                     if (addrB_i != '0) begin
                         $fwrite(fd_r_b,"[%0d] ", $time);
                         for (int i = (BUS_WIDTH/8)-1; i >= 0; i--) begin
+                        /* verilator lint_off WIDTHEXPAND */
                             $fwrite(fd_r_b,"%h ", RAM[addrB_i+i]);
+                        /* verilator lint_on  WIDTHEXPAND */
                         end
                         $fwrite(fd_r_b," <-- 0x%4h\n", addrB_i);
                     end

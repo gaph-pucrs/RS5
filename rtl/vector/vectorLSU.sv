@@ -603,28 +603,28 @@ module vectorLSU
                 EW8: begin
                     for (int i = 0; i < ELEMENTS_PER_ACCESS_EW8;  i++) begin
                         if (elementsProcessedCycle_2r > i) begin
-                            read_data_o[(8*(elementsProcessedRegister_2r+i))+:8] = read_data_8b[i];
+                            read_data_o[(8*(elementsProcessedRegister_2r+i))+:8] <= read_data_8b[i];
                         end
                     end
                 end
                 EW16: begin
                     for (int i = 0; i < ELEMENTS_PER_ACCESS_EW16;  i++) begin
                         if (elementsProcessedCycle_2r > i) begin
-                            read_data_o[(16*(elementsProcessedRegister_2r+i))+:16] = read_data_16b[i];
+                            read_data_o[(16*(elementsProcessedRegister_2r+i))+:16] <= read_data_16b[i];
                         end
                     end
                 end
                 default: begin
                     for (int i = 0; i < ELEMENTS_PER_ACCESS_EW32;  i++) begin
                         if (elementsProcessedCycle_2r > i) begin
-                            read_data_o[(32*(elementsProcessedRegister_2r+i))+:32] = read_data_32b[i];
+                            read_data_o[(32*(elementsProcessedRegister_2r+i))+:32] <= read_data_32b[i];
                         end
                     end
                 end
             endcase
         end
         else begin
-            read_data_o = '0;
+            read_data_o <= '0;
         end
     end
 
