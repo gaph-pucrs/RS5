@@ -1,11 +1,15 @@
 set OUT_FILES ./results
 
+#genus -f run_logical_synthesis.tcl -execute "set TOP_MODULE vectorUnit" -execute "set VLEN 256" -execute "set LLEN 32" -execute "set BUS_WIDTH 32"
 
 ###############################################################################
 # Setup
 ###############################################################################
-set TOP_MODULE RS5
+if {![info exists TOP_MODULE]} {set TOP_MODULE RS5}
 
+if {![info exists VLEN]} {set VLEN 64}
+if {![info exists LLEN]} {set LLEN 32}
+if {![info exists BUS_WIDTH]} {set BUS_WIDTH 32}
 
 ###############################################################################
 # Custom FLOW
@@ -86,32 +90,39 @@ puts "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 puts "Load hdl files"
 puts "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 
-	read_hdl -define SYNTH -sv "../rtl/RS5_pkg.sv			\
-								../rtl/aes/riscv_crypto_sbox_aes_out.sv 	\
-								../rtl/aes/riscv_crypto_sbox_aes_top.sv 	\
-								../rtl/aes/riscv_crypto_sbox_inv_mid.sv 	\
-								../rtl/aes/riscv_crypto_aes_fwd_sbox.sv 	\
+	#read_physical -lefs "${TECH_PATH}/lef/tsmcn28_9lm5X1Y1Z1UUTRDL.tlef \
+					 ${TECH_PATH}/lef/tcbn28hpcplusbwp30p140_110a/lef/tcbn28hpcplusbwp30p140.lef \
+					/home/williannunes/RS5/synthesis/gen_regblock/ts6n28hpcphvta32x64m2fwbso_200b/LEF/ts6n28hpcphvta32x64m2fwbso_200b.lef"
+
+	read_hdl -define SYNTH -define MEM_TSMC_28 -sv "../rtl/RS5_pkg.sv						\
+								../rtl/aes/riscv_crypto_sbox_aes_out.sv \
+								../rtl/aes/riscv_crypto_sbox_aes_top.sv \
+								../rtl/aes/riscv_crypto_sbox_inv_mid.sv \
+								../rtl/aes/riscv_crypto_aes_fwd_sbox.sv \
 								../rtl/aes_unit.sv 						\
 								../rtl/amo.sv 							\
 								../rtl/CSRBank.sv 						\
-								../rtl/decode.sv 							\
+								../rtl/decode.sv 						\
 								../rtl/decompresser.sv 					\
 								../rtl/div.sv 							\
+								../rtl/mul.sv 							\
+								../rtl/mulNbits.sv						\
+								../rtl/vector/vectorRegbank.sv  		\
+								../rtl/vector/vectorCSRs.sv				\
+								../rtl/vector/vectorLane.sv				\
+								../rtl/vector/vectorSlide.sv			\
+								../rtl/vector/vectorReductionTree.sv 	\
+								../rtl/vector/vectorReductions.sv		\
+								../rtl/vector/vectorALU.sv				\
+								../rtl/vector/vectorLSU.sv				\
+								../rtl/vectorUnit.sv					\
 								../rtl/execute.sv 						\
-								../rtl/fetch.sv 							\
+								../rtl/fetch.sv 						\
 								../rtl/lrsc.sv 							\
 								../rtl/mmu.sv 							\
-								../rtl/mulNbits.sv						\
-								../rtl/mul.sv 							\
 								../rtl/regbank.sv 						\
-								../rtl/retire.sv 							\
-								../rtl/vectorALU.sv						\
-								../rtl/vectorCSRs.sv						\
-								../rtl/vectorLSU.sv						\
-								../rtl/vectorRegbank.sv  					\
-								../rtl/vectorUnit.sv						\
+								../rtl/retire.sv 						\
 								../rtl/RS5.sv"
-
 }
 
 
@@ -120,7 +131,7 @@ puts "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 puts "Elaboration"
 puts "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 
-	elaborate ${TOP_MODULE}
+	elaborate ${TOP_MODULE} -parameters [list [list VLEN $VLEN] [list LLEN $LLEN] [list BUS_WIDTH $BUS_WIDTH]]
 
 	# Applying the constraints
 	init_design
@@ -163,6 +174,7 @@ puts "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 
 	# Returns the physical layout estimation (ple) information for the specified design
 	report_ple > ${OUT_FILES}/reports/${TOP_MODULE}_ple.rpt
+	report_qor > ${OUT_FILES}/reports/${TOP_MODULE}_qor.rpt
 
 	# Report area
 	report_gates > ${OUT_FILES}/reports/${TOP_MODULE}_gates.rpt
@@ -234,7 +246,8 @@ puts "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 
 	### To generate all files needed to be loaded in an Innovus session, use the following command:
 
-	write_design -innovus -base_name ${OUT_FILES}/physical_synthesis/work/data
+	write_design -base_name ${OUT_FILES}/physical_synthesis/work/data
+	write_db -common ${OUT_FILES}/physical_synthesis/work/db
 
 	set CURRENT_VIEW analysis_view_0p90v_25c_captyp_nominal
 	write_db ${OUT_FILES}/gate_level/${TOP_MODULE}_logic_mapped.db

@@ -259,6 +259,7 @@ module vectorALU
     endgenerate
 
     always_comb begin
+        result_mult_low = '0;
         for (int i = 0; i < VLEN/32; i++) begin
             result_mult_low[(32*i)+:32] = result_lanes_mult[(64*i)+:64];
         end
@@ -271,6 +272,7 @@ module vectorALU
     logic [VLENB-1:0] result_mask;
 
     always_comb begin
+        result_mask = '0;
         unique case (vsew)
             EW8:
                 for (int i = 0; i < LANES; i++)

@@ -535,23 +535,23 @@ module vectorLSU
     logic [ELEMENTS_PER_ACCESS_EW8 -1:0][ 7:0] read_data_8b;
     logic [ELEMENTS_PER_ACCESS_EW16-1:0][15:0] read_data_16b;
     logic [ELEMENTS_PER_ACCESS_EW32-1:0][31:0] read_data_32b;
-    logic [VLEN-1:0]  read_data;
 
     always_comb begin
+        read_data_8b = '{default:0};
         if (addrMode_r != UNIT_STRIDED || (addrMode_r == UNIT_STRIDED && state_2r == VLSU_FIRST_CYCLE)) begin
             case (address_2r[1:0])
                 2'b11: begin
-                    for (int i = 0; i < ELEMENTS_PER_ACCESS_EW8; i++) begin
+                    for (int i = 0; i < ELEMENTS_PER_ACCESS_EW8-3; i++) begin
                         read_data_8b[i] = mem_read_data_i[24+(8*i)+:8];
                     end
                 end
                 2'b10: begin
-                    for (int i = 0; i < ELEMENTS_PER_ACCESS_EW8; i++) begin
+                    for (int i = 0; i < ELEMENTS_PER_ACCESS_EW8-2; i++) begin
                         read_data_8b[i] = mem_read_data_i[16+(8*i)+:8];
                     end
                 end
                 2'b01: begin
-                    for (int i = 0; i < ELEMENTS_PER_ACCESS_EW8; i++) begin
+                    for (int i = 0; i < ELEMENTS_PER_ACCESS_EW8-1; i++) begin
                         read_data_8b[i] = mem_read_data_i[8+(8*i)+:8];
                     end
                 end
@@ -570,10 +570,11 @@ module vectorLSU
     end
 
     always_comb begin
+        read_data_16b = '{default:0};
         if (addrMode_r != UNIT_STRIDED || (addrMode_r == UNIT_STRIDED && state_2r == VLSU_FIRST_CYCLE)) begin
             case (address_2r[1])
                 1'b1:
-                    for (int i = 0; i < ELEMENTS_PER_ACCESS_EW16; i++) begin
+                    for (int i = 0; i < ELEMENTS_PER_ACCESS_EW16-1; i++) begin
                         read_data_16b[i] = mem_read_data_i[16+(16*i)+:16];
                     end
                 default: begin
@@ -591,48 +592,41 @@ module vectorLSU
     end
 
     always_comb begin
-        for (int i = 0; i < ELEMENTS_PER_ACCESS_EW32; i++)
+        for (int i = 0; i < ELEMENTS_PER_ACCESS_EW32; i++) begin
             read_data_32b[i] = mem_read_data_i[(32*i)+:32];
+        end
     end
 
-    always_comb begin
+    always @(posedge clk) begin
         if (state_2r != VLSU_IDLE) begin
             unique case (width)
                 EW8: begin
                     for (int i = 0; i < ELEMENTS_PER_ACCESS_EW8;  i++) begin
                         if (elementsProcessedCycle_2r > i) begin
-                            read_data[(8*(elementsProcessedRegister_2r+i))+:8] = read_data_8b[i];
+                            read_data_o[(8*(elementsProcessedRegister_2r+i))+:8] = read_data_8b[i];
                         end
                     end
                 end
                 EW16: begin
                     for (int i = 0; i < ELEMENTS_PER_ACCESS_EW16;  i++) begin
                         if (elementsProcessedCycle_2r > i) begin
-                            read_data[(16*(elementsProcessedRegister_2r+i))+:16] = read_data_16b[i];
+                            read_data_o[(16*(elementsProcessedRegister_2r+i))+:16] = read_data_16b[i];
                         end
                     end
                 end
                 default: begin
                     for (int i = 0; i < ELEMENTS_PER_ACCESS_EW32;  i++) begin
                         if (elementsProcessedCycle_2r > i) begin
-                            read_data[(32*(elementsProcessedRegister_2r+i))+:32] = read_data_32b[i];
+                            read_data_o[(32*(elementsProcessedRegister_2r+i))+:32] = read_data_32b[i];
                         end
                     end
                 end
             endcase
         end
         else begin
-            read_data = '0;
+            read_data_o = '0;
         end
     end
-
-    always @(posedge clk) begin
-        if (state_2r != VLSU_IDLE)
-            read_data_o <= read_data;
-        else
-            read_data_o <= '0;
-    end
-    //assign read_data_o = read_data;
 
 //////////////////////////////////////////////////////////////////////////////
 // Output Control
