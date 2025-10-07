@@ -52,6 +52,7 @@ module RS5
     input  logic                    reset_n,
     input  logic                    sys_reset_i,
     input  logic                    stall,
+    input  logic                    busy_i,
 
     input  logic [31:0]             instruction_i,
     input  logic [31:0]             mem_data_i,
@@ -188,6 +189,7 @@ module RS5
 //////////////////////////////////////////////////////////// FETCH //////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+    logic        valid_fetch;
     logic        jump_rollback;
     logic        jumping;
     logic        ctx_switch;
@@ -209,6 +211,8 @@ module RS5
         .reset_n              (reset_n            ),
         .sys_reset            (sys_reset_i        ),
         .enable_i             (enable_fetch       ),
+        .busy_i               (busy_i             ),
+        .valid_o              (valid_fetch        ),
         .jump_i               (jump               ),
         .jump_rollback_i      (jump_rollback      ),
         .jump_target_i        (jump_target        ),
@@ -266,6 +270,7 @@ module RS5
         .reset_n                    (reset_n),
         .enable                     (enable_decode),
         .sys_reset                  (sys_reset_i),
+        .valid_i                    (valid_fetch),
         .instruction_i              (instruction_decode),
         .pc_i                       (pc_decode),
         .rs1_data_read_i            (regbank_data1),
@@ -440,20 +445,10 @@ module RS5
         end
         else if (!stall) begin
             instruction_operation_retire <= instruction_operation_mem_access;
-            regbank_write_enable <= write_enable_mem_access;
-            result_retire        <= result_mem_access;
-            rd_retire            <= rd_mem_access;
-            RAISE_EXCEPTION_r    <= RAISE_EXCEPTION;
-        end
-    end
-
-    logic mmu_en_r;
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            mmu_en_r <= 1'b0;
-        end
-        else if (!stall) begin
-            mmu_en_r <= mmu_en;
+            regbank_write_enable         <= write_enable_mem_access;
+            result_retire                <= result_mem_access;
+            rd_retire                    <= rd_mem_access;
+            RAISE_EXCEPTION_r            <= RAISE_EXCEPTION;
         end
     end
 
@@ -463,6 +458,16 @@ module RS5
      * address translation.
      */
     if (XOSVMEnable == 1'b1) begin : gen_d_mmu_on
+        logic mmu_en_r;
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n) begin
+                mmu_en_r <= 1'b0;
+            end
+            else if (!stall) begin
+                mmu_en_r <= mmu_en;
+            end
+        end
+        
         mmu d_mmu (
             .en_i           (mmu_en_r                  ),
             .mask_i         (mvmdm                     ),

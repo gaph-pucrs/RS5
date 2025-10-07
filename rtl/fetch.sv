@@ -34,6 +34,8 @@ module fetch
     input   logic           reset_n,
     input   logic           sys_reset,
     input   logic           enable_i,
+    input   logic           busy_i,
+    output  logic           valid_o,
 
     input   logic           jump_i,
     input   logic           ctx_switch_i,
@@ -63,6 +65,21 @@ module fetch
 ////////////////////////////////////////////////////////////////////////////////
 // Flow control
 ////////////////////////////////////////////////////////////////////////////////
+
+    logic busy_r;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            busy_r <= 1'b0;
+        else if (enable_i)
+            busy_r <= busy_i;
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            valid_o <= 1'b0;
+        else if (enable_i)
+            valid_o <= !busy_r;
+    end
 
     logic [31:2] iaddr_rollback;
 
@@ -164,24 +181,24 @@ module fetch
 // Data control
 ////////////////////////////////////////////////////////////////////////////////
 
-    logic enable_r;
+    logic fetched;
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
-            enable_r <= '0;
+            fetched <= '0;
         else
-            enable_r <= enable_i;
+            fetched <= enable_i && !busy_i;
     end
 
     logic [31:0] idata_held;
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             idata_held <= 32'h00000013;
-        else if (!enable_i && enable_r)
+        else if (!enable_i && fetched)
             idata_held <= instruction_data_i;
     end
 
     logic [31:0] instruction_fetched;
-    assign instruction_fetched = !enable_r ? idata_held : instruction_data_i;
+    assign instruction_fetched = fetched ? instruction_data_i : idata_held;
 
     logic [31:0] instruction_next;
 
@@ -473,7 +490,7 @@ module fetch
     else begin : gen_compressed_off
         assign pc_jumped         = instruction_address_o;
         assign jump_misaligned_o = 1'b0;
-        assign iaddr_continue    = enable_i;
+        assign iaddr_continue    = enable_i && !busy_i;
         assign pc_update         = pc_jumped_r;
         assign instruction_next  = instruction_fetched;
         assign iaddr_rollback    = iaddr_fetched_adv;
