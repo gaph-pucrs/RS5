@@ -189,6 +189,7 @@ module RS5
 //////////////////////////////////////////////////////////// FETCH //////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+    logic        bp_ack;
     logic        valid_fetch;
     logic        jump_rollback;
     logic        jumping;
@@ -213,6 +214,7 @@ module RS5
         .enable_i             (enable_fetch       ),
         .busy_i               (busy_i             ),
         .valid_o              (valid_fetch        ),
+        .bp_ack_o             (bp_ack             ),
         .jump_i               (jump               ),
         .jump_rollback_i      (jump_rollback      ),
         .jump_target_i        (jump_target        ),
@@ -379,6 +381,7 @@ module RS5
         .clk                     (clk),
         .reset_n                 (reset_n),
         .stall                   (stall),
+        .bp_ack_i                (bp_ack),
         .instruction_i           (instruction_execute),
         .rs1_data_i              (rs1_data_execute),
         .rs2_data_i              (rs2_data_execute),

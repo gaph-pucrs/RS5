@@ -43,6 +43,11 @@ module execute
     input   logic               reset_n,
     input   logic               stall,
 
+    /* Not used without BP */
+    /* verilator lint_off UNUSEDSIGNAL */
+    input   logic               bp_ack_i,
+    /* verilator lint_on UNUSEDSIGNAL */
+
     /* Bits 14:12 and 6:0 are not used in this module */
     /* verilator lint_off UNUSEDSIGNAL */
     input   logic [31:0]        instruction_i,
@@ -785,8 +790,8 @@ module execute
     assign ctx_switch_o = machine_return_o || raise_exception_o || interrupt_ack_o;
 
     if (BRANCHPRED) begin : gen_bp_on
-        assign jump_o          = ( should_jump && (!bp_taken_i ||  interrupt_ack_o));
-        assign jump_rollback_o = (!should_jump && ( bp_taken_i && !interrupt_ack_o));
+        assign jump_o          = ( should_jump && (!(bp_taken_i && bp_ack_i) ||  interrupt_ack_o));
+        assign jump_rollback_o = (!should_jump && ( (bp_taken_i && bp_ack_i) && !interrupt_ack_o));
     end
     else begin : gen_bp_off
         assign jump_o          = should_jump;

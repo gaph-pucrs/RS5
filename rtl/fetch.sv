@@ -36,6 +36,7 @@ module fetch
     input   logic           enable_i,
     input   logic           busy_i,
     output  logic           valid_o,
+    output  logic           bp_ack_o,
 
     input   logic           jump_i,
     input   logic           ctx_switch_i,
@@ -225,7 +226,7 @@ module fetch
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
                 iaddr_fetched_adv <= '0;
-            else if (enable_i && bp_take_i)
+            else if ((enable_i && !busy_i) && bp_take_i)
                 iaddr_fetched_adv <= iaddr_advance;
         end
 
@@ -253,10 +254,18 @@ module fetch
                 bp_rollback_o <= jump_rollback_r;
         end
 
-        assign jumped = ctx_switch_i || jump_i || (enable_i && bp_take_i);
+        assign jumped = ctx_switch_i || jump_i || (enable_i && !busy_i && bp_take_i);
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                bp_ack_o <= '0;
+            else if (enable_i)
+                bp_ack_o <= bp_take_i && !busy_i;
+        end
     end
     else begin : gen_bp_off
         assign bp_rollback_o     = 1'b0;
+        assign bp_ack_o          = 1'b0;
         assign jumped            = ctx_switch_i || jump_i;
         assign iaddr_fetched_adv = '0;
     end
