@@ -58,6 +58,7 @@ class rs5(pluginTemplate):
         # set up the simulation command
         dut_dir = self.pluginpath + '/../../'
         self.verilatecmd = f'verilator --cc --exe --binary --timescale 1ns/1ns -j 0\
+            -I{dut_dir}/RingBuffer/rtl/\
             -I{dut_dir}/rtl/\
             -I{dut_dir}/sim/\
             -I{dut_dir}/rtl/aes\
