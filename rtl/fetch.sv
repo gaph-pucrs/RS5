@@ -80,7 +80,9 @@ module fetch
     logic empty_buffer;
     assign empty_buffer = sys_reset || jump_confirmed;
 
+    logic buffer_tx;
     logic valid_buffer;
+    assign valid_buffer = buffer_tx && !empty_buffer;
 
     logic busy_r;
     always_ff @(posedge clk or negedge reset_n) begin
@@ -118,7 +120,7 @@ module fetch
         .rx_i          (push),
         .rx_ack_o      (mem_operation_en),
         .data_i        (instruction_data_i),
-        .tx_o          (valid_buffer),
+        .tx_o          (buffer_tx),
         .tx_ack_i      (pop),
         .data_o        (inst_buffered),
         .almost_full_o (almost_full),
