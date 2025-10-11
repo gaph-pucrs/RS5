@@ -83,7 +83,7 @@ module fetch
             busy_r <= 1'b1;
         else if (sys_reset)
             busy_r <= 1'b1;
-        else if (enable_i)
+        else
             busy_r <= busy_i;
     end
 
@@ -129,6 +129,19 @@ module fetch
             iaddr_jumped = jump_target_i;
     end
 
+    logic iaddr_hold;
+    assign iaddr_hold = (almost_full && !pop) || busy_i;
+
+    logic iaddr_hold_r;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            iaddr_hold_r <= 1'b0;
+        else if (sys_reset)
+            iaddr_hold_r <= 1'b0;
+        else
+            iaddr_hold_r <= iaddr_hold;
+    end
+
     logic [31:0] instruction_address;
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
@@ -140,7 +153,7 @@ module fetch
         else begin
             if (jumped)
                 instruction_address <= iaddr_jumped;
-            else if (!(almost_full && !pop) && !busy_i)
+            else if (!iaddr_hold || (iaddr_hold_r && push && mem_operation_en))
                 instruction_address <= instruction_address + 32'd4;
         end
     end
@@ -171,34 +184,34 @@ module fetch
             instruction_o <= 32'h00000013;
         else if (sys_reset)
             instruction_o <= 32'h00000013;
-        else if (enable_i)
+        else if (enable_i && valid)
             instruction_o <= next_instruction;
     end
 
-    logic [31:0] pc;
+    logic [31:0] pc_jumped;
     logic jumped_r;
     always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            pc <= start_address;
-        end
-        else if (sys_reset) begin
-            pc <= start_address;
-        end
-        else begin 
-            if (jumped_r)
-                pc <= instruction_address_o;
-            else if (enable_i && valid)
-                pc <= pc + 32'd4;
-        end
+        if (!reset_n) 
+            pc_jumped <= start_address;
+        else if (sys_reset)
+            pc_jumped <= start_address;
+        else if (jumped_r)
+            pc_jumped <= instruction_address;
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
+        if (!reset_n) begin
             pc_o <= start_address;
-        else if (sys_reset)
+        end
+        else if (sys_reset) begin
             pc_o <= start_address;
-        else if (enable_i && valid)
-            pc_o <= pc;
+        end
+        else begin
+            if (jumping_o)
+                pc_o <= pc_jumped;
+            else if (enable_i && valid)
+                pc_o <= pc_o + 32'd4;
+        end
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
