@@ -50,7 +50,6 @@ module fetch
     input   logic [31:0]    bp_target_i,
     /* verilator lint_on UNUSEDSIGNAL */
     input   logic           jump_rollback_i,
-    output  logic           bp_rollback_o,
     output  logic           bp_ack_o,
 
     /* Memory interface */
@@ -65,21 +64,24 @@ module fetch
     output  logic           compressed_o
 );
 
+////////////////////////////////////////////////////////////////////////////////
+// Jump control
+////////////////////////////////////////////////////////////////////////////////
+
+    /* Jumped condition and fetched instruction invalidation depends on BP */
+    /* Instruction address of jump target also depends on BP               */
     logic jumped;
-    logic jump_confirmed;
-    logic compressed;
-    logic unaligned;
+    logic jumped_fetch;
     logic [31:0] iaddr_jumped;
 
-    logic jump_rollback_r;
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            jump_rollback_r <= 1'b0;
-        else if (sys_reset)
-            jump_rollback_r <= 1'b0;
-        else 
-            jump_rollback_r <= jump_rollback_i;
-    end
+    logic should_jump;
+    assign should_jump = ctx_switch_i || jump_i;
+
+    logic jump_confirmed;
+    assign jump_confirmed = should_jump || (bp_ack_o && !jump_rollback_i);
+
+    logic is_jumping;
+    assign is_jumping = jumping_o && !jump_rollback_i;
 
     logic jumped_r;
     always_ff @(posedge clk or negedge reset_n) begin
@@ -94,6 +96,9 @@ module fetch
 ////////////////////////////////////////////////////////////////////////////////
 // Memory interface and instruction queue
 ////////////////////////////////////////////////////////////////////////////////
+
+    /* The existance of prefetching only occurs with compressed enablement */
+    logic instruction_prefetched;
 
     /* verilator lint_off UNUSEDSIGNAL */
     logic almost_empty;
@@ -133,16 +138,10 @@ module fetch
     logic valid_buffer;
     assign valid_buffer = buffer_tx && !empty_buffer;
 
-    /* Read instruction from buffer/memory                        */
-    /* Read when enabled                                          */
-    /* Unaligned compressed are always prefetched, if not jumping */
-    /* A misaligned jump will always have to read 2 times         */
-    assign pop = ((
-            enable_i 
-            && !(unaligned && compressed && !(jumping_o && !jump_rollback_i))
-        ) 
-        || jump_misaligned_o
-    );
+    /* Read instruction from buffer/memory                */
+    /* Read when enabled and not prefetched               */
+    /* A misaligned jump will always have to read 2 times */
+    assign pop = (enable_i && !instruction_prefetched) || jump_misaligned_o;
 
     /* When last cycle was busy, we do not have a valid fetch */
     logic busy_r;
@@ -158,7 +157,7 @@ module fetch
     /* A valid fetch happens only when memory answers and the requested */
     /* address is still valid. A jump invalidates the request.          */
     logic valid_fetch;
-    assign valid_fetch = !busy_r && !(jumped_r && !jump_rollback_i) && !jump_rollback_r;
+    assign valid_fetch = !busy_r && !jumped_fetch;
 
     /* Insert instruction from memory into buffer      */
     /* Only insert when fetched instruction is valid   */
@@ -168,10 +167,11 @@ module fetch
     /* Do not update instruction address if memory can't answer       */
     /* Do not update if the present request will make the buffer full */
     /* Do not update if the buffer is already full                    */
-    /* @todo check if the last busy_r is really needed                */
-    /* @todo simplify?                                                */
     logic iaddr_hold;
-    assign iaddr_hold = busy_i || (!pop && almost_full && valid_fetch) || (!pop && !mem_operation_en && busy_r);
+    assign iaddr_hold = (
+        busy_i 
+        || (!pop && ((almost_full && valid_fetch) || !mem_operation_en))
+    );
 
     logic iaddr_hold_r;
     always_ff @(posedge clk or negedge reset_n) begin
@@ -202,28 +202,81 @@ module fetch
         end
     end
 
-    assign instruction_address_o    = {instruction_address[31:2], 2'b00};
+    assign instruction_address_o = {instruction_address[31:2], 2'b00};
 
     logic [31:0] next_instruction;
     assign next_instruction = valid_buffer ? inst_buffered : instruction_data_i;
 
-////////////////////////////////////////////////////////////////////////////////
-// CPU Interface
-////////////////////////////////////////////////////////////////////////////////
-    
-    /* We consider a instruction prefetched when it was removed from buffer */
-    /* or read from memory but will be used again. Happens after compressed */
-    /* instruction with unaligned PC. If jumping, it is invalid.            */
     logic valid_prefetch;
-    assign valid_prefetch = (
-        unaligned 
-        && compressed 
-        && !(jumping_o && !jump_rollback_i) 
-        && !jump_misaligned_o
-    );
+    assign valid_prefetch = instruction_prefetched && !jump_misaligned_o;
 
     logic valid;
     assign valid = valid_fetch || valid_buffer || valid_prefetch;
+
+////////////////////////////////////////////////////////////////////////////////
+// Branch Prediction
+////////////////////////////////////////////////////////////////////////////////
+
+    if (BRANCHPRED) begin : gen_bp_on
+        logic jump_rollback_r;
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                jump_rollback_r <= 1'b0;
+            else if (sys_reset)
+                jump_rollback_r <= 1'b0;
+            else 
+                jump_rollback_r <= jump_rollback_i;
+        end
+        assign jumped_fetch = (jumped_r && !jump_rollback_i) || jump_rollback_r;
+
+        logic bp_taken;
+        assign bp_taken = (enable_i && bp_take_i && valid);
+        assign jumped   = should_jump || bp_taken;
+
+        logic [31:0] iaddr_rollback;
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                iaddr_rollback <= '0;
+            else if (bp_taken)
+                iaddr_rollback <= iaddr_hold ? instruction_address : next_instruction_address;
+        end
+
+        always_comb begin
+            if (ctx_switch_i)
+                iaddr_jumped = ctx_switch_target_i;
+            else if (jump_i)
+                iaddr_jumped = jump_target_i;
+            else if (jump_rollback_i)
+                iaddr_jumped = iaddr_rollback;
+            else
+                iaddr_jumped = bp_target_i;
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                bp_ack_o <= '0;
+            else if (sys_reset)
+                bp_ack_o <= '0;
+            else if (enable_i)
+                bp_ack_o <= bp_taken;
+        end
+    end
+    else begin : gen_bp_off
+        assign jumped       = should_jump;
+        assign jumped_fetch = jumped_r && !jump_rollback_i;
+        assign bp_ack_o     = 1'b0;
+
+        always_comb begin
+            if (ctx_switch_i)
+                iaddr_jumped = ctx_switch_target_i;
+            else
+                iaddr_jumped = jump_target_i;
+        end
+    end
+
+////////////////////////////////////////////////////////////////////////////////
+// CPU Interface
+////////////////////////////////////////////////////////////////////////////////
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
@@ -255,7 +308,7 @@ module fetch
     end
 
     logic [31:0] next_pc;
-    
+
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             pc_o <= start_address;
@@ -264,7 +317,7 @@ module fetch
             pc_o <= start_address;
         end
         else begin
-            if ((jumping_o && !jump_rollback_i) || jump_misaligned_o)
+            if (is_jumping || jump_misaligned_o)
                 pc_o <= pc_jumped;
             else if (enable_i && valid)
                 pc_o <= next_pc;
@@ -287,67 +340,65 @@ module fetch
     end
 
 ////////////////////////////////////////////////////////////////////////////////
-// Branch Prediction
-////////////////////////////////////////////////////////////////////////////////
-
-    if (BRANCHPRED) begin : gen_bp_on
-        logic bp_taken;
-        // assign bp_taken = (enable_i && bp_take_i && valid && push);
-        assign bp_taken       = (enable_i && bp_take_i && valid);
-        assign jumped         = ctx_switch_i || jump_i || bp_taken;
-        assign jump_confirmed = ctx_switch_i || jump_i || (bp_ack_o && !jump_rollback_i);
-
-        logic [31:0] iaddr_rollback;
-        always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n)
-                iaddr_rollback <= '0;
-            else if (bp_taken)
-                iaddr_rollback <= iaddr_hold ? instruction_address : next_instruction_address;
-        end
-
-        always_comb begin
-            if (ctx_switch_i)
-                iaddr_jumped = ctx_switch_target_i;
-            else if (jump_i)
-                iaddr_jumped = jump_target_i;
-            else if (jump_rollback_i)
-                iaddr_jumped = iaddr_rollback;
-            else
-                iaddr_jumped = bp_target_i;
-        end
-
-        always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n)
-                bp_ack_o <= '0;
-            else if (sys_reset)
-                bp_ack_o <= '0;
-            else if (enable_i)
-                bp_ack_o <= bp_taken;
-        end
-
-        assign bp_rollback_o  = 1'b0;
-    end
-    else begin : gen_bp_off
-        assign jumped         = ctx_switch_i || jump_i;
-        assign jump_confirmed = jumped;
-        assign bp_ack_o       = 1'b0;
-        assign bp_rollback_o  = 1'b0;
-
-        always_comb begin
-            if (ctx_switch_i)
-                iaddr_jumped = ctx_switch_target_i;
-            else
-                iaddr_jumped = jump_target_i;
-        end
-    end
-
-////////////////////////////////////////////////////////////////////////////////
-// Compressed
+// Instruction aligner and compressed expansion
 ////////////////////////////////////////////////////////////////////////////////
 
     if (COMPRESSED) begin : gen_compressed_on
-        logic [31:0] instruction_built;
+        /* PC is always 2-byte or 4-byte aligned */
+        logic unaligned;
+        assign unaligned = pc_o[1];
 
+        /* Last instruction removed from buffer/memory                    */
+        /* Sometimes we need its contents two times, causing a "prefetch" */
+        logic [31:0] instruction_r;
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                instruction_r <= 32'h00000013;
+            else if (sys_reset)
+                instruction_r <= 32'h00000013;
+            else if (pop && (valid_fetch || valid_buffer))
+                instruction_r <= next_instruction;
+        end
+
+        logic compressed;
+        
+        /* Alignment control */
+        logic [31:0] instruction_built;
+        always_comb begin
+            if (is_jumping || (!jump_misaligned_o && !(unaligned || compressed)))
+                /* On jump, last valid instruction is the next one */
+                /* Also normal flow of 4-byte aligned instructions */
+                instruction_built = next_instruction;
+            else if (jump_misaligned_o || (unaligned ^ compressed))
+                /* When next instruction is unaligned we also need two fetches */
+                /* Shift the last instruction msbs and join with the next lsbs */
+                instruction_built = {next_instruction[15:0], instruction_r[31:16]};
+            else   // unaligned &&  compressed
+                /* After an unaligned compressed, the instruction we want was */
+                /* already removed from the buffer/memory                     */
+                instruction_built = instruction_r;
+        end
+
+        logic next_compressed;        
+        assign next_compressed = (instruction_built[1:0] != 2'b11);
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                compressed <= 1'b0;
+            else if (sys_reset)
+                compressed <= 1'b0;
+            else if (enable_i && valid)
+                compressed <= next_compressed;
+        end
+        assign compressed_o = compressed;
+
+        /* We consider a instruction prefetched when it was removed from buffer */
+        /* or read from memory but will be used again. Happens after compressed */
+        /* instruction with unaligned PC. If jumping, it is invalid.            */
+        assign instruction_prefetched = unaligned && compressed && !is_jumping;
+
+        /* An unaligned jump requires the input of two fetches                 */
+        /* Only after the first needed fetch is valid the signal is deasserted */
         logic unaligned_jump;
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n) begin
@@ -363,81 +414,26 @@ module fetch
                     unaligned_jump <= 1'b0;
             end
         end
+        assign jump_misaligned_o = unaligned_jump;
 
-        logic [31:0] instruction_r;
-        always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n)
-                instruction_r <= 32'h00000013;
-            else if (sys_reset)
-                instruction_r <= 32'h00000013;
-            // else if (pop && valid)
-            else if (pop && (valid_fetch || valid_buffer))
-                instruction_r <= next_instruction;
-        end
-
-        logic next_compressed;
-        assign next_compressed = (instruction_built[1:0] != 2'b11);
-
-        always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n)
-                compressed <= 1'b0;
-            else if (sys_reset)
-                compressed <= 1'b0;
-            else if (enable_i && valid)
-                compressed <= next_compressed;
-        end
-        assign compressed_o = compressed;
-
+        /* Compressed instruction expansion */
         logic [31:0] instruction_decompressed;
         decompresser #(
             .MULEXT    (MULEXT),
             .ZCBEnable (ZCBEnable)
         ) decompresser (
-            .instruction_i (instruction_built[15:0]),
+            .instruction_i (instruction_built[15:0] ),
             .instruction_o (instruction_decompressed)
         );
 
-        assign unaligned  = pc_o[1];
-        
         assign instruction = next_compressed ? instruction_decompressed : instruction_built;
         assign next_pc     = pc_o + (compressed_o ? 32'd2 : 32'd4);
-
-        always_comb begin
-            if (jumping_o && !jump_rollback_i)
-                // Disregard last instruction on jump 
-                instruction_built = next_instruction;
-            else if (jump_misaligned_o || (unaligned && !compressed))
-                // After unaligned 4-byte instruction we need the input of 2 fetches
-                instruction_built = {next_instruction[15:0], instruction_r[31:16]};
-            else if (!unaligned &&  compressed)
-                // After aligned compressed the next instruction could be prefetched if the previous was compressed
-                instruction_built = {next_instruction[15:0], instruction_r[31:16]};
-            else if (!unaligned && !compressed)
-                // Normal flow: get the entire next instruction
-                instruction_built = next_instruction;
-            else   // unaligned &&  compressed
-                // After unaligned compressed, the next instruction was not popped?
-                instruction_built = instruction_r;
-        end
-
-        // always_ff @(posedge clk or negedge reset_n) begin
-        //     if (!reset_n)
-        //         jump_misaligned_o <= 1'b0;
-        //     else if (sys_reset)
-        //         jump_misaligned_o <= 1'b0;
-        //     else if (jumping_o && !jump_rollback_i)
-        //         jump_misaligned_o <= pc_jumped[1];
-        //     else if (enable_i && valid_o)
-        //         jump_misaligned_o <= 1'b0;
-        // end
-        assign jump_misaligned_o = unaligned_jump;
     end
     else begin : gen_compressed_off
-        assign compressed_o      = 1'b0;
-        assign next_pc           = pc_o + 32'd4;
-        assign instruction       = next_instruction;
-        assign compressed        = 1'b0;
-        assign unaligned        = 1'b0;
-        assign jump_misaligned_o = 1'b0;
+        assign instruction_prefetched = 1'b0;
+        assign compressed_o           = 1'b0;
+        assign next_pc                = pc_o + 32'd4;
+        assign instruction            = next_instruction;
+        assign jump_misaligned_o      = 1'b0;
     end
 endmodule
