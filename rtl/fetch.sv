@@ -105,7 +105,9 @@ module fetch
 
     logic pop;
     // assign pop = enable_i;
-    assign pop = enable_i && (!(unaligned && compressed) || (jumping_o && !jump_rollback_i) || jump_misaligned_o);
+    logic jump_rollback_r;
+    // assign pop = enable_i && (!(unaligned && compressed && !jump_rollback_r) || (jumping_o && !jump_rollback_i) || jump_misaligned_o);
+    assign pop = (enable_i && !(unaligned && compressed && !(jumping_o && !jump_rollback_i))) || jump_misaligned_o;
 
     logic [31:0] inst_buffered;
 
@@ -133,7 +135,6 @@ module fetch
     logic [31:0] iaddr_jumped;
     logic [31:0] next_instruction_address;
 
-    logic jump_rollback_r;
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             jump_rollback_r <= 1'b0;
@@ -153,7 +154,7 @@ module fetch
     end
 
     logic valid_fetch;
-    assign valid_fetch = !busy_r && !jump_rollback_r && !(jumped_r && !jump_rollback_i);
+    assign valid_fetch = !busy_r && !(jumped_r && !jump_rollback_i) && !jump_rollback_r;
 
     if (BRANCHPRED) begin : gen_bp_on
         logic bp_taken;
@@ -191,7 +192,8 @@ module fetch
         end
 
         // assign push = valid_fetch && (!pop || valid_buffer);
-        assign push = valid_fetch && (!pop || valid_buffer) && !jumping_o;
+        // assign push = valid_fetch && (!pop || valid_buffer) && !(jumping_o && !jump_rollback_i);
+        assign push = valid_fetch && (!pop || valid_buffer);
 
         assign bp_rollback_o  = 1'b0;
     end
@@ -211,7 +213,9 @@ module fetch
         end
     end
 
-    assign iaddr_hold = (almost_full && !pop && !busy_r) || (!pop && !mem_operation_en && busy_r) || busy_i;
+    // Hold if memory can't answer, if buffer is gonna be full on next valid data, or when buffer is already full
+    // assign iaddr_hold = busy_i || (!pop && almost_full && valid_fetch) || (!pop && !mem_operation_en && busy_r);
+    assign iaddr_hold = busy_i || (!pop && almost_full && valid_fetch) || (!pop && !mem_operation_en && busy_r);
 
     logic iaddr_hold_r;
     always_ff @(posedge clk or negedge reset_n) begin
@@ -247,6 +251,7 @@ module fetch
 ////////////////////////////////////////////////////////////////////////////////
 
     // assign valid = valid_fetch || valid_buffer;
+    // assign valid = valid_fetch || valid_buffer || (unaligned && compressed && !(jumping_o && !jump_rollback_i) && !jump_misaligned_o);
     assign valid = valid_fetch || valid_buffer || (unaligned && compressed && !(jumping_o && !jump_rollback_i) && !jump_misaligned_o);
 
     always_ff @(posedge clk or negedge reset_n) begin
