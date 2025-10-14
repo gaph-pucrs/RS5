@@ -75,7 +75,7 @@ To test both *baseline* and *extensions* instruction sets, run `make all`.
 Note that running `make` will download or update the (test suite)[https://github.com/riscv-non-isa/riscv-arch-test] automatically.
 
 Variations to core implementation are controlled by environment variables.
-By default, branch prediction (`BRANCHPRED`) and forwarding (`FORWARDING`) are enabled.
+By default, branch prediction (`BRANCHPRED`), forwarding (`FORWARDING`), and dual port memory (`DUALPORT_MEM`) are enabled, and the instruction queue size (`IQUEUE_SIZE`) is 2.
 To control its behavior, run make with the environment variables defined to enable/disable the features.
 E.g., run *extensions* with branch prediction and without forwarding:
 ```

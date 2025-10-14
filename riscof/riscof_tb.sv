@@ -35,8 +35,10 @@ module riscof_tb
     parameter bit         HPMCOUNTEREnable = 1'b0,
     parameter bit         ZKNEEnable       = 1'b0,
     parameter bit         ZCBEnable        = 1'b0,
+    parameter int         IQUEUE_SIZE      = 2,
     parameter bit         BRANCHPRED       = 1'b0,
-    parameter bit         FORWARDING       = 1'b0
+    parameter bit         FORWARDING       = 1'b0,
+    parameter bit         DUALPORT_MEM     = 1'b1
 )
 (
 );
@@ -132,6 +134,8 @@ module riscof_tb
 // CPU
 //////////////////////////////////////////////////////////////////////////////
 
+    logic busy;
+
     RS5 #(
     `ifndef SYNTH
 	    .DEBUG      (DEBUG          ),
@@ -148,6 +152,7 @@ module riscof_tb
         .ZICONDEnable    (ZICONDEnable    ),
         .ZCBEnable       (ZCBEnable       ),
         .HPMCOUNTEREnable(HPMCOUNTEREnable),
+        .IQUEUE_SIZE     (IQUEUE_SIZE     ),
         .BRANCHPRED      (BRANCHPRED      ),
         .FORWARDING      (FORWARDING      )
     ) dut (
@@ -155,6 +160,7 @@ module riscof_tb
         .reset_n                (reset_n),
         .sys_reset_i            (1'b0),
         .stall                  (1'b0),
+        .busy_i                 (busy),
         .instruction_i          (instruction),
         .mem_data_i             (mem_data_read),
         .mtime_i                (mtime),
@@ -173,6 +179,20 @@ module riscof_tb
 // RAM
 //////////////////////////////////////////////////////////////////////////////
 
+    logic                             enA;
+    logic [3:0]                       weA;
+    logic [($clog2(MEM_WIDTH) - 1):0] addrA;
+    logic [31:0]                      dataAi;
+    logic [31:0]                      dataAo;
+
+    logic                             enB;
+    logic [3:0]                       weB;
+    logic [($clog2(MEM_WIDTH) - 1):0] addrB;
+    logic [31:0]                      dataBi;
+    /* verilator lint_off UNUSEDSIGNAL */
+    logic [31:0]                      dataBo;
+    /* verilator lint_on UNUSEDSIGNAL */
+
     RAM_mem #(
     `ifndef SYNTH
         .DEBUG     (DEBUG     ),
@@ -183,18 +203,49 @@ module riscof_tb
     ) RAM_MEM (
         .clk        (clk),
 
-        .enA_i      (1'b1),
-        .weA_i      (4'h0),
-        .addrA_i    (instruction_address[($clog2(MEM_WIDTH) - 1):0]),
-        .dataA_i    (32'h00000000),
-        .dataA_o    (instruction),
+        .enA_i      (enA),
+        .weA_i      (weA),
+        .addrA_i    (addrA),
+        .dataA_i    (dataAi),
+        .dataA_o    (dataAo),
 
-        .enB_i      (enable_ram),
-        .weB_i      (mem_write_enable),
-        .addrB_i    (mem_address[($clog2(MEM_WIDTH) - 1):0]),
-        .dataB_i    (mem_data_write),
-        .dataB_o    (data_ram)
+        .enB_i      (enB),
+        .weB_i      (weB),
+        .addrB_i    (addrB),
+        .dataB_i    (dataBi),
+        .dataB_o    (dataBo)
     );
+
+    if (DUALPORT_MEM) begin : dual_port
+        assign enA         = 1'b1;
+        assign weA         = 4'h0;
+        assign addrA       = instruction_address[($clog2(MEM_WIDTH) - 1):0];
+        assign dataAi      = 32'h00000000;
+        assign instruction = dataAo;
+
+        assign enB         = enable_ram;
+        assign weB         = mem_write_enable;
+        assign addrB       = mem_address[($clog2(MEM_WIDTH) - 1):0];
+        assign dataBi      = mem_data_write;
+        assign data_ram    = dataBo;
+
+        assign busy        = 1'b0;
+    end
+    else begin : single_port
+        assign enA         = 1'b1;
+        assign weA         = enable_ram ? mem_write_enable : 4'h0;
+        assign addrA       = enable_ram ? mem_address[($clog2(MEM_WIDTH) - 1):0] : instruction_address[($clog2(MEM_WIDTH) - 1):0];
+        assign dataAi      = mem_data_write;
+        assign instruction = dataAo;
+        assign data_ram    = dataAo;
+
+        assign enB         = 1'b0;
+        assign weB         = 4'h0000;
+        assign addrB       = '0;
+        assign dataBi      = 32'h00000000;
+
+        assign busy        = enable_ram;
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 // PLIC

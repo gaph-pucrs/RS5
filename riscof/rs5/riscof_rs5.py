@@ -99,6 +99,8 @@ class rs5(pluginTemplate):
 
         self.verilatecmd += " -GBRANCHPRED=1\\'b" + os.environ["BRANCHPRED"]
         self.verilatecmd += " -GFORWARDING=1\\'b" + os.environ["FORWARDING"]
+        self.verilatecmd += " -GDUALPORT_MEM=1\\'b" + os.environ["DUALPORT_MEM"]
+        self.verilatecmd += " -GIQUEUE_SIZE=" + os.environ["IQUEUE_SIZE"]
 
         self.compile_cmd = self.compile_cmd+' -mabi='+('lp64 ' if 64 in ispec['supported_xlen'] else 'ilp32 ')
 
