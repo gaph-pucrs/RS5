@@ -24,12 +24,11 @@ module fetch
     import RS5_pkg::*;
 #(
     parameter       start_address = 32'b0,
-    parameter bit   BRANCHPRED = 1'b1, 
-    parameter bit   COMPRESSED = 1'b0,
-    /* verilator lint_off UNUSEDPARAM */
-    parameter mul_e MULEXT     = MUL_M,
-    parameter bit   ZCBEnable  = 1'b0
-    /* verilator lint_on UNUSEDPARAM */
+    parameter int   IQUEUE_SIZE   = 2,
+    parameter bit   BRANCHPRED    = 1'b1, 
+    parameter bit   COMPRESSED    = 1'b0,
+    parameter mul_e MULEXT        = MUL_M,
+    parameter bit   ZCBEnable     = 1'b0
 )
 (
     input   logic           clk,
@@ -66,58 +65,54 @@ module fetch
     output  logic           compressed_o
 );
 
-////////////////////////////////////////////////////////////////////////////////
-// Memory interface
-////////////////////////////////////////////////////////////////////////////////
-
     logic jumped;
     logic jump_confirmed;
-    logic valid;
-    logic iaddr_hold;
-    logic jumped_r;
-    logic [31:0] instruction_address;
-
-    logic empty_buffer;
-    assign empty_buffer = sys_reset || jump_confirmed;
-
-    logic buffer_tx;
-    logic valid_buffer;
-    assign valid_buffer = buffer_tx && !empty_buffer;
-
-    logic busy_r;
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            busy_r <= 1'b1;
-        else if (sys_reset)
-            busy_r <= 1'b1;
-        else
-            busy_r <= busy_i;
-    end
-
-    logic push;
     logic compressed;
     logic unaligned;
+    logic [31:0] iaddr_jumped;
+
+    logic jump_rollback_r;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            jump_rollback_r <= 1'b0;
+        else if (sys_reset)
+            jump_rollback_r <= 1'b0;
+        else 
+            jump_rollback_r <= jump_rollback_i;
+    end
+
+    logic jumped_r;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            jumped_r <= 1'b1;
+        else if (sys_reset)
+            jumped_r <= 1'b1;
+        else
+            jumped_r <= jumped;
+    end
+
+////////////////////////////////////////////////////////////////////////////////
+// Memory interface and instruction queue
+////////////////////////////////////////////////////////////////////////////////
 
     /* verilator lint_off UNUSEDSIGNAL */
-    logic mem_operation_en;
     logic almost_empty;
     /* verilator lint_on UNUSEDSIGNAL */
 
+    /* Buffer signals */
     logic pop;
-    // assign pop = enable_i;
-    logic jump_rollback_r;
-    // assign pop = enable_i && (!(unaligned && compressed && !jump_rollback_r) || (jumping_o && !jump_rollback_i) || jump_misaligned_o);
-    assign pop = (enable_i && !(unaligned && compressed && !(jumping_o && !jump_rollback_i))) || jump_misaligned_o;
-
+    logic almost_full;
+    logic mem_operation_en;
+    logic buffer_tx;
+    logic push;
+    logic empty_buffer;
     logic [31:0] inst_buffered;
 
-    logic almost_full;
-
     RingBuffer #(
-        .DATA_SIZE(32),
-        .BUFFER_SIZE(1),
-        .ALMOST_FULL_THRESHOLD(1), /* DO NOT CHANGE */
-        .ALMOST_EMPTY_THRESHOLD(0)
+        .DATA_SIZE             (32         ),
+        .BUFFER_SIZE           (IQUEUE_SIZE),
+        .ALMOST_FULL_THRESHOLD (1          ), 
+        .ALMOST_EMPTY_THRESHOLD(0          )
     ) ibuf (
         .clk_i         (clk),
         .rst_ni        (reset_n),
@@ -132,29 +127,168 @@ module fetch
         .almost_empty_o(almost_empty)
     );
 
-    logic [31:0] iaddr_jumped;
+    /* When a jump is confirmed we clear the buffer */
+    assign empty_buffer = sys_reset || jump_confirmed;
+
+    logic valid_buffer;
+    assign valid_buffer = buffer_tx && !empty_buffer;
+
+    /* Read instruction from buffer/memory                        */
+    /* Read when enabled                                          */
+    /* Unaligned compressed are always prefetched, if not jumping */
+    /* A misaligned jump will always have to read 2 times         */
+    assign pop = ((
+            enable_i 
+            && !(unaligned && compressed && !(jumping_o && !jump_rollback_i))
+        ) 
+        || jump_misaligned_o
+    );
+
+    /* When last cycle was busy, we do not have a valid fetch */
+    logic busy_r;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            busy_r <= 1'b1;
+        else if (sys_reset)
+            busy_r <= 1'b1;
+        else
+            busy_r <= busy_i;
+    end
+
+    /* A valid fetch happens only when memory answers and the requested */
+    /* address is still valid. A jump invalidates the request.          */
+    logic valid_fetch;
+    assign valid_fetch = !busy_r && !(jumped_r && !jump_rollback_i) && !jump_rollback_r;
+
+    /* Insert instruction from memory into buffer      */
+    /* Only insert when fetched instruction is valid   */
+    /* Do not insert when being pasthrough from memory */
+    assign push = valid_fetch && (!pop || valid_buffer);
+
+    /* Do not update instruction address if memory can't answer       */
+    /* Do not update if the present request will make the buffer full */
+    /* Do not update if the buffer is already full                    */
+    /* @todo check if the last busy_r is really needed                */
+    /* @todo simplify?                                                */
+    logic iaddr_hold;
+    assign iaddr_hold = busy_i || (!pop && almost_full && valid_fetch) || (!pop && !mem_operation_en && busy_r);
+
+    logic iaddr_hold_r;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            iaddr_hold_r <= 1'b0;
+        else if (sys_reset)
+            iaddr_hold_r <= 1'b0;
+        else
+            iaddr_hold_r <= iaddr_hold;
+    end
+
+    logic [31:0] instruction_address;
     logic [31:0] next_instruction_address;
+    assign next_instruction_address = instruction_address + 32'd4;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
-            jump_rollback_r <= 1'b0;
+            instruction_address <= start_address;
         end
         else if (sys_reset) begin
-            jump_rollback_r <= 1'b0;
+            instruction_address <= start_address;
         end
-        else begin 
-            // if (jump_rollback_i)
-            //     jump_rollback_r <= 1'b1;
-            // // else if (!busy_i)
-            // else if (valid_o)
-            // // else
-            //     jump_rollback_r <= 1'b0;
-            jump_rollback_r <= jump_rollback_i;
+        else begin
+            if (jumped || jump_rollback_i)
+                instruction_address <= iaddr_jumped;
+            else if (!iaddr_hold || (iaddr_hold_r && push && mem_operation_en))
+                instruction_address <= next_instruction_address;
         end
     end
 
-    logic valid_fetch;
-    assign valid_fetch = !busy_r && !(jumped_r && !jump_rollback_i) && !jump_rollback_r;
+    assign instruction_address_o    = {instruction_address[31:2], 2'b00};
+
+    logic [31:0] next_instruction;
+    assign next_instruction = valid_buffer ? inst_buffered : instruction_data_i;
+
+////////////////////////////////////////////////////////////////////////////////
+// CPU Interface
+////////////////////////////////////////////////////////////////////////////////
+    
+    /* We consider a instruction prefetched when it was removed from buffer */
+    /* or read from memory but will be used again. Happens after compressed */
+    /* instruction with unaligned PC. If jumping, it is invalid.            */
+    logic valid_prefetch;
+    assign valid_prefetch = (
+        unaligned 
+        && compressed 
+        && !(jumping_o && !jump_rollback_i) 
+        && !jump_misaligned_o
+    );
+
+    logic valid;
+    assign valid = valid_fetch || valid_buffer || valid_prefetch;
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            valid_o <= 1'b0;
+        else if (sys_reset)
+            valid_o <= 1'b0;
+        else if (enable_i)
+            valid_o <= valid;
+    end
+
+    logic [31:0] instruction;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            instruction_o <= 32'h00000013;
+        else if (sys_reset)
+            instruction_o <= 32'h00000013;
+        else if (enable_i && valid)
+            instruction_o <= instruction;
+    end
+
+    logic [31:0] pc_jumped;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) 
+            pc_jumped <= start_address;
+        else if (sys_reset)
+            pc_jumped <= start_address;
+        else if (jumped)
+            pc_jumped <= iaddr_jumped;
+    end
+
+    logic [31:0] next_pc;
+    
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            pc_o <= start_address;
+        end
+        else if (sys_reset) begin
+            pc_o <= start_address;
+        end
+        else begin
+            if ((jumping_o && !jump_rollback_i) || jump_misaligned_o)
+                pc_o <= pc_jumped;
+            else if (enable_i && valid)
+                pc_o <= next_pc;
+        end
+    end
+    
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            jumping_o <= 1'b1;
+        end
+        else if (sys_reset) begin
+            jumping_o <= 1'b1;
+        end
+        else begin
+            if (jumped)
+                jumping_o <= 1'b1;
+            else if ((enable_i && valid) || jump_rollback_i)
+                jumping_o <= 1'b0;
+        end
+    end
+
+////////////////////////////////////////////////////////////////////////////////
+// Branch Prediction
+////////////////////////////////////////////////////////////////////////////////
 
     if (BRANCHPRED) begin : gen_bp_on
         logic bp_taken;
@@ -191,15 +325,9 @@ module fetch
                 bp_ack_o <= bp_taken;
         end
 
-        // assign push = valid_fetch && (!pop || valid_buffer);
-        // assign push = valid_fetch && (!pop || valid_buffer) && !(jumping_o && !jump_rollback_i);
-        assign push = valid_fetch && (!pop || valid_buffer);
-
         assign bp_rollback_o  = 1'b0;
     end
     else begin : gen_bp_off
-        // assign push           = !busy_r && (!pop || valid_buffer);
-        assign push           = !busy_r && (!pop || valid_buffer) && !jumping_o;
         assign jumped         = ctx_switch_i || jump_i;
         assign jump_confirmed = jumped;
         assign bp_ack_o       = 1'b0;
@@ -213,84 +341,12 @@ module fetch
         end
     end
 
-    // Hold if memory can't answer, if buffer is gonna be full on next valid data, or when buffer is already full
-    // assign iaddr_hold = busy_i || (!pop && almost_full && valid_fetch) || (!pop && !mem_operation_en && busy_r);
-    assign iaddr_hold = busy_i || (!pop && almost_full && valid_fetch) || (!pop && !mem_operation_en && busy_r);
-
-    logic iaddr_hold_r;
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            iaddr_hold_r <= 1'b0;
-        else if (sys_reset)
-            iaddr_hold_r <= 1'b0;
-        else
-            iaddr_hold_r <= iaddr_hold;
-    end
-
-    assign next_instruction_address = instruction_address + 32'd4;
-
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            instruction_address <= start_address;
-        end
-        else if (sys_reset) begin
-            instruction_address <= start_address;
-        end
-        else begin
-            if (jumped || jump_rollback_i)
-                instruction_address <= iaddr_jumped;
-            else if (!iaddr_hold || (iaddr_hold_r && push && mem_operation_en))
-                instruction_address <= next_instruction_address;
-        end
-    end
-
-    assign instruction_address_o = {instruction_address[31:2], 2'b00};
-
 ////////////////////////////////////////////////////////////////////////////////
-// CPU Interface
+// Compressed
 ////////////////////////////////////////////////////////////////////////////////
 
-    // assign valid = valid_fetch || valid_buffer;
-    // assign valid = valid_fetch || valid_buffer || (unaligned && compressed && !(jumping_o && !jump_rollback_i) && !jump_misaligned_o);
-    assign valid = valid_fetch || valid_buffer || (unaligned && compressed && !(jumping_o && !jump_rollback_i) && !jump_misaligned_o);
-
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            valid_o <= 1'b0;
-        else if (sys_reset)
-            valid_o <= 1'b0;
-        else if (enable_i)
-            valid_o <= valid;
-    end
-
-    logic [31:0] next_instruction;
-    logic [31:0] instruction;
-    assign next_instruction = valid_buffer ? inst_buffered : instruction_data_i;
-
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            instruction_o <= 32'h00000013;
-        else if (sys_reset)
-            instruction_o <= 32'h00000013;
-        else if (enable_i && valid)
-            instruction_o <= instruction;
-    end
-
-    logic [31:0] pc_jumped;
-    
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) 
-            pc_jumped <= start_address;
-        else if (sys_reset)
-            pc_jumped <= start_address;
-        else if (jumped)
-            pc_jumped <= iaddr_jumped;
-    end
-
-    logic [31:0] next_pc;
     if (COMPRESSED) begin : gen_compressed_on
         logic [31:0] instruction_built;
-
 
         logic unaligned_jump;
         always_ff @(posedge clk or negedge reset_n) begin
@@ -384,81 +440,4 @@ module fetch
         assign unaligned        = 1'b0;
         assign jump_misaligned_o = 1'b0;
     end
-
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            pc_o <= start_address;
-        end
-        else if (sys_reset) begin
-            pc_o <= start_address;
-        end
-        else begin
-            if ((jumping_o && !jump_rollback_i) || jump_misaligned_o)
-                pc_o <= pc_jumped;
-            // else if (enable_i && valid && !bp_rollback_o)
-            // else if (enable_i && valid_o)
-            else if (enable_i && valid)
-                pc_o <= next_pc;
-        end
-    end
-
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            jumped_r <= 1'b1;
-        end
-        else if (sys_reset) begin
-            jumped_r <= 1'b1;
-        end
-        else begin
-            jumped_r <= jumped;
-            // if (jumped)
-            //     jumped_r <= 1'b1;
-            // else if (enable_i || jump_rollback_i)
-            //     jumped_r <= 1'b0;
-        end
-    end
-    
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            jumping_o <= 1'b1;
-        end
-        else if (sys_reset) begin
-            jumping_o <= 1'b1;
-        end
-        else begin
-            // if (jumped || (jumped_r && !jump_rollback_i))
-            if (jumped)
-                jumping_o <= 1'b1;
-            // else if ((enable_i && valid) || jump_rollback_i)
-            // else if ((enable_i && valid) || jump_rollback_i)
-            else if ((enable_i && valid) || jump_rollback_i)
-            // else if ((enable_i && valid) || jump_rollback_i || (jump_rollback_r && valid))
-                jumping_o <= 1'b0;
-        end
-    end
-
-////////////////////////////////////////////////////////////////////////////////
-// Flow control
-////////////////////////////////////////////////////////////////////////////////
-
-////////////////////////////////////////////////////////////////////////////////
-// Jump control
-////////////////////////////////////////////////////////////////////////////////
-
-////////////////////////////////////////////////////////////////////////////////
-// PC control
-////////////////////////////////////////////////////////////////////////////////
-
-////////////////////////////////////////////////////////////////////////////////
-// Data control
-////////////////////////////////////////////////////////////////////////////////
-
-////////////////////////////////////////////////////////////////////////////////
-// Branch prediction
-////////////////////////////////////////////////////////////////////////////////
-
-////////////////////////////////////////////////////////////////////////////////
-// Alignment control
-////////////////////////////////////////////////////////////////////////////////
-
 endmodule
