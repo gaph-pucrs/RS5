@@ -44,6 +44,7 @@ module RS5
     parameter bit           ZICONDEnable     = 1'b0,
     parameter bit           ZCBEnable        = 1'b0,
     parameter bit           HPMCOUNTEREnable = 1'b0,
+    parameter int           IQUEUE_SIZE      = 2,
     parameter bit           BRANCHPRED       = 1'b1,
     parameter bit           FORWARDING       = 1'b1
 )
@@ -195,7 +196,6 @@ module RS5
     logic        jumping;
     logic        ctx_switch;
     logic        bp_take_fetch;
-    logic        bp_rollback;
     logic        compressed_decode;
     logic [31:0] bp_target;
     logic [31:0] ctx_switch_target;
@@ -203,6 +203,7 @@ module RS5
 
     fetch #(
         .start_address(START_ADDR),
+        .IQUEUE_SIZE  (IQUEUE_SIZE),
         .MULEXT       (MULEXT),
         .ZCBEnable    (ZCBEnable),
         .COMPRESSED   (COMPRESSED),
@@ -223,7 +224,6 @@ module RS5
         .bp_take_i            (bp_take_fetch      ),
         .bp_target_i          (bp_target          ),
         .jumping_o            (jumping            ),
-        .bp_rollback_o        (bp_rollback        ),
         .jump_misaligned_o    (jump_misaligned    ),
         .compressed_o         (compressed_decode  ),
         .instruction_address_o(instruction_address),
@@ -307,7 +307,6 @@ module RS5
         .jump_i                     (jump),
         .jumping_i                  (jumping),
         .jump_rollback_i            (jump_rollback),
-        .rollback_i                 (bp_rollback),
         .compressed_i               (compressed_decode),
         .jump_misaligned_i          (jump_misaligned),
         .bp_take_o                  (bp_take_fetch),
