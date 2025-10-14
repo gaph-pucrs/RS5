@@ -246,10 +246,10 @@ module fetch
                 iaddr_jumped = ctx_switch_target_i;
             else if (jump_i)
                 iaddr_jumped = jump_target_i;
-            else if (jump_rollback_i)
-                iaddr_jumped = iaddr_rollback;
-            else
+            else if (bp_take_i)
                 iaddr_jumped = bp_target_i;
+            else
+                iaddr_jumped = iaddr_rollback;
         end
 
         always_ff @(posedge clk or negedge reset_n) begin
@@ -365,14 +365,16 @@ module fetch
         /* Alignment control */
         logic [31:0] instruction_built;
         always_comb begin
-            if (is_jumping || (!jump_misaligned_o && !(unaligned || compressed)))
+            if (is_jumping)
                 /* On jump, last valid instruction is the next one */
-                /* Also normal flow of 4-byte aligned instructions */
                 instruction_built = next_instruction;
             else if (jump_misaligned_o || (unaligned ^ compressed))
                 /* When next instruction is unaligned we also need two fetches */
                 /* Shift the last instruction msbs and join with the next lsbs */
                 instruction_built = {next_instruction[15:0], instruction_r[31:16]};
+            else if (!(unaligned || compressed))
+                /* Normal flow of 4-byte aligned instructions */
+                instruction_built = next_instruction;
             else   // unaligned &&  compressed
                 /* After an unaligned compressed, the instruction we want was */
                 /* already removed from the buffer/memory                     */
