@@ -151,6 +151,9 @@ module fetch
         .almost_empty_o(almost_empty)
     );
 
+    logic mem_disabled;
+    assign mem_disabled = busy_i || !mem_operation_en_o;
+
     /* When last cycle was busy, we do not have a valid fetch */
     logic busy_r;
     always_ff @(posedge clk or negedge reset_n) begin
@@ -169,9 +172,6 @@ module fetch
 
     /* Read from memory everytime we can consume an instruction */
     assign mem_operation_en_o = !almost_full || pop || !valid_fetch;
-
-    logic mem_disabled;
-    assign mem_disabled = busy_i || !mem_operation_en_o;
 
     /* When a jump is confirmed we clear the buffer */
     assign empty_buffer = sys_reset || jump_confirmed;
