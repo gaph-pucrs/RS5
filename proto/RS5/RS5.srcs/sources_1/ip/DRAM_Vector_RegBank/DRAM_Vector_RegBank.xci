@@ -3,7 +3,7 @@
   "ip_inst": {
     "xci_name": "DRAM_Vector_RegBank",
     "component_reference": "xilinx.com:ip:dist_mem_gen:8.0",
-    "ip_revision": "14",
+    "ip_revision": "15",
     "gen_directory": "../../../../RS5.gen/sources_1/ip/DRAM_Vector_RegBank",
     "parameters": {
       "component_parameters": {
@@ -83,12 +83,12 @@
       },
       "runtime_parameters": {
         "IPCONTEXT": [ { "value": "IP_Flow" } ],
-        "IPREVISION": [ { "value": "14" } ],
+        "IPREVISION": [ { "value": "15" } ],
         "MANAGED": [ { "value": "TRUE" } ],
         "OUTPUTDIR": [ { "value": "../../../../RS5.gen/sources_1/ip/DRAM_Vector_RegBank" } ],
         "SELECTEDSIMMODEL": [ { "value": "" } ],
         "SHAREDDIR": [ { "value": "." } ],
-        "SWVERSION": [ { "value": "2023.2" } ],
+        "SWVERSION": [ { "value": "2024.2" } ],
         "SYNTHESISFLOW": [ { "value": "GLOBAL" } ]
       }
     },

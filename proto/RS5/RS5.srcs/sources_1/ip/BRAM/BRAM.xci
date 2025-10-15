@@ -3,7 +3,7 @@
   "ip_inst": {
     "xci_name": "BRAM",
     "component_reference": "xilinx.com:ip:blk_mem_gen:8.4",
-    "ip_revision": "7",
+    "ip_revision": "9",
     "gen_directory": "../../../../RS5.gen/sources_1/ip/BRAM",
     "parameters": {
       "component_parameters": {
@@ -27,8 +27,8 @@
         "RD_ADDR_CHNG_B": [ { "value": "false", "resolve_type": "user", "format": "bool", "enabled": false, "usage": "all" } ],
         "Use_Error_Injection_Pins": [ { "value": "false", "resolve_type": "user", "format": "bool", "enabled": false, "usage": "all" } ],
         "Error_Injection_Type": [ { "value": "Single_Bit_Error_Injection", "resolve_type": "user", "enabled": false, "usage": "all" } ],
-        "Use_Byte_Write_Enable": [ { "value": "true", "value_src": "user", "resolve_type": "user", "format": "bool", "enabled": false, "usage": "all" } ],
-        "Byte_Size": [ { "value": "8", "value_src": "user", "resolve_type": "user", "enabled": false, "usage": "all" } ],
+        "Use_Byte_Write_Enable": [ { "value": "true", "resolve_type": "user", "format": "bool", "enabled": false, "usage": "all" } ],
+        "Byte_Size": [ { "value": "8", "resolve_type": "user", "enabled": false, "usage": "all" } ],
         "Algorithm": [ { "value": "Minimum_Area", "resolve_type": "user", "enabled": false, "usage": "all" } ],
         "Primitive": [ { "value": "8kx2", "resolve_type": "user", "enabled": false, "usage": "all" } ],
         "Assume_Synchronous_Clk": [ { "value": "false", "resolve_type": "user", "format": "bool", "usage": "all" } ],
@@ -76,7 +76,7 @@
         "use_bram_block": [ { "value": "Stand_Alone", "resolve_type": "user", "usage": "all" } ],
         "MEM_FILE": [ { "value": "no_mem_loaded", "resolve_type": "user", "usage": "all" } ],
         "CTRL_ECC_ALGO": [ { "value": "NONE", "resolve_type": "user", "usage": "all" } ],
-        "EN_SAFETY_CKT": [ { "value": "false", "value_src": "user", "resolve_type": "user", "format": "bool", "enabled": false, "usage": "all" } ],
+        "EN_SAFETY_CKT": [ { "value": "false", "resolve_type": "user", "format": "bool", "enabled": false, "usage": "all" } ],
         "READ_LATENCY_A": [ { "value": "1", "resolve_type": "user", "format": "long", "enabled": false, "usage": "all" } ],
         "READ_LATENCY_B": [ { "value": "1", "resolve_type": "user", "format": "long", "enabled": false, "usage": "all" } ]
       },
@@ -168,18 +168,16 @@
         "SIMULATOR_LANGUAGE": [ { "value": "MIXED" } ],
         "SPEEDGRADE": [ { "value": "-1" } ],
         "STATIC_POWER": [ { "value": "" } ],
-        "TEMPERATURE_GRADE": [ { "value": "" } ],
-        "USE_RDI_CUSTOMIZATION": [ { "value": "TRUE" } ],
-        "USE_RDI_GENERATION": [ { "value": "TRUE" } ]
+        "TEMPERATURE_GRADE": [ { "value": "" } ]
       },
       "runtime_parameters": {
         "IPCONTEXT": [ { "value": "IP_Flow" } ],
-        "IPREVISION": [ { "value": "7" } ],
+        "IPREVISION": [ { "value": "9" } ],
         "MANAGED": [ { "value": "TRUE" } ],
         "OUTPUTDIR": [ { "value": "../../../../RS5.gen/sources_1/ip/BRAM" } ],
         "SELECTEDSIMMODEL": [ { "value": "" } ],
         "SHAREDDIR": [ { "value": "." } ],
-        "SWVERSION": [ { "value": "2023.2" } ],
+        "SWVERSION": [ { "value": "2024.2" } ],
         "SYNTHESISFLOW": [ { "value": "GLOBAL" } ]
       }
     },
@@ -228,6 +226,7 @@
           "abstraction_type": "xilinx.com:interface:bram_rtl:1.0",
           "mode": "slave",
           "parameters": {
+            "MEM_ADDRESS_MODE": [ { "value": "BYTE_ADDRESS", "resolve_type": "user", "usage": "all" } ],
             "MEM_SIZE": [ { "value": "8192", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
             "MEM_WIDTH": [ { "value": "32", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
             "MEM_ECC": [ { "value": "NONE", "resolve_type": "generated", "is_ips_inferred": true, "is_static_object": false } ],
@@ -249,6 +248,7 @@
           "abstraction_type": "xilinx.com:interface:bram_rtl:1.0",
           "mode": "slave",
           "parameters": {
+            "MEM_ADDRESS_MODE": [ { "value": "BYTE_ADDRESS", "resolve_type": "user", "usage": "all" } ],
             "MEM_SIZE": [ { "value": "8192", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
             "MEM_WIDTH": [ { "value": "32", "resolve_type": "generated", "format": "long", "is_ips_inferred": true, "is_static_object": false } ],
             "MEM_ECC": [ { "value": "NONE", "resolve_type": "generated", "is_ips_inferred": true, "is_static_object": false } ],
