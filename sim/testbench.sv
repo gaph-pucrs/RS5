@@ -139,6 +139,7 @@ module testbench
 //////////////////////////////////////////////////////////////////////////////
 
     logic busy;
+    logic enable_imem;
 
     RS5 #(
     `ifndef SYNTH
@@ -172,8 +173,9 @@ module testbench
         .mtime_i                (mtime),
         .tip_i                  (mti),
         .eip_i                  (mei),
+        .imem_operation_enable_o(enable_imem),
         .instruction_address_o  (instruction_address),
-        .mem_operation_enable_o (mem_operation_enable),
+        .dmem_operation_enable_o(mem_operation_enable),
         .mem_write_enable_o     (mem_write_enable),
         .mem_address_o          (mem_address),
         .mem_data_o             (mem_data_write),
@@ -222,7 +224,7 @@ module testbench
     );
 
     if (DUALPORT_MEM) begin : dual_port
-        assign enA         = 1'b1;
+        assign enA         = enable_imem;
         assign weA         = 4'h0;
         assign addrA       = instruction_address[($clog2(MEM_WIDTH) - 1):0];
         assign dataAi      = 32'h00000000;
@@ -237,7 +239,7 @@ module testbench
         assign busy        = 1'b0;
     end
     else begin : single_port
-        assign enA         = 1'b1;
+        assign enA         = enable_imem || enable_ram;
         assign weA         = enable_ram ? mem_write_enable : 4'h0;
         assign addrA       = enable_ram ? mem_address[($clog2(MEM_WIDTH) - 1):0] : instruction_address[($clog2(MEM_WIDTH) - 1):0];
         assign dataAi      = mem_data_write;

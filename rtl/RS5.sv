@@ -55,18 +55,21 @@ module RS5
     input  logic                    stall,
     input  logic                    busy_i,
 
-    input  logic [31:0]             instruction_i,
-    input  logic [31:0]             mem_data_i,
-    input  logic [63:0]             mtime_i,
     input  logic                    tip_i,
     input  logic                    eip_i,
+    output logic                    interrupt_ack_o,
 
+    input  logic [63:0]             mtime_i,
+
+    output logic                    imem_operation_enable_o,
     output logic [31:0]             instruction_address_o,
-    output logic                    mem_operation_enable_o,
+    input  logic [31:0]             instruction_i,
+
+    output logic                    dmem_operation_enable_o,
     output logic  [3:0]             mem_write_enable_o,
     output logic [31:0]             mem_address_o,
     output logic [31:0]             mem_data_o,
-    output logic                    interrupt_ack_o
+    input  logic [31:0]             mem_data_i
 );
 
 //////////////////////////////////////////////////////////////////////////////
@@ -209,27 +212,28 @@ module RS5
         .COMPRESSED   (COMPRESSED),
         .BRANCHPRED   (BRANCHPRED)
     ) fetch1 (
-        .clk                  (clk                ),
-        .reset_n              (reset_n            ),
-        .sys_reset            (sys_reset_i        ),
-        .enable_i             (enable_fetch       ),
-        .busy_i               (busy_i             ),
-        .valid_o              (valid_fetch        ),
-        .bp_ack_o             (bp_ack             ),
-        .jump_i               (jump               ),
-        .jump_rollback_i      (jump_rollback      ),
-        .jump_target_i        (jump_target        ),
-        .ctx_switch_i         (ctx_switch         ),
-        .ctx_switch_target_i  (ctx_switch_target  ),
-        .bp_take_i            (bp_take_fetch      ),
-        .bp_target_i          (bp_target          ),
-        .jumping_o            (jumping            ),
-        .jump_misaligned_o    (jump_misaligned    ),
-        .compressed_o         (compressed_decode  ),
-        .instruction_address_o(instruction_address),
-        .instruction_data_i   (instruction_i      ),
-        .instruction_o        (instruction_decode ),
-        .pc_o                 (pc_decode          )
+        .clk                  (clk                    ),
+        .reset_n              (reset_n                ),
+        .sys_reset            (sys_reset_i            ),
+        .enable_i             (enable_fetch           ),
+        .busy_i               (busy_i                 ),
+        .valid_o              (valid_fetch            ),
+        .bp_ack_o             (bp_ack                 ),
+        .jump_i               (jump                   ),
+        .jump_rollback_i      (jump_rollback          ),
+        .jump_target_i        (jump_target            ),
+        .ctx_switch_i         (ctx_switch             ),
+        .ctx_switch_target_i  (ctx_switch_target      ),
+        .bp_take_i            (bp_take_fetch          ),
+        .bp_target_i          (bp_target              ),
+        .jumping_o            (jumping                ),
+        .jump_misaligned_o    (jump_misaligned        ),
+        .compressed_o         (compressed_decode      ),
+        .mem_operation_en_o   (imem_operation_enable_o),
+        .instruction_address_o(instruction_address    ),
+        .instruction_data_i   (instruction_i          ),
+        .instruction_o        (instruction_decode     ),
+        .pc_o                 (pc_decode              )
     );
 
     if (XOSVMEnable == 1'b1) begin : gen_xosvm_i_mmu_on
@@ -485,7 +489,7 @@ module RS5
         assign mem_address_o  = {mem_address[31:2], 2'b00};
     end
 
-    assign mem_operation_enable_o = (mem_write_enable != '0 || mem_read_enable) && !mmu_data_fault && !RAISE_EXCEPTION_r;
+    assign dmem_operation_enable_o = (mem_write_enable != '0 || mem_read_enable) && !mmu_data_fault && !RAISE_EXCEPTION_r;
     assign mem_write_enable_o = mem_write_enable;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

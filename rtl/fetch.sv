@@ -53,6 +53,7 @@ module fetch
     output  logic           bp_ack_o,
 
     /* Memory interface */
+    output  logic           mem_operation_en_o,
     input   logic           busy_i,
     output  logic [31:0]    instruction_address_o,
     input   logic [31:0]    instruction_data_i,
@@ -123,7 +124,7 @@ module fetch
     /* Buffer signals */
     logic pop;
     logic almost_full;
-    logic mem_operation_en;
+    logic buffer_not_full;
     logic buffer_tx;
     logic push;
     logic empty_buffer;
@@ -139,7 +140,7 @@ module fetch
         .rst_ni        (reset_n),
         .buf_rst_i     (empty_buffer),
         .rx_i          (push),
-        .rx_ack_o      (mem_operation_en),
+        .rx_ack_o      (buffer_not_full),
         .data_i        (instruction_data_i),
         .tx_o          (buffer_tx),
         .tx_ack_i      (pop),
@@ -147,6 +148,9 @@ module fetch
         .almost_full_o (almost_full),
         .almost_empty_o(almost_empty)
     );
+
+    /* Read from memory everytime we can consume an instruction in the next cycle */
+    assign mem_operation_en_o = pop || (!(almost_full && valid_fetch) && buffer_not_full);
 
     /* When a jump is confirmed we clear the buffer */
     assign empty_buffer = sys_reset || jump_confirmed;
@@ -186,7 +190,7 @@ module fetch
     logic iaddr_hold;
     assign iaddr_hold = (
         busy_i 
-        || (!pop && ((almost_full && valid_fetch) || !mem_operation_en))
+        || (!pop && ((almost_full && valid_fetch) || !buffer_not_full))
     );
 
     logic iaddr_hold_r;
@@ -213,7 +217,7 @@ module fetch
         else begin
             if (jumped || jump_rollback_i)
                 instruction_address <= iaddr_jumped;
-            else if (!iaddr_hold || (iaddr_hold_r && push && mem_operation_en))
+            else if (!iaddr_hold || (iaddr_hold_r && push && buffer_not_full))
                 instruction_address <= next_instruction_address;
         end
     end
