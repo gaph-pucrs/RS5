@@ -69,6 +69,8 @@ module fetch
 // Jump control
 ////////////////////////////////////////////////////////////////////////////////
 
+    logic valid;
+
     /* Jumped condition and fetched instruction invalidation depends on BP */
     /* Instruction address of jump target also depends on BP               */
     logic jumped;
@@ -149,8 +151,27 @@ module fetch
         .almost_empty_o(almost_empty)
     );
 
-    /* Read from memory everytime we can consume an instruction in the next cycle */
-    assign mem_operation_en_o = pop || (!(almost_full && valid_fetch) && buffer_not_full);
+    /* When last cycle was busy, we do not have a valid fetch */
+    logic busy_r;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            busy_r <= 1'b1;
+        else if (sys_reset)
+            busy_r <= 1'b1;
+        else
+            busy_r <= mem_disabled;
+    end
+
+    /* A valid fetch happens only when memory answers and the requested */
+    /* address is still valid. A jump invalidates the request.          */
+    logic valid_fetch;
+    assign valid_fetch = !busy_r && !jumped_fetch;
+
+    /* Read from memory everytime we can consume an instruction */
+    assign mem_operation_en_o = !almost_full || pop || !valid_fetch;
+
+    logic mem_disabled;
+    assign mem_disabled = busy_i || !mem_operation_en_o;
 
     /* When a jump is confirmed we clear the buffer */
     assign empty_buffer = sys_reset || jump_confirmed;
@@ -163,22 +184,6 @@ module fetch
     /* A misaligned jump will always have to read 2 times */
     assign pop = (enable_i && !instruction_prefetched) || jump_misaligned_o;
 
-    /* When last cycle was busy, we do not have a valid fetch */
-    logic busy_r;
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            busy_r <= 1'b1;
-        else if (sys_reset)
-            busy_r <= 1'b1;
-        else
-            busy_r <= busy_i;
-    end
-
-    /* A valid fetch happens only when memory answers and the requested */
-    /* address is still valid. A jump invalidates the request.          */
-    logic valid_fetch;
-    assign valid_fetch = !busy_r && !jumped_fetch;
-
     /* Insert instruction from memory into buffer      */
     /* Only insert when fetched instruction is valid   */
     /* Do not insert when being pasthrough from memory */
@@ -189,7 +194,7 @@ module fetch
     /* Do not update if the buffer is already full                    */
     logic iaddr_hold;
     assign iaddr_hold = (
-        busy_i 
+        mem_disabled 
         || (!pop && ((almost_full && valid_fetch) || !buffer_not_full))
     );
 
@@ -230,7 +235,6 @@ module fetch
     logic valid_prefetch;
     assign valid_prefetch = instruction_prefetched && !jump_misaligned_o;
 
-    logic valid;
     assign valid = valid_fetch || valid_buffer || valid_prefetch;
 
 ////////////////////////////////////////////////////////////////////////////////
