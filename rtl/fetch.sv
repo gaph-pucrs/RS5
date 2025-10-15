@@ -93,6 +93,22 @@ module fetch
             jumped_r <= jumped;
     end
 
+    logic jump_confirmed_r;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            jump_confirmed_r <= 1'b1;
+        end
+        else if (sys_reset) begin
+            jump_confirmed_r <= 1'b1;
+        end
+        else begin
+            if (jump_confirmed)
+                jump_confirmed_r <= 1'b1;
+            else if (enable_i && valid)
+                jump_confirmed_r <= 1'b0;
+        end
+    end
+
 ////////////////////////////////////////////////////////////////////////////////
 // Memory interface and instruction queue
 ////////////////////////////////////////////////////////////////////////////////
@@ -317,7 +333,7 @@ module fetch
             pc_o <= start_address;
         end
         else begin
-            if (is_jumping || jump_misaligned_o)
+            if (jump_confirmed_r || jump_misaligned_o)
                 pc_o <= pc_jumped;
             else if (enable_i && valid)
                 pc_o <= next_pc;
@@ -365,7 +381,7 @@ module fetch
         /* Alignment control */
         logic [31:0] instruction_built;
         always_comb begin
-            if (is_jumping)
+            if (jump_confirmed_r)
                 /* On jump, last valid instruction is the next one */
                 instruction_built = next_instruction;
             else if (jump_misaligned_o || (unaligned ^ compressed))
@@ -401,22 +417,20 @@ module fetch
 
         /* An unaligned jump requires the input of two fetches                 */
         /* Only after the first needed fetch is valid the signal is deasserted */
-        logic unaligned_jump;
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n) begin
-                unaligned_jump <= 1'b0;
+                jump_misaligned_o <= 1'b0;
             end
             else if (sys_reset) begin
-                unaligned_jump <= 1'b0;
+                jump_misaligned_o <= 1'b0;
             end
             else begin
-                if (jumping_o && !jump_rollback_i)
-                    unaligned_jump <= pc_jumped[1];
+                if (jump_confirmed_r)
+                    jump_misaligned_o <= pc_jumped[1];
                 else if (enable_i && valid_o)
-                    unaligned_jump <= 1'b0;
+                    jump_misaligned_o <= 1'b0;
             end
         end
-        assign jump_misaligned_o = unaligned_jump;
 
         /* Compressed instruction expansion */
         logic [31:0] instruction_decompressed;
