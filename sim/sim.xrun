@@ -1,2 +1,2 @@
-testbench.sv -smartorder ../rtl/*.sv *.sv -incdir ../rtl  -incdir ../rtl/aes/ ../rtl/aes/*.sv -incdir ../rtl/vector/ ../rtl/vector/*.sv
+testbench.sv -smartorder ../rtl/*.sv ../RingBuffer/rtl/*.sv *.sv -incdir ../rtl  -incdir ../RingBuffer/rtl -incdir ../rtl/aes/ ../rtl/aes/*.sv -incdir ../rtl/vector/ ../rtl/vector/*.sv
 ./testbench.sv
