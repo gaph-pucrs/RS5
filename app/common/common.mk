@@ -49,7 +49,7 @@ $(TARGET).elf: $(CCOBJ) $(ASOBJ)
 clean:
 	@printf "Cleaning up\n"
 	@rm -rf src/*.o
-	@rm -rf ../common/*.o
+	@rm -rf $(COMMON_DIR)/*.o
 	@rm -rf *.bin
 	@rm -rf *.map
 	@rm -rf *.lst
