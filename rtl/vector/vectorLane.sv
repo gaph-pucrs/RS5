@@ -32,7 +32,9 @@ module vectorLane
     input  logic [LLEN/16-1:0] mask_sew16_i,
     input  logic [LLEN/32-1:0] mask_sew32_i,
 
+    /* verilator lint_off UNUSEDSIGNAL */
     input  logic               enable_i,
+    /* verilator lint_on  UNUSEDSIGNAL */
     input  iTypeVector_e       vector_operation_i,
     input  vew_e               vsew,
     input  logic               vm,
@@ -56,8 +58,10 @@ module vectorLane
 //////////////////////////////////////////////////////////////////////////////
 
     localparam ELEMENTS_PER_LANE = LLEN/32;
+    /* verilator lint_off ASCRANGE */
     logic [$clog2(LLEN/32)-1:0] cycle;
     logic [$clog2(LLEN/32)-1:0] cycle_r;
+    /* verilator lint_on  ASCRANGE */
     logic hold_llen;
 
     logic [31:0] first_operand;

@@ -29,6 +29,7 @@ module vectorSlide
     input  vew_e                        vsew,
     input  vlmul_e                      vlmul,
     input  logic[$bits(VLEN)-1:0]       vl,
+    input  logic[$bits(VLEN)-1:0]       vl_next,
 
     output logic [VLEN-1:0]             result_o
 );
@@ -44,13 +45,20 @@ module vectorSlide
             EW8: begin
                 for (int i = 0; i < (VLEN/8); i++) begin
                     if (i < (vl-1)) begin
-                        result_slide1down[(8*i)+:8] = first_operand[(8*(i+1))+:8];
+                        if (i < (VLEN/8)-1) begin
+                            result_slide1down[(8*i)+:8] = first_operand[(8*(i+1))+:8];
+                        end
+                        else begin
+                            result_slide1down[(8*i)+:8] = '0;
+                        end
                     end
                     else if (i == (vl-1)) begin // last element
-                        if ((vlmul == LMUL_1 && cycle_count == 1)
+                        if ( vl_next == 0
+                         || (vlmul == LMUL_1 && cycle_count == 1)
                          || (vlmul == LMUL_2 && cycle_count == 2)
                          || (vlmul == LMUL_4 && cycle_count == 4)
-                         || (vlmul == LMUL_8 && cycle_count == 8)) begin
+                         || (vlmul == LMUL_8 && cycle_count == 8)
+                         ) begin
                             result_slide1down[(8*i)+:8] = scalar_operand[7:0];
                          end
                          else begin
@@ -65,10 +73,16 @@ module vectorSlide
             EW16: begin
                 for (int i = 0; i < (VLEN/16); i++) begin
                     if (i < (vl-1)) begin
-                        result_slide1down[(16*i)+:16] = first_operand[(16*(i+1))+:16];
+                        if (i < (VLEN/16)-1) begin
+                            result_slide1down[(16*i)+:16] = first_operand[(16*(i+1))+:16];
+                        end
+                        else begin
+                            result_slide1down[(16*i)+:16] = '0;
+                        end
                     end
                     else if (i == (vl-1)) begin // last element
-                        if ((vlmul == LMUL_1 && cycle_count == 1)
+                        if ( vl_next == 0
+                         || (vlmul == LMUL_1 && cycle_count == 1)
                          || (vlmul == LMUL_2 && cycle_count == 2)
                          || (vlmul == LMUL_4 && cycle_count == 4)
                          || (vlmul == LMUL_8 && cycle_count == 8)) begin
@@ -86,10 +100,16 @@ module vectorSlide
             default: begin
                 for (int i = 0; i < (VLEN/32); i++) begin
                     if (i < (vl-1)) begin
-                        result_slide1down[(32*i)+:32] = first_operand[(32*(i+1))+:32];
+                        if (i < (VLEN/32)-1) begin
+                            result_slide1down[(32*i)+:32] = first_operand[(32*(i+1))+:32];
+                        end
+                        else begin
+                            result_slide1down[(32*i)+:32] = '0;
+                        end
                     end
                     else if (i == (vl-1)) begin // last element
-                        if ((vlmul == LMUL_1 && cycle_count == 1)
+                        if ( vl_next == 0
+                         || (vlmul == LMUL_1 && cycle_count == 1)
                          || (vlmul == LMUL_2 && cycle_count == 2)
                          || (vlmul == LMUL_4 && cycle_count == 4)
                          || (vlmul == LMUL_8 && cycle_count == 8)) begin
@@ -124,7 +144,7 @@ module vectorSlide
             EW8: begin
                 for (int i = 0; i < (VLEN/8); i++) begin
                     if (i == 0) begin // first element
-                        if (cycle_count == 0) begin
+                        if (cycle_count == 1) begin
                             result_slide1up[(8*i)+:8] = scalar_operand[7:0];
                         end
                         else begin
@@ -142,7 +162,7 @@ module vectorSlide
             EW16: begin
                 for (int i = 0; i < (VLEN/16); i++) begin
                     if (i == 0) begin // first element
-                        if (cycle_count == 0) begin
+                        if (cycle_count == 1) begin
                             result_slide1up[(16*i)+:16] = scalar_operand[15:0];
                         end
                         else begin
@@ -160,7 +180,7 @@ module vectorSlide
             default: begin
                 for (int i = 0; i < (VLEN/32); i++) begin
                     if (i == 0) begin // first element
-                        if (cycle_count == 0) begin
+                        if (cycle_count == 1) begin
                             result_slide1up[(32*i)+:32] = scalar_operand[31:0];
                         end
                         else begin

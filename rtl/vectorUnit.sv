@@ -18,32 +18,33 @@ module vectorUnit
 #(
     parameter environment_e Environment = ASIC,
     parameter int           VLEN        = 64,
-    parameter int           LLEN        = 32
+    parameter int           LLEN        = 32,
+    parameter int           BUS_WIDTH   = 32
 )
 (
-    input   logic           clk,
-    input   logic           reset_n,
+    input   logic                  clk,
+    input   logic                  reset_n,
 
-    input   logic [31:0]    instruction_i,
-    input   iType_e         instruction_operation_i,
-    input   iTypeVector_e   vector_operation_i,
+    input   logic [31:0]           instruction_i,
+    input   iType_e                instruction_operation_i,
+    input   iTypeVector_e          vector_operation_i,
 
-    input   logic [31:0]    op1_scalar_i,
-    input   logic [31:0]    op2_scalar_i,
+    input   logic [31:0]           op1_scalar_i,
+    input   logic [31:0]           op2_scalar_i,
 
-    output  logic           hold_o,
+    output  logic                  hold_o,
 
-    output  logic [31:0]    vtype_o,
-    output  logic [31:0]    vlen_o,
+    output  logic [31:0]           vtype_o,
+    output  logic [31:0]           vlen_o,
 
-    output logic [31:0]     mem_address_o,
-    output logic            mem_read_enable_o,
-    output logic [ 3:0]     mem_write_enable_o,
-    output logic [31:0]     mem_write_data_o,
-    input  logic [31:0]     mem_read_data_i,
+    output logic [31:0]            mem_address_o,
+    output logic                   mem_read_enable_o,
+    output logic [BUS_WIDTH/8-1:0] mem_write_enable_o,
+    output logic [BUS_WIDTH-1:0]   mem_write_data_o,
+    input  logic [BUS_WIDTH-1:0]   mem_read_data_i,
 
-    output  logic [31:0]    res_scalar_o,
-    output  logic           wr_en_scalar_o
+    output  logic [31:0]           res_scalar_o,
+    output  logic                  wr_en_scalar_o
 );
 
     localparam VLENB = VLEN/8;
@@ -57,11 +58,12 @@ module vectorUnit
     logic        accumulate_instruction;
     logic        widening_instruction;
     logic        whole_reg_load_store;
+    logic        mask_load_store;
     logic        mask_instruction;
 
     vew_e   vsew, vsew_effective;
     vlmul_e vlmul, vlmul_effective;
-    logic[$bits(VLEN )-1:0] vl, vl_curr_reg, vl_next;
+    logic[$bits(VLEN )-1:0] vl, vl_curr_reg, vl_next_reg, vl_next;
     logic[$bits(VLENB)-1:0] elements_per_reg;
     logic[$bits(VLEN )-1:0] total_elements_processed;
     logic                   vector_process_done;
@@ -101,7 +103,8 @@ module vectorUnit
     assign accumulate_instruction = (vector_operation_i inside {VMACC, VNMSAC, VMADD, VNMSUB});
     assign reduction_instruction  = (vector_operation_i inside {VREDSUM, VREDMAXU, VREDMAX, VREDMINU, VREDMIN, VREDAND, VREDOR, VREDXOR});
     assign widening_instruction   = (vector_operation_i inside {VWMUL, VWMULU, VWMULSU});
-    assign whole_reg_load_store   = (instruction_i[24:20] == 5'b01000 && instruction_operation_i inside {VLOAD, VSTORE});
+    assign whole_reg_load_store   = (instruction_i[24:20] == 5'b01000 && instruction_operation_i inside {VLOAD, VSTORE} && instruction_i[27:26] == 2'b00);
+    assign mask_load_store        = (instruction_i[24:20] == 5'b01011 && instruction_operation_i inside {VLOAD, VSTORE} && instruction_i[27:26] == 2'b00);
     assign mask_instruction       = (vector_operation_i inside {VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT});
 
     assign elements_per_reg = VLENB >> vsew;
@@ -237,6 +240,9 @@ module vectorUnit
                 default: vlmul_effective = LMUL_1;
             endcase
         end
+        else if (mask_load_store) begin
+            vlmul_effective = LMUL_1;
+        end
         else if (widening_instruction) begin
             unique case (vlmul)
                 LMUL_1:
@@ -290,6 +296,10 @@ module vectorUnit
 // Vector Length Control
 //////////////////////////////////////////////////////////////////////////////
 
+    assign vl_next_reg = ($signed(vl_curr_reg - elements_per_reg) >= 0)
+                        ? vl_curr_reg - elements_per_reg
+                        : 0;
+
     always_ff @(posedge clk or negedge reset_n)
         if (!reset_n)
             vl_curr_reg <= '0;
@@ -297,13 +307,12 @@ module vectorUnit
             vl_curr_reg <= 0;
         else if (whole_reg_load_store)
             vl_curr_reg <= '1;
+        else if (mask_load_store)
+            vl_curr_reg <= (vl >> 3) + ((vl[2:0] & 3'h7) != 3'h0 ? 1 : 0);
         else if (state == V_IDLE && next_state == V_EXEC)
             vl_curr_reg <= vl;
         else if (next_state == V_EXEC && !hold)
-            if ($signed(vl_curr_reg - elements_per_reg) >= 0)
-                vl_curr_reg <= vl_curr_reg - elements_per_reg;
-            else
-                vl_curr_reg <= 0;
+            vl_curr_reg <= vl_next_reg;
 
     always_ff @(posedge clk or negedge reset_n)
         if (!reset_n)
@@ -495,8 +504,9 @@ module vectorUnit
 //////////////////////////////////////////////////////////////////////////////
 
     vectorLSU #(
-        .VLEN   (VLEN),
-        .VLENB  (VLENB)
+        .VLEN      (VLEN     ),
+        .VLENB     (VLENB    ),
+        .BUS_WIDTH (BUS_WIDTH)
     ) vectorLSU1 (
         .clk                    (clk),
         .reset_n                (reset_n),
@@ -552,6 +562,7 @@ module vectorUnit
         .cycle_count_r      (cycle_count_r),
         .vlmul              (vlmul),
         .vl                 (vl_reductions),
+        .vl_next            (vl_next_reg),
         .vm                 (vm),
         .mask_sew8          (mask_sew8),
         .mask_sew16         (mask_sew16),

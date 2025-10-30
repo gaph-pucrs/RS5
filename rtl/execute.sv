@@ -36,12 +36,13 @@ module execute
     parameter bit           VEnable      = 1'b0,
     parameter int           VLEN         = 64,
     parameter int           LLEN         = 32,
+    parameter int           BUS_WIDTH    = 32,
     parameter bit           BRANCHPRED   = 1'b1
 )
 (
-    input   logic               clk,
-    input   logic               reset_n,
-    input   logic               stall,
+    input   logic                   clk,
+    input   logic                   reset_n,
+    input   logic                   stall,
 
     /* Not used without BP */
     /* verilator lint_off UNUSEDSIGNAL */
@@ -50,88 +51,88 @@ module execute
 
     /* Bits 14:12 and 6:0 are not used in this module */
     /* verilator lint_off UNUSEDSIGNAL */
-    input   logic [31:0]        instruction_i,
+    input   logic [31:0]            instruction_i,
     /* verilator lint_on UNUSEDSIGNAL */
 
-    input   logic [31:0]        rs1_data_i,
-    input   logic [31:0]        rs2_data_i,
-    input   logic [31:0]        second_operand_i,
-    input   logic  [4:0]        rd_i,
-    input   logic  [4:0]        rs1_i,
-    input   iType_e             instruction_operation_i,
+    input   logic [31:0]            rs1_data_i,
+    input   logic [31:0]            rs2_data_i,
+    input   logic [31:0]            second_operand_i,
+    input   logic  [4:0]            rd_i,
+    input   logic  [4:0]            rs1_i,
+    input   iType_e                 instruction_operation_i,
 
     /* Not used without zaamo */
     /* verilator lint_off UNUSEDSIGNAL */
-    input   iTypeAtomic_e       atomic_operation_i,
+    input   iTypeAtomic_e           atomic_operation_i,
     /* verilator lint_on UNUSEDSIGNAL */
 
     /* Not used if VEnable is 0 */
     /* verilator lint_off UNUSEDSIGNAL */
-    input   iTypeVector_e       vector_operation_i,
+    input   iTypeVector_e           vector_operation_i,
     /* verilator lint_on UNUSEDSIGNAL */
 
-    input   privilegeLevel_e    privilege_i,
-    input   logic               exc_ilegal_inst_i,
-    input   logic               exc_inst_access_fault_i,
-    input   logic               exc_load_access_fault_i,
+    input   privilegeLevel_e        privilege_i,
+    input   logic                   exc_ilegal_inst_i,
+    input   logic                   exc_inst_access_fault_i,
+    input   logic                   exc_load_access_fault_i,
 
-    output  logic               hold_o,
-    output  logic               write_enable_o,
-    output  logic               write_enable_fwd_o,
-    output  iType_e             instruction_operation_o,
-    output  logic   [31:0]      result_o,
-    output  logic   [31:0]      result_fwd_o,
-    output  logic   [ 4:0]      rd_o,
+    output  logic                   hold_o,
+    output  logic                   write_enable_o,
+    output  logic                   write_enable_fwd_o,
+    output  iType_e                 instruction_operation_o,
+    output  logic   [31:0]          result_o,
+    output  logic   [31:0]          result_fwd_o,
+    output  logic   [ 4:0]          rd_o,
 
-    output  logic [31:0]        mem_address_exec_o,
-    output  logic [31:0]        mem_address_o,
-    output  logic               mem_read_enable_o,
-    output  logic  [3:0]        mem_write_enable_o,
-    output  logic [31:0]        mem_write_data_o,
+    output  logic [31:0]            mem_address_exec_o,
+    output  logic [31:0]            mem_address_o,
+    output  logic                   mem_read_enable_o,
+    output  logic [BUS_WIDTH/8-1:0] mem_write_enable_o,
+    output  logic [BUS_WIDTH-1:0]   mem_write_data_o,
     /* Not used if VEnable is 0 */
     /* verilator lint_off UNUSEDSIGNAL */
-    input   logic [31:0]        mem_read_data_i,
+    input   logic [BUS_WIDTH-1:0]   mem_read_data_i,
     /* verilator lint_on UNUSEDSIGNAL */
 
     /* We only use some bits of this signal here */
     /* verilator lint_off UNUSEDSIGNAL */
-    input   logic [11:0]        csr_address_i,
+    input   logic [11:0]            csr_address_i,
     /* verilator lint_on UNUSEDSIGNAL */
-    output  logic               csr_read_enable_o,
-    input   logic [31:0]        csr_data_read_i,
-    output  logic               csr_write_enable_o,
-    output  csrOperation_e      csr_operation_o,
-    output  logic [31:0]        csr_data_o,
+    output  logic                   csr_read_enable_o,
+    input   logic [31:0]            csr_data_read_i,
+    output  logic                   csr_write_enable_o,
+    output  csrOperation_e          csr_operation_o,
+    output  logic [31:0]            csr_data_o,
 
-    output  logic [31:0]        vtype_o,
-    output  logic [31:0]        vlen_o,
+    output  logic [31:0]            vtype_o,
+    output  logic [31:0]            vlen_o,
 
     /* Not used if BP is off */
     /* verilator lint_off UNUSEDSIGNAL */
-    input   logic               bp_taken_i,
+    input   logic                   bp_taken_i,
     /* verilator lint_on UNUSEDSIGNAL */
-    output  logic               jump_rollback_o,
-    output  logic               ctx_switch_o,
-    output  logic [31:0]        ctx_switch_target_o,
+    output  logic                   jump_rollback_o,
+    output  logic                   ctx_switch_o,
+    output  logic [31:0]            ctx_switch_target_o,
 
-    input   logic               interrupt_pending_i,
-    input   logic [31:0]        mtvec_i,
-    input   logic [31:0]        mepc_i,
-    input   logic [31:0]        jump_imm_target_i,
-    input   logic [31:0]        pc_next_i,
+    input   logic                   interrupt_pending_i,
+    input   logic [31:0]            mtvec_i,
+    input   logic [31:0]            mepc_i,
+    input   logic [31:0]            jump_imm_target_i,
+    input   logic [31:0]            pc_next_i,
 
 
     /* Not used without zalrsc */
     /* verilator lint_off UNUSEDSIGNAL */
-    input   logic [31:0]        reservation_data_i,
+    input   logic [31:0]            reservation_data_i,
     /* verilator lint_on UNUSEDSIGNAL */
 
-    output  logic               jump_o,
-    output  logic               interrupt_ack_o,
-    output  logic               machine_return_o,
-    output  logic               raise_exception_o,
-    output  logic [31:0]        jump_target_o,
-    output  exceptionCode_e     exception_code_o
+    output  logic                   jump_o,
+    output  logic                   interrupt_ack_o,
+    output  logic                   machine_return_o,
+    output  logic                   raise_exception_o,
+    output  logic [31:0]            jump_target_o,
+    output  exceptionCode_e         exception_code_o
 );
 
     logic [31:0]    result;
@@ -199,11 +200,11 @@ module execute
     logic        mem_read_enable;
     logic        mem_read_enable_vector;
 
-    logic  [3:0] mem_write_enable;
-    logic  [3:0] mem_write_enable_vector;
+    logic  [3:0]             mem_write_enable;
+    logic  [BUS_WIDTH/8-1:0] mem_write_enable_vector;
 
-    logic [31:0] mem_write_data;
-    logic [31:0] mem_write_data_vector;
+    logic [31:0]          mem_write_data;
+    logic [BUS_WIDTH-1:0] mem_write_data_vector;
 
     logic        atomic_mem_read_enable;
     logic        atomic_mem_write_enable;
@@ -239,7 +240,6 @@ module execute
 
     logic mem_read_enable_vector_inst;
     assign mem_read_enable_vector_inst = mem_read_enable_vector && (instruction_operation_i inside {VLOAD, VSTORE});
-
     assign mem_read_enable = instruction_operation_i inside {LB, LBU, LH, LHU, LW, LR_W};
 
     always_comb begin
@@ -270,13 +270,21 @@ module execute
         else if (!stall) begin
             mem_address_o       <= mem_address;
             mem_read_enable_o   <= (mem_read_enable || atomic_mem_read_enable || mem_read_enable_vector_inst);
-            mem_write_enable_o  <= (mem_write_enable | {4{atomic_mem_write_enable}} | mem_write_enable_vector);
+            /* verilator lint_off WIDTHEXPAND */
+            /* verilator lint_off WIDTHTRUNC */
+            mem_write_enable_o  <= ({'0, mem_write_enable} | {'0, {4{atomic_mem_write_enable}}} | mem_write_enable_vector);
+            /* verilator lint_on WIDTHTRUNC */
+            /* verilator lint_on WIDTHEXPAND */
 
             unique case (instruction_operation_i)
+            /* verilator lint_off WIDTHEXPAND */
+            /* verilator lint_off WIDTHTRUNC */
                 VLOAD,
-                VSTORE:  mem_write_data_o <= VEnable ? mem_write_data_vector : mem_write_data;
-                AMO_W:   mem_write_data_o <= (AMOEXT inside {AMO_ZAAMO, AMO_A}) ? amo_operand : mem_write_data;
-                default: mem_write_data_o <= mem_write_data;
+                VSTORE:  mem_write_data_o <= VEnable ? mem_write_data_vector : {'0, mem_write_data};
+                AMO_W:   mem_write_data_o <= (AMOEXT inside {AMO_ZAAMO, AMO_A}) ? {'0, amo_operand} : {'0, mem_write_data};
+                default: mem_write_data_o <= {'0, mem_write_data};
+            /* verilator lint_on WIDTHTRUNC */
+            /* verilator lint_on WIDTHEXPAND */
             endcase
         end
     end
@@ -461,8 +469,9 @@ module execute
     if (VEnable) begin : v_gen_on
         vectorUnit #(
             .Environment (Environment),
-            .VLEN        (VLEN),
-            .LLEN        (LLEN)
+            .VLEN        (VLEN       ),
+            .LLEN        (LLEN       ),
+            .BUS_WIDTH   (BUS_WIDTH  )
         ) vector (
             .clk                    (clk),
             .reset_n                (reset_n),
@@ -537,7 +546,7 @@ module execute
                 .equal_i           (equal                ),
                 .enable_i          (lrsc_enable          ),
                 .rs1_data_i        (rs1_data_i           ),
-                .data_i            (mem_read_data_i      ),
+                .data_i            (mem_read_data_i[31:0]),
                 .reservation_addr_i(reservation_addr     ),
                 .reservation_data_i(reservation_data_i   ),
                 .hold_o            (lrsc_hold            ),
@@ -594,17 +603,17 @@ module execute
             end
 
             amo amo_m (
-                .clk               (clk                 ),
-                .reset_n           (reset_n             ),
-                .stall             (stall               ),
-                .enable_i          (amo_enable          ),
-                .data_i            (mem_read_data_i     ),
-                .amo_result_i      (amo_result          ),
-                .hold_o            (amo_hold            ),
-                .write_enable_o    (amo_write_enable    ),
-                .mem_read_enable_o (amo_mem_read_enable ),
-                .mem_write_enable_o(amo_mem_write_enable),
-                .opA_o             (amo_operand         )
+                .clk               (clk                  ),
+                .reset_n           (reset_n              ),
+                .stall             (stall                ),
+                .enable_i          (amo_enable           ),
+                .data_i            (mem_read_data_i[31:0]),
+                .amo_result_i      (amo_result           ),
+                .hold_o            (amo_hold             ),
+                .write_enable_o    (amo_write_enable     ),
+                .mem_read_enable_o (amo_mem_read_enable  ),
+                .mem_write_enable_o(amo_mem_write_enable ),
+                .opA_o             (amo_operand          )
             );
 
             assign first_operand = amo_enable ? amo_operand : rs1_data_i;

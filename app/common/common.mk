@@ -1,6 +1,8 @@
 RED  =\033[0;31m
 NC   =\033[0m # No Color
 
+COMMON_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+
 TARGET   ?= $(notdir $(CURDIR))
 MEM_SIZE ?= 65536
 ARCH     ?= rv32im_zicsr
@@ -11,15 +13,15 @@ OBJCOPY = riscv64-elf-objcopy
 
 SRCDIR  = src
 INCDIR  = $(SRCDIR)/include
-HEADERS = $(wildcard $(INCDIR)/*.h) $(wildcard ../common/include/*.h)
+HEADERS = $(wildcard $(INCDIR)/*.h) $(wildcard $(COMMON_DIR)/include/*.h)
 
-CFLAGS  = -march=$(ARCH) -mabi=ilp32 -Os -Wall -std=c23 -I$(INCDIR) -I../common/include
-LDFLAGS = --specs=nano.specs -T ../common/link.ld -march=$(ARCH) -mabi=ilp32 -nostartfiles -lm -u _printf_float
+CFLAGS  = -march=$(ARCH) -mabi=ilp32 -Os -Wall -std=c23 -I$(INCDIR) -I$(COMMON_DIR)/include
+LDFLAGS = --specs=nano.specs -T $(COMMON_DIR)/link.ld -march=$(ARCH) -mabi=ilp32 -nostartfiles -lm -u _printf_float
 
-CCSRC = $(wildcard $(SRCDIR)/*.c) $(wildcard ../common/*.c)
+CCSRC = $(wildcard $(SRCDIR)/*.c) $(wildcard $(COMMON_DIR)/*.c)
 CCOBJ = $(patsubst %.c, %.o, $(CCSRC))
 
-ASSRC = $(wildcard $(SRCDIR)/*.S) $(wildcard ../common/*.S)
+ASSRC = $(wildcard $(SRCDIR)/*.S) $(wildcard $(COMMON_DIR)/*.S)
 ASOBJ = $(patsubst %.S,%.o, $(ASSRC))
 
 all: $(TARGET).bin $(TARGET).lst
