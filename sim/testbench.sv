@@ -31,18 +31,6 @@ module testbench
 
   timeunit 1ns; timeprecision 1ns;
 
-`ifndef VLEN_P
-  `define VLEN_P 512
-`endif
-
-`ifndef LLEN_P
-  `define LLEN_P 32
-`endif
-
-`ifndef BUS_WIDTH_P
-  `define BUS_WIDTH_P 32
-`endif
-
 //////////////////////////////////////////////////////////////////////////////
 // PARAMETERS FOR CORE INSTANTIATION
 //////////////////////////////////////////////////////////////////////////////
@@ -61,8 +49,8 @@ module testbench
     localparam bit           DUALPORT_MEM    = 1'b1;
 
     localparam bit           VEnable         = 1'b1;
-    localparam int           VLEN            = `VLEN_P;
-    localparam int           LLEN            = `LLEN_P;
+    localparam int           VLEN            = 512;
+    localparam int           LLEN            = 32;
 
 `ifndef SYNTH
     localparam bit           PROFILING       = 1'b1;
@@ -71,7 +59,7 @@ module testbench
     localparam string        PROFILING_FILE  = "./results/Report.txt";
     localparam string        OUTPUT_FILE     = "./results/Output.txt";
 
-    localparam int           BUS_WIDTH       = `BUS_WIDTH_P;
+    localparam int           BUS_WIDTH       = 32;
     localparam int           MEM_ADDR_BITS   = 28;
     localparam string        BIN_FILE        = "../app/riscv-tests/test.bin";
 
