@@ -147,12 +147,8 @@ module testbench
     always_comb begin
         unique case ({enable_tb_r, enable_plic_r, enable_rtc_r})
             3'b100:  mem_data_read = data_tb;
-            /* verilator lint_off WIDTHTRUNC */
-            /* verilator lint_off WIDTHEXPAND */
-            3'b010:  mem_data_read = {'0, data_plic};
-            3'b001:  mem_data_read = {'0, data_rtc[31:0]};
-            /* verilator lint_on  WIDTHEXPAND */
-            /* verilator lint_on  WIDTHTRUNC */
+            3'b010:  mem_data_read = {{(BUS_WIDTH-32){1'b0}}, data_plic};
+            3'b001:  mem_data_read = {{(BUS_WIDTH-32){1'b0}}, data_rtc[31:0]};
             default: mem_data_read = data_ram;
         endcase
     end
