@@ -42,6 +42,7 @@ module decode
     input   logic           reset_n,
     input   logic           enable,
     input   logic           sys_reset,
+    input   logic           valid_i,
 
     input   logic [31:0]    instruction_i,
     input   logic [31:0]    pc_i,
@@ -53,7 +54,6 @@ module decode
     input   logic [ 4:0]    rd_retire_i,
     input   logic           mem_access_we_i,
     input   logic           regbank_we_i,
-    input   logic           rollback_i,
     input   logic           compressed_i,
 
     /* Not used without forwarding */
@@ -633,7 +633,7 @@ module decode
     assign hazard_rs1 = locked_rs1 && use_rs1;
     assign hazard_rs2 = locked_rs2 && use_rs2;
 
-    assign killed   = jump_confirmed || jump_misaligned_i || rollback_i;
+    assign killed   = jump_confirmed || jump_misaligned_i || !valid_i;
     assign hazard_o = (hazard_mem || hazard_rs1 || hazard_rs2) && !killed && !exception;
 
     always_ff @(posedge clk or negedge reset_n) begin

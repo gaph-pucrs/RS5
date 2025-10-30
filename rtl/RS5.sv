@@ -44,6 +44,7 @@ module RS5
     parameter bit           ZICONDEnable     = 1'b0,
     parameter bit           ZCBEnable        = 1'b0,
     parameter bit           HPMCOUNTEREnable = 1'b0,
+    parameter int           IQUEUE_SIZE      = 2,
     parameter bit           BRANCHPRED       = 1'b1,
     parameter bit           FORWARDING       = 1'b1
 )
@@ -52,19 +53,23 @@ module RS5
     input  logic                    reset_n,
     input  logic                    sys_reset_i,
     input  logic                    stall,
+    input  logic                    busy_i,
 
-    input  logic [31:0]             instruction_i,
-    input  logic [31:0]             mem_data_i,
-    input  logic [63:0]             mtime_i,
     input  logic                    tip_i,
     input  logic                    eip_i,
+    output logic                    interrupt_ack_o,
 
+    input  logic [63:0]             mtime_i,
+
+    output logic                    imem_operation_enable_o,
     output logic [31:0]             instruction_address_o,
-    output logic                    mem_operation_enable_o,
+    input  logic [31:0]             instruction_i,
+
+    output logic                    dmem_operation_enable_o,
     output logic  [3:0]             mem_write_enable_o,
     output logic [31:0]             mem_address_o,
     output logic [31:0]             mem_data_o,
-    output logic                    interrupt_ack_o
+    input  logic [31:0]             mem_data_i
 );
 
 //////////////////////////////////////////////////////////////////////////////
@@ -188,11 +193,12 @@ module RS5
 //////////////////////////////////////////////////////////// FETCH //////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+    logic        bp_ack;
+    logic        valid_fetch;
     logic        jump_rollback;
     logic        jumping;
     logic        ctx_switch;
     logic        bp_take_fetch;
-    logic        bp_rollback;
     logic        compressed_decode;
     logic [31:0] bp_target;
     logic [31:0] ctx_switch_target;
@@ -200,30 +206,34 @@ module RS5
 
     fetch #(
         .start_address(START_ADDR),
+        .IQUEUE_SIZE  (IQUEUE_SIZE),
         .MULEXT       (MULEXT),
         .ZCBEnable    (ZCBEnable),
         .COMPRESSED   (COMPRESSED),
         .BRANCHPRED   (BRANCHPRED)
     ) fetch1 (
-        .clk                  (clk                ),
-        .reset_n              (reset_n            ),
-        .sys_reset            (sys_reset_i        ),
-        .enable_i             (enable_fetch       ),
-        .jump_i               (jump               ),
-        .jump_rollback_i      (jump_rollback      ),
-        .jump_target_i        (jump_target        ),
-        .ctx_switch_i         (ctx_switch         ),
-        .ctx_switch_target_i  (ctx_switch_target  ),
-        .bp_take_i            (bp_take_fetch      ),
-        .bp_target_i          (bp_target          ),
-        .jumping_o            (jumping            ),
-        .bp_rollback_o        (bp_rollback        ),
-        .jump_misaligned_o    (jump_misaligned    ),
-        .compressed_o         (compressed_decode  ),
-        .instruction_address_o(instruction_address),
-        .instruction_data_i   (instruction_i      ),
-        .instruction_o        (instruction_decode ),
-        .pc_o                 (pc_decode          )
+        .clk                  (clk                    ),
+        .reset_n              (reset_n                ),
+        .sys_reset            (sys_reset_i            ),
+        .enable_i             (enable_fetch           ),
+        .busy_i               (busy_i                 ),
+        .valid_o              (valid_fetch            ),
+        .bp_ack_o             (bp_ack                 ),
+        .jump_i               (jump                   ),
+        .jump_rollback_i      (jump_rollback          ),
+        .jump_target_i        (jump_target            ),
+        .ctx_switch_i         (ctx_switch             ),
+        .ctx_switch_target_i  (ctx_switch_target      ),
+        .bp_take_i            (bp_take_fetch          ),
+        .bp_target_i          (bp_target              ),
+        .jumping_o            (jumping                ),
+        .jump_misaligned_o    (jump_misaligned        ),
+        .compressed_o         (compressed_decode      ),
+        .mem_operation_en_o   (imem_operation_enable_o),
+        .instruction_address_o(instruction_address    ),
+        .instruction_data_i   (instruction_i          ),
+        .instruction_o        (instruction_decode     ),
+        .pc_o                 (pc_decode              )
     );
 
     if (XOSVMEnable == 1'b1) begin : gen_xosvm_i_mmu_on
@@ -266,6 +276,7 @@ module RS5
         .reset_n                    (reset_n),
         .enable                     (enable_decode),
         .sys_reset                  (sys_reset_i),
+        .valid_i                    (valid_fetch),
         .instruction_i              (instruction_decode),
         .pc_i                       (pc_decode),
         .rs1_data_read_i            (regbank_data1),
@@ -300,7 +311,6 @@ module RS5
         .jump_i                     (jump),
         .jumping_i                  (jumping),
         .jump_rollback_i            (jump_rollback),
-        .rollback_i                 (bp_rollback),
         .compressed_i               (compressed_decode),
         .jump_misaligned_i          (jump_misaligned),
         .bp_take_o                  (bp_take_fetch),
@@ -374,6 +384,7 @@ module RS5
         .clk                     (clk),
         .reset_n                 (reset_n),
         .stall                   (stall),
+        .bp_ack_i                (bp_ack),
         .instruction_i           (instruction_execute),
         .rs1_data_i              (rs1_data_execute),
         .rs2_data_i              (rs2_data_execute),
@@ -440,20 +451,10 @@ module RS5
         end
         else if (!stall) begin
             instruction_operation_retire <= instruction_operation_mem_access;
-            regbank_write_enable <= write_enable_mem_access;
-            result_retire        <= result_mem_access;
-            rd_retire            <= rd_mem_access;
-            RAISE_EXCEPTION_r    <= RAISE_EXCEPTION;
-        end
-    end
-
-    logic mmu_en_r;
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            mmu_en_r <= 1'b0;
-        end
-        else if (!stall) begin
-            mmu_en_r <= mmu_en;
+            regbank_write_enable         <= write_enable_mem_access;
+            result_retire                <= result_mem_access;
+            rd_retire                    <= rd_mem_access;
+            RAISE_EXCEPTION_r            <= RAISE_EXCEPTION;
         end
     end
 
@@ -463,6 +464,16 @@ module RS5
      * address translation.
      */
     if (XOSVMEnable == 1'b1) begin : gen_d_mmu_on
+        logic mmu_en_r;
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n) begin
+                mmu_en_r <= 1'b0;
+            end
+            else if (!stall) begin
+                mmu_en_r <= mmu_en;
+            end
+        end
+        
         mmu d_mmu (
             .en_i           (mmu_en_r                  ),
             .mask_i         (mvmdm                     ),
@@ -478,7 +489,7 @@ module RS5
         assign mem_address_o  = {mem_address[31:2], 2'b00};
     end
 
-    assign mem_operation_enable_o = (mem_write_enable != '0 || mem_read_enable) && !mmu_data_fault && !RAISE_EXCEPTION_r;
+    assign dmem_operation_enable_o = (mem_write_enable != '0 || mem_read_enable) && !mmu_data_fault && !RAISE_EXCEPTION_r;
     assign mem_write_enable_o = mem_write_enable;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

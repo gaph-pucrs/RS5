@@ -47,6 +47,8 @@ module testbench
     localparam bit           USE_HPMCOUNTER  = 1'b1;
     localparam bit           BRANCHPRED      = 1'b1;
     localparam bit           FORWARDING      = 1'b1;
+    localparam int           IQUEUE_SIZE     = 2;
+    localparam bit           DUALPORT_MEM    = 1'b1;
 
 `ifndef SYNTH
     localparam bit           PROFILING       = 1'b1;
@@ -57,6 +59,7 @@ module testbench
 
     localparam int           MEM_WIDTH       = 65_536;
     localparam string        BIN_FILE        = "../app/riscv-tests/test.bin";
+    // localparam string        BIN_FILE        = "../app/coremark/coremark.bin";
 
     localparam int           i_cnt = 1;
 
@@ -111,40 +114,10 @@ module testbench
 // Control
 //////////////////////////////////////////////////////////////////////////////
 
-    always_comb begin
-        if (mem_operation_enable) begin
-            if (mem_address[31:28] < 4'h2) begin
-                enable_ram  = 1'b1;
-                enable_rtc  = 1'b0;
-                enable_plic = 1'b0;
-                enable_tb   = 1'b0;
-            end
-            else if (mem_address[31:28] < 4'h3) begin
-                enable_ram  = 1'b0;
-                enable_rtc  = 1'b1;
-                enable_plic = 1'b0;
-                enable_tb   = 1'b0;
-            end
-            else if (mem_address[31:28] < 4'h8) begin
-                enable_ram  = 1'b0;
-                enable_rtc  = 1'b0;
-                enable_plic = 1'b1;
-                enable_tb   = 1'b0;
-            end
-            else begin
-                enable_ram  = 1'b0;
-                enable_rtc  = 1'b0;
-                enable_plic = 1'b0;
-                enable_tb   = 1'b1;
-            end
-        end
-        else begin
-            enable_ram  = 1'b0;
-            enable_rtc  = 1'b0;
-            enable_plic = 1'b0;
-            enable_tb   = 1'b0;
-        end
-    end
+    assign enable_ram  = mem_operation_enable && ((mem_address[31:28] == 4'b0000) || (mem_address[31:28] == 4'b0001));
+    assign enable_rtc  = mem_operation_enable && (mem_address[31:28] == 4'b0010);
+    assign enable_plic = mem_operation_enable && (mem_address[31:28] == 4'b0100);
+    assign enable_tb   = mem_operation_enable && (mem_address[31:28] == 4'b1000);
 
     always_ff @(posedge clk) begin
         enable_tb_r     <= enable_tb;
@@ -153,23 +126,20 @@ module testbench
     end
 
     always_comb begin
-        if (enable_tb_r) begin
-            mem_data_read = data_tb;
-        end
-        else if (enable_rtc_r) begin
-            mem_data_read = data_rtc[31:0];
-        end
-        else if (enable_plic_r) begin
-            mem_data_read = data_plic;
-        end
-        else begin
-            mem_data_read = data_ram;
-        end
+        unique case ({enable_tb_r, enable_plic_r, enable_rtc_r})
+            3'b100:  mem_data_read = data_tb;
+            3'b010:  mem_data_read = data_plic;
+            3'b001:  mem_data_read = data_rtc[31:0];
+            default: mem_data_read = data_ram;
+        endcase
     end
 
 //////////////////////////////////////////////////////////////////////////////
 // CPU
 //////////////////////////////////////////////////////////////////////////////
+
+    logic busy;
+    logic enable_imem;
 
     RS5 #(
     `ifndef SYNTH
@@ -189,6 +159,7 @@ module testbench
         .ZICONDEnable    (USE_ZICOND    ),
         .ZCBEnable       (USE_ZCB       ),
         .HPMCOUNTEREnable(USE_HPMCOUNTER),
+        .IQUEUE_SIZE     (IQUEUE_SIZE   ),
         .BRANCHPRED      (BRANCHPRED    ),
         .FORWARDING      (FORWARDING    )
     ) dut (
@@ -196,13 +167,15 @@ module testbench
         .reset_n                (reset_n),
         .sys_reset_i            (1'b0),
         .stall                  (1'b0),
+        .busy_i                 (busy),
         .instruction_i          (instruction),
         .mem_data_i             (mem_data_read),
         .mtime_i                (mtime),
         .tip_i                  (mti),
         .eip_i                  (mei),
+        .imem_operation_enable_o(enable_imem),
         .instruction_address_o  (instruction_address),
-        .mem_operation_enable_o (mem_operation_enable),
+        .dmem_operation_enable_o(mem_operation_enable),
         .mem_write_enable_o     (mem_write_enable),
         .mem_address_o          (mem_address),
         .mem_data_o             (mem_data_write),
@@ -212,6 +185,20 @@ module testbench
 //////////////////////////////////////////////////////////////////////////////
 // RAM
 //////////////////////////////////////////////////////////////////////////////
+
+    logic                             enA;
+    logic [3:0]                       weA;
+    logic [($clog2(MEM_WIDTH) - 1):0] addrA;
+    logic [31:0]                      dataAi;
+    logic [31:0]                      dataAo;
+
+    logic                             enB;
+    logic [3:0]                       weB;
+    logic [($clog2(MEM_WIDTH) - 1):0] addrB;
+    logic [31:0]                      dataBi;
+    /* verilator lint_off UNUSEDSIGNAL */
+    logic [31:0]                      dataBo;
+    /* verilator lint_on UNUSEDSIGNAL */
 
     RAM_mem #(
     `ifndef SYNTH
@@ -223,18 +210,49 @@ module testbench
     ) RAM_MEM (
         .clk        (clk),
 
-        .enA_i      (1'b1),
-        .weA_i      (4'h0),
-        .addrA_i    (instruction_address[($clog2(MEM_WIDTH) - 1):0]),
-        .dataA_i    (32'h00000000),
-        .dataA_o    (instruction),
+        .enA_i      (enA),
+        .weA_i      (weA),
+        .addrA_i    (addrA),
+        .dataA_i    (dataAi),
+        .dataA_o    (dataAo),
 
-        .enB_i      (enable_ram),
-        .weB_i      (mem_write_enable),
-        .addrB_i    (mem_address[($clog2(MEM_WIDTH) - 1):0]),
-        .dataB_i    (mem_data_write),
-        .dataB_o    (data_ram)
+        .enB_i      (enB),
+        .weB_i      (weB),
+        .addrB_i    (addrB),
+        .dataB_i    (dataBi),
+        .dataB_o    (dataBo)
     );
+
+    if (DUALPORT_MEM) begin : dual_port
+        assign enA         = enable_imem;
+        assign weA         = 4'h0;
+        assign addrA       = instruction_address[($clog2(MEM_WIDTH) - 1):0];
+        assign dataAi      = 32'h00000000;
+        assign instruction = dataAo;
+
+        assign enB         = enable_ram;
+        assign weB         = mem_write_enable;
+        assign addrB       = mem_address[($clog2(MEM_WIDTH) - 1):0];
+        assign dataBi      = mem_data_write;
+        assign data_ram    = dataBo;
+
+        assign busy        = 1'b0;
+    end
+    else begin : single_port
+        assign enA         = enable_imem || enable_ram;
+        assign weA         = enable_ram ? mem_write_enable : 4'h0;
+        assign addrA       = enable_ram ? mem_address[($clog2(MEM_WIDTH) - 1):0] : instruction_address[($clog2(MEM_WIDTH) - 1):0];
+        assign dataAi      = mem_data_write;
+        assign instruction = dataAo;
+        assign data_ram    = dataAo;
+
+        assign enB         = 1'b0;
+        assign weB         = 4'h0000;
+        assign addrB       = '0;
+        assign dataBi      = 32'h00000000;
+
+        assign busy        = enable_ram;
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 // PLIC

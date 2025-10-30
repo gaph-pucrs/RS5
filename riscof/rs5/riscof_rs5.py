@@ -58,6 +58,7 @@ class rs5(pluginTemplate):
         # set up the simulation command
         dut_dir = self.pluginpath + '/../../'
         self.verilatecmd = f'verilator --cc --exe --binary --timescale 1ns/1ns -j 0\
+            -I{dut_dir}/RingBuffer/rtl/\
             -I{dut_dir}/rtl/\
             -I{dut_dir}/sim/\
             -I{dut_dir}/rtl/aes\
@@ -98,6 +99,8 @@ class rs5(pluginTemplate):
 
         self.verilatecmd += " -GBRANCHPRED=1\\'b" + os.environ["BRANCHPRED"]
         self.verilatecmd += " -GFORWARDING=1\\'b" + os.environ["FORWARDING"]
+        self.verilatecmd += " -GDUALPORT_MEM=1\\'b" + os.environ["DUALPORT_MEM"]
+        self.verilatecmd += " -GIQUEUE_SIZE=" + os.environ["IQUEUE_SIZE"]
 
         self.compile_cmd = self.compile_cmd+' -mabi='+('lp64 ' if 64 in ispec['supported_xlen'] else 'ilp32 ')
 
