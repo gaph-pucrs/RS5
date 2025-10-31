@@ -28,7 +28,8 @@ module testbench
     import RS5_pkg::*;
 (
 );
-    timeunit 1ns; timeprecision 1ns;
+
+  timeunit 1ns; timeprecision 1ns;
 
 //////////////////////////////////////////////////////////////////////////////
 // PARAMETERS FOR CORE INSTANTIATION
@@ -41,31 +42,32 @@ module testbench
     localparam bit           USE_ZKNE        = 1'b1;
     localparam bit           USE_ZICOND      = 1'b1;
     localparam bit           USE_ZCB         = 1'b1;
-    localparam bit           VEnable         = 1'b0;
-    localparam int           VLEN            = 256;
-    localparam int           LLEN            = 32;
     localparam bit           USE_HPMCOUNTER  = 1'b1;
     localparam bit           BRANCHPRED      = 1'b1;
     localparam bit           FORWARDING      = 1'b1;
     localparam int           IQUEUE_SIZE     = 2;
     localparam bit           DUALPORT_MEM    = 1'b1;
 
+    localparam bit           VEnable         = 1'b1;
+    localparam int           VLEN            = 512;
+    localparam int           LLEN            = 32;
+
 `ifndef SYNTH
     localparam bit           PROFILING       = 1'b1;
-    localparam bit           DEBUG           = 1'b0;
+    localparam bit           DEBUG           = 1'b1;
 `endif
     localparam string        PROFILING_FILE  = "./results/Report.txt";
     localparam string        OUTPUT_FILE     = "./results/Output.txt";
 
-    localparam int           MEM_WIDTH       = 65_536;
+    localparam int           BUS_WIDTH       = 32;
+    localparam int           MEM_ADDR_BITS   = 28;
     localparam string        BIN_FILE        = "../app/riscv-tests/test.bin";
-    // localparam string        BIN_FILE        = "../app/coremark/coremark.bin";
 
     localparam int           i_cnt = 1;
 
 ///////////////////////////////////////// Clock generator //////////////////////////////
 
-    logic        clk=1;
+    logic clk=1;
 
     always begin
         #5.0 clk <= 0;
@@ -100,13 +102,18 @@ module testbench
 
     logic                   interrupt_ack;
     logic [63:0]            mtime;
-    logic [31:0]            instruction;
+    /* verilator lint_off UNUSEDSIGNAL */
+    logic [BUS_WIDTH-1:0]   instruction;
+    /* verilator lint_on UNUSEDSIGNAL */
     logic                   enable_ram, enable_rtc, enable_plic, enable_tb;
     logic                   mem_operation_enable;
-    logic [31:0]            mem_address, mem_data_read, mem_data_write;
-    logic [3:0]             mem_write_enable;
+    logic [31:0]            mem_address;
+    logic [BUS_WIDTH  -1:0] mem_data_read, mem_data_write;
+    logic [BUS_WIDTH/8-1:0] mem_write_enable;
     byte                    char;
-    logic [31:0]            data_ram, data_plic, data_tb;
+    logic [BUS_WIDTH  -1:0] data_ram;
+    logic [31:0]            data_plic;
+    logic [BUS_WIDTH  -1:0] data_tb;
     logic                   enable_tb_r, enable_rtc_r, enable_plic_r;
     logic                   mti, mei;
 
@@ -128,8 +135,8 @@ module testbench
     always_comb begin
         unique case ({enable_tb_r, enable_plic_r, enable_rtc_r})
             3'b100:  mem_data_read = data_tb;
-            3'b010:  mem_data_read = data_plic;
-            3'b001:  mem_data_read = data_rtc[31:0];
+            3'b010:  mem_data_read = {{(BUS_WIDTH-32){1'b0}}, data_plic};
+            3'b001:  mem_data_read = {{(BUS_WIDTH-32){1'b0}}, data_rtc[31:0]};
             default: mem_data_read = data_ram;
         endcase
     end
@@ -151,6 +158,7 @@ module testbench
         .MULEXT          (MULEXT        ),
         .AMOEXT          (AMOEXT        ),
         .COMPRESSED      (COMPRESSED    ),
+        .BUS_WIDTH       (BUS_WIDTH     ),
         .VEnable         (VEnable       ),
         .VLEN            (VLEN          ),
         .LLEN            (LLEN          ),
@@ -168,7 +176,7 @@ module testbench
         .sys_reset_i            (1'b0),
         .stall                  (1'b0),
         .busy_i                 (busy),
-        .instruction_i          (instruction),
+        .instruction_i          (instruction[31:0]),
         .mem_data_i             (mem_data_read),
         .mtime_i                (mtime),
         .tip_i                  (mti),
@@ -186,18 +194,20 @@ module testbench
 // RAM
 //////////////////////////////////////////////////////////////////////////////
 
+    localparam int MEM_WIDTH = 1 << MEM_ADDR_BITS;
+
     logic                             enA;
-    logic [3:0]                       weA;
+    logic [BUS_WIDTH/8-1:0]           weA;
     logic [($clog2(MEM_WIDTH) - 1):0] addrA;
-    logic [31:0]                      dataAi;
-    logic [31:0]                      dataAo;
+    logic [BUS_WIDTH-1:0]             dataAi;
+    logic [BUS_WIDTH-1:0]             dataAo;
 
     logic                             enB;
-    logic [3:0]                       weB;
+    logic [BUS_WIDTH/8-1:0]           weB;
     logic [($clog2(MEM_WIDTH) - 1):0] addrB;
-    logic [31:0]                      dataBi;
+    logic [BUS_WIDTH-1:0]             dataBi;
     /* verilator lint_off UNUSEDSIGNAL */
-    logic [31:0]                      dataBo;
+    logic [BUS_WIDTH-1:0]             dataBo;
     /* verilator lint_on UNUSEDSIGNAL */
 
     RAM_mem #(
@@ -205,6 +215,7 @@ module testbench
         .DEBUG     (DEBUG     ),
         .DEBUG_PATH("./debug/"),
     `endif
+        .BUS_WIDTH(BUS_WIDTH  ),
         .MEM_WIDTH(MEM_WIDTH  ),
         .BIN_FILE (BIN_FILE   )
     ) RAM_MEM (
@@ -225,9 +236,9 @@ module testbench
 
     if (DUALPORT_MEM) begin : dual_port
         assign enA         = enable_imem;
-        assign weA         = 4'h0;
+        assign weA         = '0;
         assign addrA       = instruction_address[($clog2(MEM_WIDTH) - 1):0];
-        assign dataAi      = 32'h00000000;
+        assign dataAi      = '0;
         assign instruction = dataAo;
 
         assign enB         = enable_ram;
@@ -240,16 +251,16 @@ module testbench
     end
     else begin : single_port
         assign enA         = enable_imem || enable_ram;
-        assign weA         = enable_ram ? mem_write_enable : 4'h0;
+        assign weA         = enable_ram ? mem_write_enable : '0;
         assign addrA       = enable_ram ? mem_address[($clog2(MEM_WIDTH) - 1):0] : instruction_address[($clog2(MEM_WIDTH) - 1):0];
         assign dataAi      = mem_data_write;
         assign instruction = dataAo;
         assign data_ram    = dataAo;
 
-        assign enB         = 1'b0;
-        assign weB         = 4'h0000;
+        assign enB         = '0;
+        assign weB         = '0;
         assign addrB       = '0;
-        assign dataBi      = 32'h00000000;
+        assign dataBi      = '0;
 
         assign busy        = enable_ram;
     end
@@ -269,9 +280,9 @@ module testbench
         .clk     (clk),
         .reset_n (reset_n),
         .en_i    (enable_plic),
-        .we_i    (mem_write_enable),
+        .we_i    (mem_write_enable[3:0]),
         .addr_i  (mem_address[23:0]),
-        .data_i  (mem_data_write),
+        .data_i  (mem_data_write[31:0]),
         .data_o  (data_plic),
         .irq_i   ('0),
         .iack_i  (interrupt_ack),
@@ -288,8 +299,8 @@ module testbench
         .reset_n    (reset_n),
         .en_i       (enable_rtc),
         .addr_i     (mem_address[3:0]),
-        .we_i       ({4'h0, mem_write_enable}),
-        .data_i     ({32'h0, mem_data_write}),
+        .we_i       ({4'h0, mem_write_enable[3:0]}),
+        .data_i     ({32'h0, mem_data_write[31:0]}),
         .data_o     (data_rtc),
         .mti_o      (mti),
         .mtime_o    (mtime)

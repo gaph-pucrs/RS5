@@ -40,6 +40,7 @@ module vectorALU
     input  logic [3:0]                  cycle_count_r,
     input  vlmul_e                      vlmul,
     input  logic[$bits(VLEN)-1:0]       vl,
+    input  logic[$bits(VLEN)-1:0]       vl_next,
     input  logic                        vm,
     input  logic [7:0][ VLENB   -1:0]   mask_sew8,
     input  logic [7:0][(VLENB/2)-1:0]   mask_sew16,
@@ -144,7 +145,10 @@ module vectorALU
 //////////////////////////////////////////////////////////////////////////////
 // Slides
 //////////////////////////////////////////////////////////////////////////////
+    logic            slide_instruction;
     logic [VLEN-1:0] result_slide;
+
+    assign slide_instruction = vector_operation_i inside {VSLIDE1UP, VSLIDE1DOWN};
 
     vectorSlide #(
             .VLEN (VLEN)
@@ -153,12 +157,13 @@ module vectorALU
             .reset_n           (reset_n),
             .vector_operation_i(vector_operation_i),
             .first_operand     (first_operand),
-            .second_operand    (second_operand),
+            .second_operand    (second_operand[31:0]),
             .scalar_operand    (scalar_operand),
             .cycle_count       (cycle_count),
             .vsew              (vsew),
             .vlmul             (vlmul),
             .vl                (vl),
+            .vl_next           (vl_next),
             .result_o          (result_slide)
         );
 
@@ -218,7 +223,7 @@ module vectorALU
     logic [   VLEN -1:0]    result_lanes;
     logic [   VLEN -1:0]    result_mult_low;
 
-    assign enable_lane = current_state == V_EXEC && vector_operation_i != VNOP && !hold_widening_r && !hold_accumulation_r && !reduction_instruction;
+    assign enable_lane = current_state == V_EXEC && vector_operation_i != VNOP && !hold_widening_r && !hold_accumulation_r && !reduction_instruction && !slide_instruction;
 
     generate
         for (genvar i_lane = 0; i_lane < LANES; i_lane++) begin : LANE_LOOP
@@ -254,6 +259,7 @@ module vectorALU
     endgenerate
 
     always_comb begin
+        result_mult_low = '0;
         for (int i = 0; i < VLEN/32; i++) begin
             result_mult_low[(32*i)+:32] = result_lanes_mult[(64*i)+:64];
         end
@@ -266,6 +272,7 @@ module vectorALU
     logic [VLENB-1:0] result_mask;
 
     always_comb begin
+        result_mask = '0;
         unique case (vsew)
             EW8:
                 for (int i = 0; i < LANES; i++)
@@ -303,7 +310,6 @@ module vectorALU
 //////////////////////////////////////////////////////////////////////////////
 // Hold generation
 //////////////////////////////////////////////////////////////////////////////
-    logic ended_acc_r;
 
     assign hold = |hold_lanes;
 
@@ -323,7 +329,6 @@ module vectorALU
         second_operand_r   <= second_operand;
         vector_operation_r <= vector_operation_i;
         hold_widening_2r   <= hold_widening_r;
-        ended_acc_r        <= ended_acc;
     end
 
     always_comb begin

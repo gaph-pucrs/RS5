@@ -18,13 +18,15 @@ def generate_random_arrays(n):
     v8b  = np.random.randint(-100, high=100, size=n, dtype=np.int8)
     return v32a, v32b, v16a, v16b, v8a, v8b
 
-def write_header_file(filepath, v32a, v32b, v16a, v16b, v8a, v8b):
+def write_header_file(filepath, N, v32a, v32b, v16a, v16b, v8a, v8b):
     """Writes the generated arrays to a header file."""
     with open(filepath, 'w') as file:
         file.write("// data.h\n")
         file.write("// Generated file containing random test data\n\n")
         file.write("#ifndef DATA_H\n")
         file.write("#define DATA_H\n\n")
+
+        file.write(f"const unsigned int N = {N};\n\n")
 
         file.write(f"const int32_t v32a[{len(v32a)}] = {{\n")
         file.write(",\n".join(f"    {num}" for num in v32a))
@@ -55,21 +57,23 @@ def write_header_file(filepath, v32a, v32b, v16a, v16b, v8a, v8b):
 def main():
     if len(sys.argv) != 2:
         print("Usage: python gen_data.py <N>")
-        sys.exit(1)
-
-    try:
-        n = int(sys.argv[1])
-        if n <= 0:
-            raise ValueError
-    except ValueError:
-        print("N must be a positive integer.")
-        sys.exit(1)
+        n = 4096
+    else:
+        try:
+            n = int(sys.argv[1])
+            if n <= 0:
+                raise ValueError
+        except ValueError:
+            print("N must be a positive integer.")
+            sys.exit(1)
 
     # Generate random data
     v32a, v32b, v16a, v16b, v8a, v8b = generate_random_arrays(n)
 
     # Write the data to a header file
-    write_header_file("./src/data.h", v32a, v32b, v16a, v16b, v8a, v8b)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    header_file_path = os.path.join(script_dir, "../src/data.h")
+    write_header_file(header_file_path, n, v32a, v32b, v16a, v16b, v8a, v8b)
 
     print(f"Generated ./src/data.h with {n} random numbers in each array.")
 
