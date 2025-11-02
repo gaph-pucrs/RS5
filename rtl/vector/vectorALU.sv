@@ -49,6 +49,11 @@ module vectorALU
     input  iTypeVector_e                vector_operation_i,
     input  vew_e                        vsew,
 
+    input  logic                        accumulate_instruction,
+    input  logic                        multiply_instruction,
+    input  logic                        reduction_instruction,
+    input  logic                        widening_instruction,
+
     output logic                        hold_o,
     output logic                        hold_widening_o,
     output logic [VLEN-1:0]             result_mask_o,
@@ -65,10 +70,7 @@ module vectorALU
 //////////////////////////////////////////////////////////////////////////////
 // Widening Control
 //////////////////////////////////////////////////////////////////////////////
-    logic widening_instruction;
     logic hold_widening_r;
-
-    assign widening_instruction = (vector_operation_i inside {VWMUL, VWMULU, VWMULSU});
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
@@ -79,15 +81,12 @@ module vectorALU
         end
     end
 
-    assign hold_widening_o = widening_instruction && !hold && current_state == V_EXEC && !hold_widening_r;
+    assign hold_widening_o = widening_instruction && !hold && !hold_widening_r;
 
 //////////////////////////////////////////////////////////////////////////////
 // Accumulation Control
 //////////////////////////////////////////////////////////////////////////////
-    logic accumulate_instruction;
     logic hold_accumulation_r;
-
-    assign accumulate_instruction = (vector_operation_i inside {VMACC, VNMSAC, VMADD, VNMSUB});
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
@@ -98,20 +97,14 @@ module vectorALU
         end
     end
 
-    assign hold_accumulation = accumulate_instruction && !hold && current_state == V_EXEC && !hold_accumulation_r;
+    assign hold_accumulation = accumulate_instruction && !hold && !hold_accumulation_r;
 
 //////////////////////////////////////////////////////////////////////////////
 // Reductions
 //////////////////////////////////////////////////////////////////////////////
 
-    logic        reduction_instruction;
-    logic        reduction_enable;
     logic [31:0] second_operand_reductions;
     logic [31:0] result_reductions;
-
-    assign reduction_instruction = (vector_operation_i inside {VREDSUM, VREDMAXU, VREDMAX, VREDMINU, VREDMIN, VREDAND, VREDOR, VREDXOR});
-
-    assign reduction_enable = reduction_instruction && current_state == V_EXEC;
 
     assign second_operand_reductions = (cycle_count_r > 0)
                                      ?  result_reductions
@@ -127,7 +120,7 @@ module vectorALU
     )   u_vector_reductions (
             .clk               (clk),
             .reset_n           (reset_n),
-            .enable_i          (reduction_enable),
+            .enable_i          (reduction_instruction),
             .vector_operation_i(vector_operation_i),
             .first_operand     (first_operand),
             .second_operand    (second_operand_reductions),
@@ -193,8 +186,7 @@ module vectorALU
                             );
 
     assign mult_enable = (
-                            (vector_operation_i inside {VMUL, VMULH, VMULHSU, VMULHU, VMACC, VNMSAC, VMADD, VNMSUB} || widening_instruction)
-                        &&  (current_state == V_EXEC)
+                            multiply_instruction
                         &&  (!ended_acc)
                         &&  (!hold_widening_r == 1'b1)
                         &&  (!hold_accumulation_r)

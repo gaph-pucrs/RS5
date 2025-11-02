@@ -54,12 +54,18 @@ module vectorUnit
     logic [10:0] zimm;
     logic        vm;
     opCat_e      opCat;
-    logic        reduction_instruction;
     logic        accumulate_instruction;
+    logic        multiply_instruction;
+    logic        reduction_instruction;
     logic        widening_instruction;
     logic        whole_reg_load_store;
     logic        mask_load_store;
     logic        mask_instruction;
+
+    logic        accumulate_instruction_r;
+    logic        multiply_instruction_r;
+    logic        reduction_instruction_r;
+    logic        widening_instruction_r;
 
     vew_e   vsew, vsew_effective;
     vlmul_e vlmul, vlmul_effective;
@@ -101,6 +107,7 @@ module vectorUnit
     assign opCat    = opCat_e'(instruction_i[14:12]);
 
     assign accumulate_instruction = (vector_operation_i inside {VMACC, VNMSAC, VMADD, VNMSUB});
+    assign multiply_instruction   = (vector_operation_i inside {VMUL, VMULH, VMULHSU, VMULHU} | accumulate_instruction | widening_instruction);
     assign reduction_instruction  = (vector_operation_i inside {VREDSUM, VREDMAXU, VREDMAX, VREDMINU, VREDMIN, VREDAND, VREDOR, VREDXOR});
     assign widening_instruction   = (vector_operation_i inside {VWMUL, VWMULU, VWMULSU});
     assign whole_reg_load_store   = (instruction_i[24:20] == 5'b01000 && instruction_operation_i inside {VLOAD, VSTORE} && instruction_i[27:26] == 2'b00);
@@ -108,6 +115,27 @@ module vectorUnit
     assign mask_instruction       = (vector_operation_i inside {VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT});
 
     assign elements_per_reg = VLENB >> vsew;
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            accumulate_instruction_r <= 1'b0;
+            multiply_instruction_r   <= 1'b0;
+            reduction_instruction_r  <= 1'b0;
+            widening_instruction_r   <= 1'b0;
+        end
+        else if (next_state == V_EXEC) begin
+            accumulate_instruction_r <= accumulate_instruction;
+            multiply_instruction_r   <= multiply_instruction;
+            reduction_instruction_r  <= reduction_instruction;
+            widening_instruction_r   <= widening_instruction;
+        end
+        else begin
+            accumulate_instruction_r <= 1'b0;
+            multiply_instruction_r   <= 1'b0;
+            reduction_instruction_r  <= 1'b0;
+            widening_instruction_r   <= 1'b0;
+        end
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 // CSRs
@@ -551,28 +579,32 @@ module vectorUnit
         .LLEN   (LLEN),
         .VLENB  (VLENB)
     ) vectorALU1 (
-        .clk                (clk),
-        .reset_n            (reset_n),
-        .first_operand      (first_operand),
-        .second_operand     (second_operand),
-        .third_operand      (third_operand),
-        .scalar_operand     (op1_scalar_i),
-        .vector_operation_i (vector_operation_i),
-        .cycle_count        (cycle_count),
-        .cycle_count_r      (cycle_count_r),
-        .vlmul              (vlmul),
-        .vl                 (vl_reductions),
-        .vl_next            (vl_next_reg),
-        .vm                 (vm),
-        .mask_sew8          (mask_sew8),
-        .mask_sew16         (mask_sew16),
-        .mask_sew32         (mask_sew32),
-        .current_state      (state),
-        .vsew               (vsew),
-        .hold_o             (hold_alu),
-        .hold_widening_o    (hold_widening),
-        .result_mask_o      (result_alu_mask),
-        .result_o           (result_alu)
+        .clk                   (clk),
+        .reset_n               (reset_n),
+        .first_operand         (first_operand),
+        .second_operand        (second_operand),
+        .third_operand         (third_operand),
+        .scalar_operand        (op1_scalar_i),
+        .vector_operation_i    (vector_operation_i),
+        .cycle_count           (cycle_count),
+        .cycle_count_r         (cycle_count_r),
+        .vlmul                 (vlmul),
+        .vl                    (vl_reductions),
+        .vl_next               (vl_next_reg),
+        .vm                    (vm),
+        .mask_sew8             (mask_sew8),
+        .mask_sew16            (mask_sew16),
+        .mask_sew32            (mask_sew32),
+        .accumulate_instruction(accumulate_instruction_r),
+        .multiply_instruction  (multiply_instruction_r),
+        .reduction_instruction (reduction_instruction_r),
+        .widening_instruction  (widening_instruction_r),
+        .current_state         (state),
+        .vsew                  (vsew),
+        .hold_o                (hold_alu),
+        .hold_widening_o       (hold_widening),
+        .result_mask_o         (result_alu_mask),
+        .result_o              (result_alu)
     );
 
 //////////////////////////////////////////////////////////////////////////////

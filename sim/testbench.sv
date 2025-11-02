@@ -48,7 +48,7 @@ module testbench
     localparam int           IQUEUE_SIZE     = 2;
     localparam bit           DUALPORT_MEM    = 1'b1;
 
-    localparam bit           VEnable         = 1'b1;
+    localparam bit           VEnable         = 1'b0;
     localparam int           VLEN            = 512;
     localparam int           LLEN            = 32;
 

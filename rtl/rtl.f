@@ -8,6 +8,7 @@
 ./aes_unit.sv
 ./vector/vectorReductionTree.sv
 ./vector/vectorReductions.sv
+./vector/vectorSlide.sv
 ./vector/vectorLane.sv
 ./vector/vectorCSRs.sv
 ./vector/vectorALU.sv
