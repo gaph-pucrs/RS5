@@ -1,8 +1,8 @@
 -incdir ./
 -incdir ./aes/
 -incdir ./vector/
--incdir ../RingBuffer/
-../RingBuffer/RingBuffer.sv
+-incdir ../RingBuffer/rtl
+../RingBuffer/rtl/RingBuffer.sv
 ./aes/riscv_crypto_sbox_inv_mid.sv
 ./aes/riscv_crypto_sbox_aes_top.sv
 ./aes/riscv_crypto_sbox_aes_out.sv
@@ -34,4 +34,3 @@
 ./RS5_pkg.sv
 ./RS5.sv
 ./rtc.sv
-
