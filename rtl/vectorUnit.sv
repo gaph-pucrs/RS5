@@ -403,45 +403,50 @@ module vectorUnit
     end
 
     // WRITE ENABLE GENERATION
-    always_ff @(posedge clk) begin
-        if ((state == V_EXEC) && (!hold || hold_widening) && instruction_operation_i != VSTORE && vector_operation_i != VMVXS) begin
-            if (reduction_instruction || vector_operation_i == VMVSX) begin
-                unique case (vsew_effective)
-                    EW8:     write_enable <= {'0, 1'b1};
-                    EW16:    write_enable <= {'0, 2'b11};
-                    default: write_enable <= {'0, 4'b1111};
-                endcase
-            end
-            else if (whole_reg_load_store || mask_instruction) begin
-                write_enable <= '1;
-            end
-            else begin
-                unique case (vsew_effective)
-                    EW8:
-                        for (int i = 0; i < VLENB; i++)
-                            if ((vm || mask_sew8[cycle_count_r][i]) && (i < vl_curr_reg))
-                                write_enable[i] <= 1'b1;
-                            else
-                                write_enable[i] <= 1'b0;
-
-                    EW16:
-                        for (int i = 0; i < VLENB/2; i++)
-                            if ((vm || mask_sew16[cycle_count_r][i]) && (i < vl_curr_reg))
-                                write_enable[(i*2)+:2] <= 2'b11;
-                            else
-                                write_enable[(i*2)+:2] <= 2'b00;
-
-                    default:
-                        for (int i = 0; i < VLENB/4; i++)
-                            if ((vm || mask_sew32[cycle_count_r][i]) && (i < vl_curr_reg))
-                                write_enable[(i*4)+:4] <= 4'b1111;
-                            else
-                                write_enable[(i*4)+:4] <= 4'b0000;
-                endcase
-            end
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            write_enable <= '0;
         end
         else begin
-            write_enable <= '0;
+            if ((state == V_EXEC) && (!hold || hold_widening) && instruction_operation_i != VSTORE && vector_operation_i != VMVXS) begin
+                if (reduction_instruction || vector_operation_i == VMVSX) begin
+                    unique case (vsew_effective)
+                        EW8:     write_enable <= {'0, 1'b1};
+                        EW16:    write_enable <= {'0, 2'b11};
+                        default: write_enable <= {'0, 4'b1111};
+                    endcase
+                end
+                else if (whole_reg_load_store || mask_instruction) begin
+                    write_enable <= '1;
+                end
+                else begin
+                    unique case (vsew_effective)
+                        EW8:
+                            for (int i = 0; i < VLENB; i++)
+                                if ((vm || mask_sew8[cycle_count_r][i]) && (i < vl_curr_reg))
+                                    write_enable[i] <= 1'b1;
+                                else
+                                    write_enable[i] <= 1'b0;
+
+                        EW16:
+                            for (int i = 0; i < VLENB/2; i++)
+                                if ((vm || mask_sew16[cycle_count_r][i]) && (i < vl_curr_reg))
+                                    write_enable[(i*2)+:2] <= 2'b11;
+                                else
+                                    write_enable[(i*2)+:2] <= 2'b00;
+
+                        default:
+                            for (int i = 0; i < VLENB/4; i++)
+                                if ((vm || mask_sew32[cycle_count_r][i]) && (i < vl_curr_reg))
+                                    write_enable[(i*4)+:4] <= 4'b1111;
+                                else
+                                    write_enable[(i*4)+:4] <= 4'b0000;
+                    endcase
+                end
+            end
+            else begin
+                write_enable <= '0;
+            end
         end
     end
 
@@ -497,32 +502,47 @@ module vectorUnit
 // Operands
 //////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk) begin
-        if (!hold) begin
-            first_operand  <= vs2_data;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            first_operand <= '0;
+        end
+        else begin
+            if (!hold) begin
+                first_operand  <= vs2_data;
+            end
         end
     end
 
-    always_ff @(posedge clk) begin
-        if (hold) begin
-            third_operand  <= vs2_data;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            third_operand <= '0;
+        end
+        else begin
+            if (hold) begin
+                third_operand  <= vs2_data;
+            end
         end
     end
 
-    always_ff @(posedge clk) begin
-        if (!hold) begin
-            if (instruction_operation_i == VSTORE) begin
-                second_operand <= vs1_data;
-            end
-            else if (instruction_operation_i == VECTOR && vector_operation_i inside {VSLIDE1UP, VSLIDE1DOWN}) begin
-                second_operand <= vs1_data;
-            end
-            else begin
-                unique case (opCat)
-                    OPIVX, OPFVF, OPMVX: second_operand <= scalar_replicated;
-                    OPIVI:               second_operand <= imm_replicated;
-                    default:             second_operand <= vs1_data;
-                endcase
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            second_operand <= '0;
+        end
+        else begin
+            if (!hold) begin
+                if (instruction_operation_i == VSTORE) begin
+                    second_operand <= vs1_data;
+                end
+                else if (instruction_operation_i == VECTOR && vector_operation_i inside {VSLIDE1UP, VSLIDE1DOWN}) begin
+                    second_operand <= vs1_data;
+                end
+                else begin
+                    unique case (opCat)
+                        OPIVX, OPFVF, OPMVX: second_operand <= scalar_replicated;
+                        OPIVI:               second_operand <= imm_replicated;
+                        default:             second_operand <= vs1_data;
+                    endcase
+                end
             end
         end
     end
