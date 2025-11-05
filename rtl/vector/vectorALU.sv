@@ -280,23 +280,28 @@ module vectorALU
         endcase
     end
 
-    always_ff @(posedge clk) begin
-        unique case (vsew)
-            EW8:
-                for (int i = 0; i < 8; i++)
-                    if (i == cycle_count_r)
-                        result_mask_o[(VLENB*i)+:VLENB] <= result_mask[VLENB-1:0];
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            result_mask_o <= '0;
+        end
+        else begin
+            unique case (vsew)
+                EW8:
+                    for (int i = 0; i < 8; i++)
+                        if (i == cycle_count_r)
+                            result_mask_o[(VLENB*i)+:VLENB] <= result_mask[VLENB-1:0];
 
-            EW16:
-                for (int i = 0; i < 8; i++)
-                    if (i == cycle_count_r)
-                        result_mask_o[((VLENB/2)*i)+:VLENB/2] <= result_mask[(VLENB/2)-1:0];
+                EW16:
+                    for (int i = 0; i < 8; i++)
+                        if (i == cycle_count_r)
+                            result_mask_o[((VLENB/2)*i)+:VLENB/2] <= result_mask[(VLENB/2)-1:0];
 
-            default:
-                for (int i = 0; i < 8; i++)
-                    if (i == cycle_count_r)
-                        result_mask_o[((VLENB/4)*i)+:VLENB/4] <= result_mask[(VLENB/4)-1:0];
-        endcase
+                default:
+                    for (int i = 0; i < 8; i++)
+                        if (i == cycle_count_r)
+                            result_mask_o[((VLENB/4)*i)+:VLENB/4] <= result_mask[(VLENB/4)-1:0];
+            endcase
+        end
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -316,11 +321,19 @@ module vectorALU
     iTypeVector_e    vector_operation_r;
     logic            hold_widening_2r;
 
-    always_ff @(posedge clk) begin
-        first_operand_r    <= first_operand;
-        second_operand_r   <= second_operand;
-        vector_operation_r <= vector_operation_i;
-        hold_widening_2r   <= hold_widening_r;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            first_operand_r    <= '0;
+            second_operand_r   <= '0;
+            vector_operation_r <= VNOP;
+            hold_widening_2r   <= '0;
+        end
+        else begin
+            first_operand_r    <= first_operand;
+            second_operand_r   <= second_operand;
+            vector_operation_r <= vector_operation_i;
+            hold_widening_2r   <= hold_widening_r;
+        end
     end
 
     always_comb begin

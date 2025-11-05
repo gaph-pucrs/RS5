@@ -94,12 +94,13 @@ puts "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 					 ${TECH_PATH}/lef/tcbn28hpcplusbwp30p140_110a/lef/tcbn28hpcplusbwp30p140.lef \
 					/home/williannunes/RS5/synthesis/gen_regblock/ts6n28hpcphvta32x64m2fwbso_200b/LEF/ts6n28hpcphvta32x64m2fwbso_200b.lef"
 
-	read_hdl -define SYNTH -define MEM_TSMC_28 -sv "../rtl/RS5_pkg.sv						\
+	read_hdl -define SYNTH -sv "../rtl/RS5_pkg.sv						\
 								../rtl/aes/riscv_crypto_sbox_aes_out.sv \
 								../rtl/aes/riscv_crypto_sbox_aes_top.sv \
 								../rtl/aes/riscv_crypto_sbox_inv_mid.sv \
 								../rtl/aes/riscv_crypto_aes_fwd_sbox.sv \
 								../rtl/aes_unit.sv 						\
+								../RingBuffer/rtl/RingBuffer.sv 		\
 								../rtl/amo.sv 							\
 								../rtl/CSRBank.sv 						\
 								../rtl/decode.sv 						\

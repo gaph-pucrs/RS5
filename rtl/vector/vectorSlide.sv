@@ -201,8 +201,10 @@ module vectorSlide
     // *********************************
     // Result Demux
     // *********************************
-    always_ff @(posedge clk) begin
-        if (vector_operation_i == VSLIDE1DOWN)
+        always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            result_o <= '0;
+        else if (vector_operation_i == VSLIDE1DOWN)
             result_o <= result_slide1down;
         else
             result_o <= result_slide1up;

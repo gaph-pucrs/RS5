@@ -393,8 +393,12 @@ module vectorUnit
         end
     end
 
-    always_ff @(posedge clk) begin
-        if (!hold || hold_widening) begin
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            vd_addr   <= '0;
+            vd_addr_r <= '0;
+        end
+        else if (!hold || hold_widening) begin
             vd_addr   <= (reduction_instruction || mask_instruction)
                         ? rd
                         : rd + cycle_count_vd;
@@ -403,8 +407,11 @@ module vectorUnit
     end
 
     // WRITE ENABLE GENERATION
-    always_ff @(posedge clk) begin
-        if ((state == V_EXEC) && (!hold || hold_widening) && instruction_operation_i != VSTORE && vector_operation_i != VMVXS) begin
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            write_enable <= '0;
+        end
+        else if ((state == V_EXEC) && (!hold || hold_widening) && instruction_operation_i != VSTORE && vector_operation_i != VMVXS) begin
             if (reduction_instruction || vector_operation_i == VMVSX) begin
                 unique case (vsew_effective)
                     EW8:     write_enable <= {'0, 1'b1};
@@ -497,20 +504,29 @@ module vectorUnit
 // Operands
 //////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk) begin
-        if (!hold) begin
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            first_operand <= '0;
+        end
+        else if (!hold) begin
             first_operand  <= vs2_data;
         end
     end
 
-    always_ff @(posedge clk) begin
-        if (hold) begin
-            third_operand  <= vs2_data;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            third_operand <= '0;
+        end
+        else if (hold) begin
+            third_operand <= vs2_data;
         end
     end
 
-    always_ff @(posedge clk) begin
-        if (!hold) begin
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            second_operand <= '0;
+        end
+        else if (!hold) begin
             if (instruction_operation_i == VSTORE) begin
                 second_operand <= vs1_data;
             end
@@ -614,9 +630,15 @@ module vectorUnit
     iType_e instruction_operation_r;
     logic   mask_instruction_r;
 
-    always_ff @(posedge clk) begin
-        instruction_operation_r <= instruction_operation_i;
-        mask_instruction_r      <= mask_instruction;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            instruction_operation_r <= NOP;
+            mask_instruction_r      <= '0;
+        end
+        else begin
+            instruction_operation_r <= instruction_operation_i;
+            mask_instruction_r      <= mask_instruction;
+        end
     end
 
     always_comb begin

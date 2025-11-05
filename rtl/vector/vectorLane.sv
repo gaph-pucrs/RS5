@@ -84,8 +84,13 @@ module vectorLane
             end
         end
 
-        always_ff @(posedge clk) begin
-            cycle_r <= cycle;
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n) begin
+                cycle_r <= '0;
+            end
+            else begin
+                cycle_r <= cycle;
+            end
         end
 
         assign hold_llen = cycle < ELEMENTS_PER_LANE-1 && enable_i ;
@@ -275,7 +280,7 @@ module vectorLane
         endcase
     end
 
-    always_comb begin
+    always_ff @(posedge clk) begin
         unique case (vsew)
             EW8:     result_mask_o[(4*cycle)+:4] =        result_comparison_8b  & ({4{vm}} | mask_sew8);
             EW16:    result_mask_o[(2*cycle)+:2] = {2'b0, result_comparison_16b & ({2{vm}} | mask_sew16)};
@@ -459,8 +464,12 @@ module vectorLane
         endcase
     end
 
-    always_ff @(posedge clk) begin
-        if (!hold_mult) begin
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            result_mult_r   <= '0;
+            third_operand_r <= '0;
+        end
+        else if (!hold_mult) begin
             result_mult_r   <= result_mult[31:0];
             third_operand_r <= third_operand;
         end
@@ -716,30 +725,39 @@ module vectorLane
 // Result Demux
 //////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk) begin
-        unique case(vector_operation_i)
-            VAND:              result_o[(32*cycle)+:32] <= result_and;
-            VOR:               result_o[(32*cycle)+:32] <= result_or;
-            VXOR:              result_o[(32*cycle)+:32] <= result_xor;
-            VSLL:              result_o[(32*cycle)+:32] <= result_sll;
-            VSRL:              result_o[(32*cycle)+:32] <= result_srl;
-            VSRA:              result_o[(32*cycle)+:32] <= result_sra;
-            VMIN:              result_o[(32*cycle)+:32] <= result_min;
-            VMINU:             result_o[(32*cycle)+:32] <= result_minu;
-            VMAX:              result_o[(32*cycle)+:32] <= result_max;
-            VMAXU:             result_o[(32*cycle)+:32] <= result_maxu;
-            VMERGE:            result_o[(32*cycle)+:32] <= result_merge;
-            VDIV, VDIVU:       result_o[(32*cycle)+:32] <= result_div;
-            VREM, VREMU:       result_o[(32*cycle)+:32] <= result_rem;
-            VMACC, VNMSAC,
-            VMADD, VNMSUB:     result_o[(32*cycle_r)+:32] <= result_add;
-            default:           result_o[(32*cycle)  +:32] <= result_add;
-        endcase
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            result_o <= '0;
+        end
+        else begin
+            unique case(vector_operation_i)
+                VAND:              result_o[(32*cycle)+:32] <= result_and;
+                VOR:               result_o[(32*cycle)+:32] <= result_or;
+                VXOR:              result_o[(32*cycle)+:32] <= result_xor;
+                VSLL:              result_o[(32*cycle)+:32] <= result_sll;
+                VSRL:              result_o[(32*cycle)+:32] <= result_srl;
+                VSRA:              result_o[(32*cycle)+:32] <= result_sra;
+                VMIN:              result_o[(32*cycle)+:32] <= result_min;
+                VMINU:             result_o[(32*cycle)+:32] <= result_minu;
+                VMAX:              result_o[(32*cycle)+:32] <= result_max;
+                VMAXU:             result_o[(32*cycle)+:32] <= result_maxu;
+                VMERGE:            result_o[(32*cycle)+:32] <= result_merge;
+                VDIV, VDIVU:       result_o[(32*cycle)+:32] <= result_div;
+                VREM, VREMU:       result_o[(32*cycle)+:32] <= result_rem;
+                VMACC, VNMSAC,
+                VMADD, VNMSUB:     result_o[(32*cycle_r)+:32] <= result_add;
+                default:           result_o[(32*cycle)  +:32] <= result_add;
+            endcase
+        end
     end
 
-    always_ff @(posedge clk) begin
-        if (!hold_widening)
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            result_mult_o <= '0;
+        end
+        else if (!hold_widening) begin
             result_mult_o[(64*cycle)+:64] <= result_mult;
+        end
     end
 
 endmodule

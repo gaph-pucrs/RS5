@@ -125,6 +125,7 @@ module vectorReductions
             .MULTI_CYCLE     (MULTI_CYCLE)
         )   reduction_tree_sum_8b (
             .clk           (clk),
+            .reset_n       (reset_n),
             .first_operand (first_operand_8b),
             .second_operand(second_operand[7:0]),
             .vl            (vl),
@@ -142,6 +143,7 @@ module vectorReductions
             .MULTI_CYCLE     (MULTI_CYCLE)
         )   reduction_tree_sum_16b (
             .clk           (clk),
+            .reset_n       (reset_n),
             .first_operand (first_operand_16b),
             .second_operand(second_operand[15:0]),
             .vl            (vl),
@@ -159,6 +161,7 @@ module vectorReductions
             .MULTI_CYCLE     (MULTI_CYCLE)
         )   reduction_tree_sum_32b (
             .clk           (clk),
+            .reset_n       (reset_n),
             .first_operand (first_operand_32b),
             .second_operand(second_operand[31:0]),
             .vl            (vl),
@@ -208,6 +211,7 @@ module vectorReductions
             .MULTI_CYCLE     (MULTI_CYCLE)
         )   reduction_tree_and_8b (
             .clk           (clk),
+            .reset_n       (reset_n),
             .first_operand (first_operand_8b),
             .second_operand(second_operand[7:0]),
             .vl            (vl),
@@ -225,6 +229,7 @@ module vectorReductions
             .MULTI_CYCLE     (MULTI_CYCLE)
         )   reduction_tree_or_8b (
             .clk           (clk),
+            .reset_n       (reset_n),
             .first_operand (first_operand_8b),
             .second_operand(second_operand[7:0]),
             .vl            (vl),
@@ -242,6 +247,7 @@ module vectorReductions
             .MULTI_CYCLE     (MULTI_CYCLE)
         )   reduction_tree_xor_8b (
             .clk           (clk),
+            .reset_n       (reset_n),
             .first_operand (first_operand_8b),
             .second_operand(second_operand[7:0]),
             .vl            (vl),
@@ -266,6 +272,7 @@ module vectorReductions
             .MULTI_CYCLE     (MULTI_CYCLE)
         )   reduction_tree_and_16b (
             .clk           (clk),
+            .reset_n       (reset_n),
             .first_operand (first_operand_16b),
             .second_operand(second_operand[15:0]),
             .vl            (vl),
@@ -283,6 +290,7 @@ module vectorReductions
             .MULTI_CYCLE     (MULTI_CYCLE)
         )   reduction_tree_or_16b (
             .clk           (clk),
+            .reset_n       (reset_n),
             .first_operand (first_operand_16b),
             .second_operand(second_operand[15:0]),
             .vl            (vl),
@@ -300,6 +308,7 @@ module vectorReductions
             .MULTI_CYCLE     (MULTI_CYCLE)
         )   reduction_tree_xor_16b (
             .clk           (clk),
+            .reset_n       (reset_n),
             .first_operand (first_operand_16b),
             .second_operand(second_operand[15:0]),
             .vl            (vl),
@@ -324,6 +333,7 @@ module vectorReductions
             .MULTI_CYCLE     (MULTI_CYCLE)
         )   reduction_tree_and_32b (
             .clk           (clk),
+            .reset_n       (reset_n),
             .first_operand (first_operand_32b),
             .second_operand(second_operand[31:0]),
             .vl            (vl),
@@ -341,6 +351,7 @@ module vectorReductions
             .MULTI_CYCLE     (MULTI_CYCLE)
         )   reduction_tree_or_32b (
             .clk           (clk),
+            .reset_n       (reset_n),
             .first_operand (first_operand_32b),
             .second_operand(second_operand[31:0]),
             .vl            (vl),
@@ -358,6 +369,7 @@ module vectorReductions
             .MULTI_CYCLE     (MULTI_CYCLE)
         )   reduction_tree_xor_32b (
             .clk           (clk),
+            .reset_n       (reset_n),
             .first_operand (first_operand_32b),
             .second_operand(second_operand[31:0]),
             .vl            (vl),
@@ -418,6 +430,7 @@ module vectorReductions
             .MULTI_CYCLE     (MULTI_CYCLE)
         )   reduction_tree_min_8b (
             .clk           (clk),
+            .reset_n       (reset_n),
             .first_operand (first_operand_8b),
             .second_operand(second_operand[7:0]),
             .vl            (vl),
@@ -435,6 +448,7 @@ module vectorReductions
             .MULTI_CYCLE     (MULTI_CYCLE)
         )   reduction_tree_minu_8b (
             .clk           (clk),
+            .reset_n       (reset_n),
             .first_operand (first_operand_8b),
             .second_operand(second_operand[7:0]),
             .vl            (vl),
@@ -452,6 +466,7 @@ module vectorReductions
             .MULTI_CYCLE     (MULTI_CYCLE)
         )   reduction_tree_max_8b (
             .clk           (clk),
+            .reset_n       (reset_n),
             .first_operand (first_operand_8b),
             .second_operand(second_operand[7:0]),
             .vl            (vl),
@@ -469,6 +484,7 @@ module vectorReductions
             .MULTI_CYCLE     (MULTI_CYCLE)
         )   reduction_tree_maxu_8b (
             .clk           (clk),
+            .reset_n       (reset_n),
             .first_operand (first_operand_8b),
             .second_operand(second_operand[7:0]),
             .vl            (vl),
@@ -494,6 +510,7 @@ module vectorReductions
             .MULTI_CYCLE     (MULTI_CYCLE)
         )   reduction_tree_min_16b (
             .clk           (clk),
+            .reset_n       (reset_n),
             .first_operand (first_operand_16b),
             .second_operand(second_operand[15:0]),
             .vl            (vl),
@@ -511,6 +528,7 @@ module vectorReductions
             .MULTI_CYCLE     (MULTI_CYCLE)
         )   reduction_tree_minu_16b (
             .clk           (clk),
+            .reset_n       (reset_n),
             .first_operand (first_operand_16b),
             .second_operand(second_operand[15:0]),
             .vl            (vl),
@@ -528,6 +546,7 @@ module vectorReductions
             .MULTI_CYCLE     (MULTI_CYCLE)
         )   reduction_tree_max_16b (
             .clk           (clk),
+            .reset_n       (reset_n),
             .first_operand (first_operand_16b),
             .second_operand(second_operand[15:0]),
             .vl            (vl),
@@ -545,6 +564,7 @@ module vectorReductions
             .MULTI_CYCLE     (MULTI_CYCLE)
         )   reduction_tree_maxu_16b (
             .clk           (clk),
+            .reset_n       (reset_n),
             .first_operand (first_operand_16b),
             .second_operand(second_operand[15:0]),
             .vl            (vl),
@@ -570,6 +590,7 @@ module vectorReductions
             .MULTI_CYCLE     (MULTI_CYCLE)
         )   reduction_tree_min_32b (
             .clk           (clk),
+            .reset_n       (reset_n),
             .first_operand (first_operand_32b),
             .second_operand(second_operand[31:0]),
             .vl            (vl),
@@ -587,6 +608,7 @@ module vectorReductions
             .MULTI_CYCLE     (MULTI_CYCLE)
         )   reduction_tree_minu_32b (
             .clk           (clk),
+            .reset_n       (reset_n),
             .first_operand (first_operand_32b),
             .second_operand(second_operand[31:0]),
             .vl            (vl),
@@ -604,6 +626,7 @@ module vectorReductions
             .MULTI_CYCLE     (MULTI_CYCLE)
         )   reduction_tree_max_32b (
             .clk           (clk),
+            .reset_n       (reset_n),
             .first_operand (first_operand_32b),
             .second_operand(second_operand[31:0]),
             .vl            (vl),
@@ -621,6 +644,7 @@ module vectorReductions
             .MULTI_CYCLE     (MULTI_CYCLE)
         )   reduction_tree_maxu_32b (
             .clk           (clk),
+            .reset_n       (reset_n),
             .first_operand (first_operand_32b),
             .second_operand(second_operand[31:0]),
             .vl            (vl),
