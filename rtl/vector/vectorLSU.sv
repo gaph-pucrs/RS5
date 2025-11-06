@@ -452,6 +452,7 @@ module vectorLSU
     logic [BUS_WIDTH-1:0] write_data;
 
     always_comb begin
+        write_data = '0;
         if (addrMode == UNIT_STRIDED) begin
             unique case (width)
                 EW8: begin
