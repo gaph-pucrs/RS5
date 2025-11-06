@@ -282,9 +282,9 @@ module vectorLane
 
     always_ff @(posedge clk) begin
         unique case (vsew)
-            EW8:     result_mask_o[(4*cycle)+:4] =        result_comparison_8b  & ({4{vm}} | mask_sew8);
-            EW16:    result_mask_o[(2*cycle)+:2] = {2'b0, result_comparison_16b & ({2{vm}} | mask_sew16)};
-            default: result_mask_o[(  cycle)   ] = {3'b0, result_comparison_32b & ({1{vm}} | mask_sew32)};
+            EW8:     result_mask_o[(4*cycle)+:4] <=        result_comparison_8b  & ({4{vm}} | mask_sew8);
+            EW16:    result_mask_o[(2*cycle)+:2] <= {2'b0, result_comparison_16b & ({2{vm}} | mask_sew16)};
+            default: result_mask_o[(  cycle)   ] <= {3'b0, result_comparison_32b & ({1{vm}} | mask_sew32)};
         endcase
     end
 

@@ -55,14 +55,15 @@ module vectorUnit
     logic        vm;
     opCat_e      opCat;
     logic        accumulate_instruction;
+    logic        mask_instruction;
     logic        multiply_instruction;
     logic        reduction_instruction;
     logic        widening_instruction;
     logic        whole_reg_load_store;
     logic        mask_load_store;
-    logic        mask_instruction;
 
     logic        accumulate_instruction_r;
+    logic        mask_instruction_nr;
     logic        multiply_instruction_r;
     logic        reduction_instruction_r;
     logic        widening_instruction_r;
@@ -119,18 +120,21 @@ module vectorUnit
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             accumulate_instruction_r <= 1'b0;
+            mask_instruction_nr      <= 1'b0;
             multiply_instruction_r   <= 1'b0;
             reduction_instruction_r  <= 1'b0;
             widening_instruction_r   <= 1'b0;
         end
         else if (next_state == V_EXEC) begin
             accumulate_instruction_r <= accumulate_instruction;
+            mask_instruction_nr      <= mask_instruction;
             multiply_instruction_r   <= multiply_instruction;
             reduction_instruction_r  <= reduction_instruction;
             widening_instruction_r   <= widening_instruction;
         end
         else begin
             accumulate_instruction_r <= 1'b0;
+            mask_instruction_nr      <= 1'b0;
             multiply_instruction_r   <= 1'b0;
             reduction_instruction_r  <= 1'b0;
             widening_instruction_r   <= 1'b0;
@@ -612,6 +616,7 @@ module vectorUnit
         .mask_sew16            (mask_sew16),
         .mask_sew32            (mask_sew32),
         .accumulate_instruction(accumulate_instruction_r),
+        .mask_instruction      (mask_instruction_nr),
         .multiply_instruction  (multiply_instruction_r),
         .reduction_instruction (reduction_instruction_r),
         .widening_instruction  (widening_instruction_r),

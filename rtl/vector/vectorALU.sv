@@ -50,6 +50,7 @@ module vectorALU
     input  vew_e                        vsew,
 
     input  logic                        accumulate_instruction,
+    input  logic                        mask_instruction,
     input  logic                        multiply_instruction,
     input  logic                        reduction_instruction,
     input  logic                        widening_instruction,
@@ -65,6 +66,7 @@ module vectorALU
     logic [LANES-1:0] hold_lanes;
     logic             hold_reductions;
     logic             hold_accumulation;
+    logic             hold_mask;
     logic             hold;
 
 //////////////////////////////////////////////////////////////////////////////
@@ -98,6 +100,22 @@ module vectorALU
     end
 
     assign hold_accumulation = accumulate_instruction && !hold && !hold_accumulation_r;
+
+//////////////////////////////////////////////////////////////////////////////
+// Mask Control
+//////////////////////////////////////////////////////////////////////////////
+    logic hold_mask_r;
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            hold_mask_r <= 1'b0;
+        end
+        else begin
+            hold_mask_r <= hold_mask;
+        end
+    end
+
+    assign hold_mask = mask_instruction && !hold && !hold_mask_r ;
 
 //////////////////////////////////////////////////////////////////////////////
 // Reductions
@@ -257,7 +275,6 @@ module vectorALU
         end
     end
 
-
 //////////////////////////////////////////////////////////////////////////////
 // Mask Instructions
 //////////////////////////////////////////////////////////////////////////////
@@ -310,7 +327,7 @@ module vectorALU
 
     assign hold = |hold_lanes;
 
-    assign hold_o = hold | hold_widening_o | hold_accumulation | hold_reductions;
+    assign hold_o = hold | hold_widening_o | hold_accumulation | hold_reductions | hold_mask;
 
 //////////////////////////////////////////////////////////////////////////////
 // Result Demux
