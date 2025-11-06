@@ -457,15 +457,18 @@ module vectorLSU
             unique case (width)
                 EW8: begin
                     for (int i = 0; i < ELEMENTS_PER_ACCESS_EW8; i++)
-                        write_data[(8*i)+:8] = write_data_i[(8*(elementsProcessedRegister+i))+:8];
+                        if (elementsProcessedRegister+i < VLEN/8)
+                            write_data[(8*i)+:8] = write_data_i[(8*(elementsProcessedRegister+i))+:8];
                 end
                 EW16: begin
                     for (int i = 0; i < ELEMENTS_PER_ACCESS_EW16; i++)
-                        write_data[(16*i)+:16] = write_data_i[(16*(elementsProcessedRegister+i))+:16];
+                        if (elementsProcessedRegister+i < VLEN/16)
+                            write_data[(16*i)+:16] = write_data_i[(16*(elementsProcessedRegister+i))+:16];
                 end
                 default: begin
                     for (int i = 0; i < ELEMENTS_PER_ACCESS_EW32; i++)
-                        write_data[(32*i)+:32] = write_data_i[(32*(elementsProcessedRegister+i))+:32];
+                        if (elementsProcessedRegister+i < VLEN/32)
+                            write_data[(32*i)+:32] = write_data_i[(32*(elementsProcessedRegister+i))+:32];
                 end
             endcase
         end
