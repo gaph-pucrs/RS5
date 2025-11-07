@@ -75,13 +75,14 @@ module fetch
     /* Instruction address of jump target also depends on BP               */
     logic jumped;
     logic jumped_fetch;
+    logic bp_taken_r;
     logic [31:0] iaddr_jumped;
 
     logic should_jump;
     assign should_jump = ctx_switch_i || jump_i;
 
     logic jump_confirmed;
-    assign jump_confirmed = should_jump || (bp_ack_o && !jump_rollback_i);
+    assign jump_confirmed = should_jump || (bp_taken_r && !jump_rollback_i);
 
     logic is_jumping;
     assign is_jumping = jumping_o && !jump_rollback_i;
@@ -278,6 +279,15 @@ module fetch
 
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
+                bp_taken_r <= '0;
+            else if (sys_reset)
+                bp_taken_r <= '0;
+            else
+                bp_taken_r <= bp_taken;
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
                 bp_ack_o <= '0;
             else if (sys_reset)
                 bp_ack_o <= '0;
@@ -288,6 +298,7 @@ module fetch
     else begin : gen_bp_off
         assign jumped       = should_jump;
         assign jumped_fetch = jumped_r && !jump_rollback_i;
+        assign bp_taken_r   = 1'b0;
         assign bp_ack_o     = 1'b0;
 
         always_comb begin
