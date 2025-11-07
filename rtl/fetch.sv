@@ -221,7 +221,7 @@ module fetch
             instruction_address <= start_address;
         end
         else begin
-            if (jumped || jump_rollback_i)
+            if (jumped || (jump_rollback_i && bp_taken_r))
                 instruction_address <= iaddr_jumped;
             else if (!iaddr_hold || (iaddr_hold_r && push && buffer_not_full))
                 instruction_address <= next_instruction_address;
@@ -250,7 +250,7 @@ module fetch
             else if (sys_reset)
                 jump_rollback_r <= 1'b0;
             else 
-                jump_rollback_r <= jump_rollback_i;
+                jump_rollback_r <= jump_rollback_i && bp_taken_r;
         end
         assign jumped_fetch = (jumped_r && !jump_rollback_i) || jump_rollback_r;
 
