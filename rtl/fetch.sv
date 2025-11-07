@@ -81,11 +81,23 @@ module fetch
     logic should_jump;
     assign should_jump = ctx_switch_i || jump_i;
 
-    logic jump_confirmed;
-    assign jump_confirmed = should_jump || (bp_taken_r && !jump_rollback_i);
+    logic should_jump_r;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            should_jump_r <= 1'b0;
+        else if (sys_reset)
+            should_jump_r <= 1'b0;
+        else
+            should_jump_r <= should_jump;
+    end
+    
+    /* Two jumps in sequence never occur, but the exec stage can be stalled */
+    /* So we only consider a new jump on posedge, so we can keep fetching   */
+    logic should_jump_posedge;
+    assign should_jump_posedge = should_jump && !should_jump_r;
 
-    logic is_jumping;
-    assign is_jumping = jumping_o && !jump_rollback_i;
+    logic jump_confirmed;
+    assign jump_confirmed = should_jump_posedge || (bp_taken_r && !jump_rollback_i);
 
     logic jumped_r;
     always_ff @(posedge clk or negedge reset_n) begin
@@ -256,7 +268,7 @@ module fetch
 
         logic bp_taken;
         assign bp_taken = (enable_i && bp_take_i && valid);
-        assign jumped   = should_jump || bp_taken;
+        assign jumped   = should_jump_posedge || bp_taken;
 
         logic [31:0] iaddr_rollback;
         always_ff @(posedge clk or negedge reset_n) begin
@@ -296,7 +308,7 @@ module fetch
         end
     end
     else begin : gen_bp_off
-        assign jumped       = should_jump;
+        assign jumped       = should_jump_posedge;
         assign jumped_fetch = jumped_r && !jump_rollback_i;
         assign bp_taken_r   = 1'b0;
         assign bp_ack_o     = 1'b0;
@@ -432,6 +444,8 @@ module fetch
         /* We consider a instruction prefetched when it was removed from buffer */
         /* or read from memory but will be used again. Happens after compressed */
         /* instruction with unaligned PC. If jumping, it is invalid.            */
+        logic is_jumping;
+        assign is_jumping = jumping_o && !jump_rollback_i;
         assign instruction_prefetched = unaligned && compressed && !is_jumping;
 
         /* An unaligned jump requires the input of two fetches                 */
