@@ -83,12 +83,18 @@ module fetch
 
     logic should_jump_r;
     always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
+        if (!reset_n) begin
             should_jump_r <= 1'b0;
-        else if (sys_reset)
+        end
+        else if (sys_reset) begin
             should_jump_r <= 1'b0;
-        else
-            should_jump_r <= should_jump;
+        end
+        else begin;
+            if (enable_i)
+                should_jump_r <= 1'b0;
+            else if (should_jump)
+                should_jump_r <= 1'b1;
+        end
     end
     
     /* Two jumps in sequence never occur, but the exec stage can be stalled */
