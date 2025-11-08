@@ -38,13 +38,18 @@ main:
     li t1, 10         # t1 = 10
     add t2, t0, t1    # t2 = t0 + t1
 
+    addi sp, sp, -8   # aloca 2 words na pilha
+    sw ra, 4(sp)      # salva ra na pilha
     sw t2, 0(sp)      # salva t2 no topo da pilha
 
-    jal ra, my_label   # jump and link para my_label
+    jal ra, my_label  # jump and link para my_label
 
     li a0, 0
 
     sub t2, t2, t0
+
+    lw ra, 4(sp)      # restaura ra da pilha
+    addi sp, sp, 8    # desaloca 2 words da pilha
 
     ret
     nop
