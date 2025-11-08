@@ -47,7 +47,7 @@ module testbench
     localparam bit           FORWARDING      = 1'b1;
     localparam int           IQUEUE_SIZE     = 2;
     localparam bit           DUALPORT_MEM    = 1'b1;
-    localparam int           RAM_DELAY_CYCLES= 0;
+    localparam int           RAM_DELAY_CYCLES= 4;
 
     localparam bit           VEnable         = 1'b0;
     localparam int           VLEN            = 512;
@@ -62,7 +62,7 @@ module testbench
 
     localparam int           BUS_WIDTH       = 32;
     localparam int           MEM_ADDR_BITS   = 28;
-    localparam string        BIN_FILE        = "../app/riscv-tests/test.bin";
+    localparam string        BIN_FILE        = "../app/fetch_test/fetch_test.bin";
 
     localparam int           i_cnt = 1;
 
@@ -359,7 +359,7 @@ module testbench
             if (mem_address == 32'h80000000 && mem_write_enable != '0) begin
                 $display(    "\n# %0t END OF SIMULATION",$time);
                 $fdisplay(fd,"\n# %0t END OF SIMULATION",$time);
-                $finish;
+                //$finish;
             end
         end
         else begin

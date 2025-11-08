@@ -33,7 +33,7 @@ module RAM_mem
 `endif
     parameter int    MEM_WIDTH  = 65536,
     parameter int    BUS_WIDTH  = 32,
-    parameter string BIN_FILE   = "../app/berkeley_suite/test.bin"
+    parameter string BIN_FILE   = "../app/coremark/coremark.bin"
 )
 (
     input  logic                             clk,
@@ -61,7 +61,7 @@ module RAM_mem
         fd = $fopen (BIN_FILE, "r");
         if (fd == '0) begin
             $display("[%d] [RAM_mem] ERROR: %s not found.", $time(), BIN_FILE);
-            $finish();
+            //$finish();
         end
 
         void'($fread(RAM, fd));
