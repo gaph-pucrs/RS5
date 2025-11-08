@@ -73,7 +73,6 @@ module decode
     output  logic [31:0]    pc_o,
     output  logic [31:0]    instruction_o,
     output  logic [31:0]    jump_imm_target_o,
-    output  logic [31:0]    pc_next_o,
 
     output  logic           compressed_o,
     output  iType_e         instruction_operation_o,
@@ -784,16 +783,6 @@ module decode
                 instruction_operation_o <= NOP;
             else
                 instruction_operation_o <= instruction_operation;
-        end
-    end
-
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            pc_next_o <= '0;
-        end
-        else begin
-            // To link register. Maybe we can remove this by using the PC in decode stage
-            pc_next_o <= pc_i + ((COMPRESSED && compressed_i) ? 32'd2 : 32'd4);
         end
     end
 

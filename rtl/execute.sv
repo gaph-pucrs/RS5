@@ -46,7 +46,7 @@ module execute
 
     /* Not used without BP */
     /* verilator lint_off UNUSEDSIGNAL */
-    input   logic               bp_ack_i,
+    input   logic                   bp_ack_i,
     /* verilator lint_on UNUSEDSIGNAL */
 
     /* Bits 14:12 and 6:0 are not used in this module */
@@ -116,11 +116,12 @@ module execute
     output  logic [31:0]            ctx_switch_target_o,
 
     input   logic                   interrupt_pending_i,
+    input   logic                   compressed_i,
     input   logic [31:0]            mtvec_i,
     input   logic [31:0]            mepc_i,
     input   logic [31:0]            jump_imm_target_i,
-    input   logic [31:0]            pc_next_i,
-
+    input   logic [31:0]            pc_i,
+    output  logic [31:0]            pc_next_o,
 
     /* Not used without zalrsc */
     /* verilator lint_off UNUSEDSIGNAL */
@@ -185,6 +186,13 @@ module execute
     assign or_result               = first_operand | second_operand_i;
     assign xor_result              = first_operand ^ second_operand_i;
     assign equal                   = equal_opA == equal_opB;
+
+    /* We can't obtain the PC from fetch stage because it can be modified due */
+    /* to load/store stalls when the current instruction is JAL[R]            */
+    logic [31:0] pc_next;
+    assign pc_next = pc_i + (compressed_i ? 32'h00000002 : 32'h00000004);
+
+    assign pc_next_o = pc_next;
 
 //////////////////////////////////////////////////////////////////////////////
 // Load/Store signals
@@ -661,7 +669,7 @@ module execute
         unique case (instruction_operation_i)
             CSRRW, CSRRS, CSRRC,
             CSRRWI,CSRRSI,CSRRCI:   result = csr_data_read_i;
-            JAL,JALR:               result = pc_next_i;
+            JAL,JALR:               result = pc_next;
             SLT:                    result = {31'b0, less_than};
             SLTU:                   result = {31'b0, less_than_unsigned};
             XOR:                    result = xor_result;
