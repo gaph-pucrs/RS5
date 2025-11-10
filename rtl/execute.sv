@@ -129,6 +129,7 @@ module execute
     /* verilator lint_on UNUSEDSIGNAL */
 
     output  logic                   jump_o,
+    output  logic                   should_jump_o,
     output  logic                   interrupt_ack_o,
     output  logic                   machine_return_o,
     output  logic                   raise_exception_o,
@@ -805,6 +806,27 @@ module execute
         assign jump_o          = should_jump;
         assign jump_rollback_o = 1'b0;
     end
+
+    logic req_jump;
+    assign req_jump = ctx_switch_o || jump_o;
+
+    logic req_jump_r;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            req_jump_r <= 1'b0;
+        end
+        else begin;
+            if (!stall)
+                req_jump_r <= 1'b0;
+            else if (req_jump)
+                req_jump_r <= 1'b1;
+        end
+    end
+    
+    /* Two jumps in sequence never occur, but the exec stage can be stalled */
+    /* So we only consider a new jump on posedge, so we can keep fetching   */
+    /* (and decoding)                                                       */
+    assign should_jump_o = req_jump && !req_jump_r;
 
     logic iaddr_misaligned;
     assign iaddr_misaligned = (!COMPRESSED && jump_target_o[1] && should_jump);

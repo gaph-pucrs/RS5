@@ -55,6 +55,7 @@ module decode
     input   logic           mem_access_we_i,
     input   logic           regbank_we_i,
     input   logic           compressed_i,
+    input   logic           should_jump_i,
 
     /* Not used without forwarding */
     /* verilator lint_off UNUSEDSIGNAL */
@@ -85,8 +86,6 @@ module decode
     /* verilator lint_off UNUSEDSIGNAL */
     input   logic           jump_rollback_i,
     /* verilator lint_on UNUSEDSIGNAL */
-    input   logic           ctx_switch_i,
-    input   logic           jump_i,
     input   logic           jumping_i,
     /* Not used without C */
     /* verilator lint_off UNUSEDSIGNAL */
@@ -483,7 +482,7 @@ module decode
 
         assign bp_take_o   = (bp_jump_taken || bp_branch_taken) && !jumping_i && !killed;
 
-        assign jump_confirmed = ctx_switch_i || jump_i || (jumping_i && !jump_rollback_i);
+        assign jump_confirmed = should_jump_i || (jumping_i && !jump_rollback_i);
         
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
@@ -497,7 +496,7 @@ module decode
     else begin : gen_bp_off
         assign bp_take_o   = 1'b0;
         assign bp_taken_o  = 1'b0;
-        assign jump_confirmed = ctx_switch_i || jump_i || jumping_i;
+        assign jump_confirmed = should_jump_i || jumping_i;
     end
 
 //////////////////////////////////////////////////////////////////////////////
