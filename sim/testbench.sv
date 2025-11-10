@@ -15,7 +15,7 @@
  * Testbench for RS5 simulation.
  *
  * \detailed
- * Testbench for RS5 simulation.de
+ * Testbench for RS5 simulation.
  */
 
 `include "../rtl/RS5_pkg.sv"
