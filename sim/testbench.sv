@@ -242,22 +242,20 @@ module testbench
 
         forever begin
             // 1. Wait for enable_ram to go high
-            @(posedge enable_ram);
+            @(negedge clk iff enable_ram);
 
-            if (mem_write_enable != '0) begin
-                // 2. Immediately (in 0-time) assert stall
-                stall = 1'b1;
+            // 2. Assert stall
+            stall = 1'b1;
 
-                // 3. Wait for some cycles (to simulate delay)
-                repeat (RAM_DELAY_CYCLES) @(posedge clk);
-            end
+            // 3. Wait for some cycles (to simulate delay)
+            repeat (RAM_DELAY_CYCLES) @(negedge clk);
 
             // 4. Deassert stall, assert delayed signal
             stall = 1'b0;
             enable_ram_delayed = 1'b1;
 
             // 5. Wait for enable_ram to go low to finish
-            @(negedge enable_ram);
+            @(negedge clk iff !enable_ram);
             enable_ram_delayed = 1'b0;
         end
     end
