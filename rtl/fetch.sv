@@ -39,6 +39,7 @@ module fetch
     /* Jump control */
     input   logic           jump_i,
     input   logic           ctx_switch_i,
+    input   logic           should_jump_i,
     input   logic [31:0]    jump_target_i,
     input   logic [31:0]    ctx_switch_target_i,
     output  logic           jumping_o,
@@ -78,32 +79,11 @@ module fetch
     logic bp_taken_r;
     logic [31:0] iaddr_jumped;
 
-    logic should_jump;
-    assign should_jump = ctx_switch_i || jump_i;
-
-    logic should_jump_r;
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            should_jump_r <= 1'b0;
-        end
-        else if (sys_reset) begin
-            should_jump_r <= 1'b0;
-        end
-        else begin;
-            if (enable_i)
-                should_jump_r <= 1'b0;
-            else if (should_jump)
-                should_jump_r <= 1'b1;
-        end
-    end
-    
-    /* Two jumps in sequence never occur, but the exec stage can be stalled */
-    /* So we only consider a new jump on posedge, so we can keep fetching   */
-    logic should_jump_posedge;
-    assign should_jump_posedge = should_jump && !should_jump_r;
+    logic is_jumping;
+    assign is_jumping = (jumping_o && !jump_rollback_i) || jump_misaligned_o;
 
     logic jump_confirmed;
-    assign jump_confirmed = should_jump_posedge || (bp_taken_r && !jump_rollback_i);
+    assign jump_confirmed = should_jump_i || (bp_taken_r && !jump_rollback_i);
 
     logic jumped_r;
     always_ff @(posedge clk or negedge reset_n) begin
@@ -126,7 +106,7 @@ module fetch
         else begin
             if (jump_confirmed)
                 jump_confirmed_r <= 1'b1;
-            else if (enable_i && valid)
+            else if (valid)
                 jump_confirmed_r <= 1'b0;
         end
     end
@@ -201,7 +181,7 @@ module fetch
     /* Read instruction from buffer/memory                */
     /* Read when enabled and not prefetched               */
     /* A misaligned jump will always have to read 2 times */
-    assign pop = (enable_i && !instruction_prefetched) || jump_misaligned_o;
+    assign pop = ((enable_i && !instruction_prefetched) || is_jumping);
 
     /* Insert instruction from memory into buffer      */
     /* Only insert when fetched instruction is valid   */
@@ -250,11 +230,8 @@ module fetch
 
     logic [31:0] next_instruction;
     assign next_instruction = valid_buffer ? inst_buffered : instruction_data_i;
-
-    logic valid_prefetch;
-    assign valid_prefetch = instruction_prefetched && !jump_misaligned_o;
-
-    assign valid = valid_fetch || valid_buffer || valid_prefetch;
+    
+    assign valid = valid_fetch || valid_buffer || instruction_prefetched;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Branch Prediction
@@ -274,7 +251,7 @@ module fetch
 
         logic bp_taken;
         assign bp_taken = (enable_i && bp_take_i && valid);
-        assign jumped   = should_jump_posedge || bp_taken;
+        assign jumped   = should_jump_i || bp_taken;
 
         logic [31:0] iaddr_rollback;
         always_ff @(posedge clk or negedge reset_n) begin
@@ -314,7 +291,7 @@ module fetch
         end
     end
     else begin : gen_bp_off
-        assign jumped       = should_jump_posedge;
+        assign jumped       = should_jump_i;
         assign jumped_fetch = jumped_r && !jump_rollback_i;
         assign bp_taken_r   = 1'b0;
         assign bp_ack_o     = 1'b0;
@@ -336,7 +313,7 @@ module fetch
             valid_o <= 1'b0;
         else if (sys_reset)
             valid_o <= 1'b0;
-        else if (enable_i)
+        else if (enable_i || is_jumping)
             valid_o <= valid;
     end
 
@@ -346,7 +323,7 @@ module fetch
             instruction_o <= 32'h00000013;
         else if (sys_reset)
             instruction_o <= 32'h00000013;
-        else if (enable_i && valid)
+        else if (enable_i || is_jumping)
             instruction_o <= instruction;
     end
 
@@ -387,7 +364,7 @@ module fetch
         else begin
             if (jumped)
                 jumping_o <= 1'b1;
-            else if ((enable_i && valid) || jump_rollback_i)
+            else if (valid || jump_rollback_i)
                 jumping_o <= 1'b0;
         end
     end
@@ -442,7 +419,7 @@ module fetch
                 compressed <= 1'b0;
             else if (sys_reset)
                 compressed <= 1'b0;
-            else if (enable_i && valid)
+            else if ((enable_i || is_jumping) && valid)
                 compressed <= next_compressed;
         end
         assign compressed_o = compressed;
@@ -450,8 +427,6 @@ module fetch
         /* We consider a instruction prefetched when it was removed from buffer */
         /* or read from memory but will be used again. Happens after compressed */
         /* instruction with unaligned PC. If jumping, it is invalid.            */
-        logic is_jumping;
-        assign is_jumping = jumping_o && !jump_rollback_i;
         assign instruction_prefetched = unaligned && compressed && !is_jumping;
 
         /* An unaligned jump requires the input of two fetches                 */
@@ -466,7 +441,7 @@ module fetch
             else begin
                 if (jump_confirmed_r)
                     jump_misaligned_o <= pc_jumped[1];
-                else if (enable_i && valid_o)
+                else if (!jumping_o && valid)
                     jump_misaligned_o <= 1'b0;
             end
         end
