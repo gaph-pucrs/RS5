@@ -531,12 +531,10 @@ module decode
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
+        if (!reset_n)
             locked_register_r <= '0;
-        end
-        else begin
+        else if (enable)
             locked_register_r <= locked_register;
-        end
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
@@ -626,8 +624,8 @@ module decode
     /* It also breaks if we limit the hazard to same address access */
     assign hazard_mem = locked_memory && is_load;
 
-    assign locked_rs1 = (locked_register != '0 && locked_register == rs1_o) || ( locked_register_r != '0 && locked_register_r == rs1_o);
-    assign locked_rs2 = (locked_register != '0 && locked_register == rs2_o) || ( locked_register_r != '0 && locked_register_r == rs2_o);
+    assign locked_rs1 = (locked_register != '0 && locked_register == rs1_o) || (locked_register_r != '0 && locked_register_r == rs1_o);
+    assign locked_rs2 = (locked_register != '0 && locked_register == rs2_o) || (locked_register_r != '0 && locked_register_r == rs2_o);
 
     assign hazard_rs1 = locked_rs1 && use_rs1;
     assign hazard_rs2 = locked_rs2 && use_rs2;
