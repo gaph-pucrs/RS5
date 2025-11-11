@@ -39,7 +39,7 @@ module riscof_tb
     parameter bit         BRANCHPRED       = 1'b0,
     parameter bit         FORWARDING       = 1'b0,
     parameter bit         DUALPORT_MEM     = 1'b1,
-    parameter int         RAM_DELAY_CYCLES = 1
+    parameter int         DELAY_CYCLES     = 0
 )
 (
 );
@@ -233,7 +233,7 @@ module riscof_tb
             stall = 1'b1;
 
             // 3. Wait for some cycles (to simulate delay)
-            repeat (RAM_DELAY_CYCLES) @(negedge clk);
+            repeat (DELAY_CYCLES) @(negedge clk);
 
             // 4. Deassert stall, assert delayed signal
             stall = 1'b0;
