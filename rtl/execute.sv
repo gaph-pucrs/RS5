@@ -297,8 +297,8 @@ module execute
 
     logic       csr_read_enable, csr_write_enable;
 
-    assign csr_read_enable_o = csr_read_enable & !exc_ilegal_csr_inst;
-    assign csr_write_enable_o = csr_write_enable & !exc_ilegal_csr_inst;
+    assign csr_read_enable_o = csr_read_enable & !exc_ilegal_csr_inst && !stall;
+    assign csr_write_enable_o = csr_write_enable & !exc_ilegal_csr_inst && !stall;
 
     always_comb begin
         unique case (instruction_operation_i)
