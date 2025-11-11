@@ -285,9 +285,7 @@ module execute
     end
 
     logic [BUS_WIDTH/8-1:0] mem_write_enable_mux;
-    always_comb begin
-        mem_write_enable_mux = {{(BUS_WIDTH/8-4){1'b0}}, (mem_write_enable | {4{atomic_mem_write_enable}})}  | mem_write_enable_vector;
-    end
+    assign mem_write_enable_mux = {{(BUS_WIDTH/8-4){1'b0}}, (mem_write_enable | {4{atomic_mem_write_enable}})}  | mem_write_enable_vector;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
@@ -309,7 +307,8 @@ module execute
 // CSR access signals
 //////////////////////////////////////////////////////////////////////////////
 
-    logic       csr_read_enable, csr_write_enable;
+    logic csr_read_enable;
+    logic csr_write_enable;
 
     assign csr_read_enable_o  = csr_read_enable  && !raise_exception_o && !stall;
     assign csr_write_enable_o = csr_write_enable && !raise_exception_o && !stall;
@@ -354,20 +353,7 @@ module execute
         endcase
     end
 
-    always_comb begin
-        // Raise exeption if CSR is read only and write enable is true
-        if (csr_address_i[11:10] == 2'b11 && csr_write_enable == 1'b1) begin
-            exc_ilegal_csr_inst = 1;
-        end
-        // Check Level privileges
-        else if (csr_address_i[9:8] > privilege_i && ((csr_read_enable | csr_write_enable) == 1'b1)) begin
-            exc_ilegal_csr_inst = 1;
-        end
-        // No exception is raised
-        else begin
-            exc_ilegal_csr_inst = 0;
-        end
-    end
+    assign exc_ilegal_csr_inst = (csr_address_i[11:10] == 2'b11 && csr_write_enable) || (csr_address_i[9:8] > privilege_i && (csr_read_enable || csr_write_enable));
 
 /////////////////////////////////////////////////////////////////////////////
 // Multiplication signals
@@ -390,7 +376,7 @@ module execute
             endcase
         end
 
-        assign enable_mul = (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU});
+        assign enable_mul = (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU}) && !raise_exception_o;
         assign mul_low    = (instruction_operation_i == MUL);
 
         mul mul1 (
@@ -423,7 +409,7 @@ module execute
         logic enable_div;
         logic signed_div;
 
-        assign enable_div = (instruction_operation_i inside {DIV, DIVU, REM, REMU});
+        assign enable_div = (instruction_operation_i inside {DIV, DIVU, REM, REMU}) && !raise_exception_o;
         assign signed_div = (instruction_operation_i inside {DIV, REM});
 
         div div1 (
@@ -454,8 +440,8 @@ module execute
         logic aes_mix;
         logic aes_valid;
 
-        assign aes_mix = (instruction_operation_i == AES32ESMI);
-        assign aes_valid = (instruction_operation_i inside {AES32ESMI, AES32ESI});
+        assign aes_mix   = (instruction_operation_i == AES32ESMI);
+        assign aes_valid = (instruction_operation_i inside {AES32ESMI, AES32ESI}) && !raise_exception_o;
 
         aes_unit #(
             .Environment (Environment),
@@ -481,6 +467,7 @@ module execute
     logic        hold_vector;
 
     if (VEnable) begin : v_gen_on
+        /* @todo Mask enablement on exception */
         vectorUnit #(
             .Environment (Environment),
             .VLEN        (VLEN       ),
@@ -548,7 +535,7 @@ module execute
             end
 
             logic lrsc_enable;
-            assign lrsc_enable = (instruction_operation_i == SC_W);
+            assign lrsc_enable = (instruction_operation_i == SC_W) && !raise_exception_o;
 
             logic [31:0] cmp_opA;
             logic [31:0] cmp_opB;
@@ -592,7 +579,7 @@ module execute
 
         if (AMOEXT != AMO_ZALRSC) begin : gen_zaamo_on
             logic amo_enable;
-            assign amo_enable = (instruction_operation_i == AMO_W);
+            assign amo_enable = (instruction_operation_i == AMO_W) && !raise_exception_o;
 
             logic amo_lt;
             assign amo_lt = $signed(amo_operand) < $signed(rs2_data_i);
@@ -630,7 +617,7 @@ module execute
                 .opA_o             (amo_operand          )
             );
 
-            assign first_operand = amo_enable ? amo_operand : rs1_data_i;
+            assign first_operand = (instruction_operation_i == AMO_W) ? amo_operand : rs1_data_i;
         end
         else begin : gen_zaamo_off
             assign amo_hold             = 1'b0;
@@ -728,7 +715,7 @@ module execute
         endcase
     end
 
-    assign write_enable_fwd_o = write_enable;
+    assign write_enable_fwd_o = write_enable && !raise_exception_o;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Output Registers
@@ -740,7 +727,7 @@ module execute
         if (!reset_n)
             write_enable_o <= 1'b0;
         else if (!stall)
-            write_enable_o <= write_enable && !raise_exception_o;
+            write_enable_o <= write_enable_fwd_o;
     end
 
     iType_e sc_instruction;
