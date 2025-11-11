@@ -476,15 +476,15 @@ module vectorLSU
             unique case (width)
                 /* verilator lint_off WIDTHEXPAND */
                 EW8: begin
-                    if (elementsProcessedRegister+i < VLEN/8)
+                    if (elementsProcessedRegister < VLEN/8)
                         write_data = {'0, {4{write_data_i[( 8*elementsProcessedRegister)+:8 ]}}};
                 end
                 EW16: begin
-                    if (elementsProcessedRegister+i < VLEN/16)
+                    if (elementsProcessedRegister < VLEN/16)
                         write_data = {'0, {2{write_data_i[(16*elementsProcessedRegister)+:16]}}};
                 end
                 default: begin
-                    if (elementsProcessedRegister+i < VLEN/32)
+                    if (elementsProcessedRegister < VLEN/32)
                         write_data = {'0,    write_data_i[(32*elementsProcessedRegister)+:32]};
                 end
                 /* verilator lint_on WIDTHEXPAND */
