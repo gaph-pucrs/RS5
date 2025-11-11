@@ -121,7 +121,6 @@ module execute
     input   logic [31:0]            mepc_i,
     input   logic [31:0]            jump_imm_target_i,
     input   logic [31:0]            pc_i,
-    output  logic [31:0]            pc_next_o,
 
     /* Not used without zalrsc */
     /* verilator lint_off UNUSEDSIGNAL */
@@ -133,6 +132,7 @@ module execute
     output  logic                   interrupt_ack_o,
     output  logic                   machine_return_o,
     output  logic                   raise_exception_o,
+    output  logic [31:0]            pc_irq_o,
     output  logic [31:0]            jump_target_o,
     output  exceptionCode_e         exception_code_o
 );
@@ -192,8 +192,6 @@ module execute
     /* to load/store stalls when the current instruction is JAL[R]            */
     logic [31:0] pc_next;
     assign pc_next = pc_i + (compressed_i ? 32'h00000002 : 32'h00000004);
-
-    assign pc_next_o = pc_next;
 
 //////////////////////////////////////////////////////////////////////////////
 // Load/Store signals
@@ -297,8 +295,8 @@ module execute
 
     logic       csr_read_enable, csr_write_enable;
 
-    assign csr_read_enable_o = csr_read_enable & !exc_ilegal_csr_inst && !stall;
-    assign csr_write_enable_o = csr_write_enable & !exc_ilegal_csr_inst && !stall;
+    assign csr_read_enable_o  = csr_read_enable  && !exc_ilegal_csr_inst && !stall;
+    assign csr_write_enable_o = csr_write_enable && !exc_ilegal_csr_inst && !stall;
 
     always_comb begin
         unique case (instruction_operation_i)
@@ -340,20 +338,10 @@ module execute
         endcase
     end
 
-    always_comb begin
-        // Raise exeption if CSR is read only and write enable is true
-        if (csr_address_i[11:10] == 2'b11 && csr_write_enable == 1'b1) begin
-            exc_ilegal_csr_inst = 1;
-        end
-        // Check Level privileges
-        else if (csr_address_i[9:8] > privilege_i && ((csr_read_enable | csr_write_enable) == 1'b1)) begin
-            exc_ilegal_csr_inst = 1;
-        end
-        // No exception is raised
-        else begin
-            exc_ilegal_csr_inst = 0;
-        end
-    end
+    assign exc_ilegal_csr_inst = (
+        (csr_write_enable && csr_address_i[11:10] == 2'b11) ||
+        ((csr_read_enable || csr_write_enable) && csr_address_i[9:8] > privilege_i)
+    );
 
 /////////////////////////////////////////////////////////////////////////////
 // Multiplication signals
@@ -534,7 +522,7 @@ module execute
             end
 
             logic lrsc_enable;
-            assign lrsc_enable = (instruction_operation_i == SC_W);
+            assign lrsc_enable = (instruction_operation_i == SC_W) && (rs1_data_i[1:0] == '0);
 
             logic [31:0] cmp_opA;
             logic [31:0] cmp_opB;
@@ -578,7 +566,7 @@ module execute
 
         if (AMOEXT != AMO_ZALRSC) begin : gen_zaamo_on
             logic amo_enable;
-            assign amo_enable = (instruction_operation_i == AMO_W);
+            assign amo_enable = (instruction_operation_i == AMO_W) && (rs1_data_i[1:0] == '0);
 
             logic amo_lt;
             assign amo_lt = $signed(amo_operand) < $signed(rs2_data_i);
@@ -616,7 +604,7 @@ module execute
                 .opA_o             (amo_operand          )
             );
 
-            assign first_operand = amo_enable ? amo_operand : rs1_data_i;
+            assign first_operand = (instruction_operation_i == AMO_W) ? amo_operand : rs1_data_i;
         end
         else begin : gen_zaamo_off
             assign amo_hold             = 1'b0;
@@ -692,11 +680,13 @@ module execute
         endcase
     end
 
+    logic raise_exception;
+
     logic we_atomic;
-    assign we_atomic = (rd_i != '0 && atomic_write_enable && !raise_exception_o);
+    assign we_atomic  = (rd_i != '0 && atomic_write_enable); // Will not even start if exception
 
     logic we_default;
-    assign we_default = (rd_i != '0 && !hold_o && !raise_exception_o);
+    assign we_default = (rd_i != '0 && !hold_o && !raise_exception);
 
     always_comb begin
         unique case (instruction_operation_i)
@@ -789,44 +779,44 @@ module execute
         endcase
     end
 
+    logic machine_return;
     always_comb begin
-        if (machine_return_o)
+        if (machine_return)
             ctx_switch_target_o = mepc_i;
         else
             ctx_switch_target_o = mtvec_i;
     end
 
-    assign ctx_switch_o = machine_return_o || raise_exception_o || interrupt_ack_o;
-
-    if (BRANCHPRED) begin : gen_bp_on
-        assign jump_o          = ( should_jump && (!(bp_taken_i && bp_ack_i) ||  interrupt_ack_o));
-        assign jump_rollback_o = (!should_jump && ( (bp_taken_i && bp_ack_i) && !interrupt_ack_o));
-    end
-    else begin : gen_bp_off
-        assign jump_o          = should_jump;
-        assign jump_rollback_o = 1'b0;
-    end
-
-    logic req_jump;
-    assign req_jump = ctx_switch_o || jump_o;
-
-    logic req_jump_r;
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            req_jump_r <= 1'b0;
-        end
-        else begin;
-            if (!stall)
-                req_jump_r <= 1'b0;
-            else if (req_jump)
-                req_jump_r <= 1'b1;
-        end
-    end
-    
     /* Two jumps in sequence never occur, but the exec stage can be stalled */
     /* So we only consider a new jump on posedge, so we can keep fetching   */
     /* (and decoding)                                                       */
-    assign should_jump_o = req_jump && !req_jump_r;
+    logic jump;
+    if (BRANCHPRED) begin : gen_bp_on
+        assign jump            = ( should_jump && !(bp_taken_i && bp_ack_i));
+        assign jump_rollback_o = (!should_jump &&  (bp_taken_i && bp_ack_i));
+    end
+    else begin : gen_bp_off
+        assign jump            = should_jump;
+        assign jump_rollback_o = 1'b0;
+    end
+
+    logic jump_r;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            jump_r <= 1'b0;
+        end
+        else begin;
+            if (!stall)
+                jump_r <= 1'b0;
+            else if (jump)
+                jump_r <= 1'b1;
+        end
+    end
+    assign jump_o = jump && !jump_r;
+    assign ctx_switch_o = machine_return_o || raise_exception_o || interrupt_ack_o;
+
+    assign should_jump_o = jump_o || ctx_switch_o;
+    assign pc_irq_o      = should_jump ? jump_target_o : pc_next;
 
     logic iaddr_misaligned;
     assign iaddr_misaligned = (!COMPRESSED && jump_target_o[1] && should_jump);
@@ -835,34 +825,38 @@ module execute
 // Privileged Architecture Control
 //////////////////////////////////////////////////////////////////////////////
 
-    assign raise_exception_o = (
-        (
-            exc_inst_access_fault_i ||
-            exc_ilegal_inst_i ||
-            exc_ilegal_csr_inst ||
-            iaddr_misaligned ||
-            laddr_misaligned ||
-            saddr_misaligned ||
-            (instruction_operation_i inside {ECALL, EBREAK}) ||
-            (exc_load_access_fault_i && (mem_read_enable_o || (mem_write_enable_o != '0)))
-        ) &&
-        (instruction_operation_i != NOP)
+    logic illegal_mret;
+    assign illegal_mret = (instruction_operation_i == MRET) && (privilege_i != 2'b11);
+
+    /* @todo Try to optimize by triggering at posedge just like jump_o */
+    assign raise_exception = (
+        exc_inst_access_fault_i ||
+        exc_ilegal_inst_i ||
+        illegal_mret ||
+        instruction_operation_i inside {ECALL, EBREAK} ||
+        exc_ilegal_csr_inst ||
+        iaddr_misaligned ||
+        laddr_misaligned ||
+        saddr_misaligned ||
+        (exc_load_access_fault_i && (mem_read_enable_o || (mem_write_enable_o != '0))) /* @todo bring mmu inside */
     );
+    assign raise_exception_o = raise_exception && !stall;
 
-    assign machine_return_o = (instruction_operation_i == MRET) && !raise_exception_o;
+    assign machine_return   = (instruction_operation_i == MRET) && (privilege_i == 2'b11);
+    assign machine_return_o = machine_return && !stall;
 
+    /* After interrupt is acked, it will be masked     */
+    /* So we can ack any time, even with hold or stall */
     assign interrupt_ack_o = (
         interrupt_pending_i &&
-        !machine_return_o &&
-        !raise_exception_o &&
-        !hold_o &&
-        (instruction_operation_i != NOP)
+        !machine_return &&
+        !raise_exception
     );
 
     always_comb begin
         if (exc_inst_access_fault_i)
             exception_code_o  = INSTRUCTION_ACCESS_FAULT;
-        else if ((exc_ilegal_inst_i || exc_ilegal_csr_inst))
+        else if (exc_ilegal_inst_i || exc_ilegal_csr_inst || illegal_mret)
             exception_code_o  = ILLEGAL_INSTRUCTION;
         else if (iaddr_misaligned)
             exception_code_o  = INSTRUCTION_ADDRESS_MISALIGNED;

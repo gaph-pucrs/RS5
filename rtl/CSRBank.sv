@@ -74,7 +74,7 @@ module CSRBank
     input   exceptionCode_e     exception_code_i,
     input   logic [31:0]        pc_i,
     input   logic [31:0]        mem_address_exec_i,
-    input   logic [31:0]        next_pc_i,
+    input   logic [31:0]        pc_irq_i,
     input   logic [31:0]        instruction_i,
 
     input   logic               jump_i,
@@ -1051,7 +1051,7 @@ module CSRBank
             if (raise_exception_i)
                 mepc <= pc_i;
             else if (interrupt_ack_i)
-                mepc <= jump_i ? jump_target_i : next_pc_i;
+                mepc <= pc_irq_i;
             else if (write_enable_i && address_i == MEPC)
                 mepc <= wr_data;
 

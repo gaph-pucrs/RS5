@@ -263,7 +263,6 @@ module RS5
     logic        write_enable_exec;
     logic [31:0] result_exec;
     logic [31:0] jump_imm_target_exec;
-    logic [31:0] pc_next;
 
     decode # (
         .MULEXT       (MULEXT      ),
@@ -369,6 +368,7 @@ module RS5
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     logic [31:0] reservation_data;
+    logic [31:0] pc_irq;
 
     execute #(
         .Environment  (Environment ),
@@ -430,10 +430,10 @@ module RS5
         .jump_target_o           (jump_target),
         .compressed_i            (instruction_compressed_execute),
         .pc_i                    (pc_execute),
-        .pc_next_o               (pc_next),
         .interrupt_pending_i     (interrupt_pending),
         .mtvec_i                 (mtvec),
         .mepc_i                  (mepc),
+        .pc_irq_o                (pc_irq),
         .jump_o                  (jump),
         .should_jump_o           (should_jump),
         .interrupt_ack_o         (interrupt_ack_o),
@@ -551,7 +551,7 @@ module RS5
         .exception_code_i           (Exception_Code),
         .pc_i                       (pc_execute),
         .mem_address_exec_i         (mem_address_exec),
-        .next_pc_i                  (pc_next),
+        .pc_irq_i                   (pc_irq),
         .instruction_i              (instruction_execute),
         .instruction_compressed_i   (instruction_compressed_execute),
         .jump_misaligned_i          (jump_misaligned),

@@ -629,8 +629,10 @@ module decode
     assign hazard_rs1 = locked_rs1 && use_rs1;
     assign hazard_rs2 = locked_rs2 && use_rs2;
 
-    assign killed   = jump_confirmed || jump_misaligned_i || !valid_i;
-    assign hazard_o = (hazard_mem || hazard_rs1 || hazard_rs2) && !killed && !exception;
+    logic invalid;
+    assign invalid  = jump_confirmed || jump_misaligned_i || !valid_i;
+    assign killed   = invalid || exception;
+    assign hazard_o = (hazard_mem || hazard_rs1 || hazard_rs2) && !killed;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
@@ -644,11 +646,10 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     logic invalid_inst;
+    assign invalid_inst = ((instruction_i[1:0] != '1) || instruction_operation == INVALID || amo_invalid) && !invalid;
+
     logic exc_inst_access_fault;
-
-    assign invalid_inst = ((instruction_i[1:0] != '1) || instruction_operation == INVALID || amo_invalid);
-
-    assign exc_inst_access_fault = exc_inst_access_fault_i;
+    assign exc_inst_access_fault = exc_inst_access_fault_i && !invalid;
 
     assign exception = exc_inst_access_fault || invalid_inst;
 
