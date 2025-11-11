@@ -196,7 +196,6 @@ module RS5
 
     logic        bp_ack;
     logic        valid_fetch;
-    logic        should_jump;
     logic        jump_rollback;
     logic        jumping;
     logic        ctx_switch;
@@ -222,7 +221,6 @@ module RS5
         .valid_o              (valid_fetch            ),
         .bp_ack_o             (bp_ack                 ),
         .jump_i               (jump                   ),
-        .should_jump_i        (should_jump            ),
         .jump_rollback_i      (jump_rollback          ),
         .jump_target_i        (jump_target            ),
         .ctx_switch_i         (ctx_switch             ),
@@ -309,7 +307,7 @@ module RS5
         .vector_operation_o         (vector_operation_execute),
         .hazard_o                   (hazard),
         .killed_o                   (killed),
-        .should_jump_i              (should_jump),
+        .should_jump_i              (jump || ctx_switch),
         .jumping_i                  (jumping),
         .jump_rollback_i            (jump_rollback),
         .compressed_i               (compressed_decode),
@@ -435,7 +433,6 @@ module RS5
         .mtvec_i                 (mtvec),
         .mepc_i                  (mepc),
         .jump_o                  (jump),
-        .should_jump_o           (should_jump),
         .interrupt_ack_o         (interrupt_ack_o),
         .machine_return_o        (MACHINE_RETURN),
         .raise_exception_o       (RAISE_EXCEPTION),
@@ -546,6 +543,7 @@ module RS5
         .hold                       (hold),
         .vtype_i                    (vtype),
         .vlen_i                     (vlen),
+        .ctx_switch_i               (ctx_switch),
         .raise_exception_i          (RAISE_EXCEPTION),
         .machine_return_i           (MACHINE_RETURN),
         .exception_code_i           (Exception_Code),

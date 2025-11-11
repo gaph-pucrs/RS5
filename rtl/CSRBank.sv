@@ -69,6 +69,7 @@ module CSRBank
     input   logic [31:0]        vlen_i,
     /* verilator lint_on UNUSEDSIGNAL */
 
+    input   logic               ctx_switch_i,
     input   logic               raise_exception_i,
     input   logic               machine_return_i,
     input   exceptionCode_e     exception_code_i,
@@ -159,7 +160,7 @@ module CSRBank
         else if (sys_reset)
             mstatus_mpie <= 1'b0;
         else begin 
-            if (raise_exception_i || interrupt_ack_i)
+            if ((ctx_switch_i && raise_exception_i) || interrupt_ack_i)
                 mstatus_mpie <= mstatus_mie;
             else if (write_enable_i && address_i == MSTATUS)
                 mstatus_mpie <= wr_data[7];
@@ -172,9 +173,9 @@ module CSRBank
         else if (sys_reset)
             mstatus_mie <= 1'b0;
         else begin 
-            if (machine_return_i)
+            if (ctx_switch_i && machine_return_i)
                 mstatus_mie <= mstatus_mpie;
-            else if (raise_exception_i || interrupt_ack_i)
+            else if ((ctx_switch_i && raise_exception_i) || interrupt_ack_i)
                 mstatus_mie <= 1'b0;
             else if (write_enable_i && address_i == MSTATUS)
                 mstatus_mie <= wr_data[3];
@@ -188,7 +189,7 @@ module CSRBank
         else if (sys_reset)
             mstatus_mpp <= 2'b11;
         else begin 
-            if (raise_exception_i || interrupt_ack_i)
+            if ((ctx_switch_i && raise_exception_i) || interrupt_ack_i)
                 mstatus_mpp <= privilege;
             else if (write_enable_i && address_i == MSTATUS)
                 mstatus_mpp <= wr_data[12:11];
@@ -488,7 +489,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_context <= '0;
             else begin
-                if (!mcountinhibit[4] && (jump_i || raise_exception_i || machine_return_i || interrupt_ack_i))
+                if (!mcountinhibit[4] && (jump_i ||(ctx_switch_i && (raise_exception_i || machine_return_i)) || interrupt_ack_i))
                     cntr_context <= cntr_context + 1'b1;
 
                 if (write_enable_i && address_i == MHPMCOUNTER4)
@@ -502,7 +503,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_exception <= '0;
             else begin
-                if (!mcountinhibit[5] && raise_exception_i)
+                if (!mcountinhibit[5] && (ctx_switch_i && raise_exception_i))
                     cntr_exception <= cntr_exception + 1'b1;
 
                 if (write_enable_i && address_i == MHPMCOUNTER5)
@@ -1048,7 +1049,7 @@ module CSRBank
         if (!reset_n)
             mepc <= '0;
         else begin
-            if (raise_exception_i)
+            if (ctx_switch_i && raise_exception_i)
                 mepc <= pc_i;
             else if (interrupt_ack_i)
                 mepc <= jump_i ? jump_target_i : next_pc_i;
@@ -1072,7 +1073,7 @@ module CSRBank
         if (!reset_n)
             mcause_interrupt <= 1'b0;
         else begin
-            if (raise_exception_i)
+            if (ctx_switch_i && raise_exception_i)
                 mcause_interrupt <= 1'b0;
             else if (interrupt_ack_i)
                 mcause_interrupt <= 1'b1;
@@ -1086,7 +1087,7 @@ module CSRBank
         if (!reset_n)
             mcause_exception_code <= '0;
         else begin
-            if (raise_exception_i)
+            if (ctx_switch_i && raise_exception_i)
                 mcause_exception_code <= {26'b0, exception_code_i};
             else if (interrupt_ack_i)
                 mcause_exception_code <= {26'b0, irq_code};
@@ -1110,7 +1111,7 @@ module CSRBank
         if (!reset_n)
             mtval <= '0;
         else begin
-            if (raise_exception_i) begin
+            if (ctx_switch_i && raise_exception_i) begin
                 unique case (exception_code_i)
                     LOAD_PAGE_FAULT,
                     LOAD_ACCESS_FAULT,
@@ -1266,9 +1267,9 @@ module CSRBank
         else if(sys_reset)
             privilege <= privilegeLevel_e'(2'b11);
         else begin
-            if (machine_return_i) 
+            if (ctx_switch_i && machine_return_i) 
                 privilege <= privilegeLevel_e'(mstatus_mpp);
-            else if (raise_exception_i || interrupt_ack_i)
+            else if ((ctx_switch_i && raise_exception_i) || interrupt_ack_i)
                 privilege <= privilegeLevel_e'(2'b11);
         end
     end

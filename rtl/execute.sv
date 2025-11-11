@@ -129,7 +129,6 @@ module execute
     /* verilator lint_on UNUSEDSIGNAL */
 
     output  logic                   jump_o,
-    output  logic                   should_jump_o,
     output  logic                   interrupt_ack_o,
     output  logic                   machine_return_o,
     output  logic                   raise_exception_o,
@@ -272,14 +271,10 @@ module execute
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             mem_address_o       <= '0;
-            mem_read_enable_o   <= '0;
-            mem_write_enable_o  <= '0;
             mem_write_data_o    <= '0;
         end
         else if (!stall) begin
             mem_address_o       <= mem_address;
-            mem_read_enable_o   <= (mem_read_enable || atomic_mem_read_enable || mem_read_enable_vector_inst);
-            mem_write_enable_o  <= {{(BUS_WIDTH/8-4){1'b0}}, (mem_write_enable | {4{atomic_mem_write_enable}})}  | mem_write_enable_vector;
             unique case (instruction_operation_i)
                 VLOAD,
                 VSTORE:  mem_write_data_o <= VEnable ? mem_write_data_vector : {{(BUS_WIDTH-32){1'b0}}, mem_write_data};
@@ -289,6 +284,25 @@ module execute
         end
     end
 
+    logic [BUS_WIDTH/8-1:0] mem_write_enable_mux;
+    always_comb begin
+        mem_write_enable_mux = {{(BUS_WIDTH/8-4){1'b0}}, (mem_write_enable | {4{atomic_mem_write_enable}})}  | mem_write_enable_vector;
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mem_write_enable_o <= '0;
+        else if (!stall)
+            mem_write_enable_o <= raise_exception_o ? '0 : mem_write_enable_mux;
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mem_read_enable_o <= 1'b0;
+        else if (!stall)
+            mem_read_enable_o <= raise_exception_o ? 1'b0 : (mem_read_enable || atomic_mem_read_enable || mem_read_enable_vector_inst);
+    end
+    
     assign mem_address_exec_o = mem_address;
 
 //////////////////////////////////////////////////////////////////////////////
@@ -297,8 +311,8 @@ module execute
 
     logic       csr_read_enable, csr_write_enable;
 
-    assign csr_read_enable_o = csr_read_enable & !exc_ilegal_csr_inst && !stall;
-    assign csr_write_enable_o = csr_write_enable & !exc_ilegal_csr_inst && !stall;
+    assign csr_read_enable_o  = csr_read_enable  && !raise_exception_o && !stall;
+    assign csr_write_enable_o = csr_write_enable && !raise_exception_o && !stall;
 
     always_comb begin
         unique case (instruction_operation_i)
@@ -693,10 +707,10 @@ module execute
     end
 
     logic we_atomic;
-    assign we_atomic = (rd_i != '0 && atomic_write_enable && !raise_exception_o);
+    assign we_atomic = (rd_i != '0 && atomic_write_enable);
 
     logic we_default;
-    assign we_default = (rd_i != '0 && !hold_o && !raise_exception_o);
+    assign we_default = (rd_i != '0 && !hold_o);
 
     always_comb begin
         unique case (instruction_operation_i)
@@ -726,7 +740,7 @@ module execute
         if (!reset_n)
             write_enable_o <= 1'b0;
         else if (!stall)
-            write_enable_o <= write_enable;
+            write_enable_o <= write_enable && !raise_exception_o;
     end
 
     iType_e sc_instruction;
@@ -789,44 +803,30 @@ module execute
         endcase
     end
 
-    always_comb begin
-        if (machine_return_o)
-            ctx_switch_target_o = mepc_i;
-        else
-            ctx_switch_target_o = mtvec_i;
-    end
-
-    assign ctx_switch_o = machine_return_o || raise_exception_o || interrupt_ack_o;
-
+    logic jump;
     if (BRANCHPRED) begin : gen_bp_on
-        assign jump_o          = ( should_jump && (!(bp_taken_i && bp_ack_i) ||  interrupt_ack_o));
+        assign jump            = ( should_jump && (!(bp_taken_i && bp_ack_i) ||  interrupt_ack_o));
         assign jump_rollback_o = (!should_jump && ( (bp_taken_i && bp_ack_i) && !interrupt_ack_o));
     end
     else begin : gen_bp_off
-        assign jump_o          = should_jump;
+        assign jump            = should_jump;
         assign jump_rollback_o = 1'b0;
     end
 
-    logic req_jump;
-    assign req_jump = ctx_switch_o || jump_o;
-
-    logic req_jump_r;
+    /* Only trigger jump on first cycle it arrives at the exec stage */
+    logic jump_r;
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
-            req_jump_r <= 1'b0;
+            jump_r <= 1'b0;
         end
-        else begin;
+        else begin
             if (!stall)
-                req_jump_r <= 1'b0;
-            else if (req_jump)
-                req_jump_r <= 1'b1;
+                jump_r <= 1'b0;
+            else if (jump)
+                jump_r <= 1'b1;
         end
     end
-    
-    /* Two jumps in sequence never occur, but the exec stage can be stalled */
-    /* So we only consider a new jump on posedge, so we can keep fetching   */
-    /* (and decoding)                                                       */
-    assign should_jump_o = req_jump && !req_jump_r;
+    assign jump_o = jump && !jump_r;
 
     logic iaddr_misaligned;
     assign iaddr_misaligned = (!COMPRESSED && jump_target_o[1] && should_jump);
@@ -835,6 +835,7 @@ module execute
 // Privileged Architecture Control
 //////////////////////////////////////////////////////////////////////////////
 
+    /* @todo Fix Xosvm exceptions by bringing it to this stage */
     assign raise_exception_o = (
         (
             exc_inst_access_fault_i ||
@@ -856,6 +857,8 @@ module execute
         !machine_return_o &&
         !raise_exception_o &&
         !hold_o &&
+        !stall &&   /* Avoid double-taken irq */
+        !jump_r &&
         (instruction_operation_i != NOP)
     );
 
@@ -879,5 +882,28 @@ module execute
         else
             exception_code_o  = NE;
     end
+
+    always_comb begin
+        if (machine_return_o)
+            ctx_switch_target_o = mepc_i;
+        else
+            ctx_switch_target_o = mtvec_i;
+    end
+
+    logic ctx_switch;
+    assign ctx_switch = machine_return_o || raise_exception_o;
+    logic ctx_switch_r;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            ctx_switch_r <= 1'b0;
+        end
+        else begin
+            if (!stall)
+                ctx_switch_r <= 1'b0;
+            else if (ctx_switch)
+                ctx_switch_r <= 1'b1;
+        end
+    end
+    assign ctx_switch_o = (ctx_switch && !ctx_switch_r) || interrupt_ack_o;
 
 endmodule

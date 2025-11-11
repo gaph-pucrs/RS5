@@ -39,7 +39,6 @@ module fetch
     /* Jump control */
     input   logic           jump_i,
     input   logic           ctx_switch_i,
-    input   logic           should_jump_i,
     input   logic [31:0]    jump_target_i,
     input   logic [31:0]    ctx_switch_target_i,
     output  logic           jumping_o,
@@ -82,8 +81,11 @@ module fetch
     logic is_jumping;
     assign is_jumping = (jumping_o && !jump_rollback_i) || jump_misaligned_o;
 
+    logic should_jump;
+    assign should_jump = jump_i || ctx_switch_i;
+
     logic jump_confirmed;
-    assign jump_confirmed = should_jump_i || (bp_taken_r && !jump_rollback_i);
+    assign jump_confirmed = should_jump || (bp_taken_r && !jump_rollback_i);
 
     logic jumped_r;
     always_ff @(posedge clk or negedge reset_n) begin
@@ -251,7 +253,7 @@ module fetch
 
         logic bp_taken;
         assign bp_taken = (enable_i && bp_take_i && valid);
-        assign jumped   = should_jump_i || bp_taken;
+        assign jumped   = should_jump || bp_taken;
 
         logic [31:0] iaddr_rollback;
         always_ff @(posedge clk or negedge reset_n) begin
@@ -291,7 +293,7 @@ module fetch
         end
     end
     else begin : gen_bp_off
-        assign jumped       = should_jump_i;
+        assign jumped       = should_jump;
         assign jumped_fetch = jumped_r && !jump_rollback_i;
         assign bp_taken_r   = 1'b0;
         assign bp_ack_o     = 1'b0;

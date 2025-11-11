@@ -39,7 +39,7 @@ module riscof_tb
     parameter bit         BRANCHPRED       = 1'b0,
     parameter bit         FORWARDING       = 1'b0,
     parameter bit         DUALPORT_MEM     = 1'b1,
-    parameter int         RAM_DELAY_CYCLES = 0
+    parameter int         RAM_DELAY_CYCLES = 1
 )
 (
 );
