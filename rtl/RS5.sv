@@ -82,7 +82,6 @@ module RS5
     logic            hold;
 
     logic            mmu_inst_fault;
-    logic            mmu_data_fault;
 
     privilegeLevel_e privilege;
     logic   [31:0]   jump_target;
@@ -165,7 +164,7 @@ module RS5
     logic   [11:0]  csr_addr;
     logic   [31:0]  csr_data_to_write, csr_data_read;
     logic   [31:0]  mepc, mtvec;
-    logic           RAISE_EXCEPTION, MACHINE_RETURN, RAISE_EXCEPTION_r;
+    logic           RAISE_EXCEPTION, MACHINE_RETURN;
     logic           interrupt_pending;
     exceptionCode_e Exception_Code;
 
@@ -379,7 +378,8 @@ module RS5
         .VLEN         (VLEN        ),
         .LLEN         (LLEN        ),
         .BUS_WIDTH    (BUS_WIDTH   ),
-        .BRANCHPRED   (BRANCHPRED  )
+        .BRANCHPRED   (BRANCHPRED  ),
+        .XOSVMEnable  (XOSVMEnable )
     ) execute1 (
         .clk                     (clk),
         .reset_n                 (reset_n),
@@ -397,7 +397,10 @@ module RS5
         .privilege_i             (privilege),
         .exc_ilegal_inst_i       (exc_ilegal_inst_execute),
         .exc_inst_access_fault_i (exc_inst_access_fault_execute),
-        .exc_load_access_fault_i (mmu_data_fault),
+        .mmu_en_i                (mmu_en),
+        .mvmdm_i                 (mvmdm),
+        .mvmdo_i                 (mvmdo),
+        .mvmds_i                 (mvmds),
         .hold_o                  (hold),
         .write_enable_o          (write_enable_mem_access),
         .write_enable_fwd_o      (write_enable_exec),
@@ -406,7 +409,7 @@ module RS5
         .result_fwd_o            (result_exec),
         .rd_o                    (rd_mem_access),
         .mem_address_exec_o      (mem_address_exec),
-        .mem_address_o           (mem_address),
+        .mem_address_o           (mem_address_o),
         .mem_read_enable_o       (mem_read_enable),
         .mem_write_enable_o      (mem_write_enable),
         .mem_write_data_o        (mem_data_o),
@@ -449,50 +452,17 @@ module RS5
             regbank_write_enable <= '0;
             result_retire        <= '0;
             rd_retire            <= '0;
-            RAISE_EXCEPTION_r    <= '0;
         end
         else if (!stall) begin
             instruction_operation_retire <= instruction_operation_mem_access;
             regbank_write_enable         <= write_enable_mem_access;
             result_retire                <= result_mem_access;
             rd_retire                    <= rd_mem_access;
-            RAISE_EXCEPTION_r            <= RAISE_EXCEPTION;
         end
     end
 
-    /**
-     * @todo
-     * Move DMMU to inside exec stage, so memory address is registered before
-     * address translation.
-     */
-    if (XOSVMEnable == 1'b1) begin : gen_d_mmu_on
-        logic mmu_en_r;
-        always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n) begin
-                mmu_en_r <= 1'b0;
-            end
-            else if (!stall) begin
-                mmu_en_r <= mmu_en;
-            end
-        end
-
-        mmu d_mmu (
-            .en_i           (mmu_en_r                  ),
-            .mask_i         (mvmdm                     ),
-            .offset_i       (mvmdo                     ),
-            .size_i         (mvmds                     ),
-            .address_i      ({mem_address[31:2], 2'b00}),
-            .exception_o    (mmu_data_fault            ),
-            .address_o      (mem_address_o             )
-        );
-    end
-    else begin : gen_d_mmu_off
-        assign mmu_data_fault = 1'b0;
-        assign mem_address_o  = {mem_address[31:2], 2'b00};
-    end
-
-    assign dmem_operation_enable_o = (mem_write_enable != '0 || mem_read_enable) && !mmu_data_fault && !RAISE_EXCEPTION_r;
-    assign mem_write_enable_o = mem_write_enable;
+    assign dmem_operation_enable_o = (mem_write_enable != '0 || mem_read_enable);
+    assign mem_write_enable_o      = mem_write_enable;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// RETIRE //////////////////////////////////////////////////////////////////////////////////

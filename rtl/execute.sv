@@ -37,7 +37,8 @@ module execute
     parameter int           VLEN         = 64,
     parameter int           LLEN         = 32,
     parameter int           BUS_WIDTH    = 32,
-    parameter bit           BRANCHPRED   = 1'b1
+    parameter bit           BRANCHPRED   = 1'b1,
+    parameter bit           XOSVMEnable  = 1'b0
 )
 (
     input   logic                   clk,
@@ -74,7 +75,14 @@ module execute
     input   privilegeLevel_e        privilege_i,
     input   logic                   exc_ilegal_inst_i,
     input   logic                   exc_inst_access_fault_i,
-    input   logic                   exc_load_access_fault_i,
+
+    /* Not used without Xosvm */
+    /* verilator lint_off UNUSEDSIGNAL */
+    input   logic                   mmu_en_i,
+    input   logic [31:0]            mvmdm_i,
+    input   logic [31:0]            mvmdo_i,
+    input   logic [31:0]            mvmds_i,
+    /* verilator lint_on UNUSEDSIGNAL */
 
     output  logic                   hold_o,
     output  logic                   write_enable_o,
@@ -268,13 +276,31 @@ module execute
         endcase
     end
 
+    logic mmu_data_fault;
+    logic [31:0] pmem_addr;
+    if (XOSVMEnable == 1'b1) begin : gen_d_mmu_on
+        mmu d_mmu (
+            .en_i           (mmu_en_i                  ),
+            .mask_i         (mvmdm_i                   ),
+            .offset_i       (mvmdo_i                   ),
+            .size_i         (mvmds_i                   ),
+            .address_i      ({mem_address[31:2], 2'b00}),
+            .exception_o    (mmu_data_fault            ),
+            .address_o      (pmem_addr                 )
+        );
+    end
+    else begin : gen_d_mmu_off
+        assign mmu_data_fault = 1'b0;
+        assign pmem_addr      = {mem_address[31:2], 2'b00};
+    end
+
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             mem_address_o       <= '0;
             mem_write_data_o    <= '0;
         end
         else if (!stall) begin
-            mem_address_o       <= mem_address;
+            mem_address_o       <= pmem_addr;
             unique case (instruction_operation_i)
                 VLOAD,
                 VSTORE:  mem_write_data_o <= VEnable ? mem_write_data_vector : {{(BUS_WIDTH-32){1'b0}}, mem_write_data};
@@ -286,7 +312,6 @@ module execute
 
     logic [BUS_WIDTH/8-1:0] mem_write_enable_mux;
     assign mem_write_enable_mux = {{(BUS_WIDTH/8-4){1'b0}}, (mem_write_enable | {4{atomic_mem_write_enable}})}  | mem_write_enable_vector;
-
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             mem_write_enable_o <= '0;
@@ -294,11 +319,14 @@ module execute
             mem_write_enable_o <= raise_exception_o ? '0 : mem_write_enable_mux;
     end
 
+
+    logic mem_read_enable_mux;
+    assign mem_read_enable_mux = (mem_read_enable || atomic_mem_read_enable || mem_read_enable_vector_inst);
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             mem_read_enable_o <= 1'b0;
         else if (!stall)
-            mem_read_enable_o <= raise_exception_o ? 1'b0 : (mem_read_enable || atomic_mem_read_enable || mem_read_enable_vector_inst);
+            mem_read_enable_o <= raise_exception_o ? 1'b0 : mem_read_enable_mux;
     end
     
     assign mem_address_exec_o = mem_address;
@@ -832,7 +860,7 @@ module execute
             laddr_misaligned ||
             saddr_misaligned ||
             (instruction_operation_i inside {ECALL, EBREAK}) ||
-            (exc_load_access_fault_i && (mem_read_enable_o || (mem_write_enable_o != '0)))
+            (mmu_data_fault && (mem_read_enable_mux || (mem_write_enable_mux != '0)))
         ) &&
         (instruction_operation_i != NOP)
     );
@@ -864,7 +892,7 @@ module execute
             exception_code_o  = LOAD_ADDRESS_MISALIGNED;
         else if (saddr_misaligned)
             exception_code_o  = STORE_AMO_ADDRESS_MISALIGNED;
-        else if (exc_load_access_fault_i)
+        else if (mmu_data_fault)
             exception_code_o  = LOAD_ACCESS_FAULT;
         else
             exception_code_o  = NE;
