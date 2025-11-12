@@ -77,7 +77,6 @@ module CSRBank
     input   logic [31:0]        pc_irq_i,
     input   logic [31:0]        instruction_i,
 
-    input   logic               jump_i,
     input   logic [31:0]        jump_target_i,
 
     /* Not used without compressed */
@@ -488,7 +487,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_context <= '0;
             else begin
-                if (!mcountinhibit[4] && (jump_i || raise_exception_i || machine_return_i || interrupt_ack_i))
+                if (!mcountinhibit[4] && (raise_exception_i || machine_return_i || interrupt_ack_i))
                     cntr_context <= cntr_context + 1'b1;
 
                 if (write_enable_i && address_i == MHPMCOUNTER4)
