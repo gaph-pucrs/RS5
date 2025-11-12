@@ -555,22 +555,23 @@ module execute
             logic [31:0] cmp_opB;
 
             lrsc lrsc_m (
-                .clk               (clk                  ),
-                .reset_n           (reset_n              ),
-                .stall             (stall                ),
-                .equal_i           (equal                ),
-                .enable_i          (lrsc_enable          ),
-                .rs1_data_i        (rs1_data_i           ),
-                .data_i            (mem_read_data_i[31:0]),
-                .reservation_addr_i(reservation_addr     ),
-                .reservation_data_i(reservation_data_i   ),
-                .hold_o            (lrsc_hold            ),
-                .write_enable_o    (lrsc_write_enable    ),
-                .mem_read_enable_o (lrsc_mem_read_enable ),
-                .mem_write_enable_o(lrsc_mem_write_enable),
-                .result_o          (lrsc_result          ),
-                .cmp_opA_o         (cmp_opA              ),
-                .cmp_opB_o         (cmp_opB              )
+                .clk               (clk                    ),
+                .reset_n           (reset_n                ),
+                .stall             (stall                  ),
+                .equal_i           (equal                  ),
+                .enable_i          (lrsc_enable            ),
+                .exception_i       (exc_load_access_fault_i),
+                .rs1_data_i        (rs1_data_i             ),
+                .data_i            (mem_read_data_i[31:0]  ),
+                .reservation_addr_i(reservation_addr       ),
+                .reservation_data_i(reservation_data_i     ),
+                .hold_o            (lrsc_hold              ),
+                .write_enable_o    (lrsc_write_enable      ),
+                .mem_read_enable_o (lrsc_mem_read_enable   ),
+                .mem_write_enable_o(lrsc_mem_write_enable  ),
+                .result_o          (lrsc_result            ),
+                .cmp_opA_o         (cmp_opA                ),
+                .cmp_opB_o         (cmp_opB                )
             );
 
             assign equal_opA = lrsc_enable ? cmp_opA : rs1_data_i;
@@ -618,17 +619,18 @@ module execute
             end
 
             amo amo_m (
-                .clk               (clk                  ),
-                .reset_n           (reset_n              ),
-                .stall             (stall                ),
-                .enable_i          (amo_enable           ),
-                .data_i            (mem_read_data_i[31:0]),
-                .amo_result_i      (amo_result           ),
-                .hold_o            (amo_hold             ),
-                .write_enable_o    (amo_write_enable     ),
-                .mem_read_enable_o (amo_mem_read_enable  ),
-                .mem_write_enable_o(amo_mem_write_enable ),
-                .opA_o             (amo_operand          )
+                .clk               (clk                    ),
+                .reset_n           (reset_n                ),
+                .stall             (stall                  ),
+                .enable_i          (amo_enable             ),
+                .exception_i       (exc_load_access_fault_i),
+                .data_i            (mem_read_data_i[31:0]  ),
+                .amo_result_i      (amo_result             ),
+                .hold_o            (amo_hold               ),
+                .write_enable_o    (amo_write_enable       ),
+                .mem_read_enable_o (amo_mem_read_enable    ),
+                .mem_write_enable_o(amo_mem_write_enable   ),
+                .opA_o             (amo_operand            )
             );
 
             assign first_operand = (instruction_operation_i == AMO_W) ? amo_operand : rs1_data_i;
@@ -710,7 +712,7 @@ module execute
     logic raise_exception;
 
     logic we_atomic;
-    assign we_atomic  = (rd_i != '0 && atomic_write_enable); // Will not even start if exception
+    assign we_atomic  = (rd_i != '0 && atomic_write_enable);
 
     logic we_default;
     assign we_default = (rd_i != '0 && !hold_o && !raise_exception);
@@ -737,7 +739,7 @@ module execute
 // Output Registers
 ////////////////////////////////////////////////////////////////////////////////
 
-    assign hold_o = hold_div || hold_mul || hold_vector || atomic_hold;
+    assign hold_o = (hold_div || hold_mul || hold_vector || atomic_hold) && !exc_load_access_fault_i;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
