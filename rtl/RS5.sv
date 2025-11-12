@@ -79,6 +79,7 @@ module RS5
 
     logic            jump;
     logic            hazard;
+    logic            fetch_hazard;
     logic            hold;
 
     logic            mmu_inst_fault;
@@ -187,7 +188,7 @@ module RS5
         assign mmu_en = 1'b0;
     end
 
-    assign enable_fetch  = !(stall || hold || hazard);
+    assign enable_fetch  = !(stall || hold || fetch_hazard);
     assign enable_decode = !(stall || hold);
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -306,6 +307,7 @@ module RS5
         .instruction_operation_o    (instruction_operation_execute),
         .atomic_operation_o         (atomic_operation_execute),
         .vector_operation_o         (vector_operation_execute),
+        .dec_hazard_o               (fetch_hazard),
         .hazard_o                   (hazard),
         .killed_o                   (killed),
         .should_jump_i              (should_jump),
@@ -369,6 +371,8 @@ module RS5
 
     logic [31:0] reservation_data;
     logic [31:0] pc_irq;
+    logic        exec_valid;
+    assign exec_valid = !(killed || hazard);
 
     execute #(
         .Environment  (Environment ),
@@ -397,6 +401,7 @@ module RS5
         .atomic_operation_i      (atomic_operation_execute),
         .vector_operation_i      (vector_operation_execute),
         .privilege_i             (privilege),
+        .valid_i                 (exec_valid),
         .exc_ilegal_inst_i       (exc_ilegal_inst_execute),
         .exc_inst_access_fault_i (exc_inst_access_fault_execute),
         .exc_load_access_fault_i (mmu_data_fault),
@@ -555,7 +560,6 @@ module RS5
         .instruction_i              (instruction_execute),
         .instruction_compressed_i   (instruction_compressed_execute),
         .jump_misaligned_i          (jump_misaligned),
-        .jump_i                     (jump),
         .jump_target_i              (jump_target),
         .mtime_i                    (mtime_i),
         .tip_i                      (tip_i),
