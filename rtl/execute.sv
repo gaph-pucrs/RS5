@@ -72,6 +72,7 @@ module execute
     /* verilator lint_on UNUSEDSIGNAL */
 
     input   privilegeLevel_e        privilege_i,
+    input   logic                   valid_i,
     input   logic                   exc_ilegal_inst_i,
     input   logic                   exc_inst_access_fault_i,
     input   logic                   exc_load_access_fault_i,
@@ -850,6 +851,7 @@ module execute
 
     assign interrupt_ack = (
         interrupt_pending_i &&
+        valid_i &&    /* We need a valid pc reference to ack an IRQ */
         !machine_return &&
         !raise_exception &&
         !hold_o
