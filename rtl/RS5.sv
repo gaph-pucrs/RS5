@@ -88,8 +88,7 @@ module RS5
     privilegeLevel_e privilege;
     logic   [31:0]   jump_target;
 
-    logic                   mem_read_enable;
-    logic [BUS_WIDTH/8-1:0] mem_write_enable;
+    logic                   mem_enable;
     logic [31:0]            mem_address_exec;
     logic [31:0]            instruction_address;
 
@@ -166,7 +165,7 @@ module RS5
     logic   [11:0]  csr_addr;
     logic   [31:0]  csr_data_to_write, csr_data_read;
     logic   [31:0]  mepc, mtvec;
-    logic           RAISE_EXCEPTION, MACHINE_RETURN, RAISE_EXCEPTION_r;
+    logic           RAISE_EXCEPTION, MACHINE_RETURN;
     logic           interrupt_pending;
     exceptionCode_e Exception_Code;
 
@@ -372,6 +371,7 @@ module RS5
     logic [31:0] reservation_data;
     logic [31:0] pc_irq;
     logic        exec_valid;
+    logic        load_access_fault;
     assign exec_valid = !(killed || hazard);
 
     execute #(
@@ -404,7 +404,7 @@ module RS5
         .valid_i                 (exec_valid),
         .exc_ilegal_inst_i       (exc_ilegal_inst_execute),
         .exc_inst_access_fault_i (exc_inst_access_fault_execute),
-        .exc_load_access_fault_i (mmu_data_fault),
+        .exc_load_access_fault_i (load_access_fault),
         .hold_o                  (hold),
         .write_enable_o          (write_enable_mem_access),
         .write_enable_fwd_o      (write_enable_exec),
@@ -414,8 +414,8 @@ module RS5
         .rd_o                    (rd_mem_access),
         .mem_address_exec_o      (mem_address_exec),
         .mem_address_o           (mem_address),
-        .mem_read_enable_o       (mem_read_enable),
-        .mem_write_enable_o      (mem_write_enable),
+        .mem_enable_o            (mem_enable),
+        .mem_write_enable_o      (mem_write_enable_o),
         .mem_write_data_o        (mem_data_o),
         .mem_read_data_i         (mem_data_i),
         .csr_address_i           (csr_addr),
@@ -457,22 +457,15 @@ module RS5
             regbank_write_enable <= '0;
             result_retire        <= '0;
             rd_retire            <= '0;
-            RAISE_EXCEPTION_r    <= '0;
         end
         else if (!stall) begin
             instruction_operation_retire <= instruction_operation_mem_access;
             regbank_write_enable         <= write_enable_mem_access;
             result_retire                <= result_mem_access;
             rd_retire                    <= rd_mem_access;
-            RAISE_EXCEPTION_r            <= RAISE_EXCEPTION;
         end
     end
 
-    /**
-     * @todo
-     * Move DMMU to inside exec stage, so memory address is registered before
-     * address translation.
-     */
     if (XOSVMEnable == 1'b1) begin : gen_d_mmu_on
         logic mmu_en_r;
         always_ff @(posedge clk or negedge reset_n) begin
@@ -493,14 +486,15 @@ module RS5
             .exception_o    (mmu_data_fault            ),
             .address_o      (mem_address_o             )
         );
+        assign load_access_fault = mem_enable && mmu_data_fault;
     end
     else begin : gen_d_mmu_off
-        assign mmu_data_fault = 1'b0;
-        assign mem_address_o  = {mem_address[31:2], 2'b00};
+        assign load_access_fault = 1'b0;
+        assign mmu_data_fault    = 1'b0;
+        assign mem_address_o     = {mem_address[31:2], 2'b00};
     end
 
-    assign dmem_operation_enable_o = (mem_write_enable != '0 || mem_read_enable) && !mmu_data_fault && !RAISE_EXCEPTION_r;
-    assign mem_write_enable_o = mem_write_enable;
+    assign dmem_operation_enable_o = mem_enable && !mmu_data_fault;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// RETIRE //////////////////////////////////////////////////////////////////////////////////

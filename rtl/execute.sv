@@ -87,7 +87,7 @@ module execute
 
     output  logic [31:0]            mem_address_exec_o,
     output  logic [31:0]            mem_address_o,
-    output  logic                   mem_read_enable_o,
+    output  logic                   mem_enable_o,
     output  logic [BUS_WIDTH/8-1:0] mem_write_enable_o,
     output  logic [BUS_WIDTH-1:0]   mem_write_data_o,
     /* Not used if VEnable is 0 */
@@ -205,7 +205,6 @@ module execute
     /* verilator lint_on UNUSEDSIGNAL */
     logic [31:0] mem_address;
 
-    logic        mem_read_enable;
     logic        mem_read_enable_vector;
 
     logic  [3:0]             mem_write_enable;
@@ -228,6 +227,13 @@ module execute
         endcase
     end
 
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mem_address_o <= '0;
+        else if (!stall)
+            mem_address_o <= mem_address;
+    end
+
     logic misaligned_sh;
     assign misaligned_sh = mem_address[0] && (instruction_operation_i == SH);
 
@@ -248,7 +254,12 @@ module execute
 
     logic mem_read_enable_vector_inst;
     assign mem_read_enable_vector_inst = mem_read_enable_vector && (instruction_operation_i inside {VLOAD, VSTORE});
+
+    logic mem_read_enable;
     assign mem_read_enable = instruction_operation_i inside {LB, LBU, LH, LHU, LW, LR_W};
+
+    logic pmem_read_enable;
+    assign pmem_read_enable = (mem_read_enable || atomic_mem_read_enable || mem_read_enable_vector_inst);
 
     always_comb begin
         unique case (instruction_operation_i)
@@ -256,6 +267,20 @@ module execute
             SH:         mem_write_data = {2{rs2_data_i[15:0]}};
             default:    mem_write_data = rs2_data_i;
         endcase
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            mem_write_data_o <= '0;
+        end
+        else if (!stall) begin
+            unique case (instruction_operation_i)
+                VLOAD,
+                VSTORE:  mem_write_data_o <= VEnable ? mem_write_data_vector : {{(BUS_WIDTH-32){1'b0}}, mem_write_data};
+                AMO_W:   mem_write_data_o <= {{(BUS_WIDTH-32){1'b0}}, ((AMOEXT inside {AMO_ZAAMO, AMO_A}) ? amo_operand : mem_write_data)};
+                default: mem_write_data_o <= {{(BUS_WIDTH-32){1'b0}}, mem_write_data};
+            endcase
+        end
     end
 
     always_comb begin
@@ -268,24 +293,24 @@ module execute
         endcase
     end
 
+    logic [BUS_WIDTH/8-1:0] pmem_write_enable;
+    assign pmem_write_enable = {{(BUS_WIDTH/8-4){1'b0}}, (mem_write_enable | {4{atomic_mem_write_enable}})}  | mem_write_enable_vector;
+
     always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            mem_address_o       <= '0;
-            mem_read_enable_o   <= '0;
-            mem_write_enable_o  <= '0;
-            mem_write_data_o    <= '0;
-        end
-        else if (!stall) begin
-            mem_address_o       <= mem_address;
-            mem_read_enable_o   <= (mem_read_enable || atomic_mem_read_enable || mem_read_enable_vector_inst);
-            mem_write_enable_o  <= {{(BUS_WIDTH/8-4){1'b0}}, (mem_write_enable | {4{atomic_mem_write_enable}})}  | mem_write_enable_vector;
-            unique case (instruction_operation_i)
-                VLOAD,
-                VSTORE:  mem_write_data_o <= VEnable ? mem_write_data_vector : {{(BUS_WIDTH-32){1'b0}}, mem_write_data};
-                AMO_W:   mem_write_data_o <= {{(BUS_WIDTH-32){1'b0}}, ((AMOEXT inside {AMO_ZAAMO, AMO_A}) ? amo_operand : mem_write_data)};
-                default: mem_write_data_o <= {{(BUS_WIDTH-32){1'b0}}, mem_write_data};
-            endcase
-        end
+        if (!reset_n)
+            mem_write_enable_o <= '0;
+        else if (!stall)
+            mem_write_enable_o <= pmem_write_enable;
+    end
+
+    logic mem_enable;
+    assign mem_enable = pmem_read_enable || (pmem_write_enable != '0);
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mem_enable_o <= '0;
+        else if (!stall)
+            mem_enable_o <= mem_enable && !raise_exception;
     end
 
     assign mem_address_exec_o = mem_address;
@@ -836,13 +861,13 @@ module execute
     assign raise_exception = (
         exc_inst_access_fault_i ||
         exc_ilegal_inst_i ||
+        exc_load_access_fault_i ||
         illegal_mret ||
         instruction_operation_i inside {ECALL, EBREAK} ||
         exc_ilegal_csr_inst ||
         iaddr_misaligned ||
         laddr_misaligned ||
-        saddr_misaligned ||
-        (exc_load_access_fault_i && (mem_read_enable_o || (mem_write_enable_o != '0))) /* @todo bring mmu inside */
+        saddr_misaligned
     );
     assign raise_exception_o = raise_exception && !stall;
 
