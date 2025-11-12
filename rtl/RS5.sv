@@ -462,7 +462,7 @@ module RS5
         end
         else if (!stall) begin
             instruction_operation_retire <= instruction_operation_mem_access;
-            regbank_write_enable         <= write_enable_mem_access;
+            regbank_write_enable         <= write_enable_mem_access && !load_access_fault; /* Disable write on load mmu exception */
             result_retire                <= result_mem_access;
             rd_retire                    <= rd_mem_access;
         end
@@ -507,6 +507,7 @@ module RS5
     ) retire1 (
         .clk                    (clk),
         .reset_n                (reset_n),
+        .regbank_we_i           (regbank_write_enable),
         .instruction_operation_i(instruction_operation_retire),
         .result_i               (result_retire),
         .mem_data_i             (mem_data_i[31:0]),
