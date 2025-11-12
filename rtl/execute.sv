@@ -134,6 +134,7 @@ module execute
     output  logic                   machine_return_o,
     output  logic                   raise_exception_o,
     output  logic [31:0]            pc_irq_o,
+    output  logic [31:0]            pc_exc_o,
     output  logic [31:0]            jump_target_o,
     output  exceptionCode_e         exception_code_o
 );
@@ -885,7 +886,9 @@ module execute
     assign interrupt_ack_o = interrupt_ack && !stall;
 
     always_comb begin
-        if (exc_inst_access_fault_i)
+        if (exc_load_access_fault_i)    /* Highest priority because it happened last cycle */
+            exception_code_o  = LOAD_ACCESS_FAULT;
+        else if (exc_inst_access_fault_i)
             exception_code_o  = INSTRUCTION_ACCESS_FAULT;
         else if (exc_ilegal_inst_i || exc_ilegal_csr_inst || illegal_mret)
             exception_code_o  = ILLEGAL_INSTRUCTION;
@@ -899,10 +902,18 @@ module execute
             exception_code_o  = LOAD_ADDRESS_MISALIGNED;
         else if (saddr_misaligned)
             exception_code_o  = STORE_AMO_ADDRESS_MISALIGNED;
-        else if (exc_load_access_fault_i)
-            exception_code_o  = LOAD_ACCESS_FAULT;
         else
             exception_code_o  = NE;
     end
+
+    logic [31:0] pc_r;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            pc_r <= '0;
+        else if (!stall)
+            pc_r <= pc_i;
+    end
+
+    assign pc_exc_o = exc_load_access_fault_i ? pc_r : pc_i;
 
 endmodule

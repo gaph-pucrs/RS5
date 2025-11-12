@@ -370,6 +370,7 @@ module RS5
 
     logic [31:0] reservation_data;
     logic [31:0] pc_irq;
+    logic [31:0] pc_exc;
     logic        exec_valid;
     logic        load_access_fault;
     assign exec_valid = !(killed || hazard);
@@ -439,6 +440,7 @@ module RS5
         .mtvec_i                 (mtvec),
         .mepc_i                  (mepc),
         .pc_irq_o                (pc_irq),
+        .pc_exc_o                (pc_exc),
         .jump_o                  (jump),
         .should_jump_o           (should_jump),
         .interrupt_ack_o         (interrupt_ack_o),
@@ -550,7 +552,9 @@ module RS5
         .exception_code_i           (Exception_Code),
         .pc_i                       (pc_execute),
         .mem_address_exec_i         (mem_address_exec),
+        .mem_address_i              (mem_address),
         .pc_irq_i                   (pc_irq),
+        .pc_exc_i                   (pc_exc),
         .instruction_i              (instruction_execute),
         .instruction_compressed_i   (instruction_compressed_execute),
         .jump_misaligned_i          (jump_misaligned),

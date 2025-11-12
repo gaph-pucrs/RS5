@@ -74,7 +74,9 @@ module CSRBank
     input   exceptionCode_e     exception_code_i,
     input   logic [31:0]        pc_i,
     input   logic [31:0]        mem_address_exec_i,
+    input   logic [31:0]        mem_address_i,
     input   logic [31:0]        pc_irq_i,
+    input   logic [31:0]        pc_exc_i,
     input   logic [31:0]        instruction_i,
 
     input   logic [31:0]        jump_target_i,
@@ -1048,7 +1050,7 @@ module CSRBank
             mepc <= '0;
         else begin
             if (raise_exception_i)
-                mepc <= pc_i;
+                mepc <= pc_exc_i;
             else if (interrupt_ack_i)
                 mepc <= pc_irq_i;
             else if (write_enable_i && address_i == MEPC)
@@ -1112,11 +1114,11 @@ module CSRBank
             if (raise_exception_i) begin
                 unique case (exception_code_i)
                     LOAD_PAGE_FAULT,
-                    LOAD_ACCESS_FAULT,
                     STORE_AMO_PAGE_FAULT,
                     STORE_AMO_ACCESS_FAULT,
                     LOAD_ADDRESS_MISALIGNED,
                     STORE_AMO_ADDRESS_MISALIGNED:   mtval <= mem_address_exec_i;
+                    LOAD_ACCESS_FAULT:              mtval <= mem_address_i;
                     INSTRUCTION_ADDRESS_MISALIGNED: mtval <= jump_target_i;
                     BREAKPOINT,
                     INSTRUCTION_PAGE_FAULT,
