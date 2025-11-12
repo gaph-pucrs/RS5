@@ -79,6 +79,7 @@ module decode
     output  iType_e         instruction_operation_o,
     output  iTypeAtomic_e   atomic_operation_o,
     output  iTypeVector_e   vector_operation_o,
+    output  logic           dec_hazard_o,
     output  logic           hazard_o,
     output  logic           killed_o,
 
@@ -105,6 +106,7 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     logic   killed;
+    logic   hazard;
     iType_e instruction_operation;
 
     logic [2:0] funct3;
@@ -400,7 +402,7 @@ module decode
                 vector_operation_o <= VNOP;
             end
             else if (enable) begin
-                if (hazard_o || killed)
+                if (hazard || killed)
                     vector_operation_o <= VNOP;
                 else
                     vector_operation_o <= vector_operation;
@@ -489,7 +491,7 @@ module decode
                 bp_taken_o <= 1'b0;
             else if (sys_reset)
                 bp_taken_o <= 1'b0;
-            else if (enable && !hazard_o)
+            else if (enable && !hazard)
                 bp_taken_o <= bp_take_o;
         end
     end
@@ -522,7 +524,7 @@ module decode
             locked_register <= '0;
         end
         else if (enable) begin
-            if (hazard_o || killed)
+            if (hazard || killed)
                 locked_register <= '0;
             else    // Read-after-write on LOAD
                 locked_register <= (is_load || !FORWARDING) ? rd : '0;
@@ -541,7 +543,7 @@ module decode
             locked_memory   <= '0;
         end
         else if (enable) begin
-            if (hazard_o || killed)
+            if (hazard || killed)
                 locked_memory <= '0;
             else    // Read-after-write on STORE
                 locked_memory <= is_store;
@@ -630,15 +632,23 @@ module decode
     assign hazard_rs2 = locked_rs2 && use_rs2;
 
     logic invalid;
-    assign invalid  = jump_confirmed || jump_misaligned_i || !valid_i;
-    assign killed   = invalid || exception;
-    assign hazard_o = (hazard_mem || hazard_rs1 || hazard_rs2) && !killed;
+    assign invalid      = jump_confirmed || jump_misaligned_i || !valid_i;
+    assign killed       = invalid || exception;
+    assign hazard       = (hazard_mem || hazard_rs1 || hazard_rs2) && !killed;
+    assign dec_hazard_o = hazard;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             killed_o <= 1'b0;
         else if (enable)
             killed_o <= killed;
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            hazard_o <= 1'b0;
+        else if (enable)
+            hazard_o <= hazard;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -777,7 +787,7 @@ module decode
             instruction_operation_o <= NOP;
         end
         else if (enable) begin
-            if (hazard_o || killed)
+            if (hazard || killed)
                 instruction_operation_o <= NOP;
             else
                 instruction_operation_o <= instruction_operation;
