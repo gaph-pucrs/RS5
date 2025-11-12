@@ -813,7 +813,9 @@ module execute
         end
     end
     assign jump_o = jump && !jump_r;
-    assign ctx_switch_o = machine_return_o || raise_exception_o || interrupt_ack_o;
+
+    logic interrupt_ack;
+    assign ctx_switch_o = (machine_return || raise_exception || interrupt_ack) && !stall;
 
     assign should_jump_o = jump_o || ctx_switch_o;
     assign pc_irq_o      = should_jump ? jump_target_o : pc_next;
@@ -828,7 +830,8 @@ module execute
     logic illegal_mret;
     assign illegal_mret = (instruction_operation_i == MRET) && (privilege_i != 2'b11);
 
-    /* @todo Try to optimize by triggering at posedge just like jump_o */
+    /* We can't change privilege until the end of the instruction */
+    /* Hence, exception, ret and irq must be masked by stall      */
     assign raise_exception = (
         exc_inst_access_fault_i ||
         exc_ilegal_inst_i ||
@@ -845,13 +848,14 @@ module execute
     assign machine_return   = (instruction_operation_i == MRET) && (privilege_i == 2'b11);
     assign machine_return_o = machine_return && !stall;
 
-    /* After interrupt is acked, it will be masked     */
-    /* So we can ack any time, even with hold or stall */
-    assign interrupt_ack_o = (
+    assign interrupt_ack = (
         interrupt_pending_i &&
         !machine_return &&
-        !raise_exception
+        !raise_exception &&
+        !hold_o
     );
+
+    assign interrupt_ack_o = interrupt_ack && !stall;
 
     always_comb begin
         if (exc_inst_access_fault_i)
