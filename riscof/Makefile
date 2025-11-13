@@ -27,10 +27,10 @@ baseline: arch-test-update
 	@$(ENV_VARS) riscof run --suite=riscv-arch-test/riscv-test-suite --env=riscv-arch-test/riscv-test-suite/env --work-dir=$(WORK_DIR)/baseline_work --no-browser --config=baseline.ini
 
 arch-test-update: riscv-arch-test
-	@riscof arch-test --update
+	@riscof arch-test --update --get-version main
 
 riscv-arch-test:
-	@riscof arch-test --clone
+	@riscof arch-test --clone --get-version main
 
 report-baseline: $(WORK_DIR)/baseline_work/report.html
 	@xdg-open $^
