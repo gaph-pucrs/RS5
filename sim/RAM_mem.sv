@@ -33,7 +33,7 @@ module RAM_mem
 `endif
     parameter int    MEM_WIDTH  = 65536,
     parameter int    BUS_WIDTH  = 32,
-    parameter string BIN_FILE   = "../app/berkeley_suite/test.bin"
+    parameter string BIN_FILE   = "../app/riscv-tests/test.bin"
 )
 (
     input  logic                             clk,
