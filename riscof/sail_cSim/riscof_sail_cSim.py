@@ -14,7 +14,7 @@ class sail_cSim(pluginTemplate):
 
     def __init__(self, *args, **kwargs):
         sclass = super().__init__(*args, **kwargs)
-        self.args = " --disable-writable-misa --disable-vector-ext"
+        self.args = " --disable-writable-misa --disable-vector-ext --pmp-count 0"
 
         config = kwargs.get('config')
         if config is None:
