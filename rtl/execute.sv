@@ -307,6 +307,9 @@ module execute
     logic mem_enable;
     assign mem_enable = pmem_read_enable || (pmem_write_enable != '0);
 
+
+    logic raise_exception;
+
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             mem_enable_o <= '0;
@@ -708,8 +711,6 @@ module execute
             default:                result = sum_result;
         endcase
     end
-
-    logic raise_exception;
 
     logic we_atomic;
     assign we_atomic  = (rd_i != '0 && atomic_write_enable);
