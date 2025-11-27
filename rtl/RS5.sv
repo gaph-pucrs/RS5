@@ -456,16 +456,25 @@ module RS5
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             instruction_operation_retire <= NOP;
-            regbank_write_enable <= '0;
             result_retire        <= '0;
             rd_retire            <= '0;
         end
         else if (!stall) begin
             instruction_operation_retire <= instruction_operation_mem_access;
-            regbank_write_enable         <= write_enable_mem_access && !load_access_fault; /* Disable write on load mmu exception */
             result_retire                <= result_mem_access;
             rd_retire                    <= rd_mem_access;
         end
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            regbank_write_enable <= '0;
+        else
+            regbank_write_enable <= (
+                write_enable_mem_access 
+                && !load_access_fault /* Disable write on load mmu exception     */
+                && !stall             /* Disable writing immediately after stall */
+            ); 
     end
 
     if (XOSVMEnable == 1'b1) begin : gen_d_mmu_on
