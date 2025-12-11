@@ -3,6 +3,7 @@ BRANCHPRED   ?= 1
 FORWARDING   ?= 1
 DUALPORT_MEM ?= 1
 IQUEUE_SIZE  ?= 2
+DELAY_CYCLES ?= 0
 TRIPLET      ?= riscv64-elf
 
 ENV_VARS = \
@@ -10,7 +11,8 @@ ENV_VARS = \
 	BRANCHPRED=$(BRANCHPRED)\
 	FORWARDING=$(FORWARDING)\
 	DUALPORT_MEM=$(DUALPORT_MEM)\
-	IQUEUE_SIZE=$(IQUEUE_SIZE)
+	IQUEUE_SIZE=$(IQUEUE_SIZE) \
+	DELAY_CYCLES=$(DELAY_CYCLES)
 
 default: baseline
 
@@ -25,10 +27,10 @@ baseline: arch-test-update
 	@$(ENV_VARS) riscof run --suite=riscv-arch-test/riscv-test-suite --env=riscv-arch-test/riscv-test-suite/env --work-dir=$(WORK_DIR)/baseline_work --no-browser --config=baseline.ini
 
 arch-test-update: riscv-arch-test
-	@riscof arch-test --update
+	@riscof arch-test --update --get-version main
 
 riscv-arch-test:
-	@riscof arch-test --clone
+	@riscof arch-test --clone --get-version main
 
 report-baseline: $(WORK_DIR)/baseline_work/report.html
 	@xdg-open $^

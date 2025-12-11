@@ -34,6 +34,7 @@ module retire
     /* verilator lint_off UNUSEDSIGNAL */
     input   logic           clk,
     input   logic           reset_n,
+    input   logic           regbank_we_i,
     /* verilator lint_on UNUSEDSIGNAL */
 
     input   iType_e         instruction_operation_i,
@@ -129,7 +130,7 @@ module retire
             if (!reset_n) begin
                 reservation_data_o <= '0;
             end
-            else begin
+            else if (regbank_we_i) begin    /* Avoid writing on MMU exceptions */
                 unique case (instruction_operation_i)
                     LR_W:    reservation_data_o <= mem_data_i;
                     SC_W:    reservation_data_o <= '0;

@@ -76,6 +76,7 @@ Note that running `make` will download or update the (test suite)[https://github
 
 Variations to core implementation are controlled by environment variables.
 By default, branch prediction (`BRANCHPRED`), forwarding (`FORWARDING`), and dual port memory (`DUALPORT_MEM`) are enabled, and the instruction queue size (`IQUEUE_SIZE`) is 2.
+It is also possible to increase the memory latency with the variable `DELAY_CYCLES`, which is 0 by default.
 To control its behavior, run make with the environment variables defined to enable/disable the features.
 E.g., run *extensions* with branch prediction and without forwarding:
 ```

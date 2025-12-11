@@ -20,6 +20,7 @@ module lrsc
 
     input  logic        equal_i,
     input  logic        enable_i,
+    input  logic        exception_i,
     input  logic [31:0] rs1_data_i,
     input  logic [31:0] data_i,
     input  logic [31:0] reservation_addr_i,
@@ -49,7 +50,12 @@ module lrsc
     always_comb begin
         unique case (current_state)
             LOAD:     next_state = enable_i ? CMP_ADDR : LOAD;
-            CMP_ADDR: next_state = equal_i  ? REGISTER : STORE;
+            CMP_ADDR: begin
+                if (exception_i)
+                    next_state = LOAD;
+                else
+                    next_state = equal_i  ? REGISTER : STORE;
+            end
             REGISTER: next_state = CMP_DATA;
             CMP_DATA: next_state = STORE;
             default:  next_state = LOAD;    /* STORE */

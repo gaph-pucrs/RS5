@@ -15,7 +15,7 @@
  * Testbench for RS5 simulation.
  *
  * \detailed
- * Testbench for RS5 simulation.de
+ * Testbench for RS5 simulation.
  */
 
 `include "../rtl/RS5_pkg.sv"
@@ -47,6 +47,7 @@ module testbench
     localparam bit           FORWARDING      = 1'b1;
     localparam int           IQUEUE_SIZE     = 2;
     localparam bit           DUALPORT_MEM    = 1'b1;
+    localparam int           RAM_DELAY_CYCLES= 0;
 
     localparam bit           VEnable         = 1'b0;
     localparam int           VLEN            = 512;
@@ -67,11 +68,10 @@ module testbench
 
 ///////////////////////////////////////// Clock generator //////////////////////////////
 
-    logic clk=1;
-
-    always begin
-        #5.0 clk <= 0;
-        #5.0 clk <= 1;
+    logic clk;
+    initial begin
+        clk = 0;
+        forever #5.0 clk = ~clk;
     end
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -147,6 +147,7 @@ module testbench
 
     logic busy;
     logic enable_imem;
+    logic stall;
 
     RS5 #(
     `ifndef SYNTH
@@ -174,7 +175,7 @@ module testbench
         .clk                    (clk),
         .reset_n                (reset_n),
         .sys_reset_i            (1'b0),
-        .stall                  (1'b0),
+        .stall                  (stall),
         .busy_i                 (busy),
         .instruction_i          (instruction[31:0]),
         .mem_data_i             (mem_data_read),
@@ -234,6 +235,31 @@ module testbench
         .dataB_o    (dataBo)
     );
 
+    logic enable_ram_delayed;
+    initial begin
+        stall = 1'b0;
+        enable_ram_delayed = 1'b0;
+
+        forever begin
+            // 1. Wait for enable_ram to go high
+            @(negedge clk iff enable_ram);
+
+            // 2. Assert stall
+            stall = 1'b1;
+
+            // 3. Wait for some cycles (to simulate delay)
+            repeat (RAM_DELAY_CYCLES) @(negedge clk);
+
+            // 4. Deassert stall, assert delayed signal
+            stall = 1'b0;
+            enable_ram_delayed = 1'b1;
+
+            // 5. Wait for enable_ram to go low to finish
+            @(negedge clk iff !enable_ram);
+            enable_ram_delayed = 1'b0;
+        end
+    end
+
     if (DUALPORT_MEM) begin : dual_port
         assign enA         = enable_imem;
         assign weA         = '0;
@@ -241,7 +267,7 @@ module testbench
         assign dataAi      = '0;
         assign instruction = dataAo;
 
-        assign enB         = enable_ram;
+        assign enB         = enable_ram_delayed;
         assign weB         = mem_write_enable;
         assign addrB       = mem_address[($clog2(MEM_WIDTH) - 1):0];
         assign dataBi      = mem_data_write;
@@ -250,9 +276,9 @@ module testbench
         assign busy        = 1'b0;
     end
     else begin : single_port
-        assign enA         = enable_imem || enable_ram;
-        assign weA         = enable_ram ? mem_write_enable : '0;
-        assign addrA       = enable_ram ? mem_address[($clog2(MEM_WIDTH) - 1):0] : instruction_address[($clog2(MEM_WIDTH) - 1):0];
+        assign enA         = enable_imem || enable_ram_delayed;
+        assign weA         = enable_ram_delayed ? mem_write_enable : '0;
+        assign addrA       = enable_ram_delayed ? mem_address[($clog2(MEM_WIDTH) - 1):0] : instruction_address[($clog2(MEM_WIDTH) - 1):0];
         assign dataAi      = mem_data_write;
         assign instruction = dataAo;
         assign data_ram    = dataAo;
@@ -332,7 +358,6 @@ module testbench
             // END REG
             if (mem_address == 32'h80000000 && mem_write_enable != '0) begin
                 $display(    "\n# %0t END OF SIMULATION",$time);
-                $fdisplay(fd,"\n# %0t END OF SIMULATION",$time);
                 $finish;
             end
         end

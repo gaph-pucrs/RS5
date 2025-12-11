@@ -19,6 +19,7 @@ module amo
     input  logic        stall,
 
     input  logic        enable_i,
+    input  logic        exception_i,
     input  logic [31:0] data_i,
     input  logic [31:0] amo_result_i,
 
@@ -42,8 +43,8 @@ module amo
 
     always_comb begin
         unique case (current_state)
-            LOAD:     next_state = enable_i ? WAIT : LOAD;
-            WAIT:     next_state = REGISTER;
+            LOAD:     next_state = enable_i    ? WAIT : LOAD;
+            WAIT:     next_state = exception_i ? LOAD : REGISTER;
             REGISTER: next_state = MODIFY;
             MODIFY:   next_state = STORE;
             default:  next_state = LOAD; /* STORE */

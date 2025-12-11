@@ -74,10 +74,11 @@ module CSRBank
     input   exceptionCode_e     exception_code_i,
     input   logic [31:0]        pc_i,
     input   logic [31:0]        mem_address_exec_i,
-    input   logic [31:0]        next_pc_i,
+    input   logic [31:0]        mem_address_i,
+    input   logic [31:0]        pc_irq_i,
+    input   logic [31:0]        pc_exc_i,
     input   logic [31:0]        instruction_i,
 
-    input   logic               jump_i,
     input   logic [31:0]        jump_target_i,
 
     /* Not used without compressed */
@@ -507,7 +508,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_context <= '0;
             else begin
-                if (!mcountinhibit[4] && (jump_i || raise_exception_i || machine_return_i || interrupt_ack_i))
+                if (!mcountinhibit[4] && (raise_exception_i || machine_return_i || interrupt_ack_i))
                     cntr_context <= cntr_context + 1'b1;
 
                 if (write_enable_i && address_i == MHPMCOUNTER4)
@@ -1126,9 +1127,9 @@ module CSRBank
             mepc <= '0;
         else begin
             if (raise_exception_i)
-                mepc <= pc_i;
+                mepc <= pc_exc_i;
             else if (interrupt_ack_i)
-                mepc <= jump_i ? jump_target_i : next_pc_i;
+                mepc <= pc_irq_i;
             else if (write_enable_i && address_i == MEPC)
                 mepc <= wr_data;
 
@@ -1190,11 +1191,11 @@ module CSRBank
             if (raise_exception_i) begin
                 unique case (exception_code_i)
                     LOAD_PAGE_FAULT,
-                    LOAD_ACCESS_FAULT,
                     STORE_AMO_PAGE_FAULT,
                     STORE_AMO_ACCESS_FAULT,
                     LOAD_ADDRESS_MISALIGNED,
                     STORE_AMO_ADDRESS_MISALIGNED:   mtval <= mem_address_exec_i;
+                    LOAD_ACCESS_FAULT:              mtval <= mem_address_i;
                     INSTRUCTION_ADDRESS_MISALIGNED: mtval <= jump_target_i;
                     BREAKPOINT,
                     INSTRUCTION_PAGE_FAULT,

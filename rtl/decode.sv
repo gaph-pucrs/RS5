@@ -55,6 +55,7 @@ module decode
     input   logic           mem_access_we_i,
     input   logic           regbank_we_i,
     input   logic           compressed_i,
+    input   logic           should_jump_i,
 
     /* Not used without forwarding */
     /* verilator lint_off UNUSEDSIGNAL */
@@ -73,12 +74,12 @@ module decode
     output  logic [31:0]    pc_o,
     output  logic [31:0]    instruction_o,
     output  logic [31:0]    jump_imm_target_o,
-    output  logic [31:0]    pc_next_o,
 
     output  logic           compressed_o,
     output  iType_e         instruction_operation_o,
     output  iTypeAtomic_e   atomic_operation_o,
     output  iTypeVector_e   vector_operation_o,
+    output  logic           dec_hazard_o,
     output  logic           hazard_o,
     output  logic           killed_o,
 
@@ -86,8 +87,6 @@ module decode
     /* verilator lint_off UNUSEDSIGNAL */
     input   logic           jump_rollback_i,
     /* verilator lint_on UNUSEDSIGNAL */
-    input   logic           ctx_switch_i,
-    input   logic           jump_i,
     input   logic           jumping_i,
     /* Not used without C */
     /* verilator lint_off UNUSEDSIGNAL */
@@ -107,6 +106,7 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     logic   killed;
+    logic   hazard;
     iType_e instruction_operation;
 
     logic [2:0] funct3;
@@ -402,7 +402,7 @@ module decode
                 vector_operation_o <= VNOP;
             end
             else if (enable) begin
-                if (hazard_o || killed)
+                if (hazard || killed)
                     vector_operation_o <= VNOP;
                 else
                     vector_operation_o <= vector_operation;
@@ -484,21 +484,21 @@ module decode
 
         assign bp_take_o   = (bp_jump_taken || bp_branch_taken) && !jumping_i && !killed;
 
-        assign jump_confirmed = ctx_switch_i || jump_i || (jumping_i && !jump_rollback_i);
+        assign jump_confirmed = should_jump_i || (jumping_i && !jump_rollback_i);
         
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
                 bp_taken_o <= 1'b0;
             else if (sys_reset)
                 bp_taken_o <= 1'b0;
-            else if (enable && !hazard_o)
+            else if (enable && !hazard)
                 bp_taken_o <= bp_take_o;
         end
     end
     else begin : gen_bp_off
         assign bp_take_o   = 1'b0;
         assign bp_taken_o  = 1'b0;
-        assign jump_confirmed = ctx_switch_i || jump_i || jumping_i;
+        assign jump_confirmed = should_jump_i || jumping_i;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -524,7 +524,7 @@ module decode
             locked_register <= '0;
         end
         else if (enable) begin
-            if (hazard_o || killed)
+            if (hazard || killed)
                 locked_register <= '0;
             else    // Read-after-write on LOAD
                 locked_register <= (is_load || !FORWARDING) ? rd : '0;
@@ -532,12 +532,10 @@ module decode
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
+        if (!reset_n)
             locked_register_r <= '0;
-        end
-        else begin
+        else if (enable)
             locked_register_r <= locked_register;
-        end
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
@@ -545,7 +543,7 @@ module decode
             locked_memory   <= '0;
         end
         else if (enable) begin
-            if (hazard_o || killed)
+            if (hazard || killed)
                 locked_memory <= '0;
             else    // Read-after-write on STORE
                 locked_memory <= is_store;
@@ -627,14 +625,17 @@ module decode
     /* It also breaks if we limit the hazard to same address access */
     assign hazard_mem = locked_memory && is_load;
 
-    assign locked_rs1 = (locked_register != '0 && locked_register == rs1_o) || ( locked_register_r != '0 && locked_register_r == rs1_o);
-    assign locked_rs2 = (locked_register != '0 && locked_register == rs2_o) || ( locked_register_r != '0 && locked_register_r == rs2_o);
+    assign locked_rs1 = (locked_register != '0 && locked_register == rs1_o) || (locked_register_r != '0 && locked_register_r == rs1_o);
+    assign locked_rs2 = (locked_register != '0 && locked_register == rs2_o) || (locked_register_r != '0 && locked_register_r == rs2_o);
 
     assign hazard_rs1 = locked_rs1 && use_rs1;
     assign hazard_rs2 = locked_rs2 && use_rs2;
 
-    assign killed   = jump_confirmed || jump_misaligned_i || !valid_i;
-    assign hazard_o = (hazard_mem || hazard_rs1 || hazard_rs2) && !killed && !exception;
+    logic invalid;
+    assign invalid      = jump_confirmed || jump_misaligned_i || !valid_i;
+    assign killed       = invalid || exception;
+    assign hazard       = (hazard_mem || hazard_rs1 || hazard_rs2) && !killed;
+    assign dec_hazard_o = hazard;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
@@ -643,16 +644,22 @@ module decode
             killed_o <= killed;
     end
 
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            hazard_o <= 1'b0;
+        else if (enable)
+            hazard_o <= hazard;
+    end
+
 //////////////////////////////////////////////////////////////////////////////
 // Exception Detection
 //////////////////////////////////////////////////////////////////////////////
 
     logic invalid_inst;
+    assign invalid_inst = ((instruction_i[1:0] != '1) || instruction_operation == INVALID || amo_invalid) && !invalid;
+
     logic exc_inst_access_fault;
-
-    assign invalid_inst = ((instruction_i[1:0] != '1) || instruction_operation == INVALID || amo_invalid);
-
-    assign exc_inst_access_fault = exc_inst_access_fault_i;
+    assign exc_inst_access_fault = exc_inst_access_fault_i && !invalid;
 
     assign exception = exc_inst_access_fault || invalid_inst;
 
@@ -780,20 +787,10 @@ module decode
             instruction_operation_o <= NOP;
         end
         else if (enable) begin
-            if (hazard_o || killed)
+            if (hazard || killed)
                 instruction_operation_o <= NOP;
             else
                 instruction_operation_o <= instruction_operation;
-        end
-    end
-
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            pc_next_o <= '0;
-        end
-        else begin
-            // To link register. Maybe we can remove this by using the PC in decode stage
-            pc_next_o <= pc_i + ((COMPRESSED && compressed_i) ? 32'd2 : 32'd4);
         end
     end
 
