@@ -85,10 +85,10 @@ WITH ACCESS OR USE OF THE SOFTWARE.
 // DOUBLE_BUFFERING WITH PROBLEMS -- 09/08/25
 //#define DOUBLE_BUFFERING
 
-uint32_t hpm_0_s[32];
-uint32_t hpm_1_s[32];
-uint32_t hpm_0_v[32];
-uint32_t hpm_1_v[32];
+uint32_t hpm_0_s[64];
+uint32_t hpm_1_s[64];
+uint32_t hpm_0_v[64];
+uint32_t hpm_1_v[64];
 
 void j2d_s(uint32_t r, uint32_t c, DATA_TYPE *A, DATA_TYPE *B,
            uint32_t tsteps) {

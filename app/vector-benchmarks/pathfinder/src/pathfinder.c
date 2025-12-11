@@ -18,10 +18,10 @@
 
 #define MIN(a, b) ((a) <= (b) ? (a) : (b))
 
-uint32_t hpm_0_s[32];
-uint32_t hpm_1_s[32];
-uint32_t hpm_0_v[32];
-uint32_t hpm_1_v[32];
+uint32_t hpm_0_s[64];
+uint32_t hpm_1_s[64];
+uint32_t hpm_0_v[64];
+uint32_t hpm_1_v[64];
 
 int *run(int *wall, int *result_s, int *src, uint32_t cols, uint32_t rows,
          uint32_t num_runs) {

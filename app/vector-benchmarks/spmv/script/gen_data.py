@@ -153,8 +153,8 @@ if len(sys.argv) == 4:
   D = float(sys.argv[3])
 else:
   print("Usage: python gen_data.py <ROW> <COLUMN> <DENSITY>")
-  R = 16
-  C = 16
+  R = 128
+  C = 128
   D = 0.5
 
 data_type = np.int32

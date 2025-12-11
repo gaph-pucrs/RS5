@@ -21,10 +21,10 @@
 #include <riscv-csr.h>
 #include <riscv-csr-hpm.h>
 
-uint32_t hpm_0_s[32];
-uint32_t hpm_1_s[32];
-uint32_t hpm_0_v[32];
-uint32_t hpm_1_v[32];
+uint32_t hpm_0_s[64];
+uint32_t hpm_1_s[64];
+uint32_t hpm_0_v[64];
+uint32_t hpm_1_v[64];
 
 void init_gemv_data(const unsigned long int m_row,
                     const unsigned long int VECTOR_LENGTH, int *matrix,

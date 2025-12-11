@@ -57,7 +57,7 @@ def write_header_file(filepath, N, v32a, v32b, v16a, v16b, v8a, v8b):
 def main():
     if len(sys.argv) != 2:
         print("Usage: python gen_data.py <N>")
-        n = 4096
+        n = 16384
     else:
         try:
             n = int(sys.argv[1])

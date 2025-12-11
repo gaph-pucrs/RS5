@@ -41,7 +41,7 @@ def write_header_file(filepath, N, I, SCALE, SEL, O, O_GOLD):
 def main():
     if len(sys.argv) != 2:
         print("Usage: python gen_data.py <N>")
-        N = 1024
+        N = 8192
     else:
         try:
             N = int(sys.argv[1])

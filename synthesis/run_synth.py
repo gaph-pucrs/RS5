@@ -6,7 +6,7 @@ import re
 # *********************************
 # PARAMS
 # *********************************
-BUS_WIDTHs = [32, 64]
+BUS_WIDTHs = [32, 64, 128, 256]
 VLENs = [64, 128, 256]
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -19,6 +19,9 @@ output_dir = os.path.join(script_dir, "vectorUnit")
 # *********************************
 for bus_width in BUS_WIDTHs:
     for vlen in VLENs:
+        if bus_width > vlen:
+            continue
+
         LANES = [2**i for i in range((vlen//32).bit_length()) if 2**i <= (vlen//32)]
         for lanes in LANES:
             llen = lanes*32

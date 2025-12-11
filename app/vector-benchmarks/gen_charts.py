@@ -35,10 +35,10 @@ for benchmark in benchmarks_list:
     df = df.drop(0).reset_index(drop=True)
 
     vlen_values = sorted(df['VLEN'].unique())
-    configurations = df[['BUS_WIDTH', 'LANES']].drop_duplicates().sort_values(['BUS_WIDTH', 'LANES'])
+    configurations = df[['BUS_WIDTH', 'LANES']].drop_duplicates().sort_values(['LANES', 'BUS_WIDTH'])
 
     colors = {0: 'tab:gray', 1: 'tab:blue', 2: 'tab:olive', 4: 'tab:orange', 8: 'tab:green'}
-    patterns = {32: '', 64: '//'}
+    patterns = {32: '', 64: '//', 128: 'XX', 256: '..'}
     bar_width = 0.6
     bar_spacing = 0.1
 
@@ -84,6 +84,8 @@ for benchmark in benchmarks_list:
         ax_top.xaxis.tick_top()
         ax_top.tick_params(labeltop=False)
         ax_bottom.xaxis.tick_bottom()
+        ax_bottom.tick_params(axis='y', labelsize=14)
+        ax_top.tick_params(axis='y', labelsize=14)
 
         # Add broken axis markers
         add_broken_axis_markers(ax_top, break_end, scalar_cycles * 1.05)
@@ -97,6 +99,7 @@ for benchmark in benchmarks_list:
         fig, ax = plt.subplots(figsize=(14, 8))
         main_ax = ax
         scalar_ax = ax
+        main_ax.tick_params(axis='y', labelsize=14)
 
     # Prepare x-positions and labels
     all_labels = []
@@ -157,34 +160,49 @@ for benchmark in benchmarks_list:
                     color=all_colors[i], hatch=all_hatches[i])
         bars_list.extend(bar)
 
-    # Create legend handles
-    legend_handles = []
-    legend_labels = []
-
-    # Add scalar
-    legend_handles.append(plt.Rectangle((0,0),1,1, color=colors[0]))
-    legend_labels.append('Scalar')
-
-    # Add vector configurations
-    for i, (_, config) in enumerate(configurations.iterrows()):
-        bus_width, lanes = config.BUS_WIDTH, config.LANES
-        has_data = any(vlen_data[vlen][i] > 0 for vlen in vlen_values)
-        if has_data:
-            legend_handles.append(plt.Rectangle((0,0),1,1, facecolor=colors[lanes],
-                                            hatch=patterns[bus_width]*3))
-            legend_labels.append(f'Bus Width: {bus_width}, Lanes: {lanes}')
-
-    # Position legend appropriately
+    # CREATE THREE SEPARATE LEGENDS SIDE BY SIDE
+    
+    # Column 1: Scalar
+    scalar_handle = [plt.Rectangle((0,0),1,1, color=colors[0])]
+    scalar_label = ['Scalar']
+    
+    # Column 2: LANES (colors)
+    lanes_values = sorted(df['LANES'].unique())
+    lanes_handles = [plt.Rectangle((0,0),1,1, facecolor=colors.get(lanes, 'tab:gray')) 
+                     for lanes in lanes_values]
+    lanes_labels = [f'Lanes: {lanes}' for lanes in lanes_values]
+    
+    # Column 3: BUS_WIDTH (hatches)
+    bus_width_values = sorted(df['BUS_WIDTH'].unique())
+    bus_handles = [plt.Rectangle((0,0),1,1, facecolor='lightgray', 
+                                 hatch=patterns.get(bus_width, '')*1, 
+                                 edgecolor='black', ) 
+                   for bus_width in bus_width_values]
+    bus_labels = [f'Bus: {bus_width}' for bus_width in bus_width_values]
+    
+    # Position legends appropriately
     if use_broken_axis:
-        ax_top.legend(legend_handles, legend_labels, loc='upper right', fontsize=10)
+        legend_ax = ax_top
     else:
-        main_ax.legend(legend_handles, legend_labels, loc='upper right', fontsize=10)
+        legend_ax = main_ax
+    
+    # Create three separate legends (left to right: Scalar, Lanes, Bus)
+    leg1 = legend_ax.legend(scalar_handle, scalar_label, loc='upper right', 
+                           fontsize=18, frameon=True, bbox_to_anchor=(0.62, 1.0))
+    legend_ax.add_artist(leg1)
+    
+    leg2 = legend_ax.legend(lanes_handles, lanes_labels, loc='upper right', 
+                           fontsize=18, frameon=True, bbox_to_anchor=(0.81, 1.0))
+    legend_ax.add_artist(leg2)
+    
+    leg3 = legend_ax.legend(bus_handles, bus_labels, loc='upper right', 
+                           fontsize=18, frameon=True, bbox_to_anchor=(1.0, 1.0))
 
     # Customize the plot
-    main_ax.set_xlabel('VLEN', fontsize=14, fontweight='bold')
+    main_ax.set_xlabel('VLEN', fontsize=18,)
 
     if use_broken_axis:
-        fig.text(0.04, 0.5, 'Cycles', va='center', rotation='vertical', fontsize=14, fontweight='bold')
+        fig.text(0.04, 0.5, 'Cycles', va='center', rotation='vertical', fontsize=18,)
         ax_top.set_title(f'{benchmark} - Performance Analysis: Cycles vs VLEN', fontsize=16, fontweight='bold', pad=20)
     else:
         main_ax.set_ylabel('Cycles', fontsize=14, fontweight='bold')
@@ -192,7 +210,7 @@ for benchmark in benchmarks_list:
 
     # Set x-axis
     main_ax.set_xticks(vlen_tick_positions)
-    main_ax.set_xticklabels(vlen_labels, fontsize=12)
+    main_ax.set_xticklabels(vlen_labels, fontsize=18)
 
     # Add grid
     main_ax.grid(True, axis='y')
@@ -206,30 +224,31 @@ for benchmark in benchmarks_list:
     # Scalar bar label
     if use_broken_axis:
         # Add label on the top part of the broken scalar bar
-        ax_top.annotate(f'{int(scalar_cycles)}',
+        ax_top.annotate(f'1x',
                 xy=(scalar_x + bar_width/2, scalar_cycles),
                 xytext=(0, 3),
                 textcoords="offset points",
-                ha='center', va='bottom',
-                fontsize=10, fontweight='bold')
+                ha='right', va='bottom',
+                fontsize=15, fontweight='bold')
     else:
-        scalar_ax.annotate(f'{int(scalar_cycles)}',
+        scalar_ax.annotate(f'1x',
                 xy=(scalar_x + bar_width/2, scalar_cycles),
                 xytext=(0, 3),
                 textcoords="offset points",
-                ha='center', va='bottom',
-                fontsize=10, fontweight='bold')
+                ha='right', va='bottom',
+                fontsize=15, fontweight='bold')
 
     # Vector bars labels
     for bar in bars_list:
         height = bar.get_height()
         if height > 0:  # Only add label if bar has height
-            main_ax.annotate(f'{int(height)}',
+            speedup = scalar_cycles / height
+            main_ax.annotate(f'{speedup:.2f}x',
                     xy=(bar.get_x() + bar.get_width() / 2, height),
                     xytext=(0, 3),  # 3 points vertical offset
                     textcoords="offset points",
-                    ha='center', va='bottom',
-                    fontsize=9, rotation=45)
+                    ha='left', va='bottom',
+                    fontsize=14, fontweight='bold', rotation=45)
 
     # Improve layout
     plt.tight_layout()

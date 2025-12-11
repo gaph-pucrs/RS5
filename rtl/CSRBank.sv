@@ -467,6 +467,11 @@ module CSRBank
     logic [31:0] cntr_vloadstore; // mhpmcounter29
     logic [31:0] cntr_vothers;    // mhpmcounter30
 
+    logic [31:0] cntr_scalar;     // mhpmcounterh3
+    logic [31:0] cntr_vinst;      // mhpmcounterh24
+    logic [31:0] cntr_vcycles;    // mhpmcounterh25
+    logic [31:0] cntr_vlscycles;  // mhpmcounterh29
+
     if (HPMCOUNTEREnable) begin : gen_hpmcounter_on
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
@@ -479,6 +484,20 @@ module CSRBank
 
                 if (write_enable_i && address_i == MHPMCOUNTER3)
                     cntr_killed <= wr_data;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                cntr_scalar <= '0;
+            else if (sys_reset)
+                cntr_scalar <= '0;
+            else begin
+                if (!mcountinhibit[3] && !(instruction_operation_i inside {NOP, VECTOR, VLOAD, VSTORE}))
+                    cntr_scalar <= cntr_scalar + 1'b1;
+
+                if (write_enable_i && address_i == MHPMCOUNTER3H)
+                    cntr_scalar <= wr_data;
             end
         end
 
@@ -807,6 +826,26 @@ module CSRBank
 
             always_ff @(posedge clk or negedge reset_n) begin
                 if (!reset_n)
+                    cntr_vinst <= '0;
+                else if (sys_reset)
+                    cntr_vinst <= '0;
+                else begin
+                    if (
+                            !mcountinhibit[24] &&
+                            (
+                                !hold &&
+                                instruction_operation_i inside {VECTOR, VLOAD, VSTORE}
+                            )
+                        )
+                        cntr_vinst <= cntr_vinst + 1'b1;
+
+                    if (write_enable_i && address_i == MHPMCOUNTER24H)
+                        cntr_vinst <= wr_data;
+                end
+            end
+
+            always_ff @(posedge clk or negedge reset_n) begin
+                if (!reset_n)
                     cntr_vmul <= '0;
                 else if (sys_reset)
                     cntr_vmul <= '0;
@@ -823,6 +862,23 @@ module CSRBank
 
                     if (write_enable_i && address_i == MHPMCOUNTER25)
                         cntr_vmul <= wr_data;
+                end
+            end
+
+            always_ff @(posedge clk or negedge reset_n) begin
+                if (!reset_n)
+                    cntr_vcycles <= '0;
+                else if (sys_reset)
+                    cntr_vcycles <= '0;
+                else begin
+                    if (
+                            !mcountinhibit[25] &&
+                            instruction_operation_i == VECTOR
+                        )
+                        cntr_vcycles <= cntr_vcycles + 1'b1;
+
+                    if (write_enable_i && address_i == MHPMCOUNTER25H)
+                        cntr_vcycles <= wr_data;
                 end
             end
 
@@ -905,6 +961,20 @@ module CSRBank
 
             always_ff @(posedge clk or negedge reset_n) begin
                 if (!reset_n)
+                    cntr_vlscycles <= '0;
+                else if (sys_reset)
+                    cntr_vlscycles <= '0;
+                else begin
+                    if (!mcountinhibit[29] && (instruction_operation_i inside {VLOAD, VSTORE}))
+                        cntr_vlscycles <= cntr_vlscycles + 1'b1;
+
+                    if (write_enable_i && address_i == MHPMCOUNTER29H)
+                        cntr_vlscycles <= wr_data;
+                end
+            end
+
+            always_ff @(posedge clk or negedge reset_n) begin
+                if (!reset_n)
                     cntr_vothers <= '0;
                 else if (sys_reset)
                     cntr_vothers <= '0;
@@ -920,7 +990,7 @@ module CSRBank
                                     VMV, VMVR, VMVSX, VMVXS,                                    // register moves
                                     VSLL, VSRL, VSRA,                                           // shifts
                                     VAND, VOR, VXOR,                                            // logic
-                                    VMERGE
+                                    VMERGE, VSLIDE1DOWN, VSLIDE1UP                              // misc
                                 }
                             )
                         )
@@ -939,10 +1009,14 @@ module CSRBank
             assign cntr_vred       = '0;
             assign cntr_vloadstore = '0;
             assign cntr_vothers    = '0;
+            assign cntr_vinst      = '0;
+            assign cntr_vcycles    = '0;
+            assign cntr_vlscycles  = '0;
         end
     end
     else begin : gen_hpmcounter_off
         assign cntr_killed     = '0;
+        assign cntr_scalar     = '0;
         assign cntr_context    = '0;
         assign cntr_exception  = '0;
         assign cntr_irq        = '0;
@@ -970,6 +1044,9 @@ module CSRBank
         assign cntr_vred       = '0;
         assign cntr_vloadstore = '0;
         assign cntr_vothers    = '0;
+        assign cntr_vinst      = '0;
+        assign cntr_vcycles    = '0;
+        assign cntr_vlscycles  = '0;
     end
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -978,35 +1055,35 @@ module CSRBank
 
     logic [63:0] mhpmcounter [3:31];
     assign mhpmcounter = {
-        {32'h0, cntr_killed    }, // mhpmcounter3
-        {32'h0, cntr_context   }, // mhpmcounter4
-        {32'h0, cntr_exception }, // mhpmcounter5
-        {32'h0, cntr_irq       }, // mhpmcounter6
-        {32'h0, cntr_hazard    }, // mhpmcounter7
-        {32'h0, cntr_stall     }, // mhpmcounter8
-        {32'h0, cntr_nop       }, // mhpmcounter9
-        {32'h0, cntr_logic     }, // mhpmcounter10
-        {32'h0, cntr_addsub    }, // mhpmcounter11
-        {32'h0, cntr_shift     }, // mhpmcounter12
-        {32'h0, cntr_branch    }, // mhpmcounter13
-        {32'h0, cntr_jump      }, // mhpmcounter14
-        {32'h0, cntr_load      }, // mhpmcounter15
-        {32'h0, cntr_store     }, // mhpmcounter16
-        {32'h0, cntr_sys       }, // mhpmcounter17
-        {32'h0, cntr_csr       }, // mhpmcounter18
-        {32'h0, cntr_luislt    }, // mhpmcounter19
-        {32'h0, cntr_compressed}, // mhpmcounter20
-        {32'h0, cntr_misaligned}, // mhpmcounter21
-        {32'h0, cntr_mul       }, // mhpmcounter22
-        {32'h0, cntr_div       }, // mhpmcounter23
-        {32'h0, cntr_vaddsub   }, // mhpmcounter24
-        {32'h0, cntr_vmul      }, // mhpmcounter25
-        {32'h0, cntr_vdiv      }, // mhpmcounter26
-        {32'h0, cntr_vmac      }, // mhpmcounter27
-        {32'h0, cntr_vred      }, // mhpmcounter28
-        {32'h0, cntr_vloadstore}, // mhpmcounter29
-        {32'h0, cntr_vothers   }, // mhpmcounter30
-        {64'h0                 }  // mhpmcounter31
+        {cntr_scalar,    cntr_killed    }, // mhpmcounter3
+        {32'h0,          cntr_context   }, // mhpmcounter4
+        {32'h0,          cntr_exception }, // mhpmcounter5
+        {32'h0,          cntr_irq       }, // mhpmcounter6
+        {32'h0,          cntr_hazard    }, // mhpmcounter7
+        {32'h0,          cntr_stall     }, // mhpmcounter8
+        {32'h0,          cntr_nop       }, // mhpmcounter9
+        {32'h0,          cntr_logic     }, // mhpmcounter10
+        {32'h0,          cntr_addsub    }, // mhpmcounter11
+        {32'h0,          cntr_shift     }, // mhpmcounter12
+        {32'h0,          cntr_branch    }, // mhpmcounter13
+        {32'h0,          cntr_jump      }, // mhpmcounter14
+        {32'h0,          cntr_load      }, // mhpmcounter15
+        {32'h0,          cntr_store     }, // mhpmcounter16
+        {32'h0,          cntr_sys       }, // mhpmcounter17
+        {32'h0,          cntr_csr       }, // mhpmcounter18
+        {32'h0,          cntr_luislt    }, // mhpmcounter19
+        {32'h0,          cntr_compressed}, // mhpmcounter20
+        {32'h0,          cntr_misaligned}, // mhpmcounter21
+        {32'h0,          cntr_mul       }, // mhpmcounter22
+        {32'h0,          cntr_div       }, // mhpmcounter23
+        {cntr_vinst,     cntr_vaddsub   }, // mhpmcounter24
+        {cntr_vcycles,   cntr_vmul      }, // mhpmcounter25
+        {32'h0,          cntr_vdiv      }, // mhpmcounter26
+        {32'h0,          cntr_vmac      }, // mhpmcounter27
+        {32'h0,          cntr_vred      }, // mhpmcounter28
+        {cntr_vlscycles, cntr_vloadstore}, // mhpmcounter29
+        {32'h0,          cntr_vothers   }, // mhpmcounter30
+        {64'h0                          }  // mhpmcounter31
     };
 
     logic [63:0] mhpmevent [3:31];
@@ -1585,6 +1662,8 @@ module CSRBank
                 $fwrite(fd,"Misaligned Jumps:        %0d\n", cntr_misaligned);
             end
 
+            $fwrite(fd,"Cycles Scalar Instruct:  %0d\n", cntr_scalar);
+
             $fwrite(fd,"\nCYCLES WITH::\n");
             $fwrite(fd,"HAZARDS:                 %0d\n", cntr_hazard);
             $fwrite(fd,"STALL:                   %0d\n", cntr_stall);
@@ -1603,9 +1682,13 @@ module CSRBank
             $fwrite(fd,"CSR:                     %0d\n", cntr_csr);
             $fwrite(fd,"MUL:                     %0d\n", cntr_mul);
             $fwrite(fd,"DIV:                     %0d\n", cntr_div);
-        
+
             if(VEnable) begin
                 $fwrite(fd, "\nVECTOR EXTENSION:\n");
+                $fwrite(fd, "Vector Instructions:     %0d\n", cntr_vinst);
+                $fwrite(fd, "Vector Cycles Total:     %0d\n", cntr_vcycles + cntr_vlscycles);
+                $fwrite(fd, "Vector Cycles Arith/Cfg: %0d\n", cntr_vcycles);
+                $fwrite(fd, "Vector Cycles Load/Stor: %0d\n", cntr_vlscycles);
                 $fwrite(fd, "VADDSUB:                 %0d\n", cntr_vaddsub);
                 $fwrite(fd, "VMUL:                    %0d\n", cntr_vmul);
                 $fwrite(fd, "VDIV:                    %0d\n", cntr_vdiv);

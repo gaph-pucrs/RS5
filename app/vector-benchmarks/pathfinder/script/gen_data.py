@@ -54,9 +54,9 @@ if len(sys.argv) == 4:
   rows = int(sys.argv[3])
 else:
   print("Usage: python gen_data.py <RUNS> <COLUMNS> <ROWS>")
-  num_runs = 10
-  cols = 10
-  rows = 10
+  num_runs = 16
+  cols = 32
+  rows = 32
 
 dtype = np.int32
 dmax  = np.iinfo(dtype).max

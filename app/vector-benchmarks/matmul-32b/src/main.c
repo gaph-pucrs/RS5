@@ -31,10 +31,10 @@ typedef int32_t _DTYPE;
 #define _VERIFY sp_imatmul_verify
 #include "sp-imatmul.h"
 
-uint32_t hpm_0_s[32];
-uint32_t hpm_1_s[32];
-uint32_t hpm_0_v[32];
-uint32_t hpm_1_v[32];
+uint32_t hpm_0_s[64];
+uint32_t hpm_1_s[64];
+uint32_t hpm_0_v[64];
+uint32_t hpm_1_v[64];
 
 void matmul(_DTYPE *C, _DTYPE *A, _DTYPE *B,
             size_t m, size_t n, size_t p) {

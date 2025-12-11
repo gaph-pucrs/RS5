@@ -29,10 +29,10 @@
 // Check the vector results against golden vectors
 #define CHECK 1
 
-uint32_t hpm_0_s[32];
-uint32_t hpm_1_s[32];
-uint32_t hpm_0_v[32];
-uint32_t hpm_1_v[32];
+uint32_t hpm_0_s[64];
+uint32_t hpm_1_s[64];
+uint32_t hpm_0_v[64];
+uint32_t hpm_1_v[64];
 
 int32_t dotp_v32b(int32_t *a, int32_t *b, uint32_t avl) {
   size_t orig_avl = avl;

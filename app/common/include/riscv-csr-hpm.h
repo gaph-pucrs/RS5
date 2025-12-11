@@ -706,6 +706,84 @@ static inline uint64_t csr_read_write_mhpmcounter30(uint64_t new_value) {
     return prev_value;
 }
 
+/*******************************************
+ * mhpmcounter24H - MRW - Event Counters
+ */
+static inline uint64_t csr_read_mhpmcounter24h(void) {
+    uint_csr64_t value;
+    __asm__ volatile ("csrr    %0, mhpmcounter24h"
+                      : "=r" (value)  /* output : register */
+                      : /* input : none */
+                      : /* clobbers: none */);
+    return value;
+}
+static inline void csr_write_mhpmcounter24h(uint_csr64_t value) {
+    __asm__ volatile ("csrw    mhpmcounter24h, %0"
+                      : /* output: none */
+                      : "r" (value) /* input : from register */
+                      : /* clobbers: none */);
+}
+static inline uint64_t csr_read_write_mhpmcounter24h(uint64_t new_value) {
+    uint_csr64_t prev_value;
+    __asm__ volatile ("csrrw    %0, mhpmcounter24h, %1"
+                      : "=r" (prev_value) /* output: register %0 */
+                      : "r" (new_value)  /* input : register */
+                      : /* clobbers: none */);
+    return prev_value;
+}
+
+/*******************************************
+ * mhpmcounter25H - MRW - Event Counters
+ */
+static inline uint64_t csr_read_mhpmcounter25h(void) {
+    uint_csr64_t value;
+    __asm__ volatile ("csrr    %0, mhpmcounter25h"
+                      : "=r" (value)  /* output : register */
+                      : /* input : none */
+                      : /* clobbers: none */);
+    return value;
+}
+static inline void csr_write_mhpmcounter25h(uint_csr64_t value) {
+    __asm__ volatile ("csrw    mhpmcounter25h, %0"
+                      : /* output: none */
+                      : "r" (value) /* input : from register */
+                      : /* clobbers: none */);
+}
+static inline uint64_t csr_read_write_mhpmcounter25h(uint64_t new_value) {
+    uint_csr64_t prev_value;
+    __asm__ volatile ("csrrw    %0, mhpmcounter25h, %1"
+                      : "=r" (prev_value) /* output: register %0 */
+                      : "r" (new_value)  /* input : register */
+                      : /* clobbers: none */);
+    return prev_value;
+}
+
+/*******************************************
+ * mhpmcounter29H - MRW - Event Counters
+ */
+static inline uint64_t csr_read_mhpmcounter29h(void) {
+    uint_csr64_t value;
+    __asm__ volatile ("csrr    %0, mhpmcounter29h"
+                      : "=r" (value)  /* output : register */
+                      : /* input : none */
+                      : /* clobbers: none */);
+    return value;
+}
+static inline void csr_write_mhpmcounter29h(uint_csr64_t value) {
+    __asm__ volatile ("csrw    mhpmcounter29h, %0"
+                      : /* output: none */
+                      : "r" (value) /* input : from register */
+                      : /* clobbers: none */);
+}
+static inline uint64_t csr_read_write_mhpmcounter29h(uint64_t new_value) {
+    uint_csr64_t prev_value;
+    __asm__ volatile ("csrrw    %0, mhpmcounter29h, %1"
+                      : "=r" (prev_value) /* output: register %0 */
+                      : "r" (new_value)  /* input : register */
+                      : /* clobbers: none */);
+    return prev_value;
+}
+
 
 /*******************************************
  * Utils
@@ -744,10 +822,15 @@ static void read_hpms(uint32_t *hpm_values) {
   hpm_values[29] = csr_read_mhpmcounter29();
   hpm_values[30] = csr_read_mhpmcounter30();
   hpm_values[31] = csr_read_mhpmcounter31();
+
+  hpm_values[35] = csr_read_mhpmcounter3h();
+  hpm_values[56] = csr_read_mhpmcounter24h();
+  hpm_values[57] = csr_read_mhpmcounter25h();
+  hpm_values[61] = csr_read_mhpmcounter29h();
 }
 
 static void evaluate_hpms(uint32_t *hpm_values_0, uint32_t *hpm_values_1) {
-  int hpms[32];
+  int hpms [64];
 
   hpms[ 0] = (int)(hpm_values_1[ 0] - hpm_values_0[ 0]);
   hpms[ 1] = (int)(hpm_values_1[ 1] - hpm_values_0[ 1]);
@@ -782,7 +865,10 @@ static void evaluate_hpms(uint32_t *hpm_values_0, uint32_t *hpm_values_1) {
   hpms[30] = (int)(hpm_values_1[30] - hpm_values_0[30]);
   hpms[31] = (int)(hpm_values_1[31] - hpm_values_0[31]);
 
-
+  hpms[35] = (int)(hpm_values_1[35] - hpm_values_0[35]);
+  hpms[56] = (int)(hpm_values_1[56] - hpm_values_0[56]);
+  hpms[57] = (int)(hpm_values_1[57] - hpm_values_0[57]);
+  hpms[61] = (int)(hpm_values_1[61] - hpm_values_0[61]);
 
   printf("HPM Counters - Cycles Measured:\n");
   printf("Cycles[ 0] - Cycles:       %0d\n", hpms[ 0]);
@@ -817,8 +903,14 @@ static void evaluate_hpms(uint32_t *hpm_values_0, uint32_t *hpm_values_1) {
   printf("Cycles[29] - V-Load-Store: %0d\n", hpms[29]);
   printf("Cycles[30] - V-Others:     %0d\n", hpms[30]);
 //printf("Cycles[31] -  :            %0d\n", hpms[31]);
+
+  printf("Cycles[35] - CyclesScalar: %0d\n", hpms[35]);
+  printf("Cycles[56] - V-Inst:       %0d\n", hpms[56]);
+  printf("V-Cycles-Tot:              %0d\n", hpms[57] + hpms[61]);
+  printf("Cycles[57] - V-Cycles:     %0d\n", hpms[57]);
+  printf("Cycles[61] - V-Cycles-LS:  %0d\n", hpms[61]);
+
   printf("Scalar LOAD-STORES  = %0d\n", hpms[15] + hpms[16]);
-  printf("Vector Instructions = %0d\n", hpms[24] + hpms[25] + hpms[26] + hpms[27] + hpms[28] + hpms[29] + hpms[30]);
   printf("Vector LOAD-STORES  = %0d\n", hpms[29]);
   printf("\n");
 
