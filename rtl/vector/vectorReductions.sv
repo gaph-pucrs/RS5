@@ -63,8 +63,9 @@ module vectorReductions
     localparam TREE_LEVELS_16b = $clog2(VLENB/2);
     localparam TREE_LEVELS_32b = $clog2(VLENB/4);
 
+    logic [$clog2(TREE_LEVELS_8b):0] cycle_counter;
+
     if (MULTI_CYCLE) begin  : multi_cycle_reduction_on
-        logic [$clog2(TREE_LEVELS_8b):0] cycle_counter;
         logic                            last_cycle;
 
         always_ff @(posedge clk or negedge reset_n) begin
@@ -88,6 +89,7 @@ module vectorReductions
     end
     else begin : multi_cycle_reduction_off
         assign hold_o = 1'b0;
+        assign cycle_counter = '0;
     end
 
     // *********************************
@@ -132,6 +134,7 @@ module vectorReductions
             .vm            (vm),
             .mask          (mask_sew8),
             .cycle_count_r (cycle_count_r),
+            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redsum_8b)
         );
 
@@ -150,6 +153,7 @@ module vectorReductions
             .vm            (vm),
             .mask          (mask_sew16),
             .cycle_count_r (cycle_count_r),
+            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redsum_16b)
         );
 
@@ -168,6 +172,7 @@ module vectorReductions
             .vm            (vm),
             .mask          (mask_sew32),
             .cycle_count_r (cycle_count_r),
+            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redsum_32b)
         );
 
@@ -218,6 +223,7 @@ module vectorReductions
             .vm            (vm),
             .mask          (mask_sew8),
             .cycle_count_r (cycle_count_r),
+            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redand_8b)
         );
 
@@ -236,6 +242,7 @@ module vectorReductions
             .vm            (vm),
             .mask          (mask_sew8),
             .cycle_count_r (cycle_count_r),
+            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redor_8b)
         );
 
@@ -254,6 +261,7 @@ module vectorReductions
             .vm            (vm),
             .mask          (mask_sew8),
             .cycle_count_r (cycle_count_r),
+            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redxor_8b)
         );
 
@@ -279,6 +287,7 @@ module vectorReductions
             .vm            (vm),
             .mask          (mask_sew16),
             .cycle_count_r (cycle_count_r),
+            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redand_16b)
         );
 
@@ -297,6 +306,7 @@ module vectorReductions
             .vm            (vm),
             .mask          (mask_sew16),
             .cycle_count_r (cycle_count_r),
+            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redor_16b)
         );
 
@@ -315,6 +325,7 @@ module vectorReductions
             .vm            (vm),
             .mask          (mask_sew16),
             .cycle_count_r (cycle_count_r),
+            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redxor_16b)
         );
 
@@ -340,6 +351,7 @@ module vectorReductions
             .vm            (vm),
             .mask          (mask_sew32),
             .cycle_count_r (cycle_count_r),
+            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redand_32b)
         );
 
@@ -358,6 +370,7 @@ module vectorReductions
             .vm            (vm),
             .mask          (mask_sew32),
             .cycle_count_r (cycle_count_r),
+            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redor_32b)
         );
 
@@ -376,6 +389,7 @@ module vectorReductions
             .vm            (vm),
             .mask          (mask_sew32),
             .cycle_count_r (cycle_count_r),
+            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redxor_32b)
         );
 
@@ -437,6 +451,7 @@ module vectorReductions
             .vm            (vm),
             .mask          (mask_sew8),
             .cycle_count_r (cycle_count_r),
+            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redmin_8b)
         );
 
@@ -455,6 +470,7 @@ module vectorReductions
             .vm            (vm),
             .mask          (mask_sew8),
             .cycle_count_r (cycle_count_r),
+            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redminu_8b)
         );
 
@@ -473,6 +489,7 @@ module vectorReductions
             .vm            (vm),
             .mask          (mask_sew8),
             .cycle_count_r (cycle_count_r),
+            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redmax_8b)
         );
 
@@ -491,6 +508,7 @@ module vectorReductions
             .vm            (vm),
             .mask          (mask_sew8),
             .cycle_count_r (cycle_count_r),
+            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redmaxu_8b)
         );
 
@@ -517,6 +535,7 @@ module vectorReductions
             .vm            (vm),
             .mask          (mask_sew16),
             .cycle_count_r (cycle_count_r),
+            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redmin_16b)
         );
 
@@ -535,6 +554,7 @@ module vectorReductions
             .vm            (vm),
             .mask          (mask_sew16),
             .cycle_count_r (cycle_count_r),
+            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redminu_16b)
         );
 
@@ -553,6 +573,7 @@ module vectorReductions
             .vm            (vm),
             .mask          (mask_sew16),
             .cycle_count_r (cycle_count_r),
+            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redmax_16b)
         );
 
@@ -571,6 +592,7 @@ module vectorReductions
             .vm            (vm),
             .mask          (mask_sew16),
             .cycle_count_r (cycle_count_r),
+            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redmaxu_16b)
         );
 
@@ -597,6 +619,7 @@ module vectorReductions
             .vm            (vm),
             .mask          (mask_sew32),
             .cycle_count_r (cycle_count_r),
+            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redmin_32b)
         );
 
@@ -615,6 +638,7 @@ module vectorReductions
             .vm            (vm),
             .mask          (mask_sew32),
             .cycle_count_r (cycle_count_r),
+            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redminu_32b)
         );
 
@@ -633,6 +657,7 @@ module vectorReductions
             .vm            (vm),
             .mask          (mask_sew32),
             .cycle_count_r (cycle_count_r),
+            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redmax_32b)
         );
 
@@ -651,6 +676,7 @@ module vectorReductions
             .vm            (vm),
             .mask          (mask_sew32),
             .cycle_count_r (cycle_count_r),
+            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redmaxu_32b)
         );
 

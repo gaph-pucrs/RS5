@@ -34,17 +34,21 @@ module vectorReductionTree
     input  logic [7:0][ELEMENTS_PER_REG-1:0]     mask,
     input  logic [3:0]                           cycle_count_r,
 
+    input  logic [9:0]                           cycle,
+
     output logic [SEW-1:0]                       result_o
 );
 
-    localparam TREE_LEVELS = $clog2(ELEMENTS_PER_REG);
-
-    logic [ELEMENTS_PER_REG-1:0][SEW-1:0] result [TREE_LEVELS:0];
+    localparam STAGES = $clog2(ELEMENTS_PER_REG);
 
     // *********************************
     //  SINGLE-CYCLE
     // *********************************
     if (MULTI_CYCLE == 1'b0) begin : multi_cycle_reduction_off
+        logic [ELEMENTS_PER_REG-1:0][SEW-1:0] result [STAGES:0];
+
+        assign result_o = {result[STAGES][0]};
+
         always_comb begin
             // First Level
             for (int i = 0; i < ELEMENTS_PER_REG; i++) begin
@@ -111,7 +115,7 @@ module vectorReductionTree
             end
 
             // Other Levels
-            for (int i = 0; i < TREE_LEVELS; i++) begin
+            for (int i = 0; i < STAGES; i++) begin
                 for (int j = 0; j < ELEMENTS_PER_REG/(2**(i+1)); j++) begin
                     if (RED_OP == RED_MAX) begin
                         result[i+1][j] = ($signed(result[i][2*j]) > $signed(result[i][2*j+1]))
@@ -153,117 +157,142 @@ module vectorReductionTree
     //  MULTI-CYCLE
     // *********************************
     else begin  : multi_cycle_reduction_on
+
+        logic [(ELEMENTS_PER_REG  )-1:0][SEW-1:0] operand;
+        logic [(ELEMENTS_PER_REG/2)-1:0][SEW-1:0] result;
+
+        assign result_o = {operand[0]};
+
+        always_comb begin
+            for (int j = 0, int k = 0; k < (ELEMENTS_PER_REG/2); j+=2, k++) begin
+                if (RED_OP == RED_MAX) begin
+                    result[k] = ($signed(operand[j]) > $signed(operand[j+1]))
+                                        ? operand[j]
+                                        : operand[j+1];
+                end
+                else if (RED_OP == RED_MAXU) begin
+                    result[k] = (operand[j] > operand[j+1])
+                                        ? operand[j]
+                                        : operand[j+1];
+                end
+                else if (RED_OP == RED_MIN) begin
+                    result[k] = ($signed(operand[j]) > $signed(operand[j+1]))
+                                        ? operand[j+1]
+                                        : operand[j];
+                end
+                else if (RED_OP == RED_MINU) begin
+                    result[k] = (operand[j] > operand[j+1])
+                                        ? operand[j+1]
+                                        : operand[j];
+                end
+                else if (RED_OP == RED_AND) begin
+                    result[k] = operand[j] & operand[j+1];
+                end
+                else if (RED_OP == RED_OR) begin
+                    result[k] = operand[j] | operand[j+1];
+                end
+                else if (RED_OP == RED_XOR) begin
+                    result[k] = operand[j] ^ operand[j+1];
+                end
+                else begin
+                    result[k] = operand[j] + operand[j+1];
+                end
+            end
+        end
+
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n) begin
-                result <= '{default: '0};
+                operand <= '{default: '0};
             end
-            else begin
-                // First Level
+            else if (cycle == '0) begin // First Level
                 for (int i = 0; i < ELEMENTS_PER_REG; i++) begin
                     if (i == 0) begin
                         if ((vm || mask[cycle_count_r][0]) && i < vl) begin
                             if (RED_OP == RED_MAX) begin
-                                result[0][i] <= ($signed(first_operand[0]) > $signed(second_operand))
+                               operand[i] <= ($signed(first_operand[0]) > $signed(second_operand))
                                                 ? first_operand[0]
                                                 : second_operand;
                             end
                             else if (RED_OP == RED_MAXU) begin
-                                result[0][i] <= (first_operand[0] > second_operand)
+                               operand[i] <= (first_operand[0] > second_operand)
                                                 ? first_operand[0]
                                                 : second_operand;
                             end
                             else if (RED_OP == RED_MIN) begin
-                                result[0][i] <= ($signed(first_operand[0]) > $signed(second_operand))
+                               operand[i] <= ($signed(first_operand[0]) > $signed(second_operand))
                                                 ? second_operand
                                                 : first_operand[0];
                             end
                             else if (RED_OP == RED_MINU) begin
-                                result[0][i] <= (first_operand[0] > second_operand)
+                               operand[i] <= (first_operand[0] > second_operand)
                                                 ? second_operand
                                                 : first_operand[0];
                             end
                             else if (RED_OP == RED_AND) begin
-                                result[0][i] <= first_operand[0] & second_operand;
+                               operand[i] <= first_operand[0] & second_operand;
                             end
                             else if (RED_OP == RED_OR) begin
-                                result[0][i] <= first_operand[0] | second_operand;
+                               operand[i] <= first_operand[0] | second_operand;
                             end
                             else if (RED_OP == RED_XOR) begin
-                                result[0][i] <= first_operand[0] ^ second_operand;
+                               operand[i] <= first_operand[0] ^ second_operand;
                             end
                             else begin
-                                result[0][i] <= first_operand[0] + second_operand;
+                               operand[i] <= first_operand[0] + second_operand;
                             end
                         end
                         else begin
-                            result[0][i] <= second_operand;
+                           operand[i] <= second_operand;
                         end
                     end
                     else begin
                         if ((vm || mask[cycle_count_r][i]) && i < vl) begin
-                            result[0][i] <= first_operand[i];
+                           operand[i] <= first_operand[i];
                         end
                         else begin
                             if (RED_OP == RED_MIN) begin
-                                result[0][i][SEW-2:0] <=  '1;
-                                result[0][i][SEW-1]   <= 1'b0;
+                               operand[i][SEW-2:0] <=  '1;
+                               operand[i][SEW-1]   <= 1'b0;
                             end
                             else if (RED_OP == RED_MAX) begin
-                                result[0][i][SEW-2:0] <=  '0;
-                                result[0][i][SEW-1]   <= 1'b1;
+                               operand[i][SEW-2:0] <=  '0;
+                               operand[i][SEW-1]   <= 1'b1;
                             end
                             else if (RED_OP inside {RED_AND, RED_MINU}) begin
-                                result[0][i] <= '1;
+                               operand[i] <= '1;
                             end
                             else begin
-                                result[0][i] <= '0;
+                               operand[i] <= '0;
                             end
                         end
                     end
                 end
-
-                // Other Levels
-                for (int i = 0; i < TREE_LEVELS; i++) begin
-                    for (int j = 0; j < ELEMENTS_PER_REG/(2**(i+1)); j++) begin
-                        if (RED_OP == RED_MAX) begin
-                            result[i+1][j] <= ($signed(result[i][2*j]) > $signed(result[i][2*j+1]))
-                                                ? result[i][2*j]
-                                                : result[i][2*j+1];
+            end
+            else begin
+                for (int i = 0; i < ELEMENTS_PER_REG; i++) begin
+                    if (i < (ELEMENTS_PER_REG/2)) begin
+                        operand[i] <= result[i];
+                    end
+                    else begin
+                        if (RED_OP == RED_MIN) begin
+                            operand[i][SEW-2:0] <=  '1;
+                            operand[i][SEW-1]   <= 1'b0;
                         end
-                        else if (RED_OP == RED_MAXU) begin
-                            result[i+1][j] <= (result[i][2*j] > result[i][2*j+1])
-                                                ? result[i][2*j]
-                                                : result[i][2*j+1];
+                        else if (RED_OP == RED_MAX) begin
+                            operand[i][SEW-2:0] <=  '0;
+                            operand[i][SEW-1]   <= 1'b1;
                         end
-                        else if (RED_OP == RED_MIN) begin
-                            result[i+1][j] <= ($signed(result[i][2*j]) > $signed(result[i][2*j+1]))
-                                                ? result[i][2*j+1]
-                                                : result[i][2*j];
-                        end
-                        else if (RED_OP == RED_MINU) begin
-                            result[i+1][j] <= (result[i][2*j] > result[i][2*j+1])
-                                                ? result[i][2*j+1]
-                                                : result[i][2*j];
-                        end
-                        else if (RED_OP == RED_AND) begin
-                            result[i+1][j] <= result[i][2*j] & result[i][2*j+1];
-                        end
-                        else if (RED_OP == RED_OR) begin
-                            result[i+1][j] <= result[i][2*j] | result[i][2*j+1];
-                        end
-                        else if (RED_OP == RED_XOR) begin
-                            result[i+1][j] <= result[i][2*j] ^ result[i][2*j+1];
+                        else if (RED_OP inside {RED_AND, RED_MINU}) begin
+                            operand[i] <= '1;
                         end
                         else begin
-                            result[i+1][j] <= result[i][2*j] + result[i][2*j+1];
+                            operand[i] <= '0;
                         end
                     end
                 end
             end
         end
     end
-
-    assign result_o = {result[TREE_LEVELS][0]};
 
 endmodule
 /* verilator lint_on WIDTHEXPAND */

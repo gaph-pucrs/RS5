@@ -597,7 +597,8 @@ module vectorUnit
     vectorALU #(
         .VLEN   (VLEN),
         .LLEN   (LLEN),
-        .VLENB  (VLENB)
+        .VLENB  (VLENB),
+        .MULTI_CYCLE_REDUCTIONS(1'b0)
     ) vectorALU1 (
         .clk                   (clk),
         .reset_n               (reset_n),
