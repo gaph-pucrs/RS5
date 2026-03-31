@@ -26,6 +26,13 @@
 package RS5_pkg;
 
     typedef enum integer {
+        RV32MNone        = 0,
+        RV32MSlow        = 1,
+        RV32MFast        = 2,
+        RV32MSingleCycle = 3
+    } rv32m_e;
+
+    typedef enum integer {
         ASIC    = 0,
         FPGA    = 1
     } environment_e;
@@ -35,6 +42,11 @@ package RS5_pkg;
         MUL_M       = 1,
         MUL_ZMMUL   = 2
     } mul_e;
+
+    typedef enum integer { 
+        MUL_FAST    = 0, 
+        MUL_DEFAULT = 1
+    } mul_t;
 
     typedef enum integer {
         AMO_OFF,
@@ -111,7 +123,23 @@ package RS5_pkg;
         SC_W,
         AMO_W,
         CZERO_EQZ,
-        CZERO_NEZ
+        CZERO_NEZ, 
+        KYBER_ADD, 
+        KYBER_SUB,
+        KYBER_CBD2,
+        KYBER_CBD3, 
+        KYBER_MUL, 
+        KYBER_COMPRESS,
+        SIG0H,
+        SIG0L,
+        SIG1H,
+        SIG1L,
+        SUM0R,
+        SUM1R,
+        SIG0, 
+        SIG1, 
+        SUM0,
+        SUM1
     } iType_e;
 
     typedef enum logic[1:0] {

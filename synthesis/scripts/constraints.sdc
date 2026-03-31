@@ -8,7 +8,7 @@ set_load_unit -femtofarads
 set_time_unit -nanoseconds
 
 ### Creating the clock of 500 MHz
-set period_clock 2;
+set period_clock 5; # 200 Mhz
 create_clock -name {clk} -period $period_clock [get_ports {clk}]
 
 ### Ignoring the time analysis for the Reset
