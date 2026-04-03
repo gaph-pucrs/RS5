@@ -194,6 +194,19 @@ module execute
     assign xor_result              = first_operand ^ second_operand_i;
     assign equal                   = equal_opA == equal_opB;
 
+    logic [5:0] shift_amt_compl; // complementary shift amount (32 - shift_amt)
+
+    assign shift_amt_compl = 32 - second_operand_i[4:0];
+
+    always_comb begin
+
+        logic [31:0] left_shift_result;
+
+        left_shift_result = rs1_data_i <<< shift_amt_compl;
+
+        shift_result = sra_result | left_shift_result;
+    end
+
     /* We can't obtain the PC from fetch stage because it can be modified due */
     /* to load/store stalls when the current instruction is JAL[R]            */
     logic [31:0] pc_next;
@@ -856,6 +869,116 @@ module execute
         assign result_zicond = '0;
     end
 
+    //////////
+    // Pack //
+    //////////
+
+    logic packh;
+    assign packh = instruction_operation_i == ALU_PACKH;
+
+    always_comb begin
+      unique case (1'b1)
+        packh:   pack_result = {16'h0, operand_b_i[7:0], operand_a_i[7:0]};
+        default: pack_result = {operand_b_i[15:0], operand_a_i[15:0]};
+      endcase
+    end
+
+    ///////////////////
+  // Bitwise Logic //
+  ///////////////////
+
+  logic bwlogic_or;
+  logic bwlogic_and;
+  logic [31:0] bwlogic_operand_b;
+  logic [31:0] bwlogic_or_result;
+  logic [31:0] bwlogic_and_result;
+  logic [31:0] bwlogic_xor_result;
+  logic [31:0] bwlogic_result;
+
+  logic [32:0] operand_b_neg;  
+
+  assign operand_b_neg = {second_operand_i,1'b0} ^ {33{1'b1}}; //sei la se precisa estender esse sinal...
+
+  assign bwlogic_operand_b = operand_b_neg[32:1];
+
+  assign bwlogic_or_result  = rs1_data_i | bwlogic_operand_b;
+  assign bwlogic_and_result = rs1_data_i & bwlogic_operand_b;
+  assign bwlogic_xor_result = rs1_data_i ^ bwlogic_operand_b;
+
+  assign bwlogic_or  = (instruction_operation_i == ALU_ORN);
+  assign bwlogic_and = (instruction_operation_i == ALU_ANDN);
+
+  always_comb begin
+    unique case (1'b1)
+      bwlogic_or:  bwlogic_result = bwlogic_or_result;
+      bwlogic_and: bwlogic_result = bwlogic_and_result;
+      default:     bwlogic_result = bwlogic_xor_result;
+    endcase
+  end
+
+    logic [5:0] shift_amt;
+
+    assign shift_amt[4:0] = second_operand_i[4:0];
+
+    logic [4:0] zbp_shift_amt;
+
+    assign zbp_shift_amt[2:0] = shift_amt[2:0];
+    assign zbp_shift_amt[4:3] = shift_amt[4:3];
+
+    logic [31:0] rev_result;
+
+    always_comb begin
+      rev_result = operand_a_i;
+
+      if (zbp_shift_amt[0]) begin
+        rev_result = ((rev_result & 32'h5555_5555) <<  1) |
+                     ((rev_result & 32'haaaa_aaaa) >>  1);
+      end
+
+      if (zbp_shift_amt[1]) begin
+        rev_result = ((rev_result & 32'h3333_3333) <<  2) |
+                     ((rev_result & 32'hcccc_cccc) >>  2);
+      end
+
+      if (zbp_shift_amt[2]) begin
+        rev_result = ((rev_result & 32'h0f0f_0f0f) <<  4) |
+                     ((rev_result & 32'hf0f0_f0f0) >>  4);
+      end
+
+      if (zbp_shift_amt[3]) begin
+        rev_result = ((rev_result & 32'h00ff_00ff) <<  8) |
+                     ((rev_result & 32'hff00_ff00) >>  8);
+      end
+
+      if (zbp_shift_amt[4]) begin
+        rev_result = ((rev_result & 32'h0000_ffff) << 16) |
+                     ((rev_result & 32'hffff_0000) >> 16);
+      end
+    end
+
+    logic [31:0] shuffle_result;
+
+    always_comb begin
+
+        logic is_zip;
+        is_zip = instruction_operation_i == ALU_ZIP;
+
+        if (is_zip) begin
+            for (int i = 0; i < 16; i++) begin
+                shuffle_result[2*i] = rs1_data_i[i];
+                shuffle_result[2*i + 1] = rs1_data_i[i + 16];
+            end
+        end
+
+        else begin
+            for (int i = 0; i < 16; i++) begin
+                shuffle_result[i] = rs1_data_i[2*i];
+                shuffle_result[i + 16] = rs1_data_i[2*i + 1];
+            end
+        end
+
+      end
+
 //////////////////////////////////////////////////////////////////////////////
 // Demux
 //////////////////////////////////////////////////////////////////////////////
@@ -886,7 +1009,12 @@ module execute
             SC_W:                                  result = (AMOEXT inside {AMO_ZALRSC, AMO_A}) ? {31'h0, lrsc_result} : sum_result;
             KYBER_ADD, KYBER_SUB, KYBER_CBD2, 
             KYBER_CBD3, KYBER_MUL, KYBER_COMPRESS: result = (XKYBEREnable)      ? mul_result : sum_result;
-            default:                result = sum_result;
+            ALU_ROR, ALU_ROL:                      result = shift_result;
+            ALU_PACK, ALU_PACKH:                   result = pack_result;    
+            ALU_XNOR, ALU_ORN, ALU_ANDN:           result = bwlogic_result;
+            ALU_REV8, ALU_BREV8:                   result = rev_result;
+            ALU_ZIP, ALU_UNZIP:                    result = shuffle_result;          
+            default:                               result = sum_result;
         endcase
     end
 

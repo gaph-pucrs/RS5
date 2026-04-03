@@ -178,6 +178,11 @@ module decode
             10'b0100000101:     decode_op_imm = SRA;    /* SRAI */
             10'b???????110:     decode_op_imm = OR;     /* ORI */
             10'b???????111:     decode_op_imm = AND;    /* ANDI */
+            10'b01100??101:     decode_op_imm = (ZBKBEnable) ? ALU_ROR    : INVALID;  
+            10'b0000100001:     decode_op_imm = (ZBKBEnable) ? ALU_ZIP    : INVALID; ;
+            10'b01101??101:     decode_op_imm = (ZBKBEnable && instruction_i[26:20] == 5'b0_0111) ? ALU_BREV8 : INVALID;
+            10'b01101??101:     decode_op_imm = (ZBKBEnable && instruction_i[26:20] == 5'b1_1000) ? ALU_REV8  : INVALID;
+            10'b00001??101:     decode_op_imm = (ZBKBEnable) ? ALU_UNZIP  : INVALID;
             default:            decode_op_imm = INVALID;
         endcase
     end
@@ -213,6 +218,14 @@ module decode
             10'b0101011000:     decode_op = ZKNHEnable   ? SIG1L : INVALID; //sha512sig1l
             10'b0101000000:     decode_op = ZKNHEnable   ? SUM0R : INVALID; //sha512sum0r
             10'b0101001000:     decode_op = ZKNHEnable   ? SUM1R : INVALID; //sha512sum1r
+            // ZBKB ALU Operations
+            10'b0110000001:     decode_op = (ZBKBEnable) ? ALU_ROL   : INVALID;
+            10'b0110000101:     decode_op = (ZBKBEnable) ? ALU_ROR   : INVALID; 
+            10'b0000100100:     decode_op = (ZBKBEnable) ? ALU_PACK  : INVALID;
+            10'b0000100111:     decode_op = (ZBKBEnable) ? ALU_PACKH : INVALID; 
+            10'b0100000100:     decode_op = (ZBKBEnable) ? ALU_XNOR  : INVALID;
+            10'b0100000110:     decode_op = (ZBKBEnable) ? ALU_ORN   : INVALID;
+            10'b0100000111:     decode_op = (ZBKBEnable) ? ALU_ANDN  : INVALID;
             default:            decode_op = INVALID;
         endcase
     end
