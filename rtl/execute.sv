@@ -34,6 +34,7 @@ module execute
     parameter bit           COMPRESSED   = 1'b1,
     parameter bit           ZKNEEnable   = 1'b1,
     parameter bit           ZKNHEnable   = 1'b1,
+    parameter bit           ZBKBEnable   = 1'b1,
     parameter bit           ZICONDEnable = 1'b0,
     parameter bit           VEnable      = 1'b0,
     parameter int           VLEN         = 64,
@@ -198,13 +199,18 @@ module execute
 
     assign shift_amt_compl = 32 - second_operand_i[4:0];
 
+    logic [31:0] shift_result;
+
+    logic signed [32:0] shift_result_ext_signed;
+    logic        [32:0] shift_result_ext;
+
     always_comb begin
 
         logic [31:0] left_shift_result;
 
         left_shift_result = rs1_data_i <<< shift_amt_compl;
 
-        shift_result = sra_result | left_shift_result;
+        shift_result = srl_result | left_shift_result;
     end
 
     /* We can't obtain the PC from fetch stage because it can be modified due */
@@ -876,10 +882,12 @@ module execute
     logic packh;
     assign packh = instruction_operation_i == ALU_PACKH;
 
+    logic [31:0] pack_result;
+
     always_comb begin
       unique case (1'b1)
-        packh:   pack_result = {16'h0, operand_b_i[7:0], operand_a_i[7:0]};
-        default: pack_result = {operand_b_i[15:0], operand_a_i[15:0]};
+        packh:   pack_result = {16'h0, second_operand_i[7:0], rs1_data_i[7:0]};
+        default: pack_result = {second_operand_i[15:0], rs1_data_i[15:0]};
       endcase
     end
 
@@ -928,7 +936,7 @@ module execute
     logic [31:0] rev_result;
 
     always_comb begin
-      rev_result = operand_a_i;
+      rev_result = rs1_data_i;
 
       if (zbp_shift_amt[0]) begin
         rev_result = ((rev_result & 32'h5555_5555) <<  1) |

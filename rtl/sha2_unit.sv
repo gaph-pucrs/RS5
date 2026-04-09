@@ -37,7 +37,7 @@ module sha2_unit import RS5_pkg::*;  #(
       SUM0R: sha2_result_o = (op_a_gated << 25) ^ (op_a_gated << 30) ^ (op_a_gated >> 28) ^ (op_b_gated >> 7) ^ (op_b_gated >> 2) ^ (op_b_gated << 4);
       SUM1R: sha2_result_o = (op_a_gated << 23) ^ (op_a_gated >> 14) ^ (op_a_gated >> 18) ^ (op_b_gated >> 9) ^ (op_b_gated << 18) ^ (op_b_gated << 14);
 
-      //default: sha2_result_o = sha2_result_o;
+      default: sha2_result_o = sha2_result_o;
 
     endcase
 
