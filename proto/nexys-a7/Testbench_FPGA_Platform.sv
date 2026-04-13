@@ -1,0 +1,138 @@
+/*!\file testbench.sv
+ * RS5 VERSION - 1.1.0 - Pipeline Simplified and Core Renamed
+ *
+ * Distribution:  July 2023
+ *
+ * Willian Nunes    <willian.nunes@edu.pucrs.br>
+ * Angelo Dal Zotto <angelo.dalzotto@edu.pucrs.br>
+ * Marcos Sartori   <marcos.sartori@acad.pucrs.br>
+ * Ney Calazans     <ney.calazans@ufsc.br>
+ * Fernando Moraes  <fernando.moraes@pucrs.br>
+ * GAPH - Hardware Design Support Group
+ * PUCRS - Pontifical Catholic University of Rio Grande do Sul <https://pucrs.br/>
+ *
+ * \brief
+ * Testbench for RS5 simulation.
+ *
+ * \detailed
+ * Testbench for RS5 simulation.
+ */
+
+`include "../rtl/RS5_pkg.sv"
+
+`timescale 1ns/1ps
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// CPU TESTBENCH IMPLEMENTATION
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+module Testbench_FPGA_Platform 
+    import RS5_pkg::*;
+(
+
+);
+
+    logic           clk=1, rstCPU;
+    logic           BTND;
+    logic           UART_RX;
+
+//////////////////////////////////////////////////////////////////////////////
+// PARAMETERS FOR CORE INSTANTIATION
+//////////////////////////////////////////////////////////////////////////////
+    
+    localparam int              i_cnt = 2;
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// RESET CPU 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    
+    initial begin
+        rstCPU = 0;
+        #1000 
+        rstCPU = 1; 
+    end
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Clock generator
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    
+    always begin
+        #5.0 clk = 0;
+        #5.0 clk = 1;
+    end
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// CPU INSTANTIATION 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    
+    logic UART_TX;
+
+    RS5_FPGA_Platform #(
+        .i_cnt      (i_cnt),
+        .CLKS_PER_BIT_UART(5)
+    ) dut (
+        .clk        (clk), 
+        .reset_n    (rstCPU), 
+        .BTND       (BTND),
+        .UART_RX    (UART_RX),
+        .UART_TX    (UART_TX)
+    );
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Interrupt Emulation
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ 
+    initial begin
+        UART_RX  = 1;
+        BTND = 0;
+        #3000
+        UART_RX  = 0; 
+        #50
+        UART_RX  = 1; 
+        #50
+        UART_RX  = 0; 
+        #50
+        UART_RX  = 1; 
+        #50
+        UART_RX  = 0; 
+        #50
+        UART_RX  = 1; 
+        #50
+        UART_RX  = 1; 
+        #50
+        UART_RX  = 1; 
+        #50
+        UART_RX  = 1; 
+        #50
+        UART_RX  = 0;
+        #50
+        UART_RX  = 1; 
+        #5
+        BTND = 1;
+        #60
+        BTND  =0;
+        #3000
+        UART_RX  = 0; 
+        #50
+        UART_RX  = 1; 
+        #50
+        UART_RX  = 1; 
+        #50
+        UART_RX  = 1; 
+        #50
+        UART_RX  = 1; 
+        #50
+        UART_RX  = 1; 
+        #50
+        UART_RX  = 1; 
+        #50
+        UART_RX  = 1; 
+        #50
+        UART_RX  = 1; 
+        #50
+        UART_RX  = 0;
+        #50
+        UART_RX  = 1; 
+    end
+
+endmodule
