@@ -163,25 +163,23 @@ module mul
 
     assign adjust_result_low = (adjust_result_low_mux_sel ? adjust_adder_low[11:0] : adjust_adder_low_op_a[11:0]) & adjust_result_low_mask;
 
-    typedef enum logic [17:0] {
-        IDLE                         = 18'b000000000000000001,
-        ALBL                         = 18'b000000000000000010,
-        ALBH                         = 18'b000000000000000100,
-        AHBL                         = 18'b000000000000001000,
-        AHBH                         = 18'b000000000000010000,
-        L1_STAGE0_LOW                = 18'b000000000000100000,
-        L1_STAGE0_HIGH               = 18'b000000000001000000, 
-        L1_STAGE1_LOW                = 18'b000000000010000000,
-        L1_STAGE1_HIGH               = 18'b000000000100000000,
-        L1_STAGE2_LOW                = 18'b000000001000000000,
-        L1_STAGE2_HIGH               = 18'b000000010000000000,
-        L1_STAGE3_LOW                = 18'b000000100000000000,
-        L1_STAGE3_HIGH               = 18'b000001000000000000,
-        L1_STAGE4_LOW                = 18'b000010000000000000,
-        L1_STAGE4_HIGH               = 18'b000100000000000000,
-        KYBER_BARRETT_L2             = 18'b001000000000000000, 
-        KYBER_BARRETT_L3             = 18'b010000000000000000,
-        KYBER_BARRETT_L4             = 18'b100000000000000000
+    typedef enum logic [15:0] {
+        IDLE                         = 16'b0000000000000001,
+        ALBL                         = 16'b0000000000000010,
+        ALBH                         = 16'b0000000000000100,
+        AHBL                         = 16'b0000000000001000,
+        AHBH                         = 16'b0000000000010000,
+        KYBER_BARRETT_L1_STAGE0      = 16'b0000000000100000,
+        KYBER_BARRETT_L1_STAGE1      = 16'b0000000001000000, 
+        KYBER_BARRETT_L1_STAGE2      = 16'b0000000010000000,
+        KYBER_BARRETT_L1_STAGE3_LOW  = 16'b0000000100000000,
+        KYBER_BARRETT_L1_STAGE4_HIGH = 16'b0000001000000000,
+        KYBER_BARRETT_L1_STAGE5_LOW  = 16'b0000010000000000,
+        KYBER_BARRETT_L1_STAGE6_HIGH = 16'b0000100000000000,
+        KYBER_BARRETT_L1_STAGE7      = 16'b0001000000000000,
+        KYBER_BARRETT_L2             = 16'b0010000000000000, 
+        KYBER_BARRETT_L3             = 16'b0100000000000000,
+        KYBER_BARRETT_L4             = 16'b1000000000000000
     } mul_states_e;
 
     mul_states_e mul_state;
@@ -190,21 +188,19 @@ module mul
     always_comb begin
         next_state = IDLE;
         unique case (mul_state)
-            IDLE:                         next_state = (enable_i) ? ((operator_i == KYBER_MUL) ? L1_STAGE0_LOW : ALBL) : IDLE;
+            IDLE:                         next_state = (enable_i) ? ((operator_i == KYBER_MUL) ? KYBER_BARRETT_L1_STAGE0 : ALBL) : IDLE;
             ALBL:                         next_state = single_cycle_i ? IDLE : ALBH;
             ALBH:                         next_state = AHBL;
             AHBL:                         next_state = mul_low_i      ? IDLE : AHBH;
             AHBH:                         next_state = IDLE;
-            L1_STAGE0_LOW:                next_state = L1_STAGE0_HIGH;
-            L1_STAGE0_HIGH:               next_state = L1_STAGE1_LOW;
-            L1_STAGE1_LOW:                next_state = L1_STAGE1_HIGH;
-            L1_STAGE1_HIGH:               next_state = L1_STAGE2_LOW;
-            L1_STAGE2_LOW:                next_state = L1_STAGE2_HIGH;
-            L1_STAGE2_HIGH:               next_state = L1_STAGE3_LOW;
-            L1_STAGE3_LOW:                next_state = L1_STAGE3_HIGH;
-            L1_STAGE3_HIGH:               next_state = L1_STAGE4_LOW;
-            L1_STAGE4_LOW :               next_state = L1_STAGE4_HIGH;
-            L1_STAGE4_HIGH:               next_state = KYBER_BARRETT_L2;
+            KYBER_BARRETT_L1_STAGE0:      next_state = KYBER_BARRETT_L1_STAGE1;
+            KYBER_BARRETT_L1_STAGE1:      next_state = KYBER_BARRETT_L1_STAGE2;
+            KYBER_BARRETT_L1_STAGE2:      next_state = KYBER_BARRETT_L1_STAGE3_LOW;
+            KYBER_BARRETT_L1_STAGE3_LOW:  next_state = KYBER_BARRETT_L1_STAGE4_HIGH;
+            KYBER_BARRETT_L1_STAGE4_HIGH: next_state = KYBER_BARRETT_L1_STAGE5_LOW;
+            KYBER_BARRETT_L1_STAGE5_LOW:  next_state = KYBER_BARRETT_L1_STAGE6_HIGH;
+            KYBER_BARRETT_L1_STAGE6_HIGH: next_state = KYBER_BARRETT_L1_STAGE7;
+            KYBER_BARRETT_L1_STAGE7:      next_state = KYBER_BARRETT_L2;
             KYBER_BARRETT_L2:             next_state = KYBER_BARRETT_L3;
             KYBER_BARRETT_L3:             next_state = KYBER_BARRETT_L4;
             KYBER_BARRETT_L4:             next_state = IDLE;  
@@ -331,14 +327,15 @@ module mul
         if (!reset_n) begin 
             temp0_last_stage <= '0;
         end else begin 
-            if (mul_state == L1_STAGE0_LOW) temp0_last_stage <= mac_result; //in idle mac_res_d will hold the temp0 value
+            if (mul_state == KYBER_BARRETT_L1_STAGE0) temp0_last_stage <= mac_result; //in idle mac_res_d will hold the temp0 value
         end
     end
 
     logic [36:0] temp1;
 
     logic [35:0] temp1_shift;
-    
+    logic        carry_reg;
+
     
 always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin 
@@ -447,7 +444,7 @@ always_ff @(posedge clk or negedge reset_n) begin
 
       unique case (mul_state)
 
-        L1_STAGE4_HIGH: begin
+        KYBER_BARRETT_L1_STAGE4_HIGH: begin
             //mult_hold    = ~multdiv_ready_id_i;  
             mult_kyber_op_a = temp1 >> 24;
             mult_kyber_op_b = 16'd3329;
