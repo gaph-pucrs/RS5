@@ -604,8 +604,10 @@ module ibex_multdiv_fast
         KYBER_BARRETT_SUB_ADJUST: begin
 
           // alu_operand_a_kyber = {imd_val_q[0], 1'b0};
-          alu_operand_a_kyber = {imd_val_q[0][31:0], 1'b1};
+          alu_operand_a_kyber = {imd_val_q[0][31:0], 1'b1}; 
           alu_operand_b_kyber = {{imd_val_q[1][31:0] ^ {32{1'b1}}}, 1'b1};
+          //colocando 1 no final tu faz o 1 ficar em baixo do primeiro bit que significa a bosta de uma soma, PORCO LIXO
+    
 
           // mac_res_d  = barrett_adjust;
           mac_res_d  = {{4{1'b0}}, adjust_result_high, {4{1'b0}}, adjust_result_low};

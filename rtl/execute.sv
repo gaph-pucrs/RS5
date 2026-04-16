@@ -29,7 +29,7 @@ module execute
 #(
     parameter environment_e Environment  = ASIC,
     parameter mul_e         MULEXT       = MUL_M,
-    parameter mul_t         MUL_TYPE     = MUL_FAST,
+    parameter mul_t         MUL_TYPE     = MUL_DEFAULT,
     parameter atomic_e      AMOEXT       = AMO_A,
     parameter bit           COMPRESSED   = 1'b1,
     parameter bit           ZKNEEnable   = 1'b1,
@@ -167,12 +167,6 @@ module execute
     logic           greater_equal_unsigned;
 
     logic [31:0] sum2_opB;
-    always_comb begin
-        unique case (instruction_operation_i)
-            SUB:       sum2_opB = -second_operand_i;
-            default:   sum2_opB =  second_operand_i; // AMO_W
-        endcase
-    end
 
     // Can be assigned by atomic instructions or rs1_data_i
     logic [31:0] first_operand;
@@ -413,6 +407,11 @@ module execute
 
     //Modular reduction part!
 
+    logic [31:0] multdiv_alu_operand_a;
+    logic [31:0] multdiv_alu_operand_b;
+
+    logic is_xkyber;
+
     if (MULEXT != MUL_OFF) begin : gen_zmmul_on
 
         if(MUL_TYPE == MUL_FAST) begin: gen_mul_fast_ibex 
@@ -551,6 +550,9 @@ module execute
             );
         end else begin: gen_mul_rs5 
 
+            logic [2:0]  cbd_result_high;
+            logic [2:0]  cbd_result_low;
+
             logic [1:0] signed_mode_mul;
             logic       enable_mul;
             logic       mul_low;
@@ -563,21 +565,45 @@ module execute
                 endcase
             end
 
-            assign enable_mul = (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU});
+            logic eta_is_3;
+            assign eta_is_3 = (instruction_operation_i == KYBER_CBD3);
+
+            assign cbd_result_high = eta_is_3 ? (first_operand[6] + first_operand[7] + first_operand[8]) - (first_operand[9] + first_operand[10] + first_operand[11]) : 
+                                        (first_operand[4] + first_operand[5])                  - (first_operand[6] + first_operand[7]);
+
+            assign cbd_result_low = eta_is_3 ? (first_operand[0] + first_operand[1] + first_operand[2]) - (first_operand[3] + first_operand[4] + first_operand[5]) : 
+                                       (first_operand[0] + first_operand[1])                  - (first_operand[2] + first_operand[3]);
+
+            logic [3:0] kyber_compress_bits;
+
+            assign kyber_compress_bits = second_operand_i[3:0] & {4{instruction_operation_i == KYBER_COMPRESS}};
+
             assign mul_low    = (instruction_operation_i == MUL);
 
+            assign is_xkyber = (instruction_operation_i inside {KYBER_ADD, KYBER_SUB,KYBER_CBD2, KYBER_CBD3, KYBER_MUL, KYBER_COMPRESS});
+
+            assign enable_mul = (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU, KYBER_MUL});
+
             mul mul1 (
-                .clk              (clk),
-                .reset_n          (reset_n),
-                .stall            (stall),
-                .first_operand_i  (rs1_data_i),
-                .second_operand_i (rs2_data_i),
-                .signed_mode_i    (signed_mode_mul),
-                .enable_i         (enable_mul),
-                .mul_low_i        (mul_low),
-                .hold_o           (hold_mul),
-                .single_cycle_i   (1'b0),
-                .result_o         (mul_result)
+                .clk                   (clk),
+                .reset_n               (reset_n),
+                .stall                 (stall),
+                .alu_adder_i           (sum_result),
+                .operator_i            (instruction_operation_i),
+                .is_xkyber_i           (is_xkyber),
+                .first_operand_i       (rs1_data_i),
+                .second_operand_i      (rs2_data_i),
+                .signed_mode_i         (signed_mode_mul),
+                .enable_i              (enable_mul),
+                .mul_low_i             (mul_low),
+                .hold_o                (hold_mul),
+                .single_cycle_i        (1'b0),
+                .alu_operand_a_kyber   (multdiv_alu_operand_a),
+                .alu_operand_b_kyber   (multdiv_alu_operand_b),
+                .alu_cbd_high_i        (cbd_result_high),
+                .alu_cbd_low_i         (cbd_result_low),
+                .kyber_compress_bits_i (kyber_compress_bits),
+                .result_o              (mul_result)
             );            
         end
 
@@ -585,6 +611,14 @@ module execute
     else begin : gen_zmmul_off
         assign hold_mul   = 1'b0;
         assign mul_result = '0;
+    end
+
+    always_comb begin
+        unique case (instruction_operation_i)
+            KYBER_SUB, KYBER_MUL: sum2_opB = multdiv_alu_operand_b;
+            SUB:       sum2_opB = -second_operand_i;
+            default:   sum2_opB =  second_operand_i; // AMO_W
+        endcase
     end
 
 /////////////////////////////////////////////////////////////////////////////
@@ -829,13 +863,13 @@ module execute
                 .opA_o             (amo_operand            )
             );
 
-            assign first_operand = (instruction_operation_i == AMO_W) ? amo_operand : rs1_data_i;
+            assign first_operand = (instruction_operation_i == AMO_W) ? amo_operand : ((is_xkyber) ? multdiv_alu_operand_a  : rs1_data_i);
         end
         else begin : gen_zaamo_off
             assign amo_hold             = 1'b0;
             assign amo_mem_read_enable  = 1'b0;
             assign amo_mem_write_enable = 1'b0;
-            assign first_operand        = rs1_data_i;
+            assign first_operand        = (is_xkyber) ? multdiv_alu_operand_a  : rs1_data_i;
             assign amo_operand          = '0;
             assign amo_write_enable     = 1'b0;
         end
@@ -846,7 +880,7 @@ module execute
         assign atomic_mem_write_enable = lrsc_mem_write_enable || amo_mem_write_enable;
     end
     else begin : gen_atomic_off
-        assign first_operand           = rs1_data_i;
+        assign first_operand           = (is_xkyber) ? multdiv_alu_operand_a  : rs1_data_i;
         assign amo_operand             = '0;
         assign atomic_hold             = 1'b0;
         assign atomic_mem_read_enable  = 1'b0;

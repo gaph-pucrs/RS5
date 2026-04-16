@@ -93,11 +93,11 @@ int rvkat_chku32(const char *lab, uint32_t want, uint32_t have)
 	int fail = (want == have) ? 0 : 1;
 
 	rvkat_failpass(fail);
-	sio_puts(lab);
-	sio_puts(" | WANT=");
-	rvkat_hexu32(want);
-	sio_puts("	HAVE=");
-	rvkat_hexu32(have);
+	//sio_puts(lab);
+	//sio_puts(" | WANT=");
+	//rvkat_hexu32(want);
+	//sio_puts("	HAVE=");
+	//rvkat_hexu32(have);
 	sio_putc('\n');
 
 	return fail;

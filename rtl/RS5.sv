@@ -33,7 +33,7 @@ module RS5
 `endif
     parameter environment_e Environment      = ASIC,
     parameter mul_e         MULEXT           = MUL_M,
-    parameter mul_t         MUL_TYPE         = MUL_FAST,
+    parameter mul_t         MUL_TYPE         = MUL_DEFAULT,
     parameter atomic_e      AMOEXT           = AMO_A,
     parameter logic [31:0]  START_ADDR       = '0,
     parameter bit           COMPRESSED       = 1'b1,
