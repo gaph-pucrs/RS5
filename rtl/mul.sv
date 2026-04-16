@@ -163,23 +163,25 @@ module mul
 
     assign adjust_result_low = (adjust_result_low_mux_sel ? adjust_adder_low[11:0] : adjust_adder_low_op_a[11:0]) & adjust_result_low_mask;
 
-    typedef enum logic [15:0] {
-        IDLE                         = 16'b0000000000000001,
-        ALBL                         = 16'b0000000000000010,
-        ALBH                         = 16'b0000000000000100,
-        AHBL                         = 16'b0000000000001000,
-        AHBH                         = 16'b0000000000010000,
-        KYBER_BARRETT_L1_STAGE0      = 16'b0000000000100000,
-        KYBER_BARRETT_L1_STAGE1      = 16'b0000000001000000, 
-        KYBER_BARRETT_L1_STAGE2      = 16'b0000000010000000,
-        KYBER_BARRETT_L1_STAGE3_LOW  = 16'b0000000100000000,
-        KYBER_BARRETT_L1_STAGE4_HIGH = 16'b0000001000000000,
-        KYBER_BARRETT_L1_STAGE5_LOW  = 16'b0000010000000000,
-        KYBER_BARRETT_L1_STAGE6_HIGH = 16'b0000100000000000,
-        KYBER_BARRETT_L1_STAGE7      = 16'b0001000000000000,
-        KYBER_BARRETT_L2             = 16'b0010000000000000, 
-        KYBER_BARRETT_L3             = 16'b0100000000000000,
-        KYBER_BARRETT_L4             = 16'b1000000000000000
+    typedef enum logic [17:0] {
+        IDLE                         = 18'b000000000000000001,
+        ALBL                         = 18'b000000000000000010,
+        ALBH                         = 18'b000000000000000100,
+        AHBL                         = 18'b000000000000001000,
+        AHBH                         = 18'b000000000000010000,
+        L1_STAGE0_LOW                = 18'b000000000000100000,
+        L1_STAGE0_HIGH               = 18'b000000000001000000, 
+        L1_STAGE1_LOW                = 18'b000000000010000000,
+        L1_STAGE1_HIGH               = 18'b000000000100000000,
+        L1_STAGE2_LOW                = 18'b000000001000000000,
+        L1_STAGE2_HIGH               = 18'b000000010000000000,
+        L1_STAGE3_LOW                = 18'b000000100000000000,
+        L1_STAGE3_HIGH               = 18'b000001000000000000,
+        L1_STAGE4_LOW                = 18'b000010000000000000,
+        L1_STAGE4_HIGH               = 18'b000100000000000000,
+        KYBER_BARRETT_L2             = 18'b001000000000000000, 
+        KYBER_BARRETT_L3             = 18'b010000000000000000,
+        KYBER_BARRETT_L4             = 18'b100000000000000000
     } mul_states_e;
 
     mul_states_e mul_state;
@@ -188,19 +190,21 @@ module mul
     always_comb begin
         next_state = IDLE;
         unique case (mul_state)
-            IDLE:                         next_state = (enable_i) ? ((operator_i == KYBER_MUL) ? KYBER_BARRETT_L1_STAGE0 : ALBL) : IDLE;
+            IDLE:                         next_state = (enable_i) ? ((operator_i == KYBER_MUL) ? L1_STAGE0_LOW : ALBL) : IDLE;
             ALBL:                         next_state = single_cycle_i ? IDLE : ALBH;
             ALBH:                         next_state = AHBL;
             AHBL:                         next_state = mul_low_i      ? IDLE : AHBH;
             AHBH:                         next_state = IDLE;
-            KYBER_BARRETT_L1_STAGE0:      next_state = KYBER_BARRETT_L1_STAGE1;
-            KYBER_BARRETT_L1_STAGE1:      next_state = KYBER_BARRETT_L1_STAGE2;
-            KYBER_BARRETT_L1_STAGE2:      next_state = KYBER_BARRETT_L1_STAGE3_LOW;
-            KYBER_BARRETT_L1_STAGE3_LOW:  next_state = KYBER_BARRETT_L1_STAGE4_HIGH;
-            KYBER_BARRETT_L1_STAGE4_HIGH: next_state = KYBER_BARRETT_L1_STAGE5_LOW;
-            KYBER_BARRETT_L1_STAGE5_LOW:  next_state = KYBER_BARRETT_L1_STAGE6_HIGH;
-            KYBER_BARRETT_L1_STAGE6_HIGH: next_state = KYBER_BARRETT_L1_STAGE7;
-            KYBER_BARRETT_L1_STAGE7:      next_state = KYBER_BARRETT_L2;
+            L1_STAGE0_LOW:                next_state = L1_STAGE0_HIGH;
+            L1_STAGE0_HIGH:               next_state = L1_STAGE1_LOW;
+            L1_STAGE1_LOW:                next_state = L1_STAGE1_HIGH;
+            L1_STAGE1_HIGH:               next_state = L1_STAGE2_LOW;
+            L1_STAGE2_LOW:                next_state = L1_STAGE2_HIGH;
+            L1_STAGE2_HIGH:               next_state = L1_STAGE3_LOW;
+            L1_STAGE3_LOW:                next_state = L1_STAGE3_HIGH;
+            L1_STAGE3_HIGH:               next_state = L1_STAGE4_LOW;
+            L1_STAGE4_LOW :               next_state = L1_STAGE4_HIGH;
+            L1_STAGE4_HIGH:               next_state = KYBER_BARRETT_L2;
             KYBER_BARRETT_L2:             next_state = KYBER_BARRETT_L3;
             KYBER_BARRETT_L3:             next_state = KYBER_BARRETT_L4;
             KYBER_BARRETT_L4:             next_state = IDLE;  
@@ -327,7 +331,7 @@ module mul
         if (!reset_n) begin 
             temp0_last_stage <= '0;
         end else begin 
-            if (mul_state == KYBER_BARRETT_L1_STAGE0) temp0_last_stage <= mac_result; //in idle mac_res_d will hold the temp0 value
+            if (mul_state == L1_STAGE0_LOW) temp0_last_stage <= mac_result; //in idle mac_res_d will hold the temp0 value
         end
     end
 
@@ -337,85 +341,172 @@ module mul
     logic        carry_reg;
 
     
-always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin 
-            temp1 <= '0;
-        end else begin 
-            unique case(mul_state)  
-                
-                IDLE: begin 
-                    temp1 <= '0;
+    
+    // ── always_ff ──────────────────────────────────────────────────────────────
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            temp1     <= '0;
+            carry_reg <= '0;
+        end else begin
+            unique case (mul_state)
+
+                IDLE: begin
+                    temp1     <= '0;
+                    carry_reg <= '0;
                 end
-                KYBER_BARRETT_L1_STAGE3_LOW: begin 
-                    temp1[31:0] <= alu_adder_i;
+
+                // -temp0
+                L1_STAGE0_LOW: begin
+                    temp1[31:0]  <= alu_adder_i;
+                    // REMOVIDO: temp1[36:32] <= '0; <-- NUNCA zere a parte alta do acumulador no meio do LOW
+                    carry_reg <= (alu_adder_i < temp1[31:0]) ? 1'b1 : 1'b0;
                 end
-                KYBER_BARRETT_L1_STAGE4_HIGH: begin 
+                L1_STAGE0_HIGH: begin
                     temp1[36:32] <= alu_adder_i[4:0];
+                    carry_reg    <= '0;
                 end
-                KYBER_BARRETT_L1_STAGE5_LOW: begin 
-                    temp1[31:0] <= alu_adder_i[31:0];
+
+                // -(temp0<<4)
+                L1_STAGE1_LOW: begin
+                    temp1[31:0]  <= alu_adder_i;
+                    carry_reg    <= (alu_adder_i < temp1[31:0]) ? 1'b1 : 1'b0;
                 end
-                KYBER_BARRETT_L1_STAGE6_HIGH: begin 
+                L1_STAGE1_HIGH: begin
                     temp1[36:32] <= alu_adder_i[4:0];
+                    carry_reg    <= '0;
                 end
-                KYBER_BARRETT_L1_STAGE7: begin 
-                    //temp1 = temp1 >> 24;
+
+                // -(temp0<<6)
+                L1_STAGE2_LOW: begin
+                    temp1[31:0]  <= alu_adder_i;
+                    carry_reg    <= (alu_adder_i < temp1[31:0]) ? 1'b1 : 1'b0;
                 end
-                KYBER_BARRETT_L2: begin 
-                    temp1 = {2'b00, mac_result};
+                L1_STAGE2_HIGH: begin
+                    temp1[36:32] <= alu_adder_i[4:0];
+                    carry_reg    <= '0;
                 end
-                default: begin 
-                    if(alu_adder_i[31]) temp1 <= {5'b11111, alu_adder_i};
-                    else temp1 <= {5'b00000, alu_adder_i};
+
+                // +(temp0<<10)
+                L1_STAGE3_LOW: begin
+                    temp1[31:0]  <= alu_adder_i;
+                    // REMOVIDO: temp1[36:32] <= '0;
+                    carry_reg    <= (alu_adder_i < temp1[31:0]) ? 1'b1 : 1'b0;
                 end
+                L1_STAGE3_HIGH: begin
+                    temp1[36:32] <= alu_adder_i[4:0];
+                    carry_reg    <= '0;
+                end
+
+                // +(temp0<<12)
+                L1_STAGE4_LOW: begin
+                    temp1[31:0]  <= alu_adder_i;
+                    // REMOVIDO: temp1[36:32] <= '0;
+                    carry_reg    <= (alu_adder_i < temp1[31:0]) ? 1'b1 : 1'b0;
+                end
+                L1_STAGE4_HIGH: begin
+                    temp1[36:32] <= alu_adder_i[4:0];
+                    carry_reg    <= '0;
+                end
+
+                KYBER_BARRETT_L3: begin
+                    temp1 <= {2'b00, mac_result};
+                end
+
+                default: ;
+
             endcase
         end
     end
-    logic [35:0] temp1_shift;
+
+    // ── always_comb ────────────────────────────────────────────────────────────
     always_comb begin
+        temp1_shift = '0;
+        alu_operand_a_kyber_mul = '0;
+        alu_operand_b_kyber_mul = '0;
+
         unique case (mul_state)
-            KYBER_BARRETT_L1_STAGE0: begin 
-                temp1_shift = -(temp0[23:0]);
+
+            // -temp0: LOW
+            L1_STAGE0_LOW: begin
+                // CORREÇÃO 1: Estica para 36 bits PRIMEIRO, depois negativa (Complemento de 2 real)
+                temp1_shift             = -(36'(temp0[23:0])); 
+                alu_operand_a_kyber_mul = '0;
+                alu_operand_b_kyber_mul = temp1_shift[31:0];
+            end
+            // -temp0: HIGH
+            L1_STAGE0_HIGH: begin
+                temp1_shift             = -(36'(temp0[23:0]));
+                // CORREÇÃO 2: Extensão de Sinal (Preserva os '1's do número negativo)
+                alu_operand_a_kyber_mul = {{28{temp1_shift[35]}}, temp1_shift[35:32]};
+                alu_operand_b_kyber_mul = {{27{temp1[36]}}, temp1[36:32]} + {31'd0, carry_reg};
+            end
+
+            // -(temp0<<4): LOW
+            L1_STAGE1_LOW: begin
+                temp1_shift             = -(36'(temp0[23:0]) << 4);
                 alu_operand_a_kyber_mul = temp1[31:0];
                 alu_operand_b_kyber_mul = temp1_shift[31:0];
             end
-            KYBER_BARRETT_L1_STAGE1: begin
-                temp1_shift = -(temp0[23:0] << 4);
+            // -(temp0<<4): HIGH
+            L1_STAGE1_HIGH: begin
+                temp1_shift             = -(36'(temp0[23:0]) << 4);
+                alu_operand_a_kyber_mul = {{27{temp1[36]}}, temp1[36:32]} + {31'd0, carry_reg};
+                // CORREÇÃO 2: Extensão de Sinal
+                alu_operand_b_kyber_mul = {{28{temp1_shift[35]}}, temp1_shift[35:32]};
+            end
+
+            // -(temp0<<6): LOW
+            L1_STAGE2_LOW: begin
+                temp1_shift             = -(36'(temp0[23:0]) << 6);
                 alu_operand_a_kyber_mul = temp1[31:0];
                 alu_operand_b_kyber_mul = temp1_shift[31:0];
             end
-            KYBER_BARRETT_L1_STAGE2: begin
-                temp1_shift = -(temp0[23:0] << 6);
-                alu_operand_a_kyber_mul = temp1[31:0];
-                alu_operand_b_kyber_mul = temp1_shift[31:0];
+            // -(temp0<<6): HIGH
+            L1_STAGE2_HIGH: begin
+                temp1_shift             = -(36'(temp0[23:0]) << 6);
+                alu_operand_a_kyber_mul = {{27{temp1[36]}}, temp1[36:32]} + {31'd0, carry_reg};
+                // CORREÇÃO 2: Extensão de Sinal
+                alu_operand_b_kyber_mul = {{28{temp1_shift[35]}}, temp1_shift[35:32]};
             end
-            KYBER_BARRETT_L1_STAGE3_LOW: begin
-                temp1_shift = (temp0[23:0]) << 10;
-                alu_operand_a_kyber_mul = temp1_shift[31:0]; // fix: era (temp0<<10)[31:0]
+
+            // +(temp0<<10): LOW
+            L1_STAGE3_LOW: begin
+                temp1_shift             = 36'(temp0[23:0]) << 10;
+                alu_operand_a_kyber_mul = temp1_shift[31:0];
                 alu_operand_b_kyber_mul = temp1[31:0];
             end
-            KYBER_BARRETT_L1_STAGE4_HIGH: begin
-                temp1_shift = (temp0[23:0]) << 10;  
-                alu_operand_a_kyber_mul = {29'd0, temp1_shift[33:32]}; // fix: era (temp0<<10)[34:32]
-                alu_operand_b_kyber_mul = {27'd0, temp1[36:32]};
+            // +(temp0<<10): HIGH
+            L1_STAGE3_HIGH: begin
+                temp1_shift             = 36'(temp0[23:0]) << 10;
+                // AQUI É POSITIVO: Zero-padding {28'd0} está correto! (Ajustado para [35:32] por segurança)
+                alu_operand_a_kyber_mul = {28'd0, temp1_shift[35:32]};
+                alu_operand_b_kyber_mul = {{27{temp1[36]}}, temp1[36:32]} + {31'd0, carry_reg};
             end
-            KYBER_BARRETT_L1_STAGE5_LOW: begin
-                temp1_shift = (temp0[23:0]) << 12;
-                alu_operand_a_kyber_mul = temp1_shift[31:0]; // fix: era (temp0<<12)[31:0]
+
+            // +(temp0<<12): LOW
+            L1_STAGE4_LOW: begin
+                temp1_shift             = 36'(temp0[23:0]) << 12;
+                alu_operand_a_kyber_mul = temp1_shift[31:0];
                 alu_operand_b_kyber_mul = temp1[31:0];
             end
-            KYBER_BARRETT_L1_STAGE6_HIGH: begin
-                temp1_shift = (temp0[23:0]) << 12;
-                alu_operand_a_kyber_mul = {27'd0, temp1_shift[35:32]}; // fix: era (temp0<<12)[36:32]
-                alu_operand_b_kyber_mul = {27'd0, temp1[36:32]};
+            // +(temp0<<12): HIGH
+            L1_STAGE4_HIGH: begin
+                temp1_shift             = 36'(temp0[23:0]) << 12;
+                // AQUI É POSITIVO: Zero-padding {28'd0} está correto!
+                alu_operand_a_kyber_mul = {28'd0, temp1_shift[35:32]};
+                alu_operand_b_kyber_mul = {{27{temp1[36]}}, temp1[36:32]} + {31'd0, carry_reg};
             end
-            KYBER_BARRETT_L3: begin 
+
+            KYBER_BARRETT_L4: begin
                 alu_operand_a_kyber_mul = temp0[31:0];
                 alu_operand_b_kyber_mul = -temp1[31:0];
             end
+
             default: ;
+
         endcase
     end
+    
 
     logic [31:0] second_operand_neg, second_value_sub;
 
@@ -444,7 +535,7 @@ always_ff @(posedge clk or negedge reset_n) begin
 
       unique case (mul_state)
 
-        KYBER_BARRETT_L1_STAGE4_HIGH: begin
+        L1_STAGE4_HIGH: begin
             //mult_hold    = ~multdiv_ready_id_i;  
             mult_kyber_op_a = temp1 >> 24;
             mult_kyber_op_b = 16'd3329;
