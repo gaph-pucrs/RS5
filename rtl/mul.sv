@@ -163,28 +163,45 @@ module mul
 
     assign adjust_result_low = (adjust_result_low_mux_sel ? adjust_adder_low[11:0] : adjust_adder_low_op_a[11:0]) & adjust_result_low_mask;
 
-    typedef enum logic [11:0] {
-        IDLE                         = 12'b000000000001,
-        ALBL                         = 12'b000000000010,
-        ALBH                         = 12'b000000000100,
-        AHBL                         = 12'b000000001000,
-        AHBH                         = 12'b000000010000,
-        L1_STAGE0_WAIT               = 12'b000000100000,
-        L1_STAGE0_WAIT2              = 12'b000001000000,
-        L1_STAGE0_LOW                = 12'b000010000000,
-        L1_STAGE0_HIGH               = 12'b000100000000, 
-        KYBER_BARRETT_L2             = 12'b001000000000, 
-        KYBER_BARRETT_L3             = 12'b010000000000,
-        KYBER_BARRETT_L4             = 12'b100000000000
+    typedef enum logic [13:0] {
+        IDLE                         = 14'b00000000000001,
+        ALBL                         = 14'b00000000000010,
+        ALBH                         = 14'b00000000000100,
+        AHBL                         = 14'b00000000001000,
+        AHBH                         = 14'b00000000010000,
+        L1_STAGE0_WAIT               = 14'b00000000100000,
+        L1_STAGE0_WAIT2              = 14'b00000001000000,
+        L1_STAGE0_LOW                = 14'b00000010000000,
+        L1_STAGE0_HIGH               = 14'b00000100000000, 
+        KYBER_BARRETT_L2             = 14'b00001000000000, 
+        KYBER_BARRETT_L3             = 14'b00010000000000,
+        KYBER_BARRETT_L4             = 14'b00100000000000, 
+        COMPRESS_STAGE0              = 14'b01000000000000, 
+        COMPRESS_END                 = 14'b10000000000000
     } mul_states_e;
 
     mul_states_e mul_state;
     mul_states_e next_state;
 
+    mul_states_e stage;
+
+    always_comb begin 
+        stage = IDLE;
+        if(enable_i) begin 
+            if(operator_i == KYBER_MUL) stage = L1_STAGE0_WAIT; 
+            else if(operator_i == KYBER_COMPRESS) stage = COMPRESS_STAGE0;
+            else stage = ALBL;
+        end
+    end
+
+    logic is_compress;
+
+    assign is_compress = (operator_i == KYBER_COMPRESS);
+
     always_comb begin
         next_state = IDLE;
         unique case (mul_state)
-            IDLE:                         next_state = (enable_i) ? ((operator_i == KYBER_MUL) ? L1_STAGE0_WAIT : ALBL) : IDLE;
+            IDLE:                         next_state = stage;
             ALBL:                         next_state = single_cycle_i ? IDLE : ALBH;
             ALBH:                         next_state = AHBL;
             AHBL:                         next_state = mul_low_i      ? IDLE : AHBH;
@@ -192,10 +209,12 @@ module mul
             L1_STAGE0_WAIT:               next_state = L1_STAGE0_WAIT2;
             L1_STAGE0_WAIT2:              next_state = L1_STAGE0_LOW;
             L1_STAGE0_LOW:                next_state = L1_STAGE0_HIGH;
-            L1_STAGE0_HIGH:               next_state = KYBER_BARRETT_L2;
+            L1_STAGE0_HIGH:               next_state = (is_compress) ? COMPRESS_END : KYBER_BARRETT_L2;
             KYBER_BARRETT_L2:             next_state = KYBER_BARRETT_L3;
             KYBER_BARRETT_L3:             next_state = KYBER_BARRETT_L4;
-            KYBER_BARRETT_L4:             next_state = IDLE;  
+            KYBER_BARRETT_L4:             next_state = IDLE;
+            COMPRESS_STAGE0:              next_state = L1_STAGE0_WAIT2;
+            COMPRESS_END:                 next_state = IDLE;
             default:                      next_state = IDLE;
         endcase
     end
@@ -259,6 +278,57 @@ module mul
         end
     end
 
+    // synthesis translate_off
+
+    localparam string OUTPUT_FILE = "./result_kyber/Output.txt";
+    integer fd; // File Descriptor (o ponteiro para o arquivo)
+
+    // 1. Abre o arquivo uma vez só no começo da simulação
+    initial begin
+        // "w" abre em modo Write (apaga o log do run anterior e começa limpo). 
+        // Se quiser que ele vá somando os logs, troque "w" por "a" (Append).
+        fd = $fopen(OUTPUT_FILE, "w");
+        
+        if (fd == 0) begin
+            $display("ERRO FATAL: Não foi possível criar o arquivo %s. Verifique se a pasta existe!", OUTPUT_FILE);
+            $finish;
+        end
+    end
+
+    // 2. Grava no arquivo usando $fdisplay(fd, ...)
+    always_ff @(posedge clk) begin
+
+        // Operações Multi-ciclo
+        if (xkyber_valid) begin 
+            if (operator_i == KYBER_MUL)
+                $fdisplay(fd, "[CHECKER] KYBER_MUL      0x%0h e 0x%0h = 0x%0h", first_operand_i, second_operand_i, result_o);
+            else if (operator_i == KYBER_COMPRESS)
+                $fdisplay(fd, "[CHECKER] KYBER_COMPRESS 0x%0h e 0x%0h = 0x%0h", first_operand_i, second_operand_i, result_o);
+        end 
+        
+        // Operações Single-cycle
+        else if (operator_i inside {KYBER_ADD, KYBER_SUB, KYBER_CBD2, KYBER_CBD3}) begin 
+            case (operator_i)
+                KYBER_ADD:  $fdisplay(fd, "[CHECKER] KYBER_ADD      0x%0h e 0x%0h = 0x%0h", first_operand_i, second_operand_i, result_o);
+                KYBER_SUB:  $fdisplay(fd, "[CHECKER] KYBER_SUB      0x%0h e 0x%0h = 0x%0h", first_operand_i, second_operand_i, result_o);
+                KYBER_CBD2: $fdisplay(fd, "[CHECKER] KYBER_CBD2     0x%0h e 0x%0h = 0x%0h", first_operand_i, second_operand_i, result_o);
+                KYBER_CBD3: $fdisplay(fd, "[CHECKER] KYBER_CBD3     0x%0h e 0x%0h = 0x%0h", first_operand_i, second_operand_i, result_o);
+                default: ;
+            endcase
+        end
+
+    end
+
+    // 3. Fecha o arquivo de forma segura quando a simulação acaba
+    final begin
+        if (fd != 0) begin
+            $fclose(fd);
+            $display("Log de saída salvo com sucesso em: %s", OUTPUT_FILE);
+        end
+    end
+
+    // synthesis translate_on
+
     logic [15:0] mac_result_r;
 
     logic signed_mult;
@@ -305,7 +375,14 @@ module mul
 
     assign result_xkyber = {{4{1'b0}}, adjust_result_high, {4{1'b0}}, adjust_result_low};
 
-    assign result_o = (is_xkyber_i) ? result_xkyber : mac_result_partial[31:0];
+    logic [31:0] result_compress;
+
+    always_comb begin 
+        result_o = mac_result_partial[31:0];
+        if(is_compress) result_o = result_compress;
+        else if(is_xkyber_i) result_o = result_xkyber;
+    end
+
 
 //kyber part!
 
@@ -316,6 +393,7 @@ module mul
             temp0 <= '0;
         end else begin 
             if (mul_state == L1_STAGE0_WAIT) temp0 <= mac_result; //in idle mac_res_d will hold the temp0 value
+            else if(is_compress && mul_state == L1_STAGE0_WAIT2) temp0 <= mac_result;
         end
     end
 
@@ -326,7 +404,14 @@ module mul
             temp1 <= '0;
         end else begin 
             if (mul_state == L1_STAGE0_HIGH) temp1 <= ({2'b00, mac_result[20:0]} << 16) + temp1;
-            else if (mul_state != KYBER_BARRETT_L2) temp1 <= {2'b00, mac_result};
+            else begin
+                if(!is_compress) begin
+                    if (mul_state != KYBER_BARRETT_L2) temp1 <= {2'b00, mac_result};
+                end
+                else begin 
+                    if (mul_state == L1_STAGE0_LOW) temp1 <= {2'b00, mac_result}; //testar se essa condição não funciona para o mul tbm
+                end
+            end
         end
     end 
 
@@ -334,32 +419,31 @@ module mul
 
     assign second_operand_neg = second_operand_i ^ {32{1'b1}};
 
-    assign second_value_sub = second_operand_neg + 1 + (1 << 16);
+    assign second_value_sub = {{3{1'b0}}, 13'(second_operand_neg[27:16] + 1), {3{1'b0}}, 13'(second_operand_neg[11:0] + 1)};
 
     logic [31:0] alu_operand_a_kyber_mul, alu_operand_b_kyber_mul;
 
     always_comb begin 
         alu_operand_a_kyber = first_operand_i;
         alu_operand_b_kyber = second_operand_i;
-        if(operator_i == KYBER_ADD) begin 
-            alu_operand_b_kyber = second_operand_i;
-        end else if(operator_i == KYBER_SUB) begin 
-            alu_operand_b_kyber = {{4{1'b0}}, (second_value_sub[27:16]), {4{1'b0}}, second_value_sub[11:0]};
-        end else if(operator_i == KYBER_MUL) begin
+        if(operator_i == KYBER_SUB) begin 
+            alu_operand_b_kyber = second_value_sub;
+        end else if(operator_i == KYBER_MUL || operator_i == KYBER_COMPRESS) begin
             alu_operand_a_kyber = alu_operand_a_kyber_mul;
             alu_operand_b_kyber = alu_operand_b_kyber_mul;
         end
     end
 
-
     always_comb begin
 
-      mult_kyber_op_a            = first_operand_i[15:0];
+      mult_kyber_op_a            = {1'b0, first_operand_i[15:0]};
       mult_kyber_op_b            = 17'd5039;
       xkyber_valid               = 1'b0;
 
       alu_operand_a_kyber_mul = temp0[31:0];
       alu_operand_b_kyber_mul = -(temp1[31:0]);
+
+      result_compress = '0;
 
       unique case (mul_state)
 
@@ -372,11 +456,12 @@ module mul
         end
 
         L1_STAGE0_WAIT2: begin 
-            mult_kyber_op_a  = {1'b0, temp0[15:0]};  // 16 bits unsigned → 17 bits signed OK
+            if(!is_compress) mult_kyber_op_a  = {1'b0, temp0[15:0]};  // 16 bits unsigned → 17 bits signed OK
         end
 
         L1_STAGE0_LOW: begin 
-            mult_kyber_op_a  = {1'b0, temp0[31:16]};  // 16 bits altos
+            if(is_compress) mult_kyber_op_a = {9'b000000000, first_operand_i[23:16]};
+            else mult_kyber_op_a  = {1'b0, temp0[31:16]};  // 16 bits altos
         end
 
         L1_STAGE0_HIGH: begin 
@@ -402,6 +487,21 @@ module mul
             // Note no state transition will occur if mult_hold is set
             //mult_hold    = ~multdiv_ready_id_i;
         end
+
+        COMPRESS_STAGE0: begin 
+
+            mult_kyber_op_b = 16'hB760;  // Fractional part of 2**24/q, 12 bits of precision
+
+        end
+
+        COMPRESS_END: begin 
+            alu_operand_a_kyber_mul = {{16{1'b0}}, temp0[31:16]};
+            alu_operand_b_kyber_mul = temp1[31:0];
+
+            result_compress = {{20{1'b0}}, adjust_result_low};
+            xkyber_valid = 1'b1;
+        end
+
         default: ;
 
       endcase // mult_state_q

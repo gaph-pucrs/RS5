@@ -47,7 +47,7 @@ module RS5
     parameter bit           ZBKBEnable       = 1'b1,
     parameter bit           ZICONDEnable     = 1'b1,
     parameter bit           ZCBEnable        = 1'b1,
-    parameter bit           HPMCOUNTEREnable = 1'b1,
+    parameter bit           HPMCOUNTEREnable = 1'b0,
     parameter int           IQUEUE_SIZE      = 2,
     parameter bit           BRANCHPRED       = 1'b1,
     parameter bit           FORWARDING       = 1'b1,

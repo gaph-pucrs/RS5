@@ -582,7 +582,7 @@ module execute
 
             assign is_xkyber = (instruction_operation_i inside {KYBER_ADD, KYBER_SUB,KYBER_CBD2, KYBER_CBD3, KYBER_MUL, KYBER_COMPRESS});
 
-            assign enable_mul = (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU, KYBER_MUL});
+            assign enable_mul = (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU, KYBER_MUL, KYBER_COMPRESS});
 
             mul mul1 (
                 .clk                   (clk),
@@ -615,7 +615,7 @@ module execute
 
     always_comb begin
         unique case (instruction_operation_i)
-            KYBER_SUB, KYBER_MUL: sum2_opB = multdiv_alu_operand_b;
+            KYBER_SUB, KYBER_MUL, KYBER_COMPRESS: sum2_opB = multdiv_alu_operand_b;
             SUB:       sum2_opB = -second_operand_i;
             default:   sum2_opB =  second_operand_i; // AMO_W
         endcase

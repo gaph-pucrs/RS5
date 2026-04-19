@@ -64,8 +64,8 @@ module testbench
 
     localparam int           BUS_WIDTH       = 32;
     localparam int           MEM_ADDR_BITS   = 28;
-    //localparam string        BIN_FILE        = "/sim/vitao/crypto/soc/RS5/app/xkyber_keys_exchange/xkyber_keys_exchange.bin";
-    localparam string        BIN_FILE        = "/sim/vitao/crypto/soc/RS5/app/xkyber_full_test/xkyber_full_test.bin";
+    localparam string        BIN_FILE        = "/sim/vitao/crypto/soc/RS5/app/xkyber_keys_exchange/xkyber_keys_exchange.bin";
+    //localparam string        BIN_FILE        = "/sim/vitao/crypto/soc/RS5/app/xkyber_full_test/xkyber_full_test.bin";
     //localparam string        BIN_FILE        = "/sim/vitao/crypto/soc/RS5/app/keccak_test/keccak_test.bin";
     //localparam string        BIN_FILE        = "/sim/vitao/crypto/soc/RS5/app/test_bitmanip/test_bitmanip.bin";
     localparam int           i_cnt = 1;
