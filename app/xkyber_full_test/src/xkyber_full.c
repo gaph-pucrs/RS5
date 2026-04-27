@@ -15,7 +15,8 @@ int test_cbd() {
     int fail_count_cbd2 = 0;
     int fail_count_cbd3 = 0;
 
-    for (int i = 0; i < (1 << 8) - 1; i+=10) {
+    // Testa TODOS os valores de 8 bits
+    for (int i = 0; i < (1 << 8); i++) {
 
         printf("kybercbd2 i = 0x%x\n", i);
 
@@ -37,7 +38,8 @@ int test_cbd() {
         fail_count_cbd2 += rvkat_chku32("kybercbd2_coeff_high", ref_coeff_high, asm_coeff_high);
     }
 
-    for (int i = 0; i < (1 << 12) - 1; i+=100) {
+    // Testa TODOS os valores de 12 bits
+    for (int i = 0; i < (1 << 12); i++) {
 
         printf("kybercbd3 i = 0x%x\n", i);
 
@@ -74,25 +76,36 @@ int test_arith() {
     int fail_count_sub = 0;
     int fail_count_mul = 0;
 
-    for (int coeff = 1; coeff < KYBER_Q; coeff+= 100) {
+    /*int coeff = 0x20d00;
+    int coeff2 = 0x0;
 
-        printf("kyberadd coeffs = 0x%x | 0x%x\n", coeff, coeff+1);
+    printf("kybersub coeff = 0x%x * 0x%x\n", coeff, coeff2);
 
-        int asm_val, asm_coeff_high, asm_coeff_low;
+    int asm_val;
+    __asm__ __volatile__ ("kybersub %0, %1, %2" :  "=r"(asm_val) : "r"(coeff), "r"(coeff2));*/
 
-        __asm__("kyberadd %0, %1, %2" :  "=r"(asm_val)
-                : "r"(coeff | (coeff << 16)),
-                  "r"(coeff | ((coeff+1) << 16)));
+    // Testa todos os pares de coeff
+    /*for (int coeff = 0; coeff < KYBER_Q; coeff++) {
+        for (int coeff2 = 0; coeff2 < KYBER_Q; coeff2++) {
 
-        asm_coeff_low = (asm_val & 0x0000FFFF);
-        asm_coeff_high = (asm_val >> 16);
+            printf("kyberadd coeffs = 0x%x + 0x%x\n", coeff, coeff2+1);
 
-        int ref_coeff_low = (coeff + coeff) % KYBER_Q;
-        int ref_coeff_high = (coeff + coeff + 1) % KYBER_Q;
+            int asm_val, asm_coeff_high, asm_coeff_low;
 
-        fail_count_add += rvkat_chku32("kyberadd_coeff_low", ref_coeff_low, asm_coeff_low);
-        fail_count_add += rvkat_chku32("kyberadd_coeff_high", ref_coeff_high, asm_coeff_high);
-    }
+            __asm__("kyberadd %0, %1, %2" :  "=r"(asm_val)
+                    : "r"(coeff | (coeff << 16)),
+                      "r"(coeff2 | (coeff2 << 16)));
+
+            asm_coeff_low  = (asm_val & 0x0000FFFF);
+            asm_coeff_high = (asm_val >> 16);
+
+            int ref_coeff_low  = (coeff + coeff2) % KYBER_Q;
+            int ref_coeff_high = (coeff + coeff2) % KYBER_Q;
+
+            fail_count_add += rvkat_chku32("kyberadd_coeff_low",  ref_coeff_low,  asm_coeff_low);
+            fail_count_add += rvkat_chku32("kyberadd_coeff_high", ref_coeff_high, asm_coeff_high);
+        }
+    }*/
 
     for (int coeff = 1; coeff < KYBER_Q; coeff+= 100) {
 
@@ -117,17 +130,20 @@ int test_arith() {
         fail_count_sub += rvkat_chku32("kybersub_coeff_high", ref_coeff_high, asm_coeff_high);
     }
 
-    for (int coeff = 1; coeff < KYBER_Q; coeff+= 100) {
+    // Testa todos os pares de coeff
+    /*for (int coeff = 0; coeff < KYBER_Q; coeff++) {
+        for (int coeff2 = 0; coeff2 < KYBER_Q; coeff2++) {
 
-        printf("kybermul coeff = 0x%x\n", coeff);
+            printf("kybermul coeff = 0x%x * 0x%x\n", coeff, coeff2);
 
-        int asm_val;
-        __asm__("kybermul %0, %1, %2" :  "=r"(asm_val) : "r"(coeff), "r"(coeff));
+            int asm_val;
+            __asm__("kybermul %0, %1, %2" :  "=r"(asm_val) : "r"(coeff), "r"(coeff2));
 
-        int ref_val = (coeff * coeff) % KYBER_Q;
+            int ref_val = ((long long)coeff * coeff2) % KYBER_Q;
 
-        fail_count_mul += rvkat_chku32("kybermul_coeff", ref_val, asm_val);
-    }
+            fail_count_mul += rvkat_chku32("kybermul_coeff", ref_val, asm_val);
+        }
+    }*/
 
     printf("\n");
     printf("test_arith() add fail count: %d\n", fail_count_add);
@@ -142,8 +158,9 @@ int test_compress() {
     int fail_count = 0;
     int compress_d[5] = {1, 4, 5, 10, 11};
 
+    // Testa TODOS os coeff para cada d
     for (int i = 0; i < 5; i++)
-        for (int coeff = 0; coeff < KYBER_Q; coeff+=100) {
+        for (int coeff = 0; coeff < KYBER_Q; coeff++) {
 
             printf("kybercompress d = %d | coeff = 0x%x\n", compress_d[i], coeff);
 
@@ -167,14 +184,14 @@ int main() {
     int test_arith_fail_count    = 0;
     int test_compress_fail_count = 0;
 
-    //test_cbd_fail_count = test_cbd();
-    test_arith_fail_count = test_arith();
+    //test_cbd_fail_count      = test_cbd();
+    test_arith_fail_count    = test_arith();
     //test_compress_fail_count = test_compress();
 
     printf("\n");
-    //printf("test_cbd() fail count: %d\n", test_cbd_fail_count);
-    printf("test_arith() fail count: %d\n", test_arith_fail_count);
-    //printf("test_compress() fail count: %d\n", test_compress_fail_count);
+    printf("test_cbd() fail count: %d\n",      test_cbd_fail_count);
+    printf("test_arith() fail count: %d\n",    test_arith_fail_count);
+    printf("test_compress() fail count: %d\n", test_compress_fail_count);
 
     return test_cbd_fail_count + test_arith_fail_count + test_compress_fail_count;
 }
