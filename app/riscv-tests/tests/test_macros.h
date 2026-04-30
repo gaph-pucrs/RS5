@@ -709,7 +709,7 @@ test_ ## testnum: \
 // ^ x14 is used in some other macros, to avoid issues we use x15 for upper word
 
 #define MISALIGNED_LOAD_HANDLER \
-  li t0, CAUSE_MISALIGNED_LOAD; \
+  li t0, 4; \
   csrr t1, mcause; \
   bne t0, t1, fail; \
   \

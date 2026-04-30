@@ -94,6 +94,15 @@ void TEST_CASE3(void) {
   // VCMP_U64(12, v3, -1);
 }
 
+void TEST_CASE4(void) {
+  VSET(32, e32, m2);
+  VLOAD_32(v1, 9, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8,
+               9, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 50, 6, 7, 8);
+  VLOAD_32(v3, 1);
+  asm volatile("vredmaxu.vs v4, v1, v3");
+  VCMP_U32(9, v4, 50);
+}
+
 int main(void) {
   INIT_CHECK();
   enable_vec();
@@ -101,6 +110,7 @@ int main(void) {
   TEST_CASE1();
   TEST_CASE2();
   TEST_CASE3();
+  TEST_CASE4();
 
   EXIT_CHECK();
 }

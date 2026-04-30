@@ -67,12 +67,22 @@ void TEST_CASE2(void) {
 //   VCMP_U64(8, v3, 1);
 }
 
+void TEST_CASE3(void) {
+  VSET(32, e32, m2);
+  VLOAD_32(v1, 9, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8,
+               9, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 0);
+  VLOAD_32(v3, 1);
+  asm volatile("vredminu.vs v4, v1, v3");
+  VCMP_U32(9, v4, 0);
+}
+
 int main(void) {
   INIT_CHECK();
   enable_vec();
 
   TEST_CASE1();
   TEST_CASE2();
+  TEST_CASE3();
 
   EXIT_CHECK();
 }

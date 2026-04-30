@@ -1,3 +1,14 @@
+/*!\file riscv_crypto_aes_sbox.sv
+ *
+ * Willian Nunes    <willian.nunes@edu.pucrs.br>
+ * Angelo Dal Zotto <angelo.dalzotto@edu.pucrs.br>
+ * Marcos Sartori   <marcos.sartori@acad.pucrs.br>
+ * Ney Calazans     <ney.calazans@ufsc.br>
+ * Fernando Moraes  <fernando.moraes@pucrs.br>
+ * GAPH - Hardware Design Support Group
+ * PUCRS - Pontifical Catholic University of Rio Grande do Sul <https://pucrs.br/>
+ */
+
 module riscv_crypto_aes_sbox (
     output [7:0] fx,
     input  [7:0] in

@@ -1,6 +1,4 @@
-vlog ../rtl/aes/*.sv
-vlog ../rtl/*.sv
-vlog *.sv
+do compile.do
 vsim -voptargs=+acc work.testbench
-do wave_simple.do
-run -all
+do wave.do
+# run -all

@@ -1,19 +1,38 @@
+/*!
+ *
+ * Willian Nunes    <willian.nunes@edu.pucrs.br>
+ * Angelo Dal Zotto <angelo.dalzotto@edu.pucrs.br>
+ * Marcos Sartori   <marcos.sartori@acad.pucrs.br>
+ * Ney Calazans     <ney.calazans@ufsc.br>
+ * Fernando Moraes  <fernando.moraes@pucrs.br>
+ * GAPH - Hardware Design Support Group
+ * PUCRS - Pontifical Catholic University of Rio Grande do Sul <https://pucrs.br/>
+ *
+ * \brief
+ * Atomic memory operations.
+ */
+
+
 `include "../rtl/RS5_pkg.sv"
 
 module RS5_FPGA_Platform
     import RS5_pkg::*;
 #(
-    parameter int           i_cnt       = 2,
-    parameter environment_e Environment = FPGA,
-    parameter mul_e         MULEXT      = MUL_M,
-    parameter atomic_e      AMOEXT      = AMO_A,
-    parameter bit           COMPRESSED  = 1'b1,
-    parameter bit           XOSVMEnable = 1'b0,
-    parameter bit           ZIHPMEnable = 1'b0,
-    parameter bit           ZKNEEnable  = 1'b0,
-    parameter bit           VEnable     = 1'b0,
-    parameter bit           BRANCHPRED  = 1'b1,
-    parameter int           VLEN        = 64,
+    parameter int           i_cnt             = 2,
+    parameter environment_e Environment       = FPGA,
+    parameter mul_e         MULEXT            = MUL_M,
+    parameter atomic_e      AMOEXT            = AMO_A,
+    parameter bit           COMPRESSED        = 1'b1,
+    parameter bit           XOSVMEnable       = 1'b0,
+    parameter bit           HPMCOUNTEREnable  = 1'b0,
+    parameter bit           ZKNEEnable        = 1'b0,
+    parameter bit           ZICONDEnable      = 1'b0,
+    parameter bit           ZCBEnable         = 1'b1,
+    parameter bit           VEnable           = 1'b0,
+    parameter bit           BRANCHPRED        = 1'b1,
+    parameter bit           FORWARDING        = 1'b1,
+    parameter int           IQUEUE_SIZE       = 2,
+    parameter int           VLEN              = 64,
     parameter int           CLKS_PER_BIT_UART = 868
 )
 (
@@ -104,27 +123,34 @@ module RS5_FPGA_Platform
 //////////////////////////////////////////////////////////////////////////////
 
     RS5 #(
-        .Environment    (Environment),
-        .MULEXT         (MULEXT),
-        .AMOEXT         (AMOEXT),
-        .XOSVMEnable    (XOSVMEnable),
-        .ZIHPMEnable    (ZIHPMEnable),
-        .ZKNEEnable     (ZKNEEnable),
-        .COMPRESSED     (COMPRESSED),
-        .VEnable        (VEnable),
-        .VLEN           (VLEN),
-        .BRANCHPRED     (BRANCHPRED)
+        .Environment     (Environment     ),
+        .MULEXT          (MULEXT          ),
+        .AMOEXT          (AMOEXT          ),
+        .XOSVMEnable     (XOSVMEnable     ),
+        .HPMCOUNTEREnable(HPMCOUNTEREnable),
+        .ZKNEEnable      (ZKNEEnable      ),
+        .ZICONDEnable    (ZICONDEnable    ),
+        .ZCBEnable       (ZCBEnable       ),
+        .COMPRESSED      (COMPRESSED      ),
+        .VEnable         (VEnable         ),
+        .VLEN            (VLEN            ),
+        .IQUEUE_SIZE     (IQUEUE_SIZE     ),
+        .BRANCHPRED      (BRANCHPRED      ),
+        .FORWARDING      (FORWARDING      )
     ) dut (
         .clk                    (clk),
         .reset_n                (reset_n),
         .sys_reset_i            (1'b0),
         .stall                  (stall),
+        .busy_i                 (1'b0),
         .instruction_i          (cpu_instruction),
         .mem_data_i             (cpu_data_in),
         .mtime_i                (mtime),
-        .irq_i                  (irq),
+        .tip_i                  (mti),
+        .eip_i                  (mei),
+        .imem_operation_enable_o(cpu_instruction_enable),
         .instruction_address_o  (cpu_instruction_address),
-        .mem_operation_enable_o (cpu_operation_enable),
+        .dmem_operation_enable_o(cpu_operation_enable),
         .mem_write_enable_o     (cpu_write_enable),
         .mem_address_o          (cpu_data_address),
         .mem_data_o             (cpu_data_out),
@@ -137,7 +163,7 @@ module RS5_FPGA_Platform
 
     BRAM RAM (
         .clka   (clk),                      // input wire clka
-        .ena    (!stall),                   // input wire ena
+        .ena    (cpu_instruction_enable),   // input wire ena
         .wea    (4'h0),                     // input wire [3 : 0] wea
         .addra  (cpu_instruction_address),  // input wire [31 : 0] addra
         .dina   (0),                        // input wire [31 : 0] dina

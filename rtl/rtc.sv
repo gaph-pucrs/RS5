@@ -3,11 +3,13 @@
  *
  * Distribution:  July 2023
  *
- * Willian Nunes     <willian.nunes@edu.pucrs.br>
- * Angelo Dal Zotto  <angelo.dalzotto@edu.pucrs.br>
- * Caroline Borges   <caroline.s@edu.pucrs.br>
- *
- * Research group: GAPH-PUCRS  <>
+ * Willian Nunes    <willian.nunes@edu.pucrs.br>
+ * Angelo Dal Zotto <angelo.dalzotto@edu.pucrs.br>
+ * Marcos Sartori   <marcos.sartori@acad.pucrs.br>
+ * Ney Calazans     <ney.calazans@ufsc.br>
+ * Fernando Moraes  <fernando.moraes@pucrs.br>
+ * GAPH - Hardware Design Support Group
+ * PUCRS - Pontifical Catholic University of Rio Grande do Sul <https://pucrs.br/>
  *
  * \brief
  *
@@ -47,22 +49,18 @@ module rtc (
         end
     end
 
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            data_o <= '0;
-        end
-        else if (en_i && we_i == '0) begin
-            unique case (addr_i[3:2])
-                2'b00: data_o <= mtime;
-                2'b01: data_o <= {32'd0, mtime[63:32]};
-                2'b10: data_o <= mtimecmp;
-                2'b11: data_o <= {32'd0, mtimecmp[63:32]};
-            endcase
-        end
-    end
-
     logic [63:0] r_data;
     assign r_data = addr_i[3] ? mtimecmp : mtime;
+
+    logic [63:0] r_data_unaligned;
+    assign r_data_unaligned = addr_i[2] ? {32'h0, r_data[63:32]} : r_data;
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            data_o <= '0;
+        else if (en_i && we_i == '0)
+            data_o <= r_data_unaligned;
+    end
 
     logic [63:0] w_data;
     always_comb begin
@@ -82,22 +80,27 @@ module rtc (
             w_data[23:16] = we_i[2] ? data_i[23:16] : r_data[23:16];
             w_data[15: 8] = we_i[1] ? data_i[15: 8] : r_data[15: 8];
             w_data[ 7: 0] = we_i[0] ? data_i[ 7: 0] : r_data[ 7: 0];
-        end        
+        end
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             mtime    <= '0;
-            mtimecmp <= '0;
         end
         else begin
             mtime <= mtime + 1'b1;
-            if (en_i && we_i != '0) begin
-                unique case (addr_i[3])
-                    1'b0: mtime    <= w_data;
-                    1'b1: mtimecmp <= w_data;
-                endcase
-            end
+            if (en_i && we_i != '0 && !addr_i[3])
+                mtime <= w_data;
+        end
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            mtimecmp <= '0;
+        end
+        else begin
+            if (en_i && we_i != '0 && addr_i[3])
+                mtimecmp <= w_data;
         end
     end
 

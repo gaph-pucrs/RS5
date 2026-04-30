@@ -3,11 +3,13 @@
  *
  * Distribution:  July 2023
  *
- * Willian Nunes   <willian.nunes@edu.pucrs.br>
- * Marcos Sartori  <marcos.sartori@acad.pucrs.br>
- * Ney calazans    <ney.calazans@pucrs.br>
- *
- * Research group: GAPH-PUCRS  <>
+ * Willian Nunes    <willian.nunes@edu.pucrs.br>
+ * Angelo Dal Zotto <angelo.dalzotto@edu.pucrs.br>
+ * Marcos Sartori   <marcos.sartori@acad.pucrs.br>
+ * Ney Calazans     <ney.calazans@ufsc.br>
+ * Fernando Moraes  <fernando.moraes@pucrs.br>
+ * GAPH - Hardware Design Support Group
+ * PUCRS - Pontifical Catholic University of Rio Grande do Sul <https://pucrs.br/>
  *
  * \brief
  * Retire is the last stage of the RS5 processor core.
@@ -17,7 +19,7 @@
  * It performs the write-back on the register bank. It also receives the data read from memory
  * and process it based on instruction format then it decides which data should be sent to the
  * register bank, either the data from memory or the data from execute unit.
- * 
+ *
  */
 
 `include "RS5_pkg.sv"
@@ -32,6 +34,7 @@ module retire
     /* verilator lint_off UNUSEDSIGNAL */
     input   logic           clk,
     input   logic           reset_n,
+    input   logic           regbank_we_i,
     /* verilator lint_on UNUSEDSIGNAL */
 
     input   iType_e         instruction_operation_i,
@@ -52,53 +55,53 @@ module retire
         unique case (instruction_operation_i)
             LB: begin
                 case (result_i[1:0])
-                    2'b11: begin 
+                    2'b11: begin
                         memory_data[31:8] = {24{mem_data_i[31]}};
-                        memory_data[7:0]  = mem_data_i[31:24]; 
+                        memory_data[7:0]  = mem_data_i[31:24];
                     end
-                    2'b10: begin 
+                    2'b10: begin
                         memory_data[31:8] = {24{mem_data_i[23]}};
-                        memory_data[7:0]  = mem_data_i[23:16]; 
+                        memory_data[7:0]  = mem_data_i[23:16];
                     end
-                    2'b01: begin 
+                    2'b01: begin
                         memory_data[31:8] = {24{mem_data_i[15]}};
                         memory_data[7:0]  = mem_data_i[15:8];
                     end
-                    default: begin 
+                    default: begin
                         memory_data[31:8] = {24{mem_data_i[7]}};
-                        memory_data[7:0]  = mem_data_i[7:0]; 
+                        memory_data[7:0]  = mem_data_i[7:0];
                     end
                 endcase
             end
-            
+
             LBU: begin
                 memory_data[31:8] = '0;
                 case (result_i[1:0])
-                    2'b11:   memory_data[7:0]  = mem_data_i[31:24]; 
-                    2'b10:   memory_data[7:0]  = mem_data_i[23:16]; 
+                    2'b11:   memory_data[7:0]  = mem_data_i[31:24];
+                    2'b10:   memory_data[7:0]  = mem_data_i[23:16];
                     2'b01:   memory_data[7:0]  = mem_data_i[15:8];
-                    default: memory_data[7:0]  = mem_data_i[7:0]; 
+                    default: memory_data[7:0]  = mem_data_i[7:0];
                 endcase
             end
 
             LH: begin
                 case (result_i[1])
-                    1'b1: begin 
+                    1'b1: begin
                         memory_data[31:16] = {16{mem_data_i[31]}};
-                        memory_data[15:0]  = mem_data_i[31:16]; 
+                        memory_data[15:0]  = mem_data_i[31:16];
                     end
-                    default: begin  
+                    default: begin
                         memory_data[31:16] = {16{mem_data_i[15]}};
-                        memory_data[15:0]  = mem_data_i[15:0]; 
+                        memory_data[15:0]  = mem_data_i[15:0];
                     end
                 endcase
             end
 
             LHU: begin
-                memory_data[31:16] = '0; 
+                memory_data[31:16] = '0;
                 case (result_i[1])
-                    1'b1:    memory_data[15:0] = mem_data_i[31:16]; 
-                    default: memory_data[15:0] = mem_data_i[15:0]; 
+                    1'b1:    memory_data[15:0] = mem_data_i[31:16];
+                    default: memory_data[15:0] = mem_data_i[15:0];
                 endcase
             end
 
@@ -115,7 +118,7 @@ module retire
         unique case (instruction_operation_i)
             LB,LBU,LH,LHU,LW,LR_W: regbank_data_o = memory_data;
             default:               regbank_data_o = result_i;
-        endcase         
+        endcase
     end
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -127,7 +130,7 @@ module retire
             if (!reset_n) begin
                 reservation_data_o <= '0;
             end
-            else begin
+            else if (regbank_we_i) begin    /* Avoid writing on MMU exceptions */
                 unique case (instruction_operation_i)
                     LR_W:    reservation_data_o <= mem_data_i;
                     SC_W:    reservation_data_o <= '0;

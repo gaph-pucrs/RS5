@@ -25,9 +25,9 @@ module mul
 
     typedef enum logic [4:0] {
         IDLE = 5'b00001,
-        ALBL = 5'b00010, 
-        ALBH = 5'b00100, 
-        AHBL = 5'b01000, 
+        ALBL = 5'b00010,
+        ALBH = 5'b00100,
+        AHBL = 5'b01000,
         AHBH = 5'b10000
     } mul_states_e;
 
@@ -47,9 +47,9 @@ module mul
 
     logic last_cycle;
     assign last_cycle = (mul_state == AHBH) || (mul_state == AHBL && mul_low_i) || (mul_state == ALBL && single_cycle_i);
-    
+
     logic should_stall;
-    assign should_stall = stall && last_cycle;  
+    assign should_stall = stall && last_cycle;
 
     always_ff@(posedge clk or negedge reset_n) begin
         if (!reset_n)
@@ -58,7 +58,7 @@ module mul
             mul_state <= next_state;
     end
 
-    assign hold_o = enable_i && !last_cycle;  
+    assign hold_o = enable_i && !last_cycle;
 
     logic [16:0] op_al;
     logic [16:0] op_ah;
@@ -121,13 +121,13 @@ module mul
             endcase
         end
     end
-    
+
     logic [34:0] mac_result;
     assign mac_result = $signed(op_a) * $signed(op_b) + $signed(accum);
-    
+
     always_comb begin
         unique case (mul_state)
-            ALBL, 
+            ALBL,
             AHBH:    mac_result_partial = mac_result;
             ALBH,
             AHBL:    mac_result_partial = mul_low_i ? {3'b0, mac_result[15:0], mac_result_r} : mac_result;

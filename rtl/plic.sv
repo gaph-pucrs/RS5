@@ -1,3 +1,17 @@
+/*!\file plic.sv
+ *
+ * Willian Nunes    <willian.nunes@edu.pucrs.br>
+ * Angelo Dal Zotto <angelo.dalzotto@edu.pucrs.br>
+ * Marcos Sartori   <marcos.sartori@acad.pucrs.br>
+ * Ney Calazans     <ney.calazans@ufsc.br>
+ * Fernando Moraes  <fernando.moraes@pucrs.br>
+ * GAPH - Hardware Design Support Group
+ * PUCRS - Pontifical Catholic University of Rio Grande do Sul <https://pucrs.br/>
+ *
+ * \brief
+ * Peripheral Local Interrupt Controller.
+ */
+
 `include "RS5_pkg.sv"
 
 module plic
@@ -67,26 +81,44 @@ module plic
 // Memory Mapped Regs
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+    /* Register mux */
+    logic [31:0] reg_val;
+    always_comb begin
+        case (addr_i)
+            24'h200004: reg_val = {{31-$clog2(i_cnt){1'b0}}, id_r}; /* ID */
+            24'h001000: reg_val = {{31-i_cnt{1'b0}}, ip, 1'b0};     /* IP */
+            24'h002000: reg_val = {{31-i_cnt{1'b0}}, ie, 1'b0};     /* IE */
+            default:    reg_val = '0;
+        endcase
+    end
+
+    /* Byte access */
+    /* The number of bits used depends on i_cnt */
+    /* verilator lint_off UNUSEDSIGNAL */
+    logic [31:0] write_val;
+    /* verilator lint_on UNUSEDSIGNAL */
+    assign write_val[31:24] = we_i[3] ? data_i[31:24] : reg_val[31:24];
+    assign write_val[23:16] = we_i[2] ? data_i[23:16] : reg_val[23:16];
+    assign write_val[15: 8] = we_i[1] ? data_i[15: 8] : reg_val[15: 8];
+    assign write_val[ 7: 0] = we_i[0] ? data_i[ 7: 0] : reg_val[ 7: 0];
+
+    /* Read */
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            data_o <= '0;
+        end  
+        else if (en_i == 1'b1 && we_i == '0) begin
+            data_o <= reg_val;
+        end
+    end
+
+    /* Write */
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             ie      <= '0;
-            data_o  <= '0;
-        end  
-        else if (en_i == 1'b1) begin
-            if (we_i != '0) begin
-                case (addr_i)
-                    24'h002000:     ie            <= data_i[i_cnt:1];
-                    default:        ;
-                endcase
-            end
-            else begin
-                case (addr_i)
-                    24'h200004:     data_o <= {{31-$clog2(i_cnt){1'b0}}, id_r}; /* ID */
-                    24'h001000:     data_o <= {{31-i_cnt{1'b0}}, ip, 1'b0};     /* IP */
-                    24'h002000:     data_o <= {{31-i_cnt{1'b0}}, ie, 1'b0};     /* IE */
-                    default:        data_o <= '0;
-                endcase
-            end
+        end
+        else if (en_i == 1'b1 && we_i != '0 && addr_i == 24'h002000) begin
+            ie <= write_val[i_cnt:1];
         end 
     end
 
@@ -95,13 +127,10 @@ module plic
             iack_o <= '0;
         end
         else begin 
-            if (en_i == 1'b1 && we_i != '0) begin
-                if (addr_i == 24'h200004) begin
-                    iack_o[data_i] <= 1'b1;
-                end
-            end else begin
+            if (en_i == 1'b1 && we_i != '0 && addr_i == 24'h200004) 
+                iack_o[write_val[$clog2(i_cnt+1):0]] <= 1'b1;
+            else
                 iack_o <= '0;
-            end
         end
     end
 endmodule

@@ -3,11 +3,13 @@
  *
  * Distribution:  July 2023
  *
- * Willian Nunes   <willian.nunes@edu.pucrs.br>
- * Marcos Sartori  <marcos.sartori@acad.pucrs.br>
- * Ney calazans    <ney.calazans@pucrs.br>
- *
- * Research group: GAPH-PUCRS  <>
+ * Willian Nunes    <willian.nunes@edu.pucrs.br>
+ * Angelo Dal Zotto <angelo.dalzotto@edu.pucrs.br>
+ * Marcos Sartori   <marcos.sartori@acad.pucrs.br>
+ * Ney Calazans     <ney.calazans@ufsc.br>
+ * Fernando Moraes  <fernando.moraes@pucrs.br>
+ * GAPH - Hardware Design Support Group
+ * PUCRS - Pontifical Catholic University of Rio Grande do Sul <https://pucrs.br/>
  *
  * \brief
  * Execute Unit is the third stage of the RS5 processor core.
@@ -25,103 +27,116 @@
 module execute
     import RS5_pkg::*;
 #(
-    parameter environment_e Environment = ASIC,
-    parameter mul_e         MULEXT      = MUL_M,
-    parameter atomic_e      AMOEXT      = AMO_A,
-    parameter bit           ZKNEEnable  = 1'b0,
-    parameter bit           VEnable     = 1'b0,
-    parameter int           VLEN        = 64,
-    parameter bit           BRANCHPRED  = 1'b1
+    parameter environment_e Environment  = ASIC,
+    parameter mul_e         MULEXT       = MUL_M,
+    parameter atomic_e      AMOEXT       = AMO_A,
+    parameter bit           COMPRESSED   = 1'b1,
+    parameter bit           ZKNEEnable   = 1'b0,
+    parameter bit           ZICONDEnable = 1'b0,
+    parameter bit           VEnable      = 1'b0,
+    parameter int           VLEN         = 64,
+    parameter int           LLEN         = 32,
+    parameter int           BUS_WIDTH    = 32,
+    parameter bit           BRANCHPRED   = 1'b1
 )
 (
-    input   logic               clk,
-    input   logic               reset_n,
-    input   logic               stall,
+    input   logic                   clk,
+    input   logic                   reset_n,
+    input   logic                   stall,
+
+    /* Not used without BP */
+    /* verilator lint_off UNUSEDSIGNAL */
+    input   logic                   bp_ack_i,
+    /* verilator lint_on UNUSEDSIGNAL */
 
     /* Bits 14:12 and 6:0 are not used in this module */
     /* verilator lint_off UNUSEDSIGNAL */
-    input   logic [31:0]        instruction_i,
+    input   logic [31:0]            instruction_i,
     /* verilator lint_on UNUSEDSIGNAL */
 
-    input   logic [31:0]        pc_i,
-    input   logic [31:0]        rs1_data_i,
-    input   logic [31:0]        rs2_data_i,
-    input   logic [31:0]        second_operand_i,
-    input   logic  [4:0]        rd_i,
-    input   logic  [4:0]        rs1_i,
-    input   iType_e             instruction_operation_i,
-    input   logic               instruction_compressed_i,
-    
+    input   logic [31:0]            rs1_data_i,
+    input   logic [31:0]            rs2_data_i,
+    input   logic [31:0]            second_operand_i,
+    input   logic  [4:0]            rd_i,
+    input   logic  [4:0]            rs1_i,
+    input   iType_e                 instruction_operation_i,
+
     /* Not used without zaamo */
     /* verilator lint_off UNUSEDSIGNAL */
-    input   iTypeAtomic_e       atomic_operation_i,
+    input   iTypeAtomic_e           atomic_operation_i,
     /* verilator lint_on UNUSEDSIGNAL */
 
     /* Not used if VEnable is 0 */
     /* verilator lint_off UNUSEDSIGNAL */
-    input   iTypeVector_e       vector_operation_i,
+    input   iTypeVector_e           vector_operation_i,
     /* verilator lint_on UNUSEDSIGNAL */
 
-    input   privilegeLevel_e    privilege_i,
-    input   logic               exc_ilegal_inst_i,
-    input   logic               exc_misaligned_fetch_i,
-    input   logic               exc_inst_access_fault_i,
-    input   logic               exc_load_access_fault_i,
+    input   privilegeLevel_e        privilege_i,
+    input   logic                   valid_i,
+    input   logic                   exc_ilegal_inst_i,
+    input   logic                   exc_inst_access_fault_i,
+    input   logic                   exc_load_access_fault_i,
 
-    output  logic               hold_o,
-    output  logic               write_enable_o,
-    output  logic               write_enable_fwd_o,
-    output  iType_e             instruction_operation_o,
-    output  logic   [31:0]      result_o,
-    output  logic   [31:0]      result_fwd_o,
-    output  logic   [ 4:0]      rd_o,
+    output  logic                   hold_o,
+    output  logic                   write_enable_o,
+    output  logic                   write_enable_fwd_o,
+    output  iType_e                 instruction_operation_o,
+    output  logic   [31:0]          result_o,
+    output  logic   [31:0]          result_fwd_o,
+    output  logic   [ 4:0]          rd_o,
 
-    output  logic [31:0]        mem_address_o,
-    output  logic               mem_read_enable_o,
-    output  logic  [3:0]        mem_write_enable_o,
-    output  logic [31:0]        mem_write_data_o,
+    output  logic [31:0]            mem_address_exec_o,
+    output  logic [31:0]            mem_address_o,
+    output  logic                   mem_enable_o,
+    output  logic [BUS_WIDTH/8-1:0] mem_write_enable_o,
+    output  logic [BUS_WIDTH-1:0]   mem_write_data_o,
     /* Not used if VEnable is 0 */
     /* verilator lint_off UNUSEDSIGNAL */
-    input   logic [31:0]        mem_read_data_i,
+    input   logic [BUS_WIDTH-1:0]   mem_read_data_i,
     /* verilator lint_on UNUSEDSIGNAL */
 
     /* We only use some bits of this signal here */
     /* verilator lint_off UNUSEDSIGNAL */
-    input   logic [11:0]        csr_address_i,
+    input   logic [11:0]            csr_address_i,
     /* verilator lint_on UNUSEDSIGNAL */
-    output  logic               csr_read_enable_o,
-    input   logic [31:0]        csr_data_read_i,
-    output  logic               csr_write_enable_o,
-    output  csrOperation_e      csr_operation_o,
-    output  logic [31:0]        csr_data_o,
+    output  logic                   csr_read_enable_o,
+    input   logic [31:0]            csr_data_read_i,
+    output  logic                   csr_write_enable_o,
+    output  csrOperation_e          csr_operation_o,
+    output  logic [31:0]            csr_data_o,
 
-    output  logic [31:0]        vtype_o,
-    output  logic [31:0]        vlen_o,
+    output  logic [31:0]            vtype_o,
+    output  logic [31:0]            vlen_o,
 
     /* Not used if BP is off */
     /* verilator lint_off UNUSEDSIGNAL */
-    input   logic               bp_taken_i,
+    input   logic                   bp_taken_i,
     /* verilator lint_on UNUSEDSIGNAL */
-    output  logic               jump_rollback_o,
-    output  logic               ctx_switch_o,
-    output  logic [31:0]        ctx_switch_target_o,
+    output  logic                   jump_rollback_o,
+    output  logic                   ctx_switch_o,
+    output  logic [31:0]            ctx_switch_target_o,
 
-    input   logic               interrupt_pending_i,
-    input   logic [31:0]        mtvec_i,
-    input   logic [31:0]        mepc_i,
-    input   logic [31:0]        jump_imm_target_i,
+    input   logic                   interrupt_pending_i,
+    input   logic                   compressed_i,
+    input   logic [31:0]            mtvec_i,
+    input   logic [31:0]            mepc_i,
+    input   logic [31:0]            jump_imm_target_i,
+    input   logic [31:0]            pc_i,
 
     /* Not used without zalrsc */
     /* verilator lint_off UNUSEDSIGNAL */
-    input   logic [31:0]        reservation_data_i,
+    input   logic [31:0]            reservation_data_i,
     /* verilator lint_on UNUSEDSIGNAL */
 
-    output  logic               jump_o,
-    output  logic               interrupt_ack_o,
-    output  logic               machine_return_o,
-    output  logic               raise_exception_o,
-    output  logic [31:0]        jump_target_o,
-    output  exceptionCode_e     exception_code_o
+    output  logic                   jump_o,
+    output  logic                   should_jump_o,
+    output  logic                   interrupt_ack_o,
+    output  logic                   machine_return_o,
+    output  logic                   raise_exception_o,
+    output  logic [31:0]            pc_irq_o,
+    output  logic [31:0]            pc_exc_o,
+    output  logic [31:0]            jump_target_o,
+    output  exceptionCode_e         exception_code_o
 );
 
     logic [31:0]    result;
@@ -133,7 +148,6 @@ module execute
 //////////////////////////////////////////////////////////////////////////////
 
     logic [31:0]    sum_result;
-    logic [31:0]    sum2_result;
     logic [31:0]    and_result;
     logic [31:0]    or_result;
     logic [31:0]    xor_result;
@@ -147,46 +161,39 @@ module execute
     logic           greater_equal;
     logic           greater_equal_unsigned;
 
-    logic [31:0] first_operand;
-
-    logic [31:0] sum2_opA;
-    always_comb begin
-        unique case (instruction_operation_i)
-            // To link register. Maybe we can remove this by using the PC in decode stage
-            JAL, JALR: sum2_opA = pc_i;
-            default:   sum2_opA = first_operand;
-        endcase
-    end
-
     logic [31:0] sum2_opB;
     always_comb begin
         unique case (instruction_operation_i)
-            // To link register. Maybe we can remove this by using the PC in decode stage
-            JAL, JALR: sum2_opB = instruction_compressed_i ? 32'd2 : 32'd4;
             SUB:       sum2_opB = -second_operand_i;
-            default:   sum2_opB = second_operand_i; // AMO_W
+            default:   sum2_opB =  second_operand_i; // AMO_W
         endcase
     end
 
-    always_comb begin
-        /* "Unmuxable" operators */
-        sum_result              = rs1_data_i +  second_operand_i;
-        equal                   = rs1_data_i == second_operand_i;
-        less_than_unsigned      = rs1_data_i <  second_operand_i;
-        greater_equal_unsigned  = rs1_data_i >= second_operand_i;
-        less_than               = $signed(rs1_data_i) <  $signed(second_operand_i);
-        greater_equal           = $signed(rs1_data_i) >= $signed(second_operand_i);
+    // Can be assigned by atomic instructions or rs1_data_i
+    logic [31:0] first_operand;
+    logic [31:0] equal_opA;
+    logic [31:0] equal_opB;
 
-        sll_result              = rs1_data_i << second_operand_i[4:0];
-        srl_result              = rs1_data_i >> second_operand_i[4:0];
-        sra_result              = $signed(rs1_data_i) >>> second_operand_i[4:0];
+    /* Unmuxed operators */
+    assign less_than_unsigned      = rs1_data_i <  second_operand_i;
+    assign greater_equal_unsigned  = rs1_data_i >= second_operand_i;
+    assign less_than               = $signed(rs1_data_i) <  $signed(second_operand_i);
+    assign greater_equal           = $signed(rs1_data_i) >= $signed(second_operand_i);
+    assign sll_result              = rs1_data_i << second_operand_i[4:0];
+    assign srl_result              = rs1_data_i >> second_operand_i[4:0];
+    assign sra_result              = $signed(rs1_data_i) >>> second_operand_i[4:0];
 
-        /* "Muxable" operators */
-        sum2_result             = sum2_opA      + sum2_opB;
-        and_result              = first_operand & second_operand_i;
-        or_result               = first_operand | second_operand_i;
-        xor_result              = first_operand ^ second_operand_i;
-    end
+    /* Muxed operators */
+    assign sum_result              = first_operand + sum2_opB;
+    assign and_result              = first_operand & second_operand_i;
+    assign or_result               = first_operand | second_operand_i;
+    assign xor_result              = first_operand ^ second_operand_i;
+    assign equal                   = equal_opA == equal_opB;
+
+    /* We can't obtain the PC from fetch stage because it can be modified due */
+    /* to load/store stalls when the current instruction is JAL[R]            */
+    logic [31:0] pc_next;
+    assign pc_next = pc_i + (compressed_i ? 32'h00000002 : 32'h00000004);
 
 //////////////////////////////////////////////////////////////////////////////
 // Load/Store signals
@@ -196,59 +203,64 @@ module execute
 
     /* verilator lint_off UNUSEDSIGNAL */
     logic [31:0] mem_address_vector;
-    logic [31:0] mem_address;
     /* verilator lint_on UNUSEDSIGNAL */
+    logic [31:0] mem_address;
 
-    logic        mem_read_enable;
     logic        mem_read_enable_vector;
 
-    logic  [3:0] mem_write_enable;
-    logic  [3:0] mem_write_enable_vector;
+    logic  [3:0]             mem_write_enable;
+    logic  [BUS_WIDTH/8-1:0] mem_write_enable_vector;
 
-    logic [31:0] mem_write_data;
-    logic [31:0] mem_write_data_vector;
+    logic [31:0]          mem_write_data;
+    logic [BUS_WIDTH-1:0] mem_write_data_vector;
 
     logic        atomic_mem_read_enable;
     logic        atomic_mem_write_enable;
 
     always_comb begin
         unique case (instruction_operation_i)
-            VLOAD,
-            VSTORE:  mem_address_o = {mem_address_vector[31:2], 2'b00};
             AMO_W,
             LR_W,
-            SC_W:    mem_address_o = rs1_data_i;
-            default: mem_address_o = mem_address;
-        endcase
-    end
-
-    always_comb begin
-        unique case (instruction_operation_i)
+            SC_W:    mem_address = (AMOEXT != AMO_OFF) ? rs1_data_i : sum_result;
             VLOAD,
-            VSTORE:  mem_read_enable_o = mem_read_enable_vector;
-            default: mem_read_enable_o = mem_read_enable || atomic_mem_read_enable;
+            VSTORE:  mem_address = VEnable ? mem_address_vector     : sum_result;
+            default: mem_address = sum_result;
         endcase
     end
 
-    always_comb begin
-        unique case (instruction_operation_i)
-            VLOAD,
-            VSTORE:  mem_write_enable_o = mem_write_enable_vector;
-            default: mem_write_enable_o = mem_write_enable | {4{atomic_mem_write_enable}};
-        endcase
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mem_address_o <= '0;
+        else if (!stall)
+            mem_address_o <= mem_address;
     end
 
-    always_comb begin
-        unique case (instruction_operation_i)
-            VLOAD,
-            VSTORE:  mem_write_data_o = mem_write_data_vector;
-            AMO_W:   mem_write_data_o = amo_operand;
-            default: mem_write_data_o = mem_write_data;
-        endcase
-    end
+    logic misaligned_sh;
+    assign misaligned_sh = mem_address[0] && (instruction_operation_i == SH);
 
-    assign mem_address     = {sum_result[31:2], 2'b00};
+    logic misaligned_sw;
+    assign misaligned_sw = (mem_address[1:0] != '0) && (instruction_operation_i inside {SW, AMO_W, LR_W, SC_W});
+
+    logic misaligned_lh;
+    assign misaligned_lh = mem_address[0] && (instruction_operation_i inside {LH, LHU});
+
+    logic misaligned_lw;
+    assign misaligned_lw = (mem_address[1:0] != '0) && (instruction_operation_i == LW);
+
+    logic laddr_misaligned;
+    assign laddr_misaligned = (misaligned_lh || misaligned_lw);
+
+    logic saddr_misaligned;
+    assign saddr_misaligned = (misaligned_sh || misaligned_sw);
+
+    logic mem_read_enable_vector_inst;
+    assign mem_read_enable_vector_inst = mem_read_enable_vector && (instruction_operation_i inside {VLOAD, VSTORE});
+
+    logic mem_read_enable;
     assign mem_read_enable = instruction_operation_i inside {LB, LBU, LH, LHU, LW, LR_W};
+
+    logic pmem_read_enable;
+    assign pmem_read_enable = (mem_read_enable || atomic_mem_read_enable || mem_read_enable_vector_inst);
 
     always_comb begin
         unique case (instruction_operation_i)
@@ -258,21 +270,54 @@ module execute
         endcase
     end
 
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            mem_write_data_o <= '0;
+        end
+        else if (!stall) begin
+            unique case (instruction_operation_i)
+                VLOAD,
+                VSTORE:  mem_write_data_o <= VEnable ? mem_write_data_vector : {{(BUS_WIDTH-32){1'b0}}, mem_write_data};
+                AMO_W:   mem_write_data_o <= {{(BUS_WIDTH-32){1'b0}}, ((AMOEXT inside {AMO_ZAAMO, AMO_A}) ? amo_operand : mem_write_data)};
+                default: mem_write_data_o <= {{(BUS_WIDTH-32){1'b0}}, mem_write_data};
+            endcase
+        end
+    end
+
     always_comb begin
+        mem_write_enable = '0;
         unique case (instruction_operation_i)
-            SB: unique case (sum_result[1:0])
-                    2'b11:   mem_write_enable = 4'b1000;
-                    2'b10:   mem_write_enable = 4'b0100;
-                    2'b01:   mem_write_enable = 4'b0010;
-                    default: mem_write_enable = 4'b0001;
-                endcase
-            SH:              mem_write_enable = (sum_result[1])
-                                                ? 4'b1100
-                                                : 4'b0011;
-            SW:              mem_write_enable = 4'b1111;
-            default:         mem_write_enable = 4'b0000;
+            SB:      mem_write_enable[sum_result[1:0]]      = 1'b1;
+            SH:      mem_write_enable[sum_result[1:0]+1-:2] = 2'b11;
+            SW:      mem_write_enable                       = 4'b1111;
+            default: mem_write_enable                       = '0;
         endcase
-end
+    end
+
+    logic [BUS_WIDTH/8-1:0] pmem_write_enable;
+    assign pmem_write_enable = {{(BUS_WIDTH/8-4){1'b0}}, (mem_write_enable | {4{atomic_mem_write_enable}})}  | mem_write_enable_vector;
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mem_write_enable_o <= '0;
+        else if (!stall)
+            mem_write_enable_o <= pmem_write_enable;
+    end
+
+    logic mem_enable;
+    assign mem_enable = pmem_read_enable || (pmem_write_enable != '0);
+
+
+    logic raise_exception;
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mem_enable_o <= '0;
+        else if (!stall)
+            mem_enable_o <= mem_enable && !raise_exception;
+    end
+
+    assign mem_address_exec_o = mem_address;
 
 //////////////////////////////////////////////////////////////////////////////
 // CSR access signals
@@ -280,23 +325,30 @@ end
 
     logic       csr_read_enable, csr_write_enable;
 
-    assign csr_read_enable_o = csr_read_enable & !exc_ilegal_csr_inst;
-    assign csr_write_enable_o = csr_write_enable & !exc_ilegal_csr_inst;
+    assign csr_read_enable_o  = csr_read_enable  && !exc_ilegal_csr_inst && !stall;
+    assign csr_write_enable_o = csr_write_enable && !exc_ilegal_csr_inst && !stall;
 
     always_comb begin
         unique case (instruction_operation_i)
-            CSRRW, CSRRWI: begin
-                csr_read_enable  = (rd_i != '0);
-                csr_write_enable = 1'b1;
-            end
-            CSRRS, CSRRC, CSRRSI, CSRRCI: begin
-                csr_read_enable  = 1'b1;
-                csr_write_enable = (rs1_i != '0);
-            end
-            default: begin
-                csr_read_enable  = 1'b0;
-                csr_write_enable = 1'b0;
-            end
+            CSRRW,
+            CSRRWI:  csr_read_enable = (rd_i != '0);
+            CSRRS,
+            CSRRC,
+            CSRRSI,
+            CSRRCI:  csr_read_enable = 1'b1;
+            default: csr_read_enable  = 1'b0;
+        endcase
+    end
+
+    always_comb begin
+        unique case (instruction_operation_i)
+            CSRRW,
+            CSRRWI:  csr_write_enable = 1'b1;
+            CSRRS,
+            CSRRC,
+            CSRRSI,
+            CSRRCI:  csr_write_enable = (rs1_i != '0);
+            default: csr_write_enable = 1'b0;
         endcase
     end
 
@@ -316,20 +368,10 @@ end
         endcase
     end
 
-    always_comb begin
-        // Raise exeption if CSR is read only and write enable is true
-        if (csr_address_i[11:10] == 2'b11 && csr_write_enable == 1'b1) begin
-            exc_ilegal_csr_inst = 1;
-        end
-        // Check Level privileges
-        else if (csr_address_i[9:8] > privilege_i && ((csr_read_enable | csr_write_enable) == 1'b1)) begin
-            exc_ilegal_csr_inst = 1;
-        end
-        // No exception is raised
-        else begin
-            exc_ilegal_csr_inst = 0;
-        end
-    end
+    assign exc_ilegal_csr_inst = (
+        (csr_write_enable && csr_address_i[11:10] == 2'b11) ||
+        ((csr_read_enable || csr_write_enable) && csr_address_i[9:8] > privilege_i)
+    );
 
 /////////////////////////////////////////////////////////////////////////////
 // Multiplication signals
@@ -340,7 +382,6 @@ end
     logic        hold_div;
 
     if (MULEXT != MUL_OFF) begin : gen_zmmul_on
-
         logic [1:0] signed_mode_mul;
         logic       enable_mul;
         logic       mul_low;
@@ -446,7 +487,9 @@ end
     if (VEnable) begin : v_gen_on
         vectorUnit #(
             .Environment (Environment),
-            .VLEN        (VLEN)
+            .VLEN        (VLEN       ),
+            .LLEN        (LLEN       ),
+            .BUS_WIDTH   (BUS_WIDTH  )
         ) vector (
             .clk                    (clk),
             .reset_n                (reset_n),
@@ -509,23 +552,33 @@ end
             end
 
             logic lrsc_enable;
-            assign lrsc_enable = (instruction_operation_i == SC_W);
+            assign lrsc_enable = (instruction_operation_i == SC_W) && (rs1_data_i[1:0] == '0);
+
+            logic [31:0] cmp_opA;
+            logic [31:0] cmp_opB;
 
             lrsc lrsc_m (
-                .clk               (clk                  ),
-                .reset_n           (reset_n              ),
-                .stall             (stall                ),
-                .enable_i          (lrsc_enable          ),
-                .rs1_data_i        (rs1_data_i           ),
-                .data_i            (mem_read_data_i      ),
-                .reservation_addr_i(reservation_addr     ),
-                .reservation_data_i(reservation_data_i   ),
-                .hold_o            (lrsc_hold            ),
-                .write_enable_o    (lrsc_write_enable    ),
-                .mem_read_enable_o (lrsc_mem_read_enable ),
-                .mem_write_enable_o(lrsc_mem_write_enable),
-                .result_o          (lrsc_result          )
+                .clk               (clk                    ),
+                .reset_n           (reset_n                ),
+                .stall             (stall                  ),
+                .equal_i           (equal                  ),
+                .enable_i          (lrsc_enable            ),
+                .exception_i       (exc_load_access_fault_i),
+                .rs1_data_i        (rs1_data_i             ),
+                .data_i            (mem_read_data_i[31:0]  ),
+                .reservation_addr_i(reservation_addr       ),
+                .reservation_data_i(reservation_data_i     ),
+                .hold_o            (lrsc_hold              ),
+                .write_enable_o    (lrsc_write_enable      ),
+                .mem_read_enable_o (lrsc_mem_read_enable   ),
+                .mem_write_enable_o(lrsc_mem_write_enable  ),
+                .result_o          (lrsc_result            ),
+                .cmp_opA_o         (cmp_opA                ),
+                .cmp_opB_o         (cmp_opB                )
             );
+
+            assign equal_opA = lrsc_enable ? cmp_opA : rs1_data_i;
+            assign equal_opB = lrsc_enable ? cmp_opB : second_operand_i;
         end
         else begin : gen_zalrsc_off
             assign lrsc_result           = 1'b0;
@@ -533,6 +586,8 @@ end
             assign lrsc_mem_read_enable  = 1'b0;
             assign lrsc_mem_write_enable = 1'b0;
             assign lrsc_write_enable     = 1'b0;
+            assign equal_opA             = rs1_data_i;
+            assign equal_opB             = second_operand_i;
         end
 
         logic amo_write_enable;
@@ -542,18 +597,18 @@ end
 
         if (AMOEXT != AMO_ZALRSC) begin : gen_zaamo_on
             logic amo_enable;
-            assign amo_enable = (instruction_operation_i == AMO_W);
+            assign amo_enable = (instruction_operation_i == AMO_W) && (rs1_data_i[1:0] == '0);
 
             logic amo_lt;
             assign amo_lt = $signed(amo_operand) < $signed(rs2_data_i);
-            
+
             logic amo_ltu;
             assign amo_ltu = amo_operand < rs2_data_i;
 
             logic [31:0] amo_result;
             always_comb begin
                 unique case (atomic_operation_i)
-                    AMOADD:  amo_result = sum2_result;
+                    AMOADD:  amo_result = sum_result;
                     AMOAND:  amo_result = and_result;
                     AMOXOR:  amo_result = xor_result;
                     AMOOR:   amo_result = or_result;
@@ -567,20 +622,21 @@ end
             end
 
             amo amo_m (
-                .clk               (clk                 ),
-                .reset_n           (reset_n             ),
-                .stall             (stall               ),
-                .enable_i          (amo_enable          ),
-                .data_i            (mem_read_data_i     ),
-                .amo_result_i      (amo_result          ),
-                .hold_o            (amo_hold            ),
-                .write_enable_o    (amo_write_enable    ),
-                .mem_read_enable_o (amo_mem_read_enable ),
-                .mem_write_enable_o(amo_mem_write_enable),
-                .opA_o             (amo_operand         )
+                .clk               (clk                    ),
+                .reset_n           (reset_n                ),
+                .stall             (stall                  ),
+                .enable_i          (amo_enable             ),
+                .exception_i       (exc_load_access_fault_i),
+                .data_i            (mem_read_data_i[31:0]  ),
+                .amo_result_i      (amo_result             ),
+                .hold_o            (amo_hold               ),
+                .write_enable_o    (amo_write_enable       ),
+                .mem_read_enable_o (amo_mem_read_enable    ),
+                .mem_write_enable_o(amo_mem_write_enable   ),
+                .opA_o             (amo_operand            )
             );
 
-            assign first_operand = amo_enable ? amo_operand : rs1_data_i;
+            assign first_operand = (instruction_operation_i == AMO_W) ? amo_operand : rs1_data_i;
         end
         else begin : gen_zaamo_off
             assign amo_hold             = 1'b0;
@@ -604,17 +660,37 @@ end
         assign atomic_mem_write_enable = 1'b0;
         assign lrsc_result             = 1'b0;
         assign atomic_write_enable     = 1'b0;
+        assign equal_opA               = rs1_data_i;
+        assign equal_opB               = second_operand_i;
+    end
+
+//////////////////////////////////////////////////////////////////////////////
+// Zicond Extension
+//////////////////////////////////////////////////////////////////////////////
+
+    logic [31:0] result_zicond;
+
+    if (ZICONDEnable) begin : gen_zicond_on
+        always_comb begin
+            unique case (instruction_operation_i)
+                CZERO_EQZ: result_zicond = rs2_data_i == '0 ? '0 : rs1_data_i;
+                default:   result_zicond = rs2_data_i != '0 ? '0 : rs1_data_i; // CZERO_NEZ
+            endcase
+        end
+    end
+    else begin : gen_zicond_off
+        assign result_zicond = '0;
     end
 
 //////////////////////////////////////////////////////////////////////////////
 // Demux
-//////////////////////////////////////////////////////lrsc_result////////////////////////
+//////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
         unique case (instruction_operation_i)
             CSRRW, CSRRS, CSRRC,
             CSRRWI,CSRRSI,CSRRCI:   result = csr_data_read_i;
-            JAL,JALR,SUB:           result = sum2_result;
+            JAL,JALR:               result = pc_next;
             SLT:                    result = {31'b0, less_than};
             SLTU:                   result = {31'b0, less_than_unsigned};
             XOR:                    result = xor_result;
@@ -625,27 +701,36 @@ end
             SRA:                    result = sra_result;
             LUI:                    result = second_operand_i;
             AUIPC:                  result = jump_imm_target_i;
-            DIV,DIVU:               result = div_result;
-            REM,REMU:               result = rem_result;
-            MUL,MULH,MULHU,MULHSU:  result = mul_result;
-            AES32ESI, AES32ESMI:    result = aes_result;
-            VECTOR, VLOAD, VSTORE:  result = vector_scalar_result;
+            DIV,DIVU:               result = (MULEXT == MUL_M)   ? div_result                           : sum_result;
+            REM,REMU:               result = (MULEXT == MUL_M)   ? rem_result                           : sum_result;
+            MUL,MULH,MULHU,MULHSU:  result = (MULEXT != MUL_OFF) ? mul_result                           : sum_result;
+            AES32ESI, AES32ESMI:    result = ZKNEEnable          ? aes_result                           : sum_result;
+            VECTOR, VLOAD, VSTORE:  result = VEnable             ? vector_scalar_result                 : sum_result;
+            CZERO_EQZ, CZERO_NEZ:   result = ZICONDEnable        ? result_zicond                        : sum_result;
+            SC_W:                   result = (AMOEXT inside {AMO_ZALRSC, AMO_A}) ? {31'h0, lrsc_result} : sum_result;
             default:                result = sum_result;
         endcase
     end
 
+    logic we_atomic;
+    assign we_atomic  = (rd_i != '0 && atomic_write_enable);
+
+    logic we_default;
+    assign we_default = (rd_i != '0 && !hold_o && !raise_exception);
+
     always_comb begin
         unique case (instruction_operation_i)
             NOP,
-            SC_W,AMO_W,
-            SB,SH,SW, 
+            SB,SH,SW,
             BEQ,BNE,
             BLT,BLTU,
             BGE,BGEU:   write_enable = 1'b0;
             VECTOR,
             VLOAD,
-            VSTORE:     write_enable =  rd_i != '0 && vector_wr_en;
-            default:    write_enable = (rd_i != '0 && !hold_o && !raise_exception_o);
+            VSTORE:     write_enable = VEnable ? (rd_i != '0 && vector_wr_en)          : we_default;
+            SC_W:       write_enable = (AMOEXT inside {AMO_ZALRSC, AMO_A}) ? we_atomic : we_default ;
+            AMO_W:      write_enable = (AMOEXT inside {AMO_ZAAMO,  AMO_A}) ? we_atomic : we_default ;
+            default:    write_enable = we_default;
         endcase
     end
 
@@ -654,22 +739,21 @@ end
 ////////////////////////////////////////////////////////////////////////////////
 // Output Registers
 ////////////////////////////////////////////////////////////////////////////////
-    
-    assign hold_o = hold_div || hold_mul || hold_vector || atomic_hold;
+
+    assign hold_o = (hold_div || hold_mul || hold_vector || atomic_hold) && !exc_load_access_fault_i;
 
     always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
+        if (!reset_n)
             write_enable_o <= 1'b0;
-        end
-        else if (!stall) begin
-            /* Non-default cases have no forwarding */
-            unique case (instruction_operation_i)
-                SC_W,
-                AMO_W:   write_enable_o <= (rd_i != '0 && atomic_write_enable && !raise_exception_o);
-                default: write_enable_o <= write_enable;
-            endcase
-        end
+        else if (!stall)
+            write_enable_o <= write_enable;
     end
+
+    iType_e sc_instruction;
+    assign sc_instruction = atomic_write_enable ? instruction_operation_i : LW;
+
+    iType_e amo_instruction;
+    assign amo_instruction = !atomic_write_enable ? instruction_operation_i : LW;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
@@ -677,25 +761,18 @@ end
         end
         else if (!stall) begin
             unique case (instruction_operation_i)
-                SC_W:    instruction_operation_o <=  atomic_write_enable ? instruction_operation_i : LW;
-                AMO_W:   instruction_operation_o <= !atomic_write_enable ? instruction_operation_i : LW;
+                SC_W:    instruction_operation_o <= (AMOEXT inside {AMO_ZALRSC, AMO_A}) ? sc_instruction  : instruction_operation_i;
+                AMO_W:   instruction_operation_o <= (AMOEXT inside {AMO_ZAAMO,  AMO_A}) ? amo_instruction : instruction_operation_i;
                 default: instruction_operation_o <= instruction_operation_i;
             endcase
         end
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
+        if (!reset_n)
             result_o <= '0;
-        end
-        else if (!stall) begin
-            /* Non-default cases have no forwarding */
-            unique case (instruction_operation_i)
-                SC_W:    result_o <= {31'h0, lrsc_result};
-                // AMO_W has no result
-                default: result_o <= result;
-            endcase
-        end
+        else if (!stall)
+            result_o <= result;
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
@@ -732,65 +809,114 @@ end
         endcase
     end
 
+    logic machine_return;
     always_comb begin
-        if (machine_return_o)
+        if (machine_return)
             ctx_switch_target_o = mepc_i;
-        else if (raise_exception_o || interrupt_ack_o)
-            ctx_switch_target_o = mtvec_i;
         else
-            ctx_switch_target_o = jump_target_o;
+            ctx_switch_target_o = mtvec_i;
     end
 
-    assign ctx_switch_o = machine_return_o || raise_exception_o || interrupt_ack_o || jump_o;
-
+    /* Two jumps in sequence never occur, but the exec stage can be stalled */
+    /* So we only consider a new jump on posedge, so we can keep fetching   */
+    /* (and decoding)                                                       */
+    logic jump;
     if (BRANCHPRED) begin : gen_bp_on
-        assign jump_o          = ( should_jump && (!bp_taken_i ||  interrupt_ack_o));
-        assign jump_rollback_o = (!should_jump && ( bp_taken_i && !interrupt_ack_o));
+        assign jump            = ( should_jump && !(bp_taken_i && bp_ack_i));
+        assign jump_rollback_o = (!should_jump &&  (bp_taken_i && bp_ack_i));
     end
     else begin : gen_bp_off
-        assign jump_o          = should_jump;
+        assign jump            = should_jump;
         assign jump_rollback_o = 1'b0;
     end
+
+    logic jump_r;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            jump_r <= 1'b0;
+        end
+        else begin;
+            if (!stall)
+                jump_r <= 1'b0;
+            else if (jump)
+                jump_r <= 1'b1;
+        end
+    end
+    assign jump_o = jump && !jump_r;
+
+    logic interrupt_ack;
+    assign ctx_switch_o = (machine_return || raise_exception || interrupt_ack) && !stall;
+
+    assign should_jump_o = jump_o || ctx_switch_o;
+    assign pc_irq_o      = should_jump ? jump_target_o : pc_next;
+
+    logic iaddr_misaligned;
+    assign iaddr_misaligned = (!COMPRESSED && jump_target_o[1] && should_jump);
 
 //////////////////////////////////////////////////////////////////////////////
 // Privileged Architecture Control
 //////////////////////////////////////////////////////////////////////////////
 
-    assign raise_exception_o = (
-        (
-            exc_inst_access_fault_i 
-            || exc_ilegal_inst_i 
-            || exc_ilegal_csr_inst 
-            || exc_misaligned_fetch_i
-            || (instruction_operation_i inside {ECALL, EBREAK})
-            || (exc_load_access_fault_i && (mem_read_enable_o || (mem_write_enable_o != '0)))
-        )
-        && (instruction_operation_i != NOP)
+    logic illegal_mret;
+    assign illegal_mret = (instruction_operation_i == MRET) && (privilege_i != 2'b11);
+
+    /* We can't change privilege until the end of the instruction */
+    /* Hence, exception, ret and irq must be masked by stall      */
+    assign raise_exception = (
+        exc_inst_access_fault_i ||
+        exc_ilegal_inst_i ||
+        exc_load_access_fault_i ||
+        illegal_mret ||
+        instruction_operation_i inside {ECALL, EBREAK} ||
+        exc_ilegal_csr_inst ||
+        iaddr_misaligned ||
+        laddr_misaligned ||
+        saddr_misaligned
+    );
+    assign raise_exception_o = raise_exception && !stall;
+
+    assign machine_return   = (instruction_operation_i == MRET) && (privilege_i == 2'b11);
+    assign machine_return_o = machine_return && !stall;
+
+    assign interrupt_ack = (
+        interrupt_pending_i &&
+        valid_i &&    /* We need a valid pc reference to ack an IRQ */
+        !machine_return &&
+        !raise_exception &&
+        !hold_o
     );
 
-    assign machine_return_o = !raise_exception_o && (instruction_operation_i == MRET);
-
-    assign interrupt_ack_o = (
-           !machine_return_o 
-        && !raise_exception_o 
-        && (interrupt_pending_i && instruction_operation_i != NOP && !hold_o)
-    );
+    assign interrupt_ack_o = interrupt_ack && !stall;
 
     always_comb begin
-        if (exc_inst_access_fault_i)
+        if (exc_load_access_fault_i)    /* Highest priority because it happened last cycle */
+            exception_code_o  = LOAD_ACCESS_FAULT;
+        else if (exc_inst_access_fault_i)
             exception_code_o  = INSTRUCTION_ACCESS_FAULT;
-        else if ((exc_ilegal_inst_i || exc_ilegal_csr_inst)) 
+        else if (exc_ilegal_inst_i || exc_ilegal_csr_inst || illegal_mret)
             exception_code_o  = ILLEGAL_INSTRUCTION;
-        else if (exc_misaligned_fetch_i)
+        else if (iaddr_misaligned)
             exception_code_o  = INSTRUCTION_ADDRESS_MISALIGNED;
         else if (instruction_operation_i == ECALL)
             exception_code_o  = (privilege_i == USER) ? ECALL_FROM_UMODE : ECALL_FROM_MMODE;
         else if (instruction_operation_i == EBREAK)
             exception_code_o  = BREAKPOINT;
-        else if (exc_load_access_fault_i)
-            exception_code_o  = LOAD_ACCESS_FAULT;
+        else if (laddr_misaligned)
+            exception_code_o  = LOAD_ADDRESS_MISALIGNED;
+        else if (saddr_misaligned)
+            exception_code_o  = STORE_AMO_ADDRESS_MISALIGNED;
         else
             exception_code_o  = NE;
     end
+
+    logic [31:0] pc_r;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            pc_r <= '0;
+        else if (!stall)
+            pc_r <= pc_i;
+    end
+
+    assign pc_exc_o = exc_load_access_fault_i ? pc_r : pc_i;
 
 endmodule

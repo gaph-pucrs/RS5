@@ -92,6 +92,32 @@ void TEST_CASE3() {
   //          -12, -12, -12, -12);
 }
 
+static volatile uint32_t VM2_I32[32] = {
+    1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8
+};
+
+static volatile uint32_t VM2_I32_2[32] = {
+    0xdeadbeef, 0xdeadbeef, 0xdeadbeef, 0xdeadbeef, 0xdeadbeef,
+    0xdeadbeef, 0xdeadbeef, 0xdeadbeef, 0xdeadbeef, 0xdeadbeef,
+    0xdeadbeef, 0xdeadbeef, 0xdeadbeef, 0xdeadbeef, 0xdeadbeef,
+    0xdeadbeef, 0xdeadbeef, 0xdeadbeef, 0xdeadbeef, 0xdeadbeef,
+    0xdeadbeef, 0xdeadbeef, 0xdeadbeef, 0xdeadbeef, 0xdeadbeef,
+    0xdeadbeef, 0xdeadbeef, 0xdeadbeef, 0xdeadbeef, 0xdeadbeef,
+    0xdeadbeef, 0xdeadbeef
+};
+
+void TEST_CASE4(void) {
+  VSET(32, e32, m2);
+  VLOAD_32(v1, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  asm volatile("vmv.v.v v3, v1");
+  LVCMP_U32(13, v3, 32, VM2_I32);
+
+  const uint32_t scalar = 0xdeadbeef;
+  VSET(32, e32, m2);
+  asm volatile("vmv.v.x v3, %[A]" ::[A] "r"(scalar));
+  LVCMP_U32(14, v3, 32, VM2_I32_2);
+};
+
 int main(void) {
   INIT_CHECK();
   enable_vec();
@@ -99,6 +125,7 @@ int main(void) {
   TEST_CASE1();
   TEST_CASE2();
   TEST_CASE3();
+  TEST_CASE4();
 
   EXIT_CHECK();
 }

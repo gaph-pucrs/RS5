@@ -25,6 +25,7 @@ _entry:
 loop:
     j loop
 
+.align 4
 MEI_handler:
 
     li t1, 0x80005000 # uart_rx

@@ -119,6 +119,7 @@ _entry:
 	TEST(j)
 
 	/* RV32MI */
+	TEST(lw_misaligned)
 	TEST(mcsr)
 	TEST(ebreak)
 	TEST(ecall)
