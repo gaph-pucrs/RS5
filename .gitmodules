@@ -1,3 +1,6 @@
 [submodule "RingBuffer"]
 	path = RingBuffer
 	url = https://github.com/gaph-pucrs/RingBuffer
+[submodule "CacheControllers"]
+	path = CacheControllers
+	url = https://github.com/gaph-pucrs/CacheControllers.git
