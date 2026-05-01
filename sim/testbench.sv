@@ -46,7 +46,7 @@ module testbench
     localparam bit           BRANCHPRED      = 1'b1;
     localparam bit           FORWARDING      = 1'b1;
     localparam int           IQUEUE_SIZE     = 2;
-    localparam bit           DUALPORT_MEM    = 1'b1;
+    localparam bit           DUALPORT_MEM    = 1'b0;
     localparam int           RAM_DELAY_CYCLES= 0;
 
     localparam bit           VEnable         = 1'b0;
@@ -64,12 +64,16 @@ module testbench
     localparam int           MEM_ADDR_BITS   = 28;
     localparam string        BIN_FILE        = "../app/riscv-tests/test.bin";
 
-    localparam bit           ICACHE_EN       = 1'b0;
+    localparam bit           ICACHE_EN       = 1'b1;
+    localparam bit           DCACHE_EN       = 1'b1;
+
+    /* Parameters used only when cache is on */
+    /* verilator lint_off UNUSEDPARAM */
     localparam int           ICACHE_WIDTH    = 12;
     localparam int           ICACHE_OFF_W    = 6;
-    localparam bit           DCACHE_EN       = 1'b0;
     localparam int           DCACHE_WIDTH    = 12;
     localparam int           DCACHE_OFF_W    = 6;
+    /* verilator lint_on UNUSEDPARAM */
 
     localparam int           i_cnt = 1;
 
