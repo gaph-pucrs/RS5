@@ -29,12 +29,36 @@ module mul
     input   logic        mul_low_i,
     input   logic        single_cycle_i,
 
-    output  logic [31:0] alu_operand_a_kyber,
-    output  logic [31:0] alu_operand_b_kyber,
+    output  logic [31:0] alu_operand_a_kyber_o,
+    output  logic [31:0] alu_operand_b_kyber_o,
 
     output  logic        hold_o,
     output  logic [31:0] result_o
 );
+
+    logic [31:0] alu_adder_i_reg;
+
+    always_ff@(posedge clk or negedge reset_n) begin
+        if(!reset_n) begin  
+            alu_adder_i_reg <= '0;
+        end else begin 
+            alu_adder_i_reg <= alu_adder_i;
+        end
+    end
+
+    logic  [2:0]  alu_cbd_high_reg;
+    logic  [2:0]  alu_cbd_low_reg;
+
+    always_ff@(posedge clk or negedge reset_n) begin
+        if(!reset_n) begin  
+            alu_cbd_high_reg <= '0;
+            alu_cbd_low_reg  <= '0;
+        end else begin 
+            alu_cbd_high_reg <= alu_cbd_high_i;
+            alu_cbd_low_reg  <= alu_cbd_low_i;
+        end
+    end
+
 
     ///
     // Kyber Compress logic
@@ -48,17 +72,28 @@ module mul
 
       unique case (kyber_compress_bits_i)
 
-        4'd4:    alu_adder_compress_shifted = alu_adder_i[23:0] >> (24 - 4 - 1);
-        4'd5:    alu_adder_compress_shifted = alu_adder_i[23:0] >> (24 - 5 - 1);
-        4'd10:   alu_adder_compress_shifted = alu_adder_i[23:0] >> (24 - 10 - 1);
-        4'd11:   alu_adder_compress_shifted = alu_adder_i[23:0] >> (24 - 11 - 1);
-        default: alu_adder_compress_shifted = alu_adder_i[23:0] >> (24 - 1 - 1);
+        4'd4:    alu_adder_compress_shifted = alu_adder_i_reg[23:0] >> (24 - 4 - 1);
+        4'd5:    alu_adder_compress_shifted = alu_adder_i_reg[23:0] >> (24 - 5 - 1);
+        4'd10:   alu_adder_compress_shifted = alu_adder_i_reg[23:0] >> (24 - 10 - 1);
+        4'd11:   alu_adder_compress_shifted = alu_adder_i_reg[23:0] >> (24 - 11 - 1);
+        default: alu_adder_compress_shifted = alu_adder_i_reg[23:0] >> (24 - 1 - 1);
 
       endcase
 
     end
 
-    assign compress_carry_in = alu_adder_compress_shifted[0];
+    logic [12:0] alu_adder_compress_shifted_reg;
+
+    always_ff@(posedge clk or negedge reset_n) begin
+        if(!reset_n) begin  
+            alu_adder_compress_shifted_reg <= '0;
+        end else begin 
+            alu_adder_compress_shifted_reg <= alu_adder_compress_shifted;
+        end
+
+    end
+
+    assign compress_carry_in = alu_adder_compress_shifted_reg[0];
 
 
     ///
@@ -83,7 +118,7 @@ module mul
     // Subtraction is performed by adding the two's complement of 3329 (op_a + (op_b = !13'd3329) + (carry_in = 1'b1))
     assign adjust_adder_op_b_inv = (operator_i == KYBER_ADD || operator_i == KYBER_MUL);
 
-    assign adjust_adder_high_op_a = (operator_i inside {KYBER_CBD2, KYBER_CBD3}) ? {{10{alu_cbd_high_i[2]}}, alu_cbd_high_i} : alu_adder_i[28:16];
+    assign adjust_adder_high_op_a = (operator_i inside {KYBER_CBD2, KYBER_CBD3}) ? {{10{alu_cbd_high_reg[2]}}, alu_cbd_high_reg} : (operator_i == KYBER_MUL) ? alu_adder_i_reg[28:16] : alu_adder_i_reg[28:16];
     assign adjust_adder_high_op_b = adjust_adder_op_b_inv ? (13'd3329 ^ {13{1'b1}}) : 13'd3329;
     assign adjust_adder_high_carry_in = adjust_adder_op_b_inv;
     assign adjust_adder_high = adjust_adder_high_op_a + adjust_adder_high_op_b + adjust_adder_high_carry_in;
@@ -98,11 +133,11 @@ module mul
         // (operator_i == KYBER_ADD):  adjust_result_high_mux_sel = alu_adder_i[28] | !adjust_adder_high[12];
         (operator_i == KYBER_ADD):  adjust_result_high_mux_sel = !adjust_adder_high[12];
         // (operator_i == KYBER_SUB):  adjust_result_high_mux_sel = adjust_adder_high[12];
-        (operator_i == KYBER_SUB):  adjust_result_high_mux_sel = !alu_adder_i[28];
+        (operator_i == KYBER_SUB):  adjust_result_high_mux_sel = !alu_adder_i_reg[28];
         // (operator_i == KYBER_CBD2): adjust_result_high_mux_sel = adjust_adder_high[12];
-        (operator_i == KYBER_CBD2): adjust_result_high_mux_sel = alu_cbd_high_i[2];
+        (operator_i == KYBER_CBD2): adjust_result_high_mux_sel = alu_cbd_high_reg[2];
         // (operator_i == KYBER_CBD3): adjust_result_high_mux_sel = adjust_adder_high[12];
-        (operator_i == KYBER_CBD3): adjust_result_high_mux_sel = alu_cbd_high_i[2];
+        (operator_i == KYBER_CBD3): adjust_result_high_mux_sel = alu_cbd_high_reg[2];
         default:                            adjust_result_high_mux_sel = 1'b0;
 
       endcase
@@ -127,9 +162,9 @@ module mul
 
     end
 
-    assign adjust_adder_low_op_a = (operator_i == KYBER_COMPRESS)              ? {2'b00, alu_adder_compress_shifted[12:1]} :
-                                   (operator_i inside {KYBER_CBD2, KYBER_CBD3} ? {{10{alu_cbd_low_i[2]}}, alu_cbd_low_i} :
-                                                                                             alu_adder_i[12:0]);
+    assign adjust_adder_low_op_a = (operator_i == KYBER_COMPRESS)               ? {2'b00, alu_adder_compress_shifted_reg[12:1]} :
+                                   (operator_i inside {KYBER_CBD2, KYBER_CBD3}) ? {{10{alu_cbd_low_reg[2]}}, alu_cbd_low_reg} :
+                                   (operator_i == KYBER_MUL)                    ? alu_adder_i_reg[12:0] : alu_adder_i_reg[12:0];
 
     // assign adjust_adder_low_op_b = (operator_i == KYBER_COMPRESS) ? 13'd0 : (adjust_adder_op_b_inv ? !(13'd3329): 13'd3329);
     assign adjust_adder_low_op_b = (operator_i == KYBER_COMPRESS) ? 13'd0 : (adjust_adder_op_b_inv ? (13'd3329 ^ {13{1'b1}}): 13'd3329);
@@ -148,11 +183,11 @@ module mul
         // (operator_i == KYBER_ADD):    adjust_result_low_mux_sel = alu_adder_i[12] | !adjust_adder_low[12];
         (operator_i == KYBER_ADD):    adjust_result_low_mux_sel = !adjust_adder_low[12];
         // (operator_i == KYBER_SUB):    adjust_result_low_mux_sel = adjust_adder_low[12];
-        (operator_i == KYBER_SUB):    adjust_result_low_mux_sel = !alu_adder_i[12];
+        (operator_i == KYBER_SUB):    adjust_result_low_mux_sel = !alu_adder_i_reg[12];
         // (operator_i == KYBER_CBD2):   adjust_result_low_mux_sel = adjust_adder_low[12];
-        (operator_i == KYBER_CBD2):   adjust_result_low_mux_sel = alu_cbd_low_i[2];
+        (operator_i == KYBER_CBD2):   adjust_result_low_mux_sel = alu_cbd_low_reg[2];
         // (operator_i == KYBER_CBD3):   adjust_result_low_mux_sel = adjust_adder_low[12];
-        (operator_i == KYBER_CBD3):   adjust_result_low_mux_sel = alu_cbd_low_i[2];
+        (operator_i == KYBER_CBD3):   adjust_result_low_mux_sel = alu_cbd_low_reg[2];
         (operator_i == KYBER_MUL):      adjust_result_low_mux_sel = !adjust_adder_low[12];
         (operator_i == KYBER_COMPRESS): adjust_result_low_mux_sel = 1'b1;
         default:                              adjust_result_low_mux_sel = 1'b0;
@@ -163,22 +198,30 @@ module mul
 
     assign adjust_result_low = (adjust_result_low_mux_sel ? adjust_adder_low[11:0] : adjust_adder_low_op_a[11:0]) & adjust_result_low_mask;
 
-    typedef enum logic [13:0] {
-        IDLE                         = 14'b00000000000001,
-        ALBL                         = 14'b00000000000010,
-        ALBH                         = 14'b00000000000100,
-        AHBL                         = 14'b00000000001000,
-        AHBH                         = 14'b00000000010000,
-        L1_STAGE0_WAIT               = 14'b00000000100000,
-        L1_STAGE0_WAIT2              = 14'b00000001000000,
-        L1_STAGE0_LOW                = 14'b00000010000000,
-        L1_STAGE0_HIGH               = 14'b00000100000000, 
-        KYBER_BARRETT_L2             = 14'b00001000000000, 
-        KYBER_BARRETT_L3             = 14'b00010000000000,
-        KYBER_BARRETT_L4             = 14'b00100000000000, 
-        COMPRESS_STAGE0              = 14'b01000000000000, 
-        COMPRESS_END                 = 14'b10000000000000
-    } mul_states_e;
+    typedef enum logic [21:0] {
+    IDLE                           = 22'b0000000000000000000001,
+    ALBL                           = 22'b0000000000000000000010,
+    ALBH                           = 22'b0000000000000000000100,
+    AHBL                           = 22'b0000000000000000001000,
+    AHBH                           = 22'b0000000000000000010000,
+    L1_STAGE0_WAIT                 = 22'b0000000000000000100000,
+    L1_STAGE0_WAIT2                = 22'b0000000000000001000000,
+    L1_STAGE0_LOW                  = 22'b0000000000000010000000,
+    L1_STAGE0_HIGH                 = 22'b0000000000000100000000, 
+    KYBER_BARRETT_L2               = 22'b0000000000001000000000, 
+    KYBER_BARRETT_L3               = 22'b0000000000010000000000,
+    KYBER_BARRETT_L4_STAGE0        = 22'b0000000000100000000000, 
+    KYBER_BARRETT_L4_STAGE1        = 22'b0000000001000000000000,
+    KYBER_BARRETT_L4_STAGE2        = 22'b0000000010000000000000,
+    COMPRESS_STAGE0                = 22'b0000000100000000000000, 
+    COMPRESS_END_STAGE0_SUM0       = 22'b0000001000000000000000,
+    COMPRESS_END_STAGE0_SUM1       = 22'b0000010000000000000000,
+    COMPRESS_END_STAGE1            = 22'b0000100000000000000000,
+    COMPRESS_END_STAGE2            = 22'b0001000000000000000000,
+    FINAL_STAGE_SUB_CBD_SUM_STAGE0 = 22'b0010000000000000000000,
+    FINAL_STAGE_SUB_CBD_SUM_STAGE1 = 22'b0100000000000000000000,
+    LAST_STAGE                     = 22'b1000000000000000000000
+} mul_states_e;
 
     mul_states_e mul_state;
     mul_states_e next_state;
@@ -190,6 +233,7 @@ module mul
         if(enable_i) begin 
             if(operator_i == KYBER_MUL) stage = L1_STAGE0_WAIT; 
             else if(operator_i == KYBER_COMPRESS) stage = COMPRESS_STAGE0;
+            else if(operator_i inside {KYBER_ADD, KYBER_SUB, KYBER_CBD2, KYBER_CBD3}) stage = FINAL_STAGE_SUB_CBD_SUM_STAGE0;
             else stage = ALBL;
         end
     end
@@ -201,21 +245,29 @@ module mul
     always_comb begin
         next_state = IDLE;
         unique case (mul_state)
-            IDLE:                         next_state = stage;
-            ALBL:                         next_state = single_cycle_i ? IDLE : ALBH;
-            ALBH:                         next_state = AHBL;
-            AHBL:                         next_state = mul_low_i      ? IDLE : AHBH;
-            AHBH:                         next_state = IDLE;
-            L1_STAGE0_WAIT:               next_state = L1_STAGE0_WAIT2;
-            L1_STAGE0_WAIT2:              next_state = L1_STAGE0_LOW;
-            L1_STAGE0_LOW:                next_state = L1_STAGE0_HIGH;
-            L1_STAGE0_HIGH:               next_state = (is_compress) ? COMPRESS_END : KYBER_BARRETT_L2;
-            KYBER_BARRETT_L2:             next_state = KYBER_BARRETT_L3;
-            KYBER_BARRETT_L3:             next_state = KYBER_BARRETT_L4;
-            KYBER_BARRETT_L4:             next_state = IDLE;
-            COMPRESS_STAGE0:              next_state = L1_STAGE0_WAIT2;
-            COMPRESS_END:                 next_state = IDLE;
-            default:                      next_state = IDLE;
+            IDLE:                           next_state = stage;
+            ALBL:                           next_state = single_cycle_i ? IDLE : ALBH;
+            ALBH:                           next_state = AHBL;
+            AHBL:                           next_state = mul_low_i      ? IDLE : AHBH;
+            AHBH:                           next_state = IDLE;
+            L1_STAGE0_WAIT:                 next_state = L1_STAGE0_WAIT2;
+            L1_STAGE0_WAIT2:                next_state = L1_STAGE0_LOW;
+            L1_STAGE0_LOW:                  next_state = L1_STAGE0_HIGH;
+            L1_STAGE0_HIGH:                 next_state = (is_compress) ? COMPRESS_END_STAGE0_SUM0 : KYBER_BARRETT_L2;
+            KYBER_BARRETT_L2:               next_state = KYBER_BARRETT_L3;
+            KYBER_BARRETT_L3:               next_state = KYBER_BARRETT_L4_STAGE0;
+            KYBER_BARRETT_L4_STAGE0:        next_state = KYBER_BARRETT_L4_STAGE1;
+            KYBER_BARRETT_L4_STAGE1:        next_state = KYBER_BARRETT_L4_STAGE2;
+            KYBER_BARRETT_L4_STAGE2:        next_state = LAST_STAGE;  
+            COMPRESS_STAGE0:                next_state = L1_STAGE0_WAIT2;
+            COMPRESS_END_STAGE0_SUM0:       next_state = COMPRESS_END_STAGE0_SUM1;
+            COMPRESS_END_STAGE0_SUM1:       next_state = COMPRESS_END_STAGE1;
+            COMPRESS_END_STAGE1:            next_state = COMPRESS_END_STAGE2;  
+            COMPRESS_END_STAGE2:            next_state = LAST_STAGE; 
+            FINAL_STAGE_SUB_CBD_SUM_STAGE0: next_state = FINAL_STAGE_SUB_CBD_SUM_STAGE1;
+            FINAL_STAGE_SUB_CBD_SUM_STAGE1: next_state = LAST_STAGE;
+            LAST_STAGE:                     next_state = IDLE;
+            default:                        next_state = IDLE;
         endcase
     end
 
@@ -278,7 +330,7 @@ module mul
         end
     end
 
-    // synthesis translate_off
+    /*
 
     localparam string OUTPUT_FILE = "./result_kyber/Output.txt";
     integer fd; // File Descriptor (o ponteiro para o arquivo)
@@ -326,9 +378,9 @@ module mul
             $display("Log de saída salvo com sucesso em: %s", OUTPUT_FILE);
         end
     end
-
-    // synthesis translate_on
-
+    
+    */
+    
     logic [15:0] mac_result_r;
 
     logic signed_mult;
@@ -377,10 +429,20 @@ module mul
 
     logic [31:0] result_compress;
 
+    logic [31:0] result;
+
     always_comb begin 
-        result_o = mac_result_partial[31:0];
-        if(is_compress) result_o = result_compress;
-        else if(is_xkyber_i) result_o = result_xkyber;
+        result = mac_result_partial[31:0];
+        if(is_compress) result = result_compress;
+        else if(is_xkyber_i) result = result_xkyber;
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin 
+            result_o <= '0;
+        end else begin 
+            result_o <= result;
+        end
     end
 
 
@@ -406,7 +468,7 @@ module mul
             if (mul_state == L1_STAGE0_HIGH) temp1 <= ({2'b00, mac_result[20:0]} << 16) + temp1;
             else begin
                 if(!is_compress) begin
-                    if (mul_state != KYBER_BARRETT_L2) temp1 <= {2'b00, mac_result};
+                    if ((mul_state != KYBER_BARRETT_L2) && (mul_state != IDLE)) temp1 <= {2'b00, mac_result};
                 end
                 else begin 
                     if (mul_state == L1_STAGE0_LOW) temp1 <= {2'b00, mac_result}; //testar se essa condição não funciona para o mul tbm
@@ -423,6 +485,8 @@ module mul
 
     logic [31:0] alu_operand_a_kyber_mul, alu_operand_b_kyber_mul;
 
+    logic [31:0] alu_operand_a_kyber, alu_operand_b_kyber; 
+
     always_comb begin 
         alu_operand_a_kyber = first_operand_i;
         alu_operand_b_kyber = second_operand_i;
@@ -433,6 +497,16 @@ module mul
             alu_operand_b_kyber = alu_operand_b_kyber_mul;
         end
     end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            alu_operand_a_kyber_o <= '0;
+            alu_operand_b_kyber_o <= '0;
+        end begin 
+            alu_operand_a_kyber_o <= alu_operand_a_kyber;
+            alu_operand_b_kyber_o <= alu_operand_b_kyber;
+        end 
+    end 
 
     always_comb begin
 
@@ -480,13 +554,23 @@ module mul
 
         end
 
-        KYBER_BARRETT_L4: begin
+        KYBER_BARRETT_L4_STAGE0: begin
 
-            xkyber_valid         = 1'b1;
+        end
+
+        KYBER_BARRETT_L4_STAGE1: begin
+
+            //xkyber_valid         = 1'b1;
 
             // Note no state transition will occur if mult_hold is set
             //mult_hold    = ~multdiv_ready_id_i;
         end
+
+        KYBER_BARRETT_L4_STAGE2 : begin
+
+        end
+
+
 
         COMPRESS_STAGE0: begin 
 
@@ -494,11 +578,38 @@ module mul
 
         end
 
-        COMPRESS_END: begin 
+        COMPRESS_END_STAGE0_SUM0: begin 
             alu_operand_a_kyber_mul = {{16{1'b0}}, temp0[31:16]};
             alu_operand_b_kyber_mul = temp1[31:0];
 
+        end
+
+        COMPRESS_END_STAGE0_SUM1: begin 
+        
+        end 
+
+        COMPRESS_END_STAGE1: begin 
+            
+        end
+
+        COMPRESS_END_STAGE2: begin 
+            //acho que pode ser comentado, porque ja pego o resultado no estagio anterior
+            //alu_operand_a_kyber_mul = {{16{1'b0}}, temp0[31:16]};
+            //alu_operand_b_kyber_mul = temp1[31:0];
+
             result_compress = {{20{1'b0}}, adjust_result_low};
+            //xkyber_valid = 1'b1;
+        end
+
+        FINAL_STAGE_SUB_CBD_SUM_STAGE0: begin 
+            //xkyber_valid = 1'b1;
+        end
+
+        FINAL_STAGE_SUB_CBD_SUM_STAGE1: begin 
+            //xkyber_valid = 1'b1;
+        end
+
+        LAST_STAGE: begin 
             xkyber_valid = 1'b1;
         end
 

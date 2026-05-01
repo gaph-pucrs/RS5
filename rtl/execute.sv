@@ -582,7 +582,7 @@ module execute
 
             assign is_xkyber = (instruction_operation_i inside {KYBER_ADD, KYBER_SUB,KYBER_CBD2, KYBER_CBD3, KYBER_MUL, KYBER_COMPRESS});
 
-            assign enable_mul = (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU, KYBER_MUL, KYBER_COMPRESS});
+            assign enable_mul = (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU}) | is_xkyber;
 
             mul mul1 (
                 .clk                   (clk),
@@ -598,8 +598,8 @@ module execute
                 .mul_low_i             (mul_low),
                 .hold_o                (hold_mul),
                 .single_cycle_i        (1'b0),
-                .alu_operand_a_kyber   (multdiv_alu_operand_a),
-                .alu_operand_b_kyber   (multdiv_alu_operand_b),
+                .alu_operand_a_kyber_o (multdiv_alu_operand_a),
+                .alu_operand_b_kyber_o (multdiv_alu_operand_b),
                 .alu_cbd_high_i        (cbd_result_high),
                 .alu_cbd_low_i         (cbd_result_low),
                 .kyber_compress_bits_i (kyber_compress_bits),
