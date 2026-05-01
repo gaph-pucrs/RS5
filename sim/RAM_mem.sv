@@ -58,13 +58,14 @@ module RAM_mem
 `endif
 
     initial begin
-        fd = $fopen (BIN_FILE, "r");
-        if (fd == '0) begin
-            $display("[%d] [RAM_mem] ERROR: %s not found.", $time(), BIN_FILE);
-            $finish();
+        if (BIN_FILE != "") begin
+            fd = $fopen (BIN_FILE, "r");
+            if (fd == '0) begin
+                $display("[%d] [RAM_mem] ERROR: %s not found.", $time(), BIN_FILE);
+                $finish();
+            end
+            void'($fread(RAM, fd));
         end
-
-        void'($fread(RAM, fd));
 
     `ifndef SYNTH
         if (DEBUG) begin
