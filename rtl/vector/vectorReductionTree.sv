@@ -34,6 +34,7 @@ module vectorReductionTree
     input  logic [7:0][ELEMENTS_PER_REG-1:0]     mask,
     input  logic [3:0]                           cycle_count_r,
 
+    // cycle signal is only used on multi-cycle
     /* verilator lint_off UNUSEDSIGNAL */
     input  logic [9:0]                           cycle,
     /* verilator lint_on UNUSEDSIGNAL */
