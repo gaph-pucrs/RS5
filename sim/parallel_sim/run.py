@@ -13,6 +13,10 @@ def load_tests():
 def main():
     load_tests()
 
+    cores = os.cpu_count() or 8
+
+    print(cores)
+
     parser = argparse.ArgumentParser (
         description='RS5 Vector Parallel Simulation Environment'
     )
@@ -26,7 +30,7 @@ def main():
         help='Specify which testcase to run'
     )
 
-    parser.add_argument('--workers', type=int, default=8)
+    parser.add_argument('--workers', type=int, default=cores)
     parser.add_argument('--run', action='store_true')
     parser.add_argument('--clean', action='store_true')
 
