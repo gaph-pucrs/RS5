@@ -1,5 +1,6 @@
-from .vector_test import vector_test
+from .vector_test import *
 
+@register_test('lmfrnet')
 class lmfrnet_test(vector_test):
     def __init__(self):
         super().init(

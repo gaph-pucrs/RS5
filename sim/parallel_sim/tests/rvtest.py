@@ -1,5 +1,6 @@
-from .vector_test import vector_test
+from .vector_test import *
 
+@register_test('rvtest')
 class rvtest_test(vector_test):
     def __init__(self):
         super().__init__(
