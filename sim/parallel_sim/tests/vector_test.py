@@ -1,5 +1,9 @@
+"""
+    Base class for vector testcases
+"""
+
 import os
-from .base_test import base_test
+from .base_test import *
 
 class vector_test(base_test):
     def __init__(self, name, regex_pattern):

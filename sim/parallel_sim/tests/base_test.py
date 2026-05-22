@@ -10,6 +10,15 @@ import subprocess
 from concurrent.futures import ProcessPoolExecutor
 from abc import ABC, abstractmethod
 
+TEST_REGISTRY = {}
+
+# Black Magic...
+def register_test(cli_name):
+    def wrapper(cls):
+        TEST_REGISTRY[cli_name] = cls
+        return cls
+    return wrapper
+
 class base_test(ABC):
     def __init__(self, name, regex_pattern=r''):
         script_dir = os.path.dirname(__file__)
