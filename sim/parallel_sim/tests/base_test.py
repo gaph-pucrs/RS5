@@ -7,8 +7,10 @@ import re
 import shutil
 import subprocess
 
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from abc import ABC, abstractmethod
+
+from tqdm import tqdm
 
 TEST_REGISTRY = {}
 
@@ -182,11 +184,19 @@ class base_test(ABC):
             shutil.rmtree(self.testcase_root_dir)
         os.makedirs(self.testcase_root_dir, exist_ok=True)
 
+        total_jobs = len(self.params)
+
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
-            results = executor.map(self.run_config, self.params)
-            
-            for output in results:
-                print(output)
+            all_jobs = [
+                executor.submit(self.run_config, param)
+                for param in self.params
+            ]
+
+            # progress bar
+            with tqdm(total=total_jobs, desc=f'Running {self.name}', unit='cfg') as pbar:
+                for j in as_completed(all_jobs):
+                    result = j.result()
+                    pbar.update(1)
 
     def clean(self):
         shutil.rmtree(self.testcase_root_dir)

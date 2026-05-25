@@ -50,6 +50,7 @@ def main():
     if args.run:
         print(f'[*] Starting {testcase.name} simulation with {args.workers} workers...')
         testcase.run(max_workers=args.workers)
+        print('\n[+] Simulation sweep complete')
 
 if __name__ == '__main__':
     main()
