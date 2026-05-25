@@ -72,11 +72,15 @@ class base_test(ABC):
             config_dir, self.name
         )
 
+        def symlink_files(src, dst):
+            os.symlink(os.path.abspath(src), dst)
+
         shutil.copytree (
             self.app_dir, 
             os.path.join (
                 config_dir, self.name
-            )
+            ),
+            copy_function=symlink_files
         )
 
         shutil.copytree (
@@ -86,7 +90,8 @@ class base_test(ABC):
             os.path.join (
                 config_dir,
                 'common'
-            )
+            ),
+            copy_function=symlink_files
         )
 
         return config_app_dir
@@ -176,8 +181,6 @@ class base_test(ABC):
         if os.path.exists(self.testcase_root_dir):
             shutil.rmtree(self.testcase_root_dir)
         os.makedirs(self.testcase_root_dir, exist_ok=True)
-
-        print(f'[.] starting parallel simulation with {max_workers} workers')
 
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
             results = executor.map(self.run_config, self.params)
