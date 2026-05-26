@@ -15,8 +15,6 @@ def main():
 
     cores = os.cpu_count() or 8
 
-    print(cores)
-
     parser = argparse.ArgumentParser (
         description='RS5 Vector Parallel Simulation Environment'
     )

@@ -12,6 +12,8 @@ from abc import ABC, abstractmethod
 
 from tqdm import tqdm
 
+import csv
+
 TEST_REGISTRY = {}
 
 # Black Magic...
@@ -155,12 +157,20 @@ class base_test(ABC):
             f.write('=== STDERR ===\n' + ret.stderr)
 
         if ret.returncode == 0:
-            return True, f'[+] {id}: simulation finished successfully'
+            match = self.pattern.search(ret.stdout)
+            if match:
+                cycles = int(match.group(1))
+                return True, cycles, f'[+] {id}: simulation finished successfully'
+            else:
+                return False, None, f'[-] {id}: regex pattern not found in output (check {log_path})'
         else:
-            return False, f'[-] {id}: simulation error (check {log_path})'
+            return False, None, f'[-] {id}: simulation error (check {log_path})'
         
 
     def run_config(self, config):
+        data = config.copy()
+        data['test_name'] = self.name
+
         try:
             config_app_dir = self.setup(config)
             compile_success, compile_msg = self.compile (
@@ -168,16 +178,31 @@ class base_test(ABC):
             )
 
             if not compile_success:
-                return compile_msg
+                data['status'] = 'COMPILE_FAILED'
+                data['cycles'] = 'NaN'
+                data['message'] = compile_msg.strip()
+                return data
 
-            sim_success, sim_msg = self.simulate (
+            sim_success, cycles, sim_msg = self.simulate (
                 config, config_app_dir
             )
-            
-            return sim_msg
+
+            if sim_success:
+                data['status'] = 'SUCCESS'
+                data['cycles'] = cycles
+                data['message'] = sim_msg.strip()
+            else:
+                data['status'] = 'SIM_FAILED'
+                data['cycles'] = 'NaN'
+                data['message'] = sim_msg.strip()
+
+            return data
         
         except Exception as e:
-            return f"[!] {config.get('id')}: {str(e)}"
+            data['status'] = 'run_config() exception'
+            data['cycles'] = 'NaN'
+            data['message'] = str(e)
+            return data
         
     def run(self, max_workers=8):
         if os.path.exists(self.testcase_root_dir):
@@ -186,17 +211,31 @@ class base_test(ABC):
 
         total_jobs = len(self.params)
 
-        with ProcessPoolExecutor(max_workers=max_workers) as executor:
-            all_jobs = [
-                executor.submit(self.run_config, param)
-                for param in self.params
-            ]
+        self.csv_path = os.path.join (
+            self.runs_dir, self.name, 'results.csv'
+        )
 
-            # progress bar
-            with tqdm(total=total_jobs, desc=f'Running {self.name}', unit='cfg') as pbar:
-                for j in as_completed(all_jobs):
-                    result = j.result()
-                    pbar.update(1)
+        self.params_names = list(self.params[0].keys()) + ['test_name', 'status', 'cycles', 'message']
+
+        with open(self.csv_path, 'w', newline='') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=self.params_names)
+            writer.writeheader()
+
+            with ProcessPoolExecutor(max_workers=max_workers) as executor:
+                all_jobs = [
+                    executor.submit(self.run_config, param)
+                    for param in self.params
+                ]
+
+                # progress bar
+                with tqdm(total=total_jobs, desc=f'Running {self.name}', unit='cfg') as pbar:
+                    for j in as_completed(all_jobs):
+                        result = j.result()
+                        
+                        writer.writerow(result)
+                        csvfile.flush()
+
+                        pbar.update(1)
 
     def clean(self):
         shutil.rmtree(self.testcase_root_dir)
