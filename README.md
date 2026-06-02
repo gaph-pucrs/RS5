@@ -12,7 +12,9 @@
 
 ## Table of Contents
 
-- [Feature overview](#feature-overview)
+- [RS5](#rs5)
+  - [Table of Contents](#table-of-contents)
+  - [Feature overview](#feature-overview)
   - [Simulation Quick Start](#simulation-quick-start)
     - [Requirements](#requirements)
     - [Build the test application](#build-the-test-application)
