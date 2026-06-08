@@ -32,6 +32,7 @@ module execute
     parameter atomic_e      AMOEXT       = AMO_A,
     parameter bit           COMPRESSED   = 1'b1,
     parameter bit           ZKNEEnable   = 1'b0,
+    parameter bit           ZBKBEnable   = 1'b0,
     parameter bit           ZICONDEnable = 1'b0,
     parameter bit           VEnable      = 1'b0,
     parameter int           VLEN         = 64,
@@ -682,6 +683,128 @@ module execute
         assign result_zicond = '0;
     end
 
+    //////////
+    // Pack //
+    //////////
+
+    logic packh;
+    assign packh = (instruction_operation_i == ALU_PACKH);
+
+    logic [31:0] pack_result;
+
+    always_comb begin
+      unique case (1'b1)
+        packh:   pack_result = {16'h0, second_operand_i[7:0], rs1_data_i[7:0]};
+        default: pack_result = {second_operand_i[15:0], rs1_data_i[15:0]};
+      endcase
+    end
+
+    ///////////////////
+    // Bitwise Logic //
+    ///////////////////
+
+    logic bwlogic_or;
+    logic bwlogic_and;
+    logic [31:0] bwlogic_operand_b;
+    logic [31:0] bwlogic_or_result;
+    logic [31:0] bwlogic_and_result;
+    logic [31:0] bwlogic_xor_result;
+    logic [31:0] bwlogic_result;  
+
+    assign bwlogic_operand_b = second_operand_i ^ {32{1'b1}};
+
+    assign bwlogic_or_result  = rs1_data_i | bwlogic_operand_b;
+    assign bwlogic_and_result = rs1_data_i & bwlogic_operand_b;
+    assign bwlogic_xor_result = rs1_data_i ^ bwlogic_operand_b;
+
+    assign bwlogic_or  = (instruction_operation_i == ALU_ORN);
+    assign bwlogic_and = (instruction_operation_i == ALU_ANDN);
+
+    always_comb begin
+        unique case (1'b1)
+        bwlogic_or:  bwlogic_result = bwlogic_or_result;
+        bwlogic_and: bwlogic_result = bwlogic_and_result;
+        default:     bwlogic_result = bwlogic_xor_result;
+        endcase
+    end
+
+    logic [5:0] shift_amt;
+
+    assign shift_amt[4:0] = second_operand_i[4:0];
+
+    logic [4:0] zbp_shift_amt;
+
+    assign zbp_shift_amt[2:0] = shift_amt[2:0];
+    assign zbp_shift_amt[4:3] = shift_amt[4:3];
+
+    logic [31:0] rev_result;
+
+    always_comb begin
+      rev_result = rs1_data_i;
+
+      if (zbp_shift_amt[0]) begin
+        rev_result = ((rev_result & 32'h5555_5555) <<  1) |
+                     ((rev_result & 32'haaaa_aaaa) >>  1);
+      end
+
+      if (zbp_shift_amt[1]) begin
+        rev_result = ((rev_result & 32'h3333_3333) <<  2) |
+                     ((rev_result & 32'hcccc_cccc) >>  2);
+      end
+
+      if (zbp_shift_amt[2]) begin
+        rev_result = ((rev_result & 32'h0f0f_0f0f) <<  4) |
+                     ((rev_result & 32'hf0f0_f0f0) >>  4);
+      end
+
+      if (zbp_shift_amt[3]) begin
+        rev_result = ((rev_result & 32'h00ff_00ff) <<  8) |
+                     ((rev_result & 32'hff00_ff00) >>  8);
+      end
+
+      if (zbp_shift_amt[4]) begin
+        rev_result = ((rev_result & 32'h0000_ffff) << 16) |
+                     ((rev_result & 32'hffff_0000) >> 16);
+      end
+    end
+
+    logic [31:0] shuffle_result;
+
+    always_comb begin
+
+        logic is_zip;
+        is_zip = instruction_operation_i == ALU_ZIP;
+
+        if (is_zip) begin
+            for (int i = 0; i < 16; i++) begin
+                shuffle_result[2*i] = rs1_data_i[i];
+                shuffle_result[2*i + 1] = rs1_data_i[i + 16];
+            end
+        end
+
+        else begin
+            for (int i = 0; i < 16; i++) begin
+                shuffle_result[i] = rs1_data_i[2*i];
+                shuffle_result[i + 16] = rs1_data_i[2*i + 1];
+            end
+        end
+      end
+
+    logic [4:0] shift_amt_compl; // complementary shift amount (32 - shift_amt)
+
+    assign shift_amt_compl = 32 - second_operand_i[4:0];
+
+    logic [31:0] shift_result, ror_result, rol_result;
+
+    always_comb begin
+
+        ror_result   =  srl_result | (rs1_data_i << shift_amt_compl);
+
+        rol_result   =  sll_result | (rs1_data_i >> shift_amt_compl);
+
+        shift_result = (instruction_operation_i == ALU_ROL) ? rol_result : ror_result;
+    end
+
 //////////////////////////////////////////////////////////////////////////////
 // Demux
 //////////////////////////////////////////////////////////////////////////////
@@ -689,26 +812,31 @@ module execute
     always_comb begin
         unique case (instruction_operation_i)
             CSRRW, CSRRS, CSRRC,
-            CSRRWI,CSRRSI,CSRRCI:   result = csr_data_read_i;
-            JAL,JALR:               result = pc_next;
-            SLT:                    result = {31'b0, less_than};
-            SLTU:                   result = {31'b0, less_than_unsigned};
-            XOR:                    result = xor_result;
-            OR:                     result = or_result;
-            AND:                    result = and_result;
-            SLL:                    result = sll_result;
-            SRL:                    result = srl_result;
-            SRA:                    result = sra_result;
-            LUI:                    result = second_operand_i;
-            AUIPC:                  result = jump_imm_target_i;
-            DIV,DIVU:               result = (MULEXT == MUL_M)   ? div_result                           : sum_result;
-            REM,REMU:               result = (MULEXT == MUL_M)   ? rem_result                           : sum_result;
-            MUL,MULH,MULHU,MULHSU:  result = (MULEXT != MUL_OFF) ? mul_result                           : sum_result;
-            AES32ESI, AES32ESMI:    result = ZKNEEnable          ? aes_result                           : sum_result;
-            VECTOR, VLOAD, VSTORE:  result = VEnable             ? vector_scalar_result                 : sum_result;
-            CZERO_EQZ, CZERO_NEZ:   result = ZICONDEnable        ? result_zicond                        : sum_result;
-            SC_W:                   result = (AMOEXT inside {AMO_ZALRSC, AMO_A}) ? {31'h0, lrsc_result} : sum_result;
-            default:                result = sum_result;
+            CSRRWI,CSRRSI,CSRRCI:           result = csr_data_read_i;
+            JAL,JALR:                       result = pc_next;
+            SLT:                            result = {31'b0, less_than};
+            SLTU:                           result = {31'b0, less_than_unsigned};
+            XOR:                            result = xor_result;
+            OR:                             result = or_result;
+            AND:                            result = and_result;
+            SLL:                            result = sll_result;
+            SRL:                            result = srl_result;
+            SRA:                            result = sra_result;
+            LUI:                            result = second_operand_i;
+            AUIPC:                          result = jump_imm_target_i;
+            DIV,DIVU:                       result = (MULEXT == MUL_M)   ? div_result                           : sum_result;
+            REM,REMU:                       result = (MULEXT == MUL_M)   ? rem_result                           : sum_result;
+            MUL,MULH,MULHU,MULHSU:          result = (MULEXT != MUL_OFF) ? mul_result                           : sum_result;
+            AES32ESI, AES32ESMI:            result = ZKNEEnable          ? aes_result                           : sum_result;
+            VECTOR, VLOAD, VSTORE:          result = VEnable             ? vector_scalar_result                 : sum_result;
+            CZERO_EQZ, CZERO_NEZ:           result = ZICONDEnable        ? result_zicond                        : sum_result;
+            SC_W:                           result = (AMOEXT inside {AMO_ZALRSC, AMO_A}) ? {31'h0, lrsc_result} : sum_result;
+            ALU_ROR, ALU_ROL:               result = (ZBKBEnable) ? shift_result   : sum_result;
+            ALU_PACK, ALU_PACKH:            result = (ZBKBEnable) ? pack_result    : sum_result; 
+            ALU_XNOR, ALU_ORN, ALU_ANDN:    result = (ZBKBEnable) ? bwlogic_result : sum_result;
+            ALU_REV8, ALU_BREV8:            result = (ZBKBEnable) ? rev_result     : sum_result;
+            ALU_ZIP, ALU_UNZIP:             result = (ZBKBEnable) ? shuffle_result : sum_result;          
+            default:                        result = sum_result;
         endcase
     end
 

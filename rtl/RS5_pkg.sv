@@ -111,7 +111,18 @@ package RS5_pkg;
         SC_W,
         AMO_W,
         CZERO_EQZ,
-        CZERO_NEZ
+        CZERO_NEZ,
+        ALU_ROL,
+        ALU_ROR,  
+        ALU_PACK, 
+        ALU_PACKH,
+        ALU_XNOR, 
+        ALU_ORN,  
+        ALU_ANDN,
+        ALU_ZIP,
+        ALU_BREV8,
+        ALU_REV8,
+        ALU_UNZIP
     } iType_e;
 
     typedef enum logic[1:0] {
