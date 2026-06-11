@@ -71,7 +71,7 @@ Extensions are enabled via parameters in [../rtl/RS5.sv](../../rtl/RS5.sv).
 | Zicond | `ZICONDEnable = 1` | Integer conditional operations | — |
 | Zihpm | `HPMCOUNTEREnable = 1` | Hardware performance-monitoring counters | — |
 | Zkne | `ZKNEEnable = 1` | AES encryption (scalar, 32-bit) | — |
-| V (Zve32x / Zvl64b) | `VEnable = 1` | Vector extension (configurable VLEN, LLEN) | — |
+| V (Zve32x subset) | `VEnable = 1` | Vector extension (configurable VLEN, LLEN) | — |
 | Xosvm | `XOSVMEnable = 1` | Offset and size virtual memory (non-standard) | [Xosvm.md](extensions/Xosvm.md) |
 
 ---
@@ -89,7 +89,7 @@ Non-extension parameters configure processor behaviour and target environment.
 | `BRANCHPRED` | `bit` | `1` | Enable static branch prediction (resolves immediate-target branches at decode instead of execute) |
 | `FORWARDING` | `bit` | `1` | Enable data forwarding from execute result and memory read; writeback forwarding is always active |
 | `VLEN` | `int` | `256` | Vector register length in bits (effective when `VEnable = 1`) |
-| `LLEN` | `int` | `32` | Vector memory access lane width in bits (effective when `VEnable = 1`) |
+| `LLEN` | `int` | `32` | Vector Lane width in bits, number of bits each lane process, smaller values indicate more lanes and thus more parallelism (effective when `VEnable = 1`) |
 | `DEBUG` | `bit` | `0` | Dump register file contents to `DBG_REG_FILE` at end of simulation |
 | `DBG_REG_FILE` | `string` | `./debug/regBank.txt` | Output path for register file debug dump |
 | `PROFILING` | `bit` | `0` | Enable instruction profiling report written to `PROFILING_FILE` |
