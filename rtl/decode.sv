@@ -32,6 +32,7 @@ module decode
     parameter atomic_e      AMOEXT       = AMO_A,
     parameter bit           COMPRESSED   = 1'b1,
     parameter bit           ZKNEEnable   = 1'b0,
+    parameter bit           ZBKBEnable   = 1'b0,
     parameter bit           ZICONDEnable = 1'b0,
     parameter bit           VEnable      = 1'b0,
     parameter bit           BRANCHPRED   = 1'b1,
@@ -152,6 +153,17 @@ module decode
         endcase
     end
 
+
+    iType_e brev_op;
+    always_comb begin
+        unique case (instruction_i[26:20])
+            7'b000_0111: brev_op = ALU_BREV8;  // brev8: imm[11:5] = 0000111
+            7'b001_1000: brev_op = ALU_REV8;   // rev8:  imm[11:5] = 0110100  
+            default:     brev_op = INVALID;
+        endcase
+    end
+
+
     iType_e decode_op_imm;
     always_comb begin
         unique case ({funct7, funct3}) inside
@@ -164,6 +176,10 @@ module decode
             10'b0100000101:     decode_op_imm = SRA;    /* SRAI */
             10'b???????110:     decode_op_imm = OR;     /* ORI */
             10'b???????111:     decode_op_imm = AND;    /* ANDI */
+            10'b01100??101:     decode_op_imm = (ZBKBEnable) ? ALU_ROR    : INVALID;  
+            10'b0000100001:     decode_op_imm = (ZBKBEnable) ? ALU_ZIP    : INVALID;
+            10'b01101??101:     decode_op_imm = (ZBKBEnable) ? brev_op    : INVALID;
+            10'b00001??101:     decode_op_imm = (ZBKBEnable) ? ALU_UNZIP  : INVALID;
             default:            decode_op_imm = INVALID;
         endcase
     end
@@ -193,6 +209,14 @@ module decode
             10'b??10011000:     decode_op = ZKNEEnable   ? AES32ESMI : INVALID;
             10'b0000111101:     decode_op = ZICONDEnable ? CZERO_EQZ : INVALID;
             10'b0000111111:     decode_op = ZICONDEnable ? CZERO_NEZ : INVALID;
+            // ZBKB ALU Operations
+            10'b0110000001:     decode_op = (ZBKBEnable) ? ALU_ROL   : INVALID;
+            10'b0110000101:     decode_op = (ZBKBEnable) ? ALU_ROR   : INVALID; 
+            10'b0000100100:     decode_op = (ZBKBEnable) ? ALU_PACK  : INVALID;
+            10'b0000100111:     decode_op = (ZBKBEnable) ? ALU_PACKH : INVALID; 
+            10'b0100000100:     decode_op = (ZBKBEnable) ? ALU_XNOR  : INVALID;
+            10'b0100000110:     decode_op = (ZBKBEnable) ? ALU_ORN   : INVALID;
+            10'b0100000111:     decode_op = (ZBKBEnable) ? ALU_ANDN  : INVALID;
             default:            decode_op = INVALID;
         endcase
     end
