@@ -3,9 +3,44 @@ NC   =\033[0m # No Color
 
 COMMON_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
+SHA256_ZKNH ?= 0
+
+SHA512_ZKNH ?= 0
+
+AES_ASM ?= 0
+
+KYBER_ISE ?= 1
+
+ifneq (${SHA256_ZKNH}, 0)
+	DEFS += -DSHA256_ZKNH
+endif
+
+ifneq (${SHA512_ZKNH}, 0)
+	DEFS += -DSHA512_ZKNH
+endif
+
+ifneq (${AES_ASM}, 0)
+	DEFS += -DAES_RISCV_ASM
+endif
+
+ifneq (${KYBER_ISE}, 0)
+	DEFS += -DKYBER_ISE
+endif
+
+DEFS += -DTC_AES_256
+
+# DEFS += -DKYBER_90S
+
+DEFS += -DRVKINTRIN_ASSEMBLER
+
+DEFS += -DKYBER_K=2
+
+DEFS += -DRVK_ALGTEST_VERBOSE_SIO
+
 TARGET   ?= $(notdir $(CURDIR))
 MEM_SIZE ?= 65536
-ARCH     ?= rv32im_zicsr
+ARCH     ?= rv32im_zicsr_zkne_zknh
+#ARCH 	  =	rv32imc_zicsr_zkne_zknh_zbkb
 
 CC 		= riscv64-elf-gcc
 OBJDUMP = riscv64-elf-objdump
@@ -13,12 +48,12 @@ OBJCOPY = riscv64-elf-objcopy
 
 SRCDIR  = src
 INCDIR  = $(SRCDIR)/include
-HEADERS = $(wildcard $(INCDIR)/*.h) $(wildcard $(COMMON_DIR)/include/*.h)
+HEADERS = $(wildcard $(INCDIR)/*.h) $(wildcard $(COMMON_DIR)/include/*.h) $(wildcard $(COMMON_DIR)/include/kyber_round3_ref/*.h) $(wildcard $(COMMON_DIR)/include/tinycrypt/*.h)
 
-CFLAGS  = -march=$(ARCH) -mabi=ilp32 -Os -Wall -std=c23 -I$(INCDIR) -I$(COMMON_DIR)/include
-LDFLAGS = --specs=nano.specs -T $(COMMON_DIR)/link.ld -march=$(ARCH) -mabi=ilp32 -nostartfiles -lm -u _printf_float
+CFLAGS  = -march=$(ARCH) -mabi=ilp32 -Os -fdata-sections -ffunction-sections -Wall -std=c23 -I$(INCDIR) -I$(COMMON_DIR)/include -I$(COMMON_DIR)/include/kyber_round3_ref -I$(COMMON_DIR)/include/tinycrypt $(DEFS)
+LDFLAGS = --specs=nano.specs -T $(COMMON_DIR)/link.ld -Wl,--gc-sections -march=$(ARCH) -mabi=ilp32 -nostartfiles -lm -u _printf_float
 
-CCSRC = $(wildcard $(SRCDIR)/*.c) $(wildcard $(COMMON_DIR)/*.c)
+CCSRC = $(wildcard $(SRCDIR)/*.c) $(wildcard $(COMMON_DIR)/*.c) $(wildcard $(COMMON_DIR)/kyber_round3_ref/*.c) $(wildcard $(COMMON_DIR)/tinycrypt/*.c) $(wildcard $(COMMON_DIR)/keccak/*.c)
 CCOBJ = $(patsubst %.c, %.o, $(CCSRC))
 
 ASSRC = $(wildcard $(SRCDIR)/*.S) $(wildcard $(COMMON_DIR)/*.S)
@@ -50,6 +85,9 @@ clean:
 	@printf "Cleaning up\n"
 	@rm -rf src/*.o
 	@rm -rf $(COMMON_DIR)/*.o
+	@rm -rf $(COMMON_DIR)/tinycrypt/*.o
+	@rm -rf $(COMMON_DIR)/keccak/*.o
+	@rm -rf $(COMMON_DIR)/kyber_round3_ref/*.o
 	@rm -rf *.bin
 	@rm -rf *.map
 	@rm -rf *.lst

@@ -29,7 +29,7 @@ module testbench
 (
 );
 
-  timeunit 1ns; timeprecision 1ns;
+  timeunit 1ns; timeprecision 1ps;
 
 //////////////////////////////////////////////////////////////////////////////
 // PARAMETERS FOR CORE INSTANTIATION
@@ -40,6 +40,8 @@ module testbench
     localparam bit           COMPRESSED      = 1'b1;
     localparam bit           USE_XOSVM       = 1'b0;
     localparam bit           USE_ZKNE        = 1'b1;
+    localparam bit           USE_ZKNH        = 1'b1;
+    localparam bit           USE_XKYBER      = 1'b1;
     localparam bit           USE_ZICOND      = 1'b1;
     localparam bit           USE_ZCB         = 1'b1;
     localparam bit           USE_HPMCOUNTER  = 1'b1;
@@ -62,8 +64,10 @@ module testbench
 
     localparam int           BUS_WIDTH       = 32;
     localparam int           MEM_ADDR_BITS   = 28;
-    localparam string        BIN_FILE        = "../app/riscv-tests/test.bin";
-
+    localparam string        BIN_FILE        = "/sim/vitao/crypto/soc/RS5/app/xkyber_keys_exchange/xkyber_keys_exchange.bin";
+    //localparam string        BIN_FILE        = "/sim/vitao/crypto/soc/RS5/app/xkyber_full_test/xkyber_full_test.bin";
+    //localparam string        BIN_FILE        = "/sim/vitao/crypto/soc/RS5/app/keccak_test/keccak_test.bin";
+    //localparam string        BIN_FILE        = "/sim/vitao/crypto/soc/RS5/app/test_bitmanip/test_bitmanip.bin";
     localparam int           i_cnt = 1;
 
 ///////////////////////////////////////// Clock generator //////////////////////////////
@@ -71,7 +75,7 @@ module testbench
     logic clk;
     initial begin
         clk = 0;
-        forever #5.0 clk = ~clk;
+        forever #2.5 clk = ~clk;
     end
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -154,7 +158,6 @@ module testbench
 	    .DEBUG          (DEBUG          ),
 	    .PROFILING      (PROFILING      ),
         .PROFILING_FILE (PROFILING_FILE ),
-    `endif
         .Environment     (ASIC          ),
         .MULEXT          (MULEXT        ),
         .AMOEXT          (AMOEXT        ),
@@ -165,12 +168,15 @@ module testbench
         .LLEN            (LLEN          ),
         .XOSVMEnable     (USE_XOSVM     ),
         .ZKNEEnable      (USE_ZKNE      ),
+        .ZKNHEnable      (USE_ZKNH      ),
+        .XKYBEREnable    (USE_XKYBER    ),
         .ZICONDEnable    (USE_ZICOND    ),
         .ZCBEnable       (USE_ZCB       ),
         .HPMCOUNTEREnable(USE_HPMCOUNTER),
         .IQUEUE_SIZE     (IQUEUE_SIZE   ),
         .BRANCHPRED      (BRANCHPRED    ),
         .FORWARDING      (FORWARDING    )
+    `endif
     ) dut (
         .clk                    (clk),
         .reset_n                (reset_n),
@@ -195,7 +201,10 @@ module testbench
 // RAM
 //////////////////////////////////////////////////////////////////////////////
 
-    localparam int MEM_WIDTH = 1 << MEM_ADDR_BITS;
+    //localparam int MEM_WIDTH = 1 << MEM_ADDR_BITS;
+
+    localparam int MEM_WIDTH = 131072;
+    //localparam int MEM_WIDTH = 65536;
 
     logic                             enA;
     logic [BUS_WIDTH/8-1:0]           weA;

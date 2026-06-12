@@ -31,11 +31,14 @@ module decode
     parameter mul_e         MULEXT       = MUL_M,
     parameter atomic_e      AMOEXT       = AMO_A,
     parameter bit           COMPRESSED   = 1'b1,
+    parameter bit           ZKNHEnable   = 1'b1,
     parameter bit           ZKNEEnable   = 1'b0,
+    parameter bit           ZBKBEnable   = 1'b1,
     parameter bit           ZICONDEnable = 1'b0,
     parameter bit           VEnable      = 1'b0,
     parameter bit           BRANCHPRED   = 1'b1,
-    parameter bit           FORWARDING   = 1'b1
+    parameter bit           FORWARDING   = 1'b1,
+    parameter bit           XKYBEREnable = 1'b1
 )
 (
     input   logic           clk,
@@ -152,9 +155,29 @@ module decode
         endcase
     end
 
+    iType_e sha2_type;
+    always_comb begin 
+        unique case (instruction_i[26:20])
+            7'b000_0010: sha2_type = ZKNHEnable ? SIG0 : INVALID; // sha256sig0
+            7'b000_0011: sha2_type = ZKNHEnable ? SIG1 : INVALID; // sha256sig1
+            7'b000_0000: sha2_type = ZKNHEnable ? SUM0 : INVALID; // sha256sum0
+            7'b000_0001: sha2_type = ZKNHEnable ? SUM1 : INVALID; // sha256sum1
+            default: sha2_type = INVALID;
+        endcase
+    end
+
+    iType_e brev_op;
+    always_comb begin
+        if(instruction_i[26:20] == 5'b0_0111) brev_op = ALU_BREV8;
+        else if(instruction_i[26:20] == 5'b1_1000) brev_op = ALU_REV8;
+        else brev_op = INVALID;
+    end
+
+
     iType_e decode_op_imm;
     always_comb begin
         unique case ({funct7, funct3}) inside
+            10'b00010??001:     decode_op_imm = sha2_type; 
             10'b???????000:     decode_op_imm = ADD;    /* ADDI */
             10'b0000000001:     decode_op_imm = SLL;    /* SLLI */
             10'b???????010:     decode_op_imm = SLT;    /* SLTI */
@@ -164,6 +187,12 @@ module decode
             10'b0100000101:     decode_op_imm = SRA;    /* SRAI */
             10'b???????110:     decode_op_imm = OR;     /* ORI */
             10'b???????111:     decode_op_imm = AND;    /* ANDI */
+            10'b01100??101:     decode_op_imm = (ZBKBEnable) ? ALU_ROR    : INVALID;  
+            10'b0000100001:     decode_op_imm = (ZBKBEnable) ? ALU_ZIP    : INVALID;
+            10'b01101??101:     decode_op_imm = (ZBKBEnable) ? brev_op : INVALID;
+            //10'b01101??101:     decode_op_imm = (ZBKBEnable && instruction_i[26:20] == 5'b0_0111) ? ALU_BREV8 : INVALID;
+            //10'b01101??101:     decode_op_imm = (ZBKBEnable && instruction_i[26:20] == 5'b1_1000) ? ALU_REV8  : INVALID;
+            10'b00001??101:     decode_op_imm = (ZBKBEnable) ? ALU_UNZIP  : INVALID;
             default:            decode_op_imm = INVALID;
         endcase
     end
@@ -193,8 +222,38 @@ module decode
             10'b??10011000:     decode_op = ZKNEEnable   ? AES32ESMI : INVALID;
             10'b0000111101:     decode_op = ZICONDEnable ? CZERO_EQZ : INVALID;
             10'b0000111111:     decode_op = ZICONDEnable ? CZERO_NEZ : INVALID;
+            10'b0101110000:     decode_op = ZKNHEnable   ? SIG0H : INVALID; //sha512sig0h 
+            10'b0101010000:     decode_op = ZKNHEnable   ? SIG0L : INVALID; //sha512sig0l 
+            10'b0101111000:     decode_op = ZKNHEnable   ? SIG1H : INVALID; //sha512sig1h
+            10'b0101011000:     decode_op = ZKNHEnable   ? SIG1L : INVALID; //sha512sig1l
+            10'b0101000000:     decode_op = ZKNHEnable   ? SUM0R : INVALID; //sha512sum0r
+            10'b0101001000:     decode_op = ZKNHEnable   ? SUM1R : INVALID; //sha512sum1r
+            // ZBKB ALU Operations
+            10'b0110000001:     decode_op = (ZBKBEnable) ? ALU_ROL   : INVALID;
+            10'b0110000101:     decode_op = (ZBKBEnable) ? ALU_ROR   : INVALID; 
+            10'b0000100100:     decode_op = (ZBKBEnable) ? ALU_PACK  : INVALID;
+            10'b0000100111:     decode_op = (ZBKBEnable) ? ALU_PACKH : INVALID; 
+            10'b0100000100:     decode_op = (ZBKBEnable) ? ALU_XNOR  : INVALID;
+            10'b0100000110:     decode_op = (ZBKBEnable) ? ALU_ORN   : INVALID;
+            10'b0100000111:     decode_op = (ZBKBEnable) ? ALU_ANDN  : INVALID;
             default:            decode_op = INVALID;
         endcase
+    end
+
+    iType_e decode_xkyber;
+    always_comb begin
+        
+        unique case (funct7)
+
+          7'd0: decode_xkyber = KYBER_ADD;
+          7'd1: decode_xkyber = KYBER_SUB;
+          7'd2: decode_xkyber = KYBER_MUL;
+          7'd3: decode_xkyber = KYBER_COMPRESS;
+          7'd4: decode_xkyber = (instruction_i[24:20] == 5'd3) ? KYBER_CBD3 : KYBER_CBD2;
+          default: decode_xkyber = SLTU;
+
+        endcase
+
     end
 
     iType_e decode_misc_mem;
@@ -288,6 +347,7 @@ module decode
             5'b00001: instruction_operation = VEnable ? VLOAD  : INVALID; /* LOAD-FP */
             5'b01001: instruction_operation = VEnable ? VSTORE : INVALID; /* STORE-FP */
             5'b01011: instruction_operation = decode_atomic;
+            5'b01010: instruction_operation = XKYBEREnable ? decode_xkyber : INVALID; 
             default:  instruction_operation = INVALID;
         endcase
     end
@@ -426,7 +486,11 @@ module decode
             5'b11000:                       instruction_format = B_TYPE;        /* BRANCH */
             5'b01101, 5'b00101:             instruction_format = U_TYPE;        /* LUI, AUIPC */
             5'b11011:                       instruction_format = J_TYPE;        /* JAL */
-            default:                        instruction_format = R_TYPE;
+            5'b01010: begin
+                if(funct7 == 7'd4) instruction_format = I_TYPE; 
+                else instruction_format = R_TYPE;
+            end
+            default: instruction_format = R_TYPE;
         endcase
     end
 
