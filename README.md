@@ -5,7 +5,7 @@
 [![RISCOF Passing](https://img.shields.io/badge/RISCOF-Passing-blue)](riscof/README.md)
 [![FPGA: Nexys A7](https://img.shields.io/badge/FPGA-Nexys%20A7-brightgreen)](proto/RS5)
 [![FPGA: NetFPGA SUME](https://img.shields.io/badge/FPGA-NetFPGA%20SUME-brightgreen)](proto/RS5_SUME)
-[![Silicon Proven](https://img.shields.io/badge/Silicon-Proven-blue)]()
+[![Silicon Proven](https://img.shields.io/badge/Silicon-Proven-blue)](https://www.linkedin.com/feed/update/urn:li:activity:7470952399667425280/)
 
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
