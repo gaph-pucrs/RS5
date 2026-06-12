@@ -9,7 +9,7 @@ SHA512_ZKNH ?= 0
 
 AES_ASM ?= 0
 
-KYBER_ISE ?= 1
+KYBER_ISE ?= 0
 
 ifneq (${SHA256_ZKNH}, 0)
 	DEFS += -DSHA256_ZKNH
@@ -29,11 +29,7 @@ endif
 
 DEFS += -DTC_AES_256
 
-# DEFS += -DKYBER_90S
-
 DEFS += -DRVKINTRIN_ASSEMBLER
-
-DEFS += -DKYBER_K=2
 
 DEFS += -DRVK_ALGTEST_VERBOSE_SIO
 
@@ -48,12 +44,12 @@ OBJCOPY = riscv64-elf-objcopy
 
 SRCDIR  = src
 INCDIR  = $(SRCDIR)/include
-HEADERS = $(wildcard $(INCDIR)/*.h) $(wildcard $(COMMON_DIR)/include/*.h) $(wildcard $(COMMON_DIR)/include/kyber_round3_ref/*.h) $(wildcard $(COMMON_DIR)/include/tinycrypt/*.h)
+HEADERS = $(wildcard $(INCDIR)/*.h) $(wildcard $(COMMON_DIR)/include/*.h)
 
-CFLAGS  = -march=$(ARCH) -mabi=ilp32 -Os -fdata-sections -ffunction-sections -Wall -std=c23 -I$(INCDIR) -I$(COMMON_DIR)/include -I$(COMMON_DIR)/include/kyber_round3_ref -I$(COMMON_DIR)/include/tinycrypt $(DEFS)
+CFLAGS  = -march=$(ARCH) -mabi=ilp32 -Os -fdata-sections -ffunction-sections -Wall -std=c23 -I$(INCDIR) -I$(COMMON_DIR)/include $(DEFS)
 LDFLAGS = --specs=nano.specs -T $(COMMON_DIR)/link.ld -Wl,--gc-sections -march=$(ARCH) -mabi=ilp32 -nostartfiles -lm -u _printf_float
 
-CCSRC = $(wildcard $(SRCDIR)/*.c) $(wildcard $(COMMON_DIR)/*.c) $(wildcard $(COMMON_DIR)/kyber_round3_ref/*.c) $(wildcard $(COMMON_DIR)/tinycrypt/*.c) $(wildcard $(COMMON_DIR)/keccak/*.c)
+CCSRC = $(wildcard $(SRCDIR)/*.c) $(wildcard $(COMMON_DIR)/*.c) $(wildcard $(COMMON_DIR)/keccak/*.c)
 CCOBJ = $(patsubst %.c, %.o, $(CCSRC))
 
 ASSRC = $(wildcard $(SRCDIR)/*.S) $(wildcard $(COMMON_DIR)/*.S)

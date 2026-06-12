@@ -156,9 +156,11 @@ module decode
 
     iType_e brev_op;
     always_comb begin
-        if(instruction_i[26:20] == 5'b0_0111) brev_op = ALU_BREV8;
-        else if(instruction_i[26:20] == 5'b1_1000) brev_op = ALU_REV8;
-        else brev_op = INVALID;
+        unique case (instruction_i[26:20])
+            7'b000_0111: brev_op = ALU_BREV8;  // brev8: imm[11:5] = 0000111
+            7'b001_1000: brev_op = ALU_REV8;   // rev8:  imm[11:5] = 0110100  
+            default:     brev_op = INVALID;
+        endcase
     end
 
 
@@ -176,7 +178,7 @@ module decode
             10'b???????111:     decode_op_imm = AND;    /* ANDI */
             10'b01100??101:     decode_op_imm = (ZBKBEnable) ? ALU_ROR    : INVALID;  
             10'b0000100001:     decode_op_imm = (ZBKBEnable) ? ALU_ZIP    : INVALID;
-            10'b01101??101:     decode_op_imm = (ZBKBEnable) ? brev_op : INVALID;
+            10'b01101??101:     decode_op_imm = (ZBKBEnable) ? brev_op    : INVALID;
             10'b00001??101:     decode_op_imm = (ZBKBEnable) ? ALU_UNZIP  : INVALID;
             default:            decode_op_imm = INVALID;
         endcase
