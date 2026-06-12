@@ -7,6 +7,7 @@
 #include "riscv_crypto.h"
 #include "test_rvkat.h"
 #include "sha3_api.h"
+#include <stdio.h>
 
 #include <string.h>
 
@@ -189,14 +190,12 @@ int main(void) {
 
 	int result = 0;
 
-    data_ind_timing_enable(1);
-
 	result = test_sha3();
 
     if (!result)
-        puts("PASS\n");
+        printf("PASS\n");
     else
-        puts("FAIL\n");
+        printf("FAIL\n");
 
 	return result;
 }

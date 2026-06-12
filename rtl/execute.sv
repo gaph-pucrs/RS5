@@ -683,126 +683,141 @@ module execute
         assign result_zicond = '0;
     end
 
-    //////////
-    // Pack //
-    //////////
+    ////////////////////////////////////////////////////////////////////////////////
+    // ZBKB Extension
+    ////////////////////////////////////////////////////////////////////////////////
 
-    logic packh;
-    assign packh = (instruction_operation_i == ALU_PACKH);
+    logic [31:0] shift_result;   
+    logic [31:0] pack_result;   
+    logic [31:0] bwlogic_result; 
+    logic [31:0] rev_result;   
+    logic [31:0] shuffle_result;    
 
-    logic [31:0] pack_result;
+    if (ZBKBEnable) begin: zbkb_gen_on
 
-    always_comb begin
-      unique case (1'b1)
-        packh:   pack_result = {16'h0, second_operand_i[7:0], rs1_data_i[7:0]};
-        default: pack_result = {second_operand_i[15:0], rs1_data_i[15:0]};
-      endcase
-    end
+        //////////
+        // Pack //
+        //////////
 
-    ///////////////////
-    // Bitwise Logic //
-    ///////////////////
+        logic packh;
+        assign packh = (instruction_operation_i == ALU_PACKH);
 
-    logic bwlogic_or;
-    logic bwlogic_and;
-    logic [31:0] bwlogic_operand_b;
-    logic [31:0] bwlogic_or_result;
-    logic [31:0] bwlogic_and_result;
-    logic [31:0] bwlogic_xor_result;
-    logic [31:0] bwlogic_result;  
-
-    assign bwlogic_operand_b = second_operand_i ^ {32{1'b1}};
-
-    assign bwlogic_or_result  = rs1_data_i | bwlogic_operand_b;
-    assign bwlogic_and_result = rs1_data_i & bwlogic_operand_b;
-    assign bwlogic_xor_result = rs1_data_i ^ bwlogic_operand_b;
-
-    assign bwlogic_or  = (instruction_operation_i == ALU_ORN);
-    assign bwlogic_and = (instruction_operation_i == ALU_ANDN);
-
-    always_comb begin
+        always_comb begin
         unique case (1'b1)
-        bwlogic_or:  bwlogic_result = bwlogic_or_result;
-        bwlogic_and: bwlogic_result = bwlogic_and_result;
-        default:     bwlogic_result = bwlogic_xor_result;
+            packh:   pack_result = {16'h0, second_operand_i[7:0], rs1_data_i[7:0]};
+            default: pack_result = {second_operand_i[15:0], rs1_data_i[15:0]};
         endcase
-    end
+        end
 
-    logic [5:0] shift_amt;
+        ///////////////////
+        // Bitwise Logic //
+        ///////////////////
 
-    assign shift_amt[4:0] = second_operand_i[4:0];
+        logic bwlogic_or;
+        logic bwlogic_and;
+        logic [31:0] bwlogic_operand_b;
+        logic [31:0] bwlogic_or_result;
+        logic [31:0] bwlogic_and_result;
+        logic [31:0] bwlogic_xor_result;
 
-    logic [4:0] zbp_shift_amt;
+        assign bwlogic_operand_b = second_operand_i ^ {32{1'b1}};
 
-    assign zbp_shift_amt[2:0] = shift_amt[2:0];
-    assign zbp_shift_amt[4:3] = shift_amt[4:3];
+        assign bwlogic_or_result  = rs1_data_i | bwlogic_operand_b;
+        assign bwlogic_and_result = rs1_data_i & bwlogic_operand_b;
+        assign bwlogic_xor_result = rs1_data_i ^ bwlogic_operand_b;
 
-    logic [31:0] rev_result;
+        assign bwlogic_or  = (instruction_operation_i == ALU_ORN);
+        assign bwlogic_and = (instruction_operation_i == ALU_ANDN);
 
-    always_comb begin
-      rev_result = rs1_data_i;
+        always_comb begin
+            unique case (1'b1)
+            bwlogic_or:  bwlogic_result = bwlogic_or_result;
+            bwlogic_and: bwlogic_result = bwlogic_and_result;
+            default:     bwlogic_result = bwlogic_xor_result;
+            endcase
+        end
 
-      if (zbp_shift_amt[0]) begin
-        rev_result = ((rev_result & 32'h5555_5555) <<  1) |
-                     ((rev_result & 32'haaaa_aaaa) >>  1);
-      end
+        logic [5:0] shift_amt;
 
-      if (zbp_shift_amt[1]) begin
-        rev_result = ((rev_result & 32'h3333_3333) <<  2) |
-                     ((rev_result & 32'hcccc_cccc) >>  2);
-      end
+        assign shift_amt[4:0] = second_operand_i[4:0];
 
-      if (zbp_shift_amt[2]) begin
-        rev_result = ((rev_result & 32'h0f0f_0f0f) <<  4) |
-                     ((rev_result & 32'hf0f0_f0f0) >>  4);
-      end
+        logic [4:0] zbp_shift_amt;
 
-      if (zbp_shift_amt[3]) begin
-        rev_result = ((rev_result & 32'h00ff_00ff) <<  8) |
-                     ((rev_result & 32'hff00_ff00) >>  8);
-      end
+        assign zbp_shift_amt[2:0] = shift_amt[2:0];
+        assign zbp_shift_amt[4:3] = shift_amt[4:3];
 
-      if (zbp_shift_amt[4]) begin
-        rev_result = ((rev_result & 32'h0000_ffff) << 16) |
-                     ((rev_result & 32'hffff_0000) >> 16);
-      end
-    end
+        always_comb begin
+        rev_result = rs1_data_i;
 
-    logic [31:0] shuffle_result;
+        if (zbp_shift_amt[0]) begin
+            rev_result = ((rev_result & 32'h5555_5555) <<  1) |
+                        ((rev_result & 32'haaaa_aaaa) >>  1);
+        end
 
-    always_comb begin
+        if (zbp_shift_amt[1]) begin
+            rev_result = ((rev_result & 32'h3333_3333) <<  2) |
+                        ((rev_result & 32'hcccc_cccc) >>  2);
+        end
 
-        logic is_zip;
-        is_zip = instruction_operation_i == ALU_ZIP;
+        if (zbp_shift_amt[2]) begin
+            rev_result = ((rev_result & 32'h0f0f_0f0f) <<  4) |
+                        ((rev_result & 32'hf0f0_f0f0) >>  4);
+        end
 
-        if (is_zip) begin
-            for (int i = 0; i < 16; i++) begin
-                shuffle_result[2*i] = rs1_data_i[i];
-                shuffle_result[2*i + 1] = rs1_data_i[i + 16];
+        if (zbp_shift_amt[3]) begin
+            rev_result = ((rev_result & 32'h00ff_00ff) <<  8) |
+                        ((rev_result & 32'hff00_ff00) >>  8);
+        end
+
+        if (zbp_shift_amt[4]) begin
+            rev_result = ((rev_result & 32'h0000_ffff) << 16) |
+                        ((rev_result & 32'hffff_0000) >> 16);
+        end
+        end
+
+        always_comb begin
+
+            logic is_zip;
+            is_zip = instruction_operation_i == ALU_ZIP;
+
+            if (is_zip) begin
+                for (int i = 0; i < 16; i++) begin
+                    shuffle_result[2*i] = rs1_data_i[i];
+                    shuffle_result[2*i + 1] = rs1_data_i[i + 16];
+                end
+            end
+
+            else begin
+                for (int i = 0; i < 16; i++) begin
+                    shuffle_result[i]   = rs1_data_i[2*i];
+                    shuffle_result[i + 16] = rs1_data_i[2*i + 1];
+                end
             end
         end
 
-        else begin
-            for (int i = 0; i < 16; i++) begin
-                shuffle_result[i] = rs1_data_i[2*i];
-                shuffle_result[i + 16] = rs1_data_i[2*i + 1];
-            end
+        logic [4:0] shift_amt_compl; // complementary shift amount (32 - shift_amt)
+
+        assign shift_amt_compl = 32 - second_operand_i[4:0];
+
+        logic [31:0] ror_result, rol_result;
+
+        always_comb begin
+
+            ror_result   =  srl_result | (rs1_data_i << shift_amt_compl);
+
+            rol_result   =  sll_result | (rs1_data_i >> shift_amt_compl);
+
+            shift_result = (instruction_operation_i == ALU_ROL) ? rol_result : ror_result;
         end
-      end
 
-    logic [4:0] shift_amt_compl; // complementary shift amount (32 - shift_amt)
+    end
 
-    assign shift_amt_compl = 32 - second_operand_i[4:0];
-
-    logic [31:0] shift_result, ror_result, rol_result;
-
-    always_comb begin
-
-        ror_result   =  srl_result | (rs1_data_i << shift_amt_compl);
-
-        rol_result   =  sll_result | (rs1_data_i >> shift_amt_compl);
-
-        shift_result = (instruction_operation_i == ALU_ROL) ? rol_result : ror_result;
+    else begin : gen_zbkb_off
+        assign shift_result   = '0;   
+        assign pack_result    = '0;   
+        assign bwlogic_result = '0;
+        assign rev_result     = '0;
+        assign shuffle_result = '0;    
     end
 
 //////////////////////////////////////////////////////////////////////////////

@@ -16,7 +16,8 @@ extern "C" {
 
 #include <stdint.h>
 #include <stddef.h>
-#include <test_utils.h>
+#include <stdio.h>
+#include <simple_system_common.h>
 
 //	RVK_ALGTEST_VERBOSE_SIO will use generic sio for output, replace
 //	with what is suitable for your target.
