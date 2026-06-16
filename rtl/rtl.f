@@ -30,6 +30,7 @@
 ./mul.sv
 ./plic.sv
 ./regbank.sv
+./mem_access.sv
 ./retire.sv
 ./RS5_pkg.sv
 ./RS5.sv
