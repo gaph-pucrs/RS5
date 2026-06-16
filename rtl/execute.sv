@@ -45,99 +45,77 @@ module execute
     input   logic                   reset_n,
     input   logic                   stall,
 
-    /* Not used without BP */
-    /* verilator lint_off UNUSEDSIGNAL */
+    /* Registered inputs from decode */
     input   logic                   bp_ack_i,
-    /* verilator lint_on UNUSEDSIGNAL */
-
-    /* Bits 14:12 and 6:0 are not used in this module */
-    /* verilator lint_off UNUSEDSIGNAL */
-    input   logic [31:0]            instruction_i,
-    /* verilator lint_on UNUSEDSIGNAL */
-
+    input   logic                   valid_i,
+    input   logic  [4:0]            rd_i,
+    input   logic  [4:0]            rs1_i,
+    input   logic [31:0]            pc_i,
     input   logic [31:0]            rs1_data_i,
     input   logic [31:0]            rs2_data_i,
     input   logic [31:0]            second_operand_i,
-    input   logic  [4:0]            rd_i,
-    input   logic  [4:0]            rs1_i,
+    input   logic [31:0]            jump_imm_target_i,
+    /* We do not use some bits of these fields if some extensions are off */
+    /* verilator lint_off UNUSEDSIGNAL */
+    input   exec_ctrl_t             ctrl_i,
+    input   logic [11:0]            csr_address_i,
+    input   logic [31:0]            instruction_i,
     input   iType_e                 instruction_operation_i,
-
-    /* Not used without zaamo */
-    /* verilator lint_off UNUSEDSIGNAL */
-    input   iTypeAtomic_e           atomic_operation_i,
-    /* verilator lint_on UNUSEDSIGNAL */
-
-    /* Not used if VEnable is 0 */
-    /* verilator lint_off UNUSEDSIGNAL */
     input   iTypeVector_e           vector_operation_i,
     /* verilator lint_on UNUSEDSIGNAL */
 
-    input   privilegeLevel_e        privilege_i,
-    input   logic                   valid_i,
-    input   logic                   exc_ilegal_inst_i,
-    input   logic                   exc_inst_access_fault_i,
+    /* Combinational inputs from mem_access */
     input   logic                   exc_load_access_fault_i,
+    /* Not used without zalrsc */
+    /* verilator lint_off UNUSEDSIGNAL */
+    input   logic [31:0]            reservation_data_i,
+    /* verilator lint_on UNUSEDSIGNAL */
+    
+    /* CSR interface */
+    input   privilegeLevel_e        privilege_i,
+    input   logic                   interrupt_pending_i,
+    output  logic                   interrupt_ack_o,
+    output  logic                   machine_return_o,
+    output  logic                   raise_exception_o,
+    output  logic                   csr_read_enable_o,
+    output  logic                   csr_write_enable_o,
+    output  csrOperation_e          csr_operation_o,
+    output  exceptionCode_e         exception_code_o,
+    input   logic [31:0]            csr_data_read_i,
+    output  logic [31:0]            csr_data_o,
+    input   logic [31:0]            mtvec_i,
+    input   logic [31:0]            mepc_i,
+    output  logic [31:0]            vtype_o,
+    output  logic [31:0]            vlen_o,
+    output  logic [31:0]            pc_irq_o,
+    output  logic [31:0]            pc_exc_o,
 
-    output  logic                   hold_o,
-    output  logic                   write_enable_o,
-    output  logic                   write_enable_fwd_o,
-    output  iType_e                 instruction_operation_o,
-    output  logic   [31:0]          result_o,
-    output  logic   [31:0]          result_fwd_o,
-    output  logic   [ 4:0]          rd_o,
-
+    /* Memory interface */
     output  logic [31:0]            mem_address_exec_o,
     output  logic [31:0]            mem_address_o,
     output  logic                   mem_enable_o,
     output  logic [BUS_WIDTH/8-1:0] mem_write_enable_o,
     output  logic [BUS_WIDTH-1:0]   mem_write_data_o,
-    /* Not used if VEnable is 0 */
+    /* Not used if VEnable or AMO is 0 */
     /* verilator lint_off UNUSEDSIGNAL */
     input   logic [BUS_WIDTH-1:0]   mem_read_data_i,
     /* verilator lint_on UNUSEDSIGNAL */
 
-    /* We only use some bits of this signal here */
-    /* verilator lint_off UNUSEDSIGNAL */
-    input   logic [11:0]            csr_address_i,
-    /* verilator lint_on UNUSEDSIGNAL */
-    output  logic                   csr_read_enable_o,
-    input   logic [31:0]            csr_data_read_i,
-    output  logic                   csr_write_enable_o,
-    output  csrOperation_e          csr_operation_o,
-    output  logic [31:0]            csr_data_o,
-
-    output  logic [31:0]            vtype_o,
-    output  logic [31:0]            vlen_o,
-
-    /* Not used if BP is off */
-    /* verilator lint_off UNUSEDSIGNAL */
-    input   logic                   bp_taken_i,
-    /* verilator lint_on UNUSEDSIGNAL */
+    /* Combinational outputs to previous stages */
+    output  logic                   hold_o,
+    output  logic                   write_enable_fwd_o,
     output  logic                   jump_rollback_o,
     output  logic                   ctx_switch_o,
-    output  logic [31:0]            ctx_switch_target_o,
-
-    input   logic                   interrupt_pending_i,
-    input   logic                   compressed_i,
-    input   logic [31:0]            mtvec_i,
-    input   logic [31:0]            mepc_i,
-    input   logic [31:0]            jump_imm_target_i,
-    input   logic [31:0]            pc_i,
-
-    /* Not used without zalrsc */
-    /* verilator lint_off UNUSEDSIGNAL */
-    input   logic [31:0]            reservation_data_i,
-    /* verilator lint_on UNUSEDSIGNAL */
-
     output  logic                   jump_o,
     output  logic                   should_jump_o,
-    output  logic                   interrupt_ack_o,
-    output  logic                   machine_return_o,
-    output  logic                   raise_exception_o,
-    output  logic [31:0]            pc_irq_o,
-    output  logic [31:0]            pc_exc_o,
-    output  logic [31:0]            jump_target_o,
-    output  exceptionCode_e         exception_code_o
+    output  logic   [31:0]          ctx_switch_target_o,
+    output  logic   [31:0]          jump_target_o,
+    output  logic   [31:0]          result_fwd_o,
+
+    /* Registered outputs to mem_access */
+    output  wb_ctrl_t               ctrl_o,
+    output  logic   [ 4:0]          rd_o,
+    output  logic   [31:0]          result_o
 );
 
     logic [31:0]    result;
@@ -163,12 +141,7 @@ module execute
     logic           greater_equal_unsigned;
 
     logic [31:0] sum2_opB;
-    always_comb begin
-        unique case (instruction_operation_i)
-            SUB:       sum2_opB = -second_operand_i;
-            default:   sum2_opB =  second_operand_i; // AMO_W
-        endcase
-    end
+    assign sum2_opB = ctrl_i.is_sub ? -second_operand_i : second_operand_i;
 
     // Can be assigned by atomic instructions or rs1_data_i
     logic [31:0] first_operand;
@@ -194,7 +167,7 @@ module execute
     /* We can't obtain the PC from fetch stage because it can be modified due */
     /* to load/store stalls when the current instruction is JAL[R]            */
     logic [31:0] pc_next;
-    assign pc_next = pc_i + (compressed_i ? 32'h00000002 : 32'h00000004);
+    assign pc_next = pc_i + (ctrl_i.compressed ? 32'h00000002 : 32'h00000004);
 
 //////////////////////////////////////////////////////////////////////////////
 // Load/Store signals
@@ -219,13 +192,10 @@ module execute
     logic        atomic_mem_write_enable;
 
     always_comb begin
-        unique case (instruction_operation_i)
-            AMO_W,
-            LR_W,
-            SC_W:    mem_address = (AMOEXT != AMO_OFF) ? rs1_data_i : sum_result;
-            VLOAD,
-            VSTORE:  mem_address = VEnable ? mem_address_vector     : sum_result;
-            default: mem_address = sum_result;
+        unique case (1'b1)
+            ctrl_i.is_amo_w: mem_address = rs1_data_i;
+            ctrl_i.is_vector: mem_address = mem_address_vector;
+            default:          mem_address = sum_result;
         endcase
     end
 
@@ -237,16 +207,16 @@ module execute
     end
 
     logic misaligned_sh;
-    assign misaligned_sh = mem_address[0] && (instruction_operation_i == SH);
+    assign misaligned_sh = mem_address[0]        && ctrl_i.is_half && ctrl_i.is_store;
 
     logic misaligned_sw;
-    assign misaligned_sw = (mem_address[1:0] != '0) && (instruction_operation_i inside {SW, AMO_W, LR_W, SC_W});
+    assign misaligned_sw = (mem_address[1:0] != '0) && (ctrl_i.is_amo_w || (ctrl_i.is_store && !ctrl_i.is_half && !ctrl_i.is_byte));
 
     logic misaligned_lh;
-    assign misaligned_lh = mem_address[0] && (instruction_operation_i inside {LH, LHU});
+    assign misaligned_lh = mem_address[0]        && ctrl_i.is_half && ctrl_i.is_load;
 
     logic misaligned_lw;
-    assign misaligned_lw = (mem_address[1:0] != '0) && (instruction_operation_i == LW);
+    assign misaligned_lw = (mem_address[1:0] != '0) && ctrl_i.is_load && !ctrl_i.is_half && !ctrl_i.is_byte;
 
     logic laddr_misaligned;
     assign laddr_misaligned = (misaligned_lh || misaligned_lw);
@@ -255,19 +225,19 @@ module execute
     assign saddr_misaligned = (misaligned_sh || misaligned_sw);
 
     logic mem_read_enable_vector_inst;
-    assign mem_read_enable_vector_inst = mem_read_enable_vector && (instruction_operation_i inside {VLOAD, VSTORE});
+    assign mem_read_enable_vector_inst = mem_read_enable_vector && ctrl_i.is_vector;
 
     logic mem_read_enable;
-    assign mem_read_enable = instruction_operation_i inside {LB, LBU, LH, LHU, LW, LR_W};
+    assign mem_read_enable = ctrl_i.is_load || ctrl_i.is_lr;
 
     logic pmem_read_enable;
     assign pmem_read_enable = (mem_read_enable || atomic_mem_read_enable || mem_read_enable_vector_inst);
 
     always_comb begin
-        unique case (instruction_operation_i)
-            SB:         mem_write_data = {4{rs2_data_i[7:0]}};
-            SH:         mem_write_data = {2{rs2_data_i[15:0]}};
-            default:    mem_write_data = rs2_data_i;
+        unique case (1'b1)
+            ctrl_i.is_byte: mem_write_data = {4{rs2_data_i[7:0]}};
+            ctrl_i.is_half: mem_write_data = {2{rs2_data_i[15:0]}};
+            default:        mem_write_data = rs2_data_i;
         endcase
     end
 
@@ -276,23 +246,23 @@ module execute
             mem_write_data_o <= '0;
         end
         else if (!stall) begin
-            unique case (instruction_operation_i)
-                VLOAD,
-                VSTORE:  mem_write_data_o <= VEnable ? mem_write_data_vector : {{(BUS_WIDTH-32){1'b0}}, mem_write_data};
-                AMO_W:   mem_write_data_o <= {{(BUS_WIDTH-32){1'b0}}, ((AMOEXT inside {AMO_ZAAMO, AMO_A}) ? amo_operand : mem_write_data)};
-                default: mem_write_data_o <= {{(BUS_WIDTH-32){1'b0}}, mem_write_data};
+            unique case (1'b1)
+                ctrl_i.is_vector: mem_write_data_o <= mem_write_data_vector;
+                ctrl_i.is_amo:    mem_write_data_o <= {{(BUS_WIDTH-32){1'b0}}, amo_operand};
+                default:          mem_write_data_o <= {{(BUS_WIDTH-32){1'b0}}, mem_write_data};
             endcase
         end
     end
 
     always_comb begin
         mem_write_enable = '0;
-        unique case (instruction_operation_i)
-            SB:      mem_write_enable[sum_result[1:0]]      = 1'b1;
-            SH:      mem_write_enable[sum_result[1:0]+1-:2] = 2'b11;
-            SW:      mem_write_enable                       = 4'b1111;
-            default: mem_write_enable                       = '0;
-        endcase
+        if (ctrl_i.is_store) begin
+            unique case (1'b1)
+                ctrl_i.is_byte: mem_write_enable[sum_result[1:0]]      = 1'b1;
+                ctrl_i.is_half: mem_write_enable[sum_result[1:0]+1-:2] = 2'b11;
+                default:        mem_write_enable                        = 4'b1111;
+            endcase
+        end
     end
 
     logic [BUS_WIDTH/8-1:0] pmem_write_enable;
@@ -329,45 +299,10 @@ module execute
     assign csr_read_enable_o  = csr_read_enable  && !exc_ilegal_csr_inst && !stall;
     assign csr_write_enable_o = csr_write_enable && !exc_ilegal_csr_inst && !stall;
 
-    always_comb begin
-        unique case (instruction_operation_i)
-            CSRRW,
-            CSRRWI:  csr_read_enable = (rd_i != '0);
-            CSRRS,
-            CSRRC,
-            CSRRSI,
-            CSRRCI:  csr_read_enable = 1'b1;
-            default: csr_read_enable  = 1'b0;
-        endcase
-    end
-
-    always_comb begin
-        unique case (instruction_operation_i)
-            CSRRW,
-            CSRRWI:  csr_write_enable = 1'b1;
-            CSRRS,
-            CSRRC,
-            CSRRSI,
-            CSRRCI:  csr_write_enable = (rs1_i != '0);
-            default: csr_write_enable = 1'b0;
-        endcase
-    end
-
-    always_comb begin
-        unique case (instruction_operation_i)
-            CSRRW, CSRRS, CSRRC:    csr_data_o = rs1_data_i;
-            default:                csr_data_o = {27'b0, rs1_i};
-        endcase
-    end
-
-    always_comb begin
-        unique case (instruction_operation_i)
-            CSRRW, CSRRWI:  csr_operation_o = WRITE;
-            CSRRS, CSRRSI:  csr_operation_o = SET;
-            CSRRC, CSRRCI:  csr_operation_o = CLEAR;
-            default:        csr_operation_o = NONE;
-        endcase
-    end
+    assign csr_read_enable  = ctrl_i.is_csr && (ctrl_i.csr_op == WRITE ? (rd_i != '0) : 1'b1);
+    assign csr_write_enable = ctrl_i.is_csr && (ctrl_i.csr_wr_uses_rs1 ? (rs1_i != '0) : 1'b1);
+    assign csr_data_o       = ctrl_i.csr_rd_uses_rs1 ? rs1_data_i : {27'b0, rs1_i};
+    assign csr_operation_o  = ctrl_i.csr_op;
 
     assign exc_ilegal_csr_inst = (
         (csr_write_enable && csr_address_i[11:10] == 2'b11) ||
@@ -387,16 +322,9 @@ module execute
         logic       enable_mul;
         logic       mul_low;
 
-        always_comb begin
-            unique case (instruction_operation_i)
-                MULH:    signed_mode_mul = 2'b11;
-                MULHSU:  signed_mode_mul = 2'b01;
-                default: signed_mode_mul = 2'b00;
-            endcase
-        end
-
-        assign enable_mul = (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU});
-        assign mul_low    = (instruction_operation_i == MUL);
+        assign signed_mode_mul = ctrl_i.mul_signed_mode;
+        assign enable_mul      = ctrl_i.is_mul;
+        assign mul_low         = ctrl_i.mul_low;
 
         mul mul1 (
             .clk              (clk),
@@ -428,8 +356,8 @@ module execute
         logic enable_div;
         logic signed_div;
 
-        assign enable_div = (instruction_operation_i inside {DIV, DIVU, REM, REMU});
-        assign signed_div = (instruction_operation_i inside {DIV, REM});
+        assign enable_div = ctrl_i.is_div || ctrl_i.is_rem;
+        assign signed_div = ctrl_i.div_signed;
 
         div div1 (
             .clk              (clk),
@@ -459,8 +387,8 @@ module execute
         logic aes_mix;
         logic aes_valid;
 
-        assign aes_mix = (instruction_operation_i == AES32ESMI);
-        assign aes_valid = (instruction_operation_i inside {AES32ESMI, AES32ESI});
+        assign aes_mix   = ctrl_i.aes_is_mix;
+        assign aes_valid = ctrl_i.is_aes;
 
         aes_unit #(
             .Environment (Environment),
@@ -544,16 +472,16 @@ module execute
                     reservation_addr <= '0;
                 end
                 else if (!stall) begin
-                    unique case (instruction_operation_i)
-                        LR_W: reservation_addr <= rs1_data_i;
-                        SC_W: reservation_addr <= lrsc_hold ? reservation_addr : '0;
+                    unique case (1'b1)
+                        ctrl_i.is_lr: reservation_addr <= rs1_data_i;
+                        ctrl_i.is_sc: reservation_addr <= lrsc_hold ? reservation_addr : '0;
                         default: ;
                     endcase
                 end
             end
 
             logic lrsc_enable;
-            assign lrsc_enable = (instruction_operation_i == SC_W) && (rs1_data_i[1:0] == '0);
+            assign lrsc_enable = ctrl_i.is_sc && (rs1_data_i[1:0] == '0);
 
             logic [31:0] cmp_opA;
             logic [31:0] cmp_opB;
@@ -598,7 +526,7 @@ module execute
 
         if (AMOEXT != AMO_ZALRSC) begin : gen_zaamo_on
             logic amo_enable;
-            assign amo_enable = (instruction_operation_i == AMO_W) && (rs1_data_i[1:0] == '0);
+            assign amo_enable = ctrl_i.is_amo && (rs1_data_i[1:0] == '0);
 
             logic amo_lt;
             assign amo_lt = $signed(amo_operand) < $signed(rs2_data_i);
@@ -608,7 +536,7 @@ module execute
 
             logic [31:0] amo_result;
             always_comb begin
-                unique case (atomic_operation_i)
+                unique case (ctrl_i.amo_op)
                     AMOADD:  amo_result = sum_result;
                     AMOAND:  amo_result = and_result;
                     AMOXOR:  amo_result = xor_result;
@@ -637,7 +565,7 @@ module execute
                 .opA_o             (amo_operand            )
             );
 
-            assign first_operand = (instruction_operation_i == AMO_W) ? amo_operand : rs1_data_i;
+            assign first_operand = ctrl_i.is_amo ? amo_operand : rs1_data_i;
         end
         else begin : gen_zaamo_off
             assign amo_hold             = 1'b0;
@@ -672,12 +600,9 @@ module execute
     logic [31:0] result_zicond;
 
     if (ZICONDEnable) begin : gen_zicond_on
-        always_comb begin
-            unique case (instruction_operation_i)
-                CZERO_EQZ: result_zicond = rs2_data_i == '0 ? '0 : rs1_data_i;
-                default:   result_zicond = rs2_data_i != '0 ? '0 : rs1_data_i; // CZERO_NEZ
-            endcase
-        end
+        assign result_zicond = ctrl_i.zicond_is_eqz
+            ? (rs2_data_i == '0 ? '0 : rs1_data_i)   // CZERO_EQZ
+            : (rs2_data_i != '0 ? '0 : rs1_data_i);  // CZERO_NEZ
     end
     else begin : gen_zicond_off
         assign result_zicond = '0;
@@ -699,13 +624,10 @@ module execute
         // Pack //
         //////////
 
-        logic packh;
-        assign packh = (instruction_operation_i == ALU_PACKH);
-
         always_comb begin
         unique case (1'b1)
-            packh:   pack_result = {16'h0, second_operand_i[7:0], rs1_data_i[7:0]};
-            default: pack_result = {second_operand_i[15:0], rs1_data_i[15:0]};
+            ctrl_i.zbkb_is_packh: pack_result = {16'h0, second_operand_i[7:0], rs1_data_i[7:0]};
+            default:              pack_result  = {second_operand_i[15:0], rs1_data_i[15:0]};
         endcase
         end
 
@@ -713,8 +635,6 @@ module execute
         // Bitwise Logic //
         ///////////////////
 
-        logic bwlogic_or;
-        logic bwlogic_and;
         logic [31:0] bwlogic_operand_b;
         logic [31:0] bwlogic_or_result;
         logic [31:0] bwlogic_and_result;
@@ -726,18 +646,15 @@ module execute
         assign bwlogic_and_result = rs1_data_i & bwlogic_operand_b;
         assign bwlogic_xor_result = rs1_data_i ^ bwlogic_operand_b;
 
-        assign bwlogic_or  = (instruction_operation_i == ALU_ORN);
-        assign bwlogic_and = (instruction_operation_i == ALU_ANDN);
-
         always_comb begin
             unique case (1'b1)
-            bwlogic_or:  bwlogic_result = bwlogic_or_result;
-            bwlogic_and: bwlogic_result = bwlogic_and_result;
-            default:     bwlogic_result = bwlogic_xor_result;
+            ctrl_i.zbkb_is_orn:  bwlogic_result = bwlogic_or_result;
+            ctrl_i.zbkb_is_andn: bwlogic_result = bwlogic_and_result;
+            default:             bwlogic_result  = bwlogic_xor_result;
             endcase
         end
 
-        logic [5:0] shift_amt;
+        logic [4:0] shift_amt;
 
         assign shift_amt[4:0] = second_operand_i[4:0];
 
@@ -777,10 +694,7 @@ module execute
 
         always_comb begin
 
-            logic is_zip;
-            is_zip = instruction_operation_i == ALU_ZIP;
-
-            if (is_zip) begin
+            if (ctrl_i.zbkb_is_zip) begin
                 for (int i = 0; i < 16; i++) begin
                     shuffle_result[2*i] = rs1_data_i[i];
                     shuffle_result[2*i + 1] = rs1_data_i[i + 16];
@@ -797,7 +711,7 @@ module execute
 
         logic [4:0] shift_amt_compl; // complementary shift amount (32 - shift_amt)
 
-        assign shift_amt_compl = 32 - second_operand_i[4:0];
+        assign shift_amt_compl = 5'(6'd32 - 6'(second_operand_i[4:0]));
 
         logic [31:0] ror_result, rol_result;
 
@@ -807,7 +721,7 @@ module execute
 
             rol_result   =  sll_result | (rs1_data_i >> shift_amt_compl);
 
-            shift_result = (instruction_operation_i == ALU_ROL) ? rol_result : ror_result;
+            shift_result = ctrl_i.zbkb_is_rol ? rol_result : ror_result;
         end
 
     end
@@ -825,33 +739,37 @@ module execute
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        unique case (instruction_operation_i)
-            CSRRW, CSRRS, CSRRC,
-            CSRRWI,CSRRSI,CSRRCI:           result = csr_data_read_i;
-            JAL,JALR:                       result = pc_next;
-            SLT:                            result = {31'b0, less_than};
-            SLTU:                           result = {31'b0, less_than_unsigned};
-            XOR:                            result = xor_result;
-            OR:                             result = or_result;
-            AND:                            result = and_result;
-            SLL:                            result = sll_result;
-            SRL:                            result = srl_result;
-            SRA:                            result = sra_result;
-            LUI:                            result = second_operand_i;
-            AUIPC:                          result = jump_imm_target_i;
-            DIV,DIVU:                       result = (MULEXT == MUL_M)   ? div_result                           : sum_result;
-            REM,REMU:                       result = (MULEXT == MUL_M)   ? rem_result                           : sum_result;
-            MUL,MULH,MULHU,MULHSU:          result = (MULEXT != MUL_OFF) ? mul_result                           : sum_result;
-            AES32ESI, AES32ESMI:            result = ZKNEEnable          ? aes_result                           : sum_result;
-            VECTOR, VLOAD, VSTORE:          result = VEnable             ? vector_scalar_result                 : sum_result;
-            CZERO_EQZ, CZERO_NEZ:           result = ZICONDEnable        ? result_zicond                        : sum_result;
-            SC_W:                           result = (AMOEXT inside {AMO_ZALRSC, AMO_A}) ? {31'h0, lrsc_result} : sum_result;
-            ALU_ROR, ALU_ROL:               result = (ZBKBEnable) ? shift_result   : sum_result;
-            ALU_PACK, ALU_PACKH:            result = (ZBKBEnable) ? pack_result    : sum_result; 
-            ALU_XNOR, ALU_ORN, ALU_ANDN:    result = (ZBKBEnable) ? bwlogic_result : sum_result;
-            ALU_REV8, ALU_BREV8:            result = (ZBKBEnable) ? rev_result     : sum_result;
-            ALU_ZIP, ALU_UNZIP:             result = (ZBKBEnable) ? shuffle_result : sum_result;          
-            default:                        result = sum_result;
+        unique case (1'b1)
+            ctrl_i.is_csr:          result = csr_data_read_i;
+            ctrl_i.is_jal_jalr:     result = pc_next;
+            ctrl_i.is_slt:          result = {31'b0, less_than};
+            ctrl_i.is_sltu:         result = {31'b0, less_than_unsigned};
+            ctrl_i.is_xor:          result = xor_result;
+            ctrl_i.is_or:           result = or_result;
+            ctrl_i.is_and:          result = and_result;
+            ctrl_i.is_sll:          result = sll_result;
+            ctrl_i.is_srl:          result = srl_result;
+            ctrl_i.is_sra:          result = sra_result;
+            ctrl_i.is_lui:          result = second_operand_i;
+            ctrl_i.is_auipc:        result = jump_imm_target_i;
+            ctrl_i.is_div:          result = (MULEXT == MUL_M)          ? div_result                           : sum_result;
+            ctrl_i.is_rem:          result = (MULEXT == MUL_M)          ? rem_result                           : sum_result;
+            ctrl_i.is_mul:          result = (MULEXT != MUL_OFF)        ? mul_result                           : sum_result;
+            ctrl_i.is_aes:          result = ZKNEEnable                 ? aes_result                           : sum_result;
+            ctrl_i.is_vector:       result = VEnable                    ? vector_scalar_result                 : sum_result;
+            ctrl_i.is_zicond:       result = ZICONDEnable               ? result_zicond                        : sum_result;
+            ctrl_i.is_sc:           result = (AMOEXT inside {AMO_ZALRSC, AMO_A}) ? {31'h0, lrsc_result}       : sum_result;
+            ctrl_i.zbkb_is_ror:     result = ZBKBEnable                 ? shift_result                         : sum_result;
+            ctrl_i.zbkb_is_rol:     result = ZBKBEnable                 ? shift_result                         : sum_result;
+            ctrl_i.zbkb_is_orn:     result = ZBKBEnable                 ? bwlogic_result                       : sum_result;
+            ctrl_i.zbkb_is_andn:    result = ZBKBEnable                 ? bwlogic_result                       : sum_result;
+            ctrl_i.zbkb_is_rev8:    result = ZBKBEnable                 ? rev_result                           : sum_result;
+            ctrl_i.zbkb_is_brev8:   result = ZBKBEnable                 ? rev_result                           : sum_result;
+            ctrl_i.zbkb_is_zip:     result = ZBKBEnable                 ? shuffle_result                       : sum_result;
+            ctrl_i.zbkb_is_unzip:   result = ZBKBEnable                 ? shuffle_result                       : sum_result;
+            ctrl_i.zbkb_is_xnor:    result = ZBKBEnable                 ? bwlogic_result                       : sum_result;
+            ctrl_i.is_zbkb:         result = ZBKBEnable                 ? pack_result                          : sum_result;
+            default:                result = sum_result;
         endcase
     end
 
@@ -859,21 +777,14 @@ module execute
     assign we_atomic  = (rd_i != '0 && atomic_write_enable);
 
     logic we_default;
-    assign we_default = (rd_i != '0 && !hold_o && !raise_exception);
+    assign we_default = (ctrl_i.rd_we && rd_i != '0 && !hold_o && !raise_exception);
 
     always_comb begin
-        unique case (instruction_operation_i)
-            NOP,
-            SB,SH,SW,
-            BEQ,BNE,
-            BLT,BLTU,
-            BGE,BGEU:   write_enable = 1'b0;
-            VECTOR,
-            VLOAD,
-            VSTORE:     write_enable = VEnable ? (rd_i != '0 && vector_wr_en)          : we_default;
-            SC_W:       write_enable = (AMOEXT inside {AMO_ZALRSC, AMO_A}) ? we_atomic : we_default ;
-            AMO_W:      write_enable = (AMOEXT inside {AMO_ZAAMO,  AMO_A}) ? we_atomic : we_default ;
-            default:    write_enable = we_default;
+        unique case (1'b1)
+            ctrl_i.is_vector:   write_enable = ctrl_i.rd_we && rd_i != '0 && vector_wr_en;
+            ctrl_i.is_sc:       write_enable = we_atomic;
+            ctrl_i.is_amo:      write_enable = we_atomic;
+            default:            write_enable = we_default;
         endcase
     end
 
@@ -885,30 +796,23 @@ module execute
 
     assign hold_o = (hold_div || hold_mul || hold_vector || atomic_hold) && !exc_load_access_fault_i;
 
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            write_enable_o <= 1'b0;
-        else if (!stall)
-            write_enable_o <= write_enable;
+    wb_ctrl_t wb_ctrl_next;
+    always_comb begin
+        wb_ctrl_next.rd_we       = write_enable;
+        wb_ctrl_next.is_load     = ctrl_i.is_load || (ctrl_i.is_sc && !atomic_write_enable)
+                                                   || (ctrl_i.is_amo && atomic_write_enable);
+        wb_ctrl_next.is_lr       = ctrl_i.is_lr;
+        wb_ctrl_next.is_sc       = ctrl_i.is_sc;
+        wb_ctrl_next.is_byte     = ctrl_i.is_byte;
+        wb_ctrl_next.is_half     = ctrl_i.is_half;
+        wb_ctrl_next.is_unsigned = ctrl_i.is_unsigned;
     end
 
-    iType_e sc_instruction;
-    assign sc_instruction = atomic_write_enable ? instruction_operation_i : LW;
-
-    iType_e amo_instruction;
-    assign amo_instruction = !atomic_write_enable ? instruction_operation_i : LW;
-
     always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            instruction_operation_o <= NOP;
-        end
-        else if (!stall) begin
-            unique case (instruction_operation_i)
-                SC_W:    instruction_operation_o <= (AMOEXT inside {AMO_ZALRSC, AMO_A}) ? sc_instruction  : instruction_operation_i;
-                AMO_W:   instruction_operation_o <= (AMOEXT inside {AMO_ZAAMO,  AMO_A}) ? amo_instruction : instruction_operation_i;
-                default: instruction_operation_o <= instruction_operation_i;
-            endcase
-        end
+        if (!reset_n)
+            ctrl_o <= '0;
+        else if (!stall)
+            ctrl_o <= wb_ctrl_next;
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
@@ -931,24 +835,19 @@ module execute
 // BRANCH CONTROL
 //////////////////////////////////////////////////////////////////////////////
 
-    always_comb begin
-        unique case (instruction_operation_i)
-            JALR:       jump_target_o = {sum_result[31:1], 1'b0};
-            default:    jump_target_o = jump_imm_target_i;
-        endcase
-    end
+    assign jump_target_o = ctrl_i.is_jalr ? {sum_result[31:1], 1'b0} : jump_imm_target_i;
 
     logic should_jump;
     always_comb begin
-        unique case (instruction_operation_i)
-            BEQ:        should_jump = equal;
-            BNE:        should_jump = !equal;
-            BLT:        should_jump = less_than;
-            BLTU:       should_jump = less_than_unsigned;
-            BGE:        should_jump = greater_equal;
-            BGEU:       should_jump = greater_equal_unsigned;
-            JAL, JALR:  should_jump = 1'b1;
-            default:    should_jump = 1'b0;
+        unique case (1'b1)
+            ctrl_i.is_beq:      should_jump = equal;
+            ctrl_i.is_bne:      should_jump = !equal;
+            ctrl_i.is_blt:      should_jump = less_than;
+            ctrl_i.is_bltu:     should_jump = less_than_unsigned;
+            ctrl_i.is_bge:      should_jump = greater_equal;
+            ctrl_i.is_bgeu:     should_jump = greater_equal_unsigned;
+            ctrl_i.is_jal_jalr: should_jump = 1'b1;
+            default:            should_jump = 1'b0;
         endcase
     end
 
@@ -965,8 +864,8 @@ module execute
     /* (and decoding)                                                       */
     logic jump;
     if (BRANCHPRED) begin : gen_bp_on
-        assign jump            = ( should_jump && !(bp_taken_i && bp_ack_i));
-        assign jump_rollback_o = (!should_jump &&  (bp_taken_i && bp_ack_i));
+        assign jump            = ( should_jump && !(ctrl_i.bp_taken && bp_ack_i));
+        assign jump_rollback_o = (!should_jump &&  (ctrl_i.bp_taken && bp_ack_i));
     end
     else begin : gen_bp_off
         assign jump            = should_jump;
@@ -1001,16 +900,16 @@ module execute
 //////////////////////////////////////////////////////////////////////////////
 
     logic illegal_mret;
-    assign illegal_mret = (instruction_operation_i == MRET) && (privilege_i != 2'b11);
+    assign illegal_mret = ctrl_i.is_mret && (privilege_i != 2'b11);
 
     /* We can't change privilege until the end of the instruction */
     /* Hence, exception, ret and irq must be masked by stall      */
     assign raise_exception = (
-        exc_inst_access_fault_i ||
-        exc_ilegal_inst_i ||
+        ctrl_i.exc_inst_access_fault ||
+        ctrl_i.exc_ilegal_inst ||
         exc_load_access_fault_i ||
         illegal_mret ||
-        instruction_operation_i inside {ECALL, EBREAK} ||
+        ctrl_i.is_ecall || ctrl_i.is_ebreak ||
         exc_ilegal_csr_inst ||
         iaddr_misaligned ||
         laddr_misaligned ||
@@ -1018,7 +917,7 @@ module execute
     );
     assign raise_exception_o = raise_exception && !stall;
 
-    assign machine_return   = (instruction_operation_i == MRET) && (privilege_i == 2'b11);
+    assign machine_return   = ctrl_i.is_mret && (privilege_i == 2'b11);
     assign machine_return_o = machine_return && !stall;
 
     assign interrupt_ack = (
@@ -1034,15 +933,15 @@ module execute
     always_comb begin
         if (exc_load_access_fault_i)    /* Highest priority because it happened last cycle */
             exception_code_o  = LOAD_ACCESS_FAULT;
-        else if (exc_inst_access_fault_i)
+        else if (ctrl_i.exc_inst_access_fault)
             exception_code_o  = INSTRUCTION_ACCESS_FAULT;
-        else if (exc_ilegal_inst_i || exc_ilegal_csr_inst || illegal_mret)
+        else if (ctrl_i.exc_ilegal_inst || exc_ilegal_csr_inst || illegal_mret)
             exception_code_o  = ILLEGAL_INSTRUCTION;
         else if (iaddr_misaligned)
             exception_code_o  = INSTRUCTION_ADDRESS_MISALIGNED;
-        else if (instruction_operation_i == ECALL)
+        else if (ctrl_i.is_ecall)
             exception_code_o  = (privilege_i == USER) ? ECALL_FROM_UMODE : ECALL_FROM_MMODE;
-        else if (instruction_operation_i == EBREAK)
+        else if (ctrl_i.is_ebreak)
             exception_code_o  = BREAKPOINT;
         else if (laddr_misaligned)
             exception_code_o  = LOAD_ADDRESS_MISALIGNED;

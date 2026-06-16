@@ -133,6 +133,121 @@ package RS5_pkg;
         NONE, WRITE, SET, CLEAR
     } csrOperation_e;
 
+    typedef enum  logic[9:0] {
+        AMONOP  = 10'b0000000001,
+        AMOSWAP = 10'b0000000010,
+        AMOADD  = 10'b0000000100,
+        AMOXOR  = 10'b0000001000,
+        AMOAND  = 10'b0000010000,
+        AMOOR   = 10'b0000100000,
+        AMOMIN  = 10'b0001000000,
+        AMOMAX  = 10'b0010000000,
+        AMOMINU = 10'b0100000000,
+        AMOMAXU = 10'b1000000000
+    } iTypeAtomic_e;
+
+    typedef struct packed {
+        // AMO operation select (one-hot, AMONOP when unused)
+        iTypeAtomic_e amo_op;
+        // Pipeline status
+        logic        hazard;
+        logic        killed;
+        logic        compressed;
+        logic        bp_taken;
+        logic        exc_ilegal_inst;
+        logic        exc_inst_access_fault;
+        // Result select
+        logic        is_csr;
+        logic        is_jal_jalr;
+        logic        is_lui;
+        logic        is_auipc;
+        logic        is_slt;
+        logic        is_sltu;
+        logic        is_xor;
+        logic        is_or;
+        logic        is_and;
+        logic        is_sll;
+        logic        is_srl;
+        logic        is_sra;
+        logic        is_mul;
+        logic        is_div;
+        logic        is_rem;
+        logic        is_aes;
+        logic        is_vector;
+        logic        is_zicond;
+        logic        is_zbkb;
+        logic        is_sc;
+        // Memory
+        logic        is_load;
+        logic        is_store;
+        logic        is_amo;
+        logic        is_lr;
+        // Branch/jump control
+        logic        is_beq;
+        logic        is_bne;
+        logic        is_blt;
+        logic        is_bltu;
+        logic        is_bge;
+        logic        is_bgeu;
+        logic        is_jalr;
+        // Write-back suppress
+        logic        rd_we;
+        // Opcode-derived exception/system flags
+        logic        is_ecall;
+        logic        is_ebreak;
+        logic        is_mret;
+        logic        is_sret;
+        logic        is_wfi;
+        // Memory width/sign for load/store
+        logic        is_byte;
+        logic        is_half;
+        logic        is_unsigned;
+        // Sub-op selects
+        logic        is_sub;
+        logic        is_amo_w;
+        // Mul sub-op
+        logic        mul_low;
+        logic [1:0]  mul_signed_mode;
+        // AES sub-op
+        logic        aes_is_mix;
+        // Zicond sub-op
+        logic        zicond_is_eqz;
+        // Div sub-op
+        logic        div_signed;
+        // CSR operation
+        csrOperation_e csr_op;
+        logic        csr_rd_uses_rs1;
+        logic        csr_wr_uses_rs1;
+        // Zbkb sub-op
+        logic        zbkb_is_ror;
+        logic        zbkb_is_rol;
+        logic        zbkb_is_packh;
+        logic        zbkb_is_orn;
+        logic        zbkb_is_andn;
+        logic        zbkb_is_rev8;
+        logic        zbkb_is_brev8;
+        logic        zbkb_is_zip;
+        logic        zbkb_is_unzip;
+        logic        zbkb_is_xnor;
+    } exec_ctrl_t;
+
+    typedef struct packed {
+        logic        valid;
+        logic        compressed;
+        logic        jumping;
+        logic        jump_misaligned;
+    } decode_ctrl_t;
+
+    typedef struct packed {
+        logic        rd_we;
+        logic        is_load;
+        logic        is_lr;
+        logic        is_sc;
+        logic        is_byte;
+        logic        is_half;
+        logic        is_unsigned;
+    } wb_ctrl_t;
+
     typedef enum logic {
         M_IDLE, M_CALC
     } mult_states_e;
@@ -294,18 +409,6 @@ package RS5_pkg;
         VSLIDE1DOWN
     } iTypeVector_e;
 
-    typedef enum  logic[9:0] {
-        AMONOP  = 10'b0000000001,
-        AMOSWAP = 10'b0000000010,
-        AMOADD  = 10'b0000000100,
-        AMOXOR  = 10'b0000001000,
-        AMOAND  = 10'b0000010000,
-        AMOOR   = 10'b0000100000,
-        AMOMIN  = 10'b0001000000,
-        AMOMAX  = 10'b0010000000,
-        AMOMINU = 10'b0100000000,
-        AMOMAXU = 10'b1000000000
-    } iTypeAtomic_e;
 
     typedef enum  logic[2:0] {
         OPIVV = 3'b000,
