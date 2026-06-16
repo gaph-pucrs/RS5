@@ -42,8 +42,6 @@ module fetch
     input   logic           should_jump_i,
     input   logic [31:0]    jump_target_i,
     input   logic [31:0]    ctx_switch_target_i,
-    output  logic           jumping_o,
-    output  logic           jump_misaligned_o,
     
     /* Branch prediction */
     /* verilator lint_off UNUSEDSIGNAL */
@@ -60,10 +58,9 @@ module fetch
     input   logic [31:0]    instruction_data_i,
 
     /* Fetched output */
+    output  decode_ctrl_t   ctrl_o,
     output  logic [31:0]    pc_o,
-    output  logic [31:0]    instruction_o,
-    output  logic           valid_o,
-    output  logic           compressed_o
+    output  logic [31:0]    instruction_o
 );
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -80,7 +77,7 @@ module fetch
     logic [31:0] iaddr_jumped;
 
     logic is_jumping;
-    assign is_jumping = (jumping_o && !jump_rollback_i) || jump_misaligned_o;
+    assign is_jumping = (jumping_r && !jump_rollback_i) || jump_misaligned_r;
 
     logic jump_confirmed;
     assign jump_confirmed = should_jump_i || (bp_taken_r && !jump_rollback_i);
@@ -308,13 +305,18 @@ module fetch
 // CPU Interface
 ////////////////////////////////////////////////////////////////////////////////
 
+    logic valid_r;
+    logic jumping_r;
+    logic jump_misaligned_r;
+    logic compressed;
+
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
-            valid_o <= 1'b0;
+            valid_r <= 1'b0;
         else if (sys_reset)
-            valid_o <= 1'b0;
+            valid_r <= 1'b0;
         else if (enable_i || is_jumping)
-            valid_o <= valid;
+            valid_r <= valid;
     end
 
     logic [31:0] instruction;
@@ -347,7 +349,7 @@ module fetch
             pc_o <= start_address;
         end
         else begin
-            if (jump_confirmed_r || jump_misaligned_o)
+            if (jump_confirmed_r || jump_misaligned_r)
                 pc_o <= pc_jumped;
             else if (enable_i && valid)
                 pc_o <= next_pc;
@@ -356,16 +358,16 @@ module fetch
     
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
-            jumping_o <= 1'b1;
+            jumping_r <= 1'b1;
         end
         else if (sys_reset) begin
-            jumping_o <= 1'b1;
+            jumping_r <= 1'b1;
         end
         else begin
             if (jumped)
-                jumping_o <= 1'b1;
+                jumping_r <= 1'b1;
             else if (valid || jump_rollback_i)
-                jumping_o <= 1'b0;
+                jumping_r <= 1'b0;
         end
     end
 
@@ -389,8 +391,6 @@ module fetch
             else if (pop && (valid_fetch || valid_buffer))
                 instruction_r <= next_instruction;
         end
-
-        logic compressed;
         
         /* Alignment control */
         logic [31:0] instruction_built;
@@ -398,7 +398,7 @@ module fetch
             if (jump_confirmed_r)
                 /* On jump, last valid instruction is the next one */
                 instruction_built = next_instruction;
-            else if (jump_misaligned_o || (unaligned ^ compressed))
+            else if (jump_misaligned_r || (unaligned ^ compressed))
                 /* When next instruction is unaligned we also need two fetches */
                 /* Shift the last instruction msbs and join with the next lsbs */
                 instruction_built = {next_instruction[15:0], instruction_r[31:16]};
@@ -422,7 +422,6 @@ module fetch
             else if ((enable_i || is_jumping) && valid)
                 compressed <= next_compressed;
         end
-        assign compressed_o = compressed;
 
         /* We consider a instruction prefetched when it was removed from buffer */
         /* or read from memory but will be used again. Happens after compressed */
@@ -433,16 +432,16 @@ module fetch
         /* Only after the first needed fetch is valid the signal is deasserted */
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n) begin
-                jump_misaligned_o <= 1'b0;
+                jump_misaligned_r <= 1'b0;
             end
             else if (sys_reset) begin
-                jump_misaligned_o <= 1'b0;
+                jump_misaligned_r <= 1'b0;
             end
             else begin
                 if (jump_confirmed_r)
-                    jump_misaligned_o <= pc_jumped[1];
-                else if (!jumping_o && valid)
-                    jump_misaligned_o <= 1'b0;
+                    jump_misaligned_r <= pc_jumped[1];
+                else if (!jumping_r && valid)
+                    jump_misaligned_r <= 1'b0;
             end
         end
 
@@ -457,13 +456,19 @@ module fetch
         );
 
         assign instruction = next_compressed ? instruction_decompressed : instruction_built;
-        assign next_pc     = pc_o + (compressed_o ? 32'd2 : 32'd4);
+        assign next_pc     = pc_o + (compressed ? 32'd2 : 32'd4);
     end
     else begin : gen_compressed_off
         assign instruction_prefetched = 1'b0;
-        assign compressed_o           = 1'b0;
+        assign compressed             = 1'b0;
         assign next_pc                = pc_o + 32'd4;
         assign instruction            = next_instruction;
-        assign jump_misaligned_o      = 1'b0;
+        assign jump_misaligned_r      = 1'b0;
     end
+
+    assign ctrl_o.valid           = valid_r;
+    assign ctrl_o.compressed      = compressed;
+    assign ctrl_o.jumping         = jumping_r;
+    assign ctrl_o.jump_misaligned = jump_misaligned_r;
+
 endmodule
