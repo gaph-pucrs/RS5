@@ -180,22 +180,99 @@ module riscof_tb
 
 
 //////////////////////////////////////////////////////////////////////////////
-// RAM
+// Data cache (direct-mapped write-back) + RAM
+//
+// The data port is served through the DMWBCtrl write-back cache so the suite
+// exercises the controller. Instruction fetches use a dedicated RAM port and
+// bypass the cache (read-only path). Because written data may linger dirty in
+// the cache, the signature dump below reads each word through a cache-coherent
+// view (cache copy if resident, otherwise main memory).
 //////////////////////////////////////////////////////////////////////////////
 
-    logic                             enA;
-    logic [3:0]                       weA;
-    logic [($clog2(MEM_WIDTH) - 1):0] addrA;
-    logic [31:0]                      dataAi;
-    logic [31:0]                      dataAo;
+    localparam int ADDR_BITS    = $clog2(MEM_WIDTH);
+    localparam int DCACHE_WIDTH = 12;
+    localparam int DCACHE_OFF_W = 6;
+    localparam int TAG_BITS     = ADDR_BITS    - DCACHE_WIDTH;
+    localparam int IDX_BITS     = DCACHE_WIDTH - DCACHE_OFF_W;
 
-    logic                             enB;
-    logic [3:0]                       weB;
-    logic [($clog2(MEM_WIDTH) - 1):0] addrB;
-    logic [31:0]                      dataBi;
-    /* verilator lint_off UNUSEDSIGNAL */
-    logic [31:0]                      dataBo;
-    /* verilator lint_on UNUSEDSIGNAL */
+    /* Core <-> data cache */
+    logic        dcache_busy;
+    logic [31:0] dcache_dataR;
+    assign stall    = dcache_busy && enable_ram;
+    assign data_ram = dcache_dataR;
+    assign busy     = 1'b0;                 // dedicated instruction port
+
+    /* Data cache <-> cache SRAM */
+    logic                    dcache_ce;
+    logic [3:0]              dcache_we;
+    logic [DCACHE_WIDTH-1:0] dcache_addr;
+    logic [31:0]             dcache_sram_rdata;
+    logic [31:0]             dcache_sram_wdata;
+
+    /* Data cache <-> main memory (RAM port B) */
+    logic                 dmem_ce;
+    logic [3:0]           dmem_we;
+    logic [ADDR_BITS-1:0] dmem_addr;
+    logic [31:0]          dmem_dataW;
+    logic                 dmem_busy;
+
+    DMWBCtrl #(
+        .ADDR_WIDTH  (ADDR_BITS   ),
+        .CACHE_WIDTH (DCACHE_WIDTH),
+        .OFFSET_WIDTH(DCACHE_OFF_W)
+    ) dcache_ctrl (
+        .clk         (clk),
+        .rst_n       (reset_n),
+        .ce_i        (enable_ram),
+        .we_i        (mem_write_enable),
+        .address_i   (mem_address[ADDR_BITS-1:0]),
+        .data_i      (mem_data_write),
+        .data_o      (dcache_dataR),
+        .busy_o      (dcache_busy),
+        .cache_ce_o  (dcache_ce),
+        .cache_we_o  (dcache_we),
+        .cache_addr_o(dcache_addr),
+        .cache_data_i(dcache_sram_rdata),
+        .cache_data_o(dcache_sram_wdata),
+        .mem_ce_o    (dmem_ce),
+        .mem_we_o    (dmem_we),
+        .mem_addr_o  (dmem_addr),
+        .mem_data_i  (data_ram_raw),
+        .mem_data_o  (dmem_dataW),
+        .mem_busy_i  (dmem_busy)
+    );
+
+    RAM_mem #(
+        .MEM_WIDTH(1 << DCACHE_WIDTH),
+        .BIN_FILE ("")
+    ) dcache_sram (
+        .clk    (clk),
+        .enA_i  (dcache_ce),
+        .weA_i  (dcache_we),
+        .addrA_i(dcache_addr),
+        .dataA_i(dcache_sram_wdata),
+        .dataA_o(dcache_sram_rdata),
+        .enB_i  (1'b0),
+        .weB_i  ('0),
+        .addrB_i('0),
+        .dataB_i('0),
+        /* verilator lint_off PINCONNECTEMPTY */
+        .dataB_o(/* Unconnected */)
+        /* verilator lint_on PINCONNECTEMPTY */
+    );
+
+    logic                 enA;
+    logic [3:0]           weA;
+    logic [ADDR_BITS-1:0] addrA;
+    logic [31:0]          dataAi;
+    logic [31:0]          dataAo;
+
+    logic                 enB;
+    logic [3:0]           weB;
+    logic [ADDR_BITS-1:0] addrB;
+    logic [31:0]          dataBi;
+    logic [31:0]          dataBo;
+    logic [31:0]          data_ram_raw;
 
     RAM_mem #(
     `ifndef SYNTH
@@ -220,61 +297,35 @@ module riscof_tb
         .dataB_o    (dataBo)
     );
 
+    /* Memory delay handshake, keyed off the cache's main-memory requests */
     logic enable_ram_delayed;
     initial begin
-        stall = 1'b0;
+        dmem_busy          = 1'b0;
         enable_ram_delayed = 1'b0;
 
         forever begin
-            // 1. Wait for enable_ram to go high
-            @(negedge clk iff enable_ram);
-
-            // 2. Assert stall
-            stall = 1'b1;
-
-            // 3. Wait for some cycles (to simulate delay)
+            @(negedge clk iff dmem_ce);
+            dmem_busy = 1'b1;
             repeat (DELAY_CYCLES) @(negedge clk);
-
-            // 4. Deassert stall, assert delayed signal
-            stall = 1'b0;
+            dmem_busy = 1'b0;
             enable_ram_delayed = 1'b1;
-
-            // 5. Wait for enable_ram to go low to finish
-            @(negedge clk iff !enable_ram);
+            @(negedge clk iff !dmem_ce);
             enable_ram_delayed = 1'b0;
         end
     end
 
-    if (DUALPORT_MEM) begin : dual_port
-        assign enA         = instruction_enable;
-        assign weA         = 4'h0;
-        assign addrA       = instruction_address[($clog2(MEM_WIDTH) - 1):0];
-        assign dataAi      = 32'h00000000;
-        assign instruction = dataAo;
+    /* Port A: instruction fetch (direct).  Port B: cache memory traffic. */
+    assign enA          = instruction_enable;
+    assign weA          = 4'h0;
+    assign addrA        = instruction_address[ADDR_BITS-1:0];
+    assign dataAi       = 32'h00000000;
+    assign instruction  = dataAo;
 
-        assign enB         = enable_ram_delayed;
-        assign weB         = mem_write_enable;
-        assign addrB       = mem_address[($clog2(MEM_WIDTH) - 1):0];
-        assign dataBi      = mem_data_write;
-        assign data_ram    = dataBo;
-
-        assign busy        = 1'b0;
-    end
-    else begin : single_port
-        assign enA         = enable_ram_delayed || instruction_enable;
-        assign weA         = enable_ram_delayed ? mem_write_enable : 4'h0;
-        assign addrA       = enable_ram_delayed ? mem_address[($clog2(MEM_WIDTH) - 1):0] : instruction_address[($clog2(MEM_WIDTH) - 1):0];
-        assign dataAi      = mem_data_write;
-        assign instruction = dataAo;
-        assign data_ram    = dataAo;
-
-        assign enB         = 1'b0;
-        assign weB         = 4'h0000;
-        assign addrB       = '0;
-        assign dataBi      = 32'h00000000;
-
-        assign busy        = enable_ram;
-    end
+    assign enB          = enable_ram_delayed;
+    assign weB          = dmem_we;
+    assign addrB        = dmem_addr;
+    assign dataBi       = dmem_dataW;
+    assign data_ram_raw = dataBo;
 
 //////////////////////////////////////////////////////////////////////////////
 // PLIC
@@ -334,9 +385,29 @@ module riscof_tb
         $finish();
     end
 
+    /* Cache-coherent signature read: a word is taken from the cache SRAM when it
+     * is currently resident (valid tag), otherwise from main memory. This is the
+     * value the core would observe, so it captures still-dirty write-back data. */
+    function automatic logic [31:0] sig_word(input logic [31:0] a);
+        logic [ADDR_BITS-1:0]    ma;
+        logic [TAG_BITS-1:0]     tg;
+        logic [IDX_BITS-1:0]     ix;
+        logic [DCACHE_WIDTH-1:0] cb;
+        ma = a[ADDR_BITS-1:0];
+        tg = ma[ADDR_BITS-1 -: TAG_BITS];
+        ix = ma[DCACHE_WIDTH-1 -: IDX_BITS];
+        cb = ma[DCACHE_WIDTH-1:0];
+        if (dcache_ctrl.entries[ix].valid && dcache_ctrl.entries[ix].tag == tg)
+            return {dcache_sram.RAM[cb+3], dcache_sram.RAM[cb+2],
+                    dcache_sram.RAM[cb+1], dcache_sram.RAM[cb+0]};
+        else
+            return {RAM_MEM.RAM[ma+3], RAM_MEM.RAM[ma+2],
+                    RAM_MEM.RAM[ma+1], RAM_MEM.RAM[ma+0]};
+    endfunction
+
     final begin
         for (int i = SIG_START; i < SIG_END; i=i+4)
-            $fwrite(fd, "%x\n", {RAM_MEM.RAM[i+3],RAM_MEM.RAM[i+2],RAM_MEM.RAM[i+1],RAM_MEM.RAM[i]});
+            $fwrite(fd, "%x\n", sig_word(i[31:0]));
         $fclose(fd);
         $display("# %t END OF SIMULATION",$time);
     end

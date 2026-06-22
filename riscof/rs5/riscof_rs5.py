@@ -62,6 +62,7 @@ class rs5(pluginTemplate):
             -I{dut_dir}/rtl/\
             -I{dut_dir}/sim/\
             -I{dut_dir}/rtl/aes\
+            -I{dut_dir}/CacheControllers/rtl\
             {dut_dir}/riscof/riscof_tb.sv'
 
     def build(self, isa_yaml, platform_yaml):

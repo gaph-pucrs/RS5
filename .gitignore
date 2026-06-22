@@ -44,3 +44,4 @@ sim/obj_dir
 riscof/*_work
 riscof/**/__pycache__
 riscof/riscv-arch-test
+sim/obj_unit

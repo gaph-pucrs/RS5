@@ -294,7 +294,7 @@ module testbench
         logic dcache_busy;
         assign stall = dcache_busy && enable_ram;
 
-        DMWTCtrl #(
+        DMWBCtrl #(
             .ADDR_WIDTH  (MEM_ADDR_BITS),
             .CACHE_WIDTH (DCACHE_WIDTH ),
             .OFFSET_WIDTH(DCACHE_OFF_W )
