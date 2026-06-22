@@ -735,7 +735,7 @@ module execute
             endcase
         end
 
-        logic [5:0] shift_amt;
+        logic [4:0] shift_amt;
         assign shift_amt[4:0] = second_operand_i[4:0];
 
         logic [4:0] zbp_shift_amt;
@@ -792,7 +792,7 @@ module execute
 
         logic [4:0] shift_amt_compl; // complementary shift amount (32 - shift_amt)
 
-        assign shift_amt_compl = 32 - second_operand_i[4:0];
+        assign shift_amt_compl = 5'(6'd32 - {1'b0, second_operand_i[4:0]});
 
         logic [31:0] ror_result, rol_result;
 
