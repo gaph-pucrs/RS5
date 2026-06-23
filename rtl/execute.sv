@@ -29,15 +29,20 @@ module execute
 #(
     parameter environment_e Environment  = ASIC,
     parameter mul_e         MULEXT       = MUL_M,
+    parameter mul_t         MUL_TYPE     = MUL_DEFAULT,
     parameter atomic_e      AMOEXT       = AMO_A,
     parameter bit           COMPRESSED   = 1'b1,
-    parameter bit           ZKNEEnable   = 1'b0,
+    parameter bit           ZKNEEnable   = 1'b1,
+    parameter bit           ZKNHEnable   = 1'b1,
+    parameter bit           ZBKBEnable   = 1'b1,
     parameter bit           ZICONDEnable = 1'b0,
     parameter bit           VEnable      = 1'b0,
     parameter int           VLEN         = 64,
     parameter int           LLEN         = 32,
     parameter int           BUS_WIDTH    = 32,
-    parameter bit           BRANCHPRED   = 1'b1
+    parameter bit           BRANCHPRED   = 1'b1,
+    parameter bit           XKYBEREnable = 1'b1, 
+    parameter rv32m_e       RV32M        = RV32MFast
 )
 (
     input   logic                   clk,
@@ -162,12 +167,6 @@ module execute
     logic           greater_equal_unsigned;
 
     logic [31:0] sum2_opB;
-    always_comb begin
-        unique case (instruction_operation_i)
-            SUB:       sum2_opB = -second_operand_i;
-            default:   sum2_opB =  second_operand_i; // AMO_W
-        endcase
-    end
 
     // Can be assigned by atomic instructions or rs1_data_i
     logic [31:0] first_operand;
@@ -189,6 +188,24 @@ module execute
     assign or_result               = first_operand | second_operand_i;
     assign xor_result              = first_operand ^ second_operand_i;
     assign equal                   = equal_opA == equal_opB;
+
+    logic [5:0] shift_amt_compl; // complementary shift amount (32 - shift_amt)
+
+    assign shift_amt_compl = 32 - second_operand_i[4:0];
+
+    logic [31:0] shift_result;
+
+    logic signed [32:0] shift_result_ext_signed;
+    logic        [32:0] shift_result_ext;
+
+    always_comb begin
+
+        logic [31:0] left_shift_result;
+
+        left_shift_result = rs1_data_i <<< shift_amt_compl;
+
+        shift_result = srl_result | left_shift_result;
+    end
 
     /* We can't obtain the PC from fetch stage because it can be modified due */
     /* to load/store stalls when the current instruction is JAL[R]            */
@@ -377,43 +394,231 @@ module execute
 // Multiplication signals
 //////////////////////////////////////////////////////////////////////////////
 
+    //Agora que configurei todos os sinais da multi_fast, tem que usar esses aqui de baixo!
+    //E depois ver os erros quando eu rodar tudo a merda no questa
+
     logic [31:0] mul_result;
     logic        hold_mul;
     logic        hold_div;
 
-    if (MULEXT != MUL_OFF) begin : gen_zmmul_on
-        logic [1:0] signed_mode_mul;
-        logic       enable_mul;
-        logic       mul_low;
+    //assign mul_result = rs1_data_i * rs2_data_i;
 
+    //assign hold_mul = 1'b0; 
+
+    //Modular reduction part!
+
+    logic [31:0] multdiv_alu_operand_a;
+    logic [31:0] multdiv_alu_operand_b;
+
+    logic is_xkyber;
+
+    if (MULEXT != MUL_OFF) begin : gen_zmmul_on
+
+        if(MUL_TYPE == MUL_FAST) begin: gen_mul_fast_ibex 
+            
+        logic   mult_en_i,  div_en_i, mult_sel_i, div_sel_i;
+        iType_e multdiv_operator_i;
+        //iType_e   alu_operator_i;
+        logic [1:0]  multdiv_signed_mode_i;
+        logic [31:0] multdiv_operand_a_i;
+        logic [31:0] multdiv_operand_b_i;
+        logic [32:0] multdiv_alu_operand_a;
+        logic [32:0] multdiv_alu_operand_b;
+
+        logic [31:0] alu_adder_result_ex_o;
+        logic [2:0]  cbd_result_high;
+        logic [2:0]  cbd_result_low;
+        logic        alu_is_equal_result;
+        logic        data_ind_timing_i;
+        logic [3:0]  kyber_compress_bits;
+        logic        imd_val_q_i;
+        logic        multdiv_imd_val_d;
+        logic        multdiv_imd_val_we;
+        logic        multdiv_ready_id_i;
+        logic        multdiv_valid;
+        logic [31:0] multdiv_result;
+
+        assign mult_en_i =  (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU}) | 
+                            (instruction_operation_i inside {KYBER_ADD, KYBER_SUB,KYBER_CBD2, KYBER_CBD3, KYBER_MUL, KYBER_COMPRESS});
+
+        assign mult_sel_i = mult_en_i;
+
+        assign div_en_i = 1'b0;
+
+        assign div_sel_i = div_en_i;
+
+        assign multdiv_operator_i = instruction_operation_i;
+
+        assign multdiv_operand_a_i = first_operand;
+        assign multdiv_operand_b_i = second_operand_i; //-second_operand_i -> sum2_opB
+
+        assign alu_adder_result_ex_o = sum_result; //se para fazer a redução do módulo para o kyber_sub ele usa isso, o sub vai estar em sum_result, mas pode dar alguma bosta
+
+        assign multdiv_signed_mode_i = 2'b00; //por enquanto whatever, pois só usado para mult normal (MULH, MUL, ...)
+
+        logic eta_is_3;
+        assign eta_is_3 = (instruction_operation_i == KYBER_CBD3);
+
+        assign cbd_result_high = eta_is_3 ? (first_operand[6] + first_operand[7] + first_operand[8]) - (first_operand[9] + first_operand[10] + first_operand[11]) : 
+                                        (first_operand[4] + first_operand[5])                  - (first_operand[6] + first_operand[7]);
+
+        assign cbd_result_low = eta_is_3 ? (first_operand[0] + first_operand[1] + first_operand[2]) - (first_operand[3] + first_operand[4] + first_operand[5]) : 
+                                       (first_operand[0] + first_operand[1])                  - (first_operand[2] + first_operand[3]);
+
+        assign alu_is_equal_result = equal;
+
+        assign data_ind_timing_i = 1'b0; //por enquanto whatever, pois só usado para div
+
+        assign kyber_compress_bits = second_operand_i[3:0] & {4{instruction_operation_i == KYBER_COMPRESS}};
+
+        assign multdiv_ready_id_i = !stall;
+            
+        assign mul_result =  multdiv_result;
+        
+        assign hold_mul = !multdiv_valid & mult_en_i;
+
+        logic [32:0] adder_in_a, adder_in_b;
+
+        logic multdiv_sel, adder_op_b_kyber_add, adder_op_b_kyber_sub;
+
+        assign multdiv_sel = mult_sel_i && !(instruction_operation_i inside {KYBER_ADD, KYBER_SUB});
+
+        assign adder_op_b_kyber_add = (instruction_operation_i == KYBER_ADD);
+
+        assign adder_op_b_kyber_sub = (instruction_operation_i == KYBER_SUB);
+
+        // prepare operand a
         always_comb begin
-            unique case (instruction_operation_i)
-                MULH:    signed_mode_mul = 2'b11;
-                MULHSU:  signed_mode_mul = 2'b01;
-                default: signed_mode_mul = 2'b00;
+            unique case (1'b1)
+                multdiv_sel:          adder_in_a = multdiv_alu_operand_a;
+                adder_op_b_kyber_sub: adder_in_a = {first_operand[31:16], 1'b1, first_operand[14:0], 1'b1};
+                default:              adder_in_a = {first_operand, 1'b1};
             endcase
         end
 
-        assign enable_mul = (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU});
-        assign mul_low    = (instruction_operation_i == MUL);
+        // prepare operand b
+        logic [32:0] operand_b_neg;
 
-        mul mul1 (
-            .clk              (clk),
-            .reset_n          (reset_n),
-            .stall            (stall),
-            .first_operand_i  (rs1_data_i),
-            .second_operand_i (rs2_data_i),
-            .signed_mode_i    (signed_mode_mul),
-            .enable_i         (enable_mul),
-            .mul_low_i        (mul_low),
-            .hold_o           (hold_mul),
-            .single_cycle_i   (1'b0),
-            .result_o         (mul_result)
-        );
+        assign operand_b_neg = {second_operand_i,1'b0} ^ {33{1'b1}};
+        
+        always_comb begin
+            unique case (1'b1)
+                multdiv_sel:          adder_in_b = multdiv_alu_operand_b;
+                adder_op_b_kyber_add: adder_in_b = {{4{1'b0}}, second_operand_i[27:16], {4{1'b0}}, second_operand_i[11:0], 1'b0};
+                adder_op_b_kyber_sub: adder_in_b = {{4{1'b0}}, operand_b_neg[28:17], 1'b1, {3{1'b0}}, operand_b_neg[12:1], 1'b1};
+                default:              adder_in_b = {second_operand_i, 1'b0};
+            endcase
+        end
+
+    logic [33:0] adder_result_ext;
+    logic [31:0] adder_result;
+
+    // actual adder
+    assign adder_result_ext = $unsigned(adder_in_a) + $unsigned(adder_in_b);
+    assign adder_result     = adder_result_ext[32:1];
+
+
+            ibex_multdiv_fast #(
+                .RV32M(RV32M)
+            ) multdiv_i (
+                .clk_i                (clk),
+                .rst_ni               (reset_n),
+                .mult_en_i            (mult_en_i),
+                .div_en_i             (div_en_i),
+                .mult_sel_i           (mult_sel_i),
+                .div_sel_i            (div_sel_i),
+                .operator_i           (multdiv_operator_i),
+                //.alu_operator_i       (alu_operator_i),
+                .signed_mode_i        (multdiv_signed_mode_i),
+                .op_a_i               (multdiv_operand_a_i),
+                .op_b_i               (multdiv_operand_b_i),
+                .alu_operand_a_o      (multdiv_alu_operand_a),
+                .alu_operand_b_o      (multdiv_alu_operand_b),
+                //.alu_adder_ext_i      (adder_result_ext), extended is only used for divider
+                .alu_adder_i          (adder_result),
+                .alu_cbd_high_i       (cbd_result_high),
+                .alu_cbd_low_i        (cbd_result_low),
+                .equal_to_zero_i      (alu_is_equal_result),
+                .data_ind_timing_i    (data_ind_timing_i),
+                .kyber_compress_bits_i(kyber_compress_bits),
+                //.imd_val_q_i          (imd_val_q_i),
+                //.imd_val_d_o          (multdiv_imd_val_d),
+                //.imd_val_we_o         (multdiv_imd_val_we),
+                .multdiv_ready_id_i   (multdiv_ready_id_i),
+                .valid_o              (multdiv_valid),
+                .multdiv_result_o     (multdiv_result)
+            );
+        end else begin: gen_mul_rs5 
+
+            logic [2:0]  cbd_result_high;
+            logic [2:0]  cbd_result_low;
+
+            logic [1:0] signed_mode_mul;
+            logic       enable_mul;
+            logic       mul_low;
+
+            always_comb begin
+                unique case (instruction_operation_i)
+                    MULH:    signed_mode_mul = 2'b11;
+                    MULHSU:  signed_mode_mul = 2'b01;
+                    default: signed_mode_mul = 2'b00;
+                endcase
+            end
+
+            logic eta_is_3;
+            assign eta_is_3 = (instruction_operation_i == KYBER_CBD3);
+
+            assign cbd_result_high = eta_is_3 ? (first_operand[6] + first_operand[7] + first_operand[8]) - (first_operand[9] + first_operand[10] + first_operand[11]) : 
+                                        (first_operand[4] + first_operand[5])                  - (first_operand[6] + first_operand[7]);
+
+            assign cbd_result_low = eta_is_3 ? (first_operand[0] + first_operand[1] + first_operand[2]) - (first_operand[3] + first_operand[4] + first_operand[5]) : 
+                                       (first_operand[0] + first_operand[1])                  - (first_operand[2] + first_operand[3]);
+
+            logic [3:0] kyber_compress_bits;
+
+            assign kyber_compress_bits = second_operand_i[3:0] & {4{instruction_operation_i == KYBER_COMPRESS}};
+
+            assign mul_low    = (instruction_operation_i == MUL);
+
+            assign is_xkyber = (instruction_operation_i inside {KYBER_ADD, KYBER_SUB,KYBER_CBD2, KYBER_CBD3, KYBER_MUL, KYBER_COMPRESS});
+
+            assign enable_mul = (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU}) | is_xkyber;
+
+            mul mul1 (
+                .clk                   (clk),
+                .reset_n               (reset_n),
+                .stall                 (stall),
+                .alu_adder_i           (sum_result),
+                .operator_i            (instruction_operation_i),
+                .is_xkyber_i           (is_xkyber),
+                .first_operand_i       (rs1_data_i),
+                .second_operand_i      (rs2_data_i),
+                .signed_mode_i         (signed_mode_mul),
+                .enable_i              (enable_mul),
+                .mul_low_i             (mul_low),
+                .hold_o                (hold_mul),
+                .single_cycle_i        (1'b0),
+                .alu_operand_a_kyber_o (multdiv_alu_operand_a),
+                .alu_operand_b_kyber_o (multdiv_alu_operand_b),
+                .alu_cbd_high_i        (cbd_result_high),
+                .alu_cbd_low_i         (cbd_result_low),
+                .kyber_compress_bits_i (kyber_compress_bits),
+                .result_o              (mul_result)
+            );            
+        end
+
     end
     else begin : gen_zmmul_off
         assign hold_mul   = 1'b0;
         assign mul_result = '0;
+    end
+
+    always_comb begin
+        unique case (instruction_operation_i)
+            KYBER_SUB, KYBER_MUL, KYBER_COMPRESS: sum2_opB = multdiv_alu_operand_b;
+            SUB:       sum2_opB = -second_operand_i;
+            default:   sum2_opB =  second_operand_i; // AMO_W
+        endcase
     end
 
 /////////////////////////////////////////////////////////////////////////////
@@ -475,6 +680,28 @@ module execute
     end
     else begin : zkne_gen_off
         assign aes_result = '0;
+    end
+
+    logic [31:0] sha2_result;
+
+    if (ZKNHEnable) begin: zknh_gen_on
+        
+        logic sha2_en;
+
+        assign sha2_en = (instruction_operation_i inside {SIG0H,SIG0L,SIG1H,SIG1L,SUM0R,SUM1R,SIG0,SIG1,SUM0,SUM1});
+
+        sha2_unit #(
+            .LOGIC_GATING(1'b1)
+        ) u_sha2_unit (
+            .sha2_en_i(sha2_en),
+            .sha2_op_i(instruction_operation_i),
+            .op_a_i(first_operand),
+            .op_b_i(second_operand_i),
+            .sha2_result_o(sha2_result)
+        );
+    end
+    else begin : zknh_gen_off
+        assign sha2_result = '0;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -636,13 +863,13 @@ module execute
                 .opA_o             (amo_operand            )
             );
 
-            assign first_operand = (instruction_operation_i == AMO_W) ? amo_operand : rs1_data_i;
+            assign first_operand = (instruction_operation_i == AMO_W) ? amo_operand : ((is_xkyber) ? multdiv_alu_operand_a  : rs1_data_i);
         end
         else begin : gen_zaamo_off
             assign amo_hold             = 1'b0;
             assign amo_mem_read_enable  = 1'b0;
             assign amo_mem_write_enable = 1'b0;
-            assign first_operand        = rs1_data_i;
+            assign first_operand        = (is_xkyber) ? multdiv_alu_operand_a  : rs1_data_i;
             assign amo_operand          = '0;
             assign amo_write_enable     = 1'b0;
         end
@@ -653,7 +880,7 @@ module execute
         assign atomic_mem_write_enable = lrsc_mem_write_enable || amo_mem_write_enable;
     end
     else begin : gen_atomic_off
-        assign first_operand           = rs1_data_i;
+        assign first_operand           = (is_xkyber) ? multdiv_alu_operand_a  : rs1_data_i;
         assign amo_operand             = '0;
         assign atomic_hold             = 1'b0;
         assign atomic_mem_read_enable  = 1'b0;
@@ -682,6 +909,118 @@ module execute
         assign result_zicond = '0;
     end
 
+    //////////
+    // Pack //
+    //////////
+
+    logic packh;
+    assign packh = instruction_operation_i == ALU_PACKH;
+
+    logic [31:0] pack_result;
+
+    always_comb begin
+      unique case (1'b1)
+        packh:   pack_result = {16'h0, second_operand_i[7:0], rs1_data_i[7:0]};
+        default: pack_result = {second_operand_i[15:0], rs1_data_i[15:0]};
+      endcase
+    end
+
+    ///////////////////
+  // Bitwise Logic //
+  ///////////////////
+
+  logic bwlogic_or;
+  logic bwlogic_and;
+  logic [31:0] bwlogic_operand_b;
+  logic [31:0] bwlogic_or_result;
+  logic [31:0] bwlogic_and_result;
+  logic [31:0] bwlogic_xor_result;
+  logic [31:0] bwlogic_result;
+
+  logic [32:0] operand_b_neg;  
+
+  assign operand_b_neg = {second_operand_i,1'b0} ^ {33{1'b1}}; //sei la se precisa estender esse sinal...
+
+  assign bwlogic_operand_b = operand_b_neg[32:1];
+
+  assign bwlogic_or_result  = rs1_data_i | bwlogic_operand_b;
+  assign bwlogic_and_result = rs1_data_i & bwlogic_operand_b;
+  assign bwlogic_xor_result = rs1_data_i ^ bwlogic_operand_b;
+
+  assign bwlogic_or  = (instruction_operation_i == ALU_ORN);
+  assign bwlogic_and = (instruction_operation_i == ALU_ANDN);
+
+  always_comb begin
+    unique case (1'b1)
+      bwlogic_or:  bwlogic_result = bwlogic_or_result;
+      bwlogic_and: bwlogic_result = bwlogic_and_result;
+      default:     bwlogic_result = bwlogic_xor_result;
+    endcase
+  end
+
+    logic [5:0] shift_amt;
+
+    assign shift_amt[4:0] = second_operand_i[4:0];
+
+    logic [4:0] zbp_shift_amt;
+
+    assign zbp_shift_amt[2:0] = shift_amt[2:0];
+    assign zbp_shift_amt[4:3] = shift_amt[4:3];
+
+    logic [31:0] rev_result;
+
+    always_comb begin
+      rev_result = rs1_data_i;
+
+      if (zbp_shift_amt[0]) begin
+        rev_result = ((rev_result & 32'h5555_5555) <<  1) |
+                     ((rev_result & 32'haaaa_aaaa) >>  1);
+      end
+
+      if (zbp_shift_amt[1]) begin
+        rev_result = ((rev_result & 32'h3333_3333) <<  2) |
+                     ((rev_result & 32'hcccc_cccc) >>  2);
+      end
+
+      if (zbp_shift_amt[2]) begin
+        rev_result = ((rev_result & 32'h0f0f_0f0f) <<  4) |
+                     ((rev_result & 32'hf0f0_f0f0) >>  4);
+      end
+
+      if (zbp_shift_amt[3]) begin
+        rev_result = ((rev_result & 32'h00ff_00ff) <<  8) |
+                     ((rev_result & 32'hff00_ff00) >>  8);
+      end
+
+      if (zbp_shift_amt[4]) begin
+        rev_result = ((rev_result & 32'h0000_ffff) << 16) |
+                     ((rev_result & 32'hffff_0000) >> 16);
+      end
+    end
+
+    logic [31:0] shuffle_result;
+
+    always_comb begin
+
+        logic is_zip;
+        is_zip = instruction_operation_i == ALU_ZIP;
+
+        if (is_zip) begin
+            for (int i = 0; i < 16; i++) begin
+                shuffle_result[2*i] = rs1_data_i[i];
+                shuffle_result[2*i + 1] = rs1_data_i[i + 16];
+            end
+        end
+
+        else begin
+            for (int i = 0; i < 16; i++) begin
+                shuffle_result[i] = rs1_data_i[2*i];
+                shuffle_result[i + 16] = rs1_data_i[2*i + 1];
+            end
+        end
+
+      end
+
 //////////////////////////////////////////////////////////////////////////////
 // Demux
 //////////////////////////////////////////////////////////////////////////////
@@ -689,26 +1028,35 @@ module execute
     always_comb begin
         unique case (instruction_operation_i)
             CSRRW, CSRRS, CSRRC,
-            CSRRWI,CSRRSI,CSRRCI:   result = csr_data_read_i;
-            JAL,JALR:               result = pc_next;
-            SLT:                    result = {31'b0, less_than};
-            SLTU:                   result = {31'b0, less_than_unsigned};
-            XOR:                    result = xor_result;
-            OR:                     result = or_result;
-            AND:                    result = and_result;
-            SLL:                    result = sll_result;
-            SRL:                    result = srl_result;
-            SRA:                    result = sra_result;
-            LUI:                    result = second_operand_i;
-            AUIPC:                  result = jump_imm_target_i;
-            DIV,DIVU:               result = (MULEXT == MUL_M)   ? div_result                           : sum_result;
-            REM,REMU:               result = (MULEXT == MUL_M)   ? rem_result                           : sum_result;
-            MUL,MULH,MULHU,MULHSU:  result = (MULEXT != MUL_OFF) ? mul_result                           : sum_result;
-            AES32ESI, AES32ESMI:    result = ZKNEEnable          ? aes_result                           : sum_result;
-            VECTOR, VLOAD, VSTORE:  result = VEnable             ? vector_scalar_result                 : sum_result;
-            CZERO_EQZ, CZERO_NEZ:   result = ZICONDEnable        ? result_zicond                        : sum_result;
-            SC_W:                   result = (AMOEXT inside {AMO_ZALRSC, AMO_A}) ? {31'h0, lrsc_result} : sum_result;
-            default:                result = sum_result;
+            CSRRWI,CSRRSI,CSRRCI:                  result = csr_data_read_i;
+            JAL,JALR:                              result = pc_next;
+            SLT:                                   result = {31'b0, less_than};
+            SLTU:                                  result = {31'b0, less_than_unsigned};
+            XOR:                                   result = xor_result;
+            OR:                                    result = or_result;
+            AND:                                   result = and_result;
+            SLL:                                   result = sll_result;
+            SRL:                                   result = srl_result;
+            SRA:                                   result = sra_result;
+            LUI:                                   result = second_operand_i;
+            AUIPC:                                 result = jump_imm_target_i;
+            DIV,DIVU:                              result = (MULEXT == MUL_M)   ? div_result                           : sum_result;
+            REM,REMU:                              result = (MULEXT == MUL_M)   ? rem_result                           : sum_result;
+            MUL,MULH,MULHU,MULHSU:                 result = (MULEXT != MUL_OFF) ? mul_result                           : sum_result;
+            AES32ESI, AES32ESMI:                   result = ZKNEEnable          ? aes_result                           : sum_result;
+            VECTOR, VLOAD, VSTORE:                 result = VEnable             ? vector_scalar_result                 : sum_result;
+            SIG0H,SIG0L,SIG1H,SIG1L,SUM0R,
+            SUM1R,SIG0,SIG1,SUM0,SUM1:             result = ZKNHEnable          ? sha2_result                          : sum_result;
+            CZERO_EQZ, CZERO_NEZ:                  result = ZICONDEnable        ? result_zicond                        : sum_result;
+            SC_W:                                  result = (AMOEXT inside {AMO_ZALRSC, AMO_A}) ? {31'h0, lrsc_result} : sum_result;
+            KYBER_ADD, KYBER_SUB, KYBER_CBD2, 
+            KYBER_CBD3, KYBER_MUL, KYBER_COMPRESS: result = (XKYBEREnable)      ? mul_result : sum_result;
+            ALU_ROR, ALU_ROL:                      result = shift_result;
+            ALU_PACK, ALU_PACKH:                   result = pack_result;    
+            ALU_XNOR, ALU_ORN, ALU_ANDN:           result = bwlogic_result;
+            ALU_REV8, ALU_BREV8:                   result = rev_result;
+            ALU_ZIP, ALU_UNZIP:                    result = shuffle_result;          
+            default:                               result = sum_result;
         endcase
     end
 

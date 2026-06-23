@@ -21,6 +21,14 @@ VERILATOR_INPUT = testbench.sv
 
 default: run
 
+CORNER ?= worst
+
+xrun_genus_netlist_gui:
+	xrun -sv -gui -timescale 1ns/1ps -F synth.f -top testbench -define SYNTH -sdf_cmd_file sdf/sdf_cmd_$(CORNER).cmd -access r -input restore.tcl
+
+xrun_genus_netlist:
+	xrun -sv -timescale 1ns/1ps -F synth.f -top testbench -define SYNTH -sdf_cmd_file sdf/sdf_cmd_$(CORNER).cmd -access r -input xmsim_probe.tcl
+
 run:
 	@echo
 	@echo "-- VERILATE ----------------"
@@ -43,6 +51,6 @@ lint:
 clean:
 	@echo
 	@echo "-- CLEAN -------------------"
-	rm -rf obj_dir debug results
+	rm -rf obj_dir debug results/* xcelium.d/ xrun* waves.shm .simvision simvision*
 
 .PHONY: run clean

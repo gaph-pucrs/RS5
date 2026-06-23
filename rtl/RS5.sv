@@ -33,21 +33,25 @@ module RS5
 `endif
     parameter environment_e Environment      = ASIC,
     parameter mul_e         MULEXT           = MUL_M,
+    parameter mul_t         MUL_TYPE         = MUL_DEFAULT,
     parameter atomic_e      AMOEXT           = AMO_A,
     parameter logic [31:0]  START_ADDR       = '0,
-    parameter bit           COMPRESSED       = 1'b0,
+    parameter bit           COMPRESSED       = 1'b1,
     parameter bit           VEnable          = 1'b0,
     parameter int           VLEN             = 256,
     parameter int           LLEN             = 32,
     parameter int           BUS_WIDTH        = 32,
     parameter bit           XOSVMEnable      = 1'b0,
-    parameter bit           ZKNEEnable       = 1'b0,
-    parameter bit           ZICONDEnable     = 1'b0,
-    parameter bit           ZCBEnable        = 1'b0,
+    parameter bit           ZKNEEnable       = 1'b1,
+    parameter bit           ZKNHEnable       = 1'b1,
+    parameter bit           ZBKBEnable       = 1'b1,
+    parameter bit           ZICONDEnable     = 1'b1,
+    parameter bit           ZCBEnable        = 1'b1,
     parameter bit           HPMCOUNTEREnable = 1'b0,
     parameter int           IQUEUE_SIZE      = 2,
     parameter bit           BRANCHPRED       = 1'b1,
-    parameter bit           FORWARDING       = 1'b1
+    parameter bit           FORWARDING       = 1'b1,
+    parameter bit           XKYBEREnable     = 1'b1
 )
 (
     input  logic                    clk,
@@ -269,10 +273,13 @@ module RS5
         .AMOEXT       (AMOEXT      ),
         .COMPRESSED   (COMPRESSED  ),
         .ZKNEEnable   (ZKNEEnable  ),
+        .ZKNHEnable   (ZKNHEnable  ),
+        .ZBKBEnable   (ZBKBEnable  ),
         .ZICONDEnable (ZICONDEnable),
         .VEnable      (VEnable     ),
         .BRANCHPRED   (BRANCHPRED  ),
-        .FORWARDING   (FORWARDING  )
+        .FORWARDING   (FORWARDING  ),
+        .XKYBEREnable (XKYBEREnable)
     ) decoder1 (
         .clk                        (clk),
         .reset_n                    (reset_n),
@@ -378,15 +385,19 @@ module RS5
     execute #(
         .Environment  (Environment ),
         .MULEXT       (MULEXT      ),
+        .MUL_TYPE     (MUL_TYPE    ),
         .AMOEXT       (AMOEXT      ),
         .COMPRESSED   (COMPRESSED  ),
         .ZKNEEnable   (ZKNEEnable  ),
+        .ZKNHEnable   (ZKNHEnable  ),
+        .ZBKBEnable   (ZBKBEnable  ),
         .ZICONDEnable (ZICONDEnable),
         .VEnable      (VEnable     ),
         .VLEN         (VLEN        ),
         .LLEN         (LLEN        ),
         .BUS_WIDTH    (BUS_WIDTH   ),
-        .BRANCHPRED   (BRANCHPRED  )
+        .BRANCHPRED   (BRANCHPRED  ),
+        .XKYBEREnable (XKYBEREnable)
     ) execute1 (
         .clk                     (clk),
         .reset_n                 (reset_n),

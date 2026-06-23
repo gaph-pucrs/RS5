@@ -12,7 +12,7 @@
  * Peripheral Local Interrupt Controller.
  */
 
-`include "RS5_pkg.sv"
+//`include "RS5_pkg.sv"
 
 module plic
 	import RS5_pkg::*;

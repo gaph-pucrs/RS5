@@ -1,0 +1,802 @@
+# SimVision Command Script (Wed Apr 08 16:16:50 -03 2026)
+#
+# Version 23.03.s003
+#
+# You can restore this configuration with:
+#
+#      xrun -sv -timescale 1ns/1ps -F synth.f -top testbench -define SYNTH -sdf_cmd_file sdf_cmd_worst.cmd -access r -input restore.tcl
+#
+
+
+#
+# Preferences
+#
+preferences set toolbar-Standard-WatchWindow {
+  usual
+  shown 0
+}
+preferences set toolbar-txe_waveform_navigate-WaveWindow {
+  usual
+  shown 1
+  position -row 3
+}
+preferences set txe-locate-add-fibers 1
+preferences set signal-type-colors {assertion #FF0000 output #FFA500 group #0099FF inout #00FFFF input #FFFF00 fiber #00EEEE errorsignal #FF0000 unknown #FFFFFF overlay #0099FF internal #00FF00 reference #FFFFFF}
+preferences set txe-navigate-search-locate 0
+preferences set txe-view-hold 0
+preferences set plugin-enable-svdatabrowser-new 1
+preferences set toolbar-Windows-WatchWindow {
+  usual
+  shown 0
+}
+preferences set verilog-colors {Su #ff0099 0 {} 1 {} HiZ #ff9900 We #00ffff Pu #9900ff Sm #00ff99 X #ff0000 StrX #ff0000 other #ffff00 Z #ff9900 Me #0000ff La #ff00ff St {}}
+preferences set toolbar-sendToIndago-WaveWindow {
+  usual
+  position -pos 3
+}
+preferences set txe-navigate-waveform-locate 1
+preferences set txe-view-hidden 0
+preferences set waveform-height 30
+preferences set toolbar-Standard-Console {
+  usual
+  position -pos 1
+}
+preferences set txe-search-show-linenumbers 1
+preferences set toolbar-Search-Console {
+  usual
+  position -pos 2
+}
+preferences set toolbar-txe_waveform_toggle-WaveWindow {
+  usual
+  position -pos 1
+}
+preferences set current-browser-sort-mode real
+preferences set plugin-enable-groupscope 0
+preferences set toolbar-txe_waveform_view-WaveWindow {
+  usual
+  shown 1
+  position -row 3
+}
+preferences set key-bindings {Edit>Undo Ctrl+z PageUp PageUp View>Zoom>Next {Alt+Right arrow} View>Zoom>In Alt+i PageDown PageDown Edit>Copy Ctrl+c ScrollDown {Down arrow} Edit>Create>Group Ctrl+g View>Zoom>FullY_widget y Simulation>NextInScope F7 Edit>Select>All Ctrl+a Format>Radix>Decimal Ctrl+Shift+D Edit>Ungroup Ctrl+Shift+G TopOfPage Home Edit>Create>Condition Ctrl+e {command -console SimVision {%w sidebar access designbrowser selectall}} Alt+a ScrollLeft {Left arrow} Edit>SelectAllText Alt+a Edit>TextSearchConsole Alt+s View>Zoom>FullX_widget = Windows>SendTo>Waveform Ctrl+w Simulation>Return Shift+F5 View>CallstackDown {Ctrl+Down arrow} Select>All Ctrl+a Edit>Delete Del Format>Radix>Octal Ctrl+Shift+O Edit>Cut Ctrl+x Simulation>Run F2 Edit>Create>Marker Ctrl+m View>Center Alt+c View>CallstackInWindow Ctrl+k Edit>SelectAll Ctrl+a File>OpenDatabase Ctrl+o Edit>Redo Ctrl+y Format>Radix>Binary Ctrl+Shift+B View>ExpandSequenceTime>AtCursor Alt+x ScrollUp {Up arrow} File>CloseWindow Ctrl+Shift+w ScrollRight {Right arrow} View>Zoom>FullX Alt+= Edit>Create>Bus Ctrl+b Explore>NextEdge Ctrl+\] View>Zoom>Cursor-Baseline Alt+z View>Zoom>OutX Alt+o Edit>GoToLine Ctrl+g View>Zoom>Fit Alt+= View>Zoom>OutX_widget o View>CallstackUp {Ctrl+Up arrow} View>Bookmarks>Add Ctrl+b View>ShowValues Ctrl+s Simulation>Next F6 Edit>Search Ctrl+f Format>Radix>Hexadecimal Ctrl+Shift+H Edit>Create>MarkerAtCursor Ctrl+Shift+M View>Zoom>InX Alt+i View>Zoom>Out Alt+o Edit>TextSearch Ctrl+f View>Zoom>Previous {Alt+Left arrow} Edit>Paste Ctrl+v Format>Signed Ctrl+Shift+S View>CollapseSequenceTime>AtCursor Alt+s View>Zoom>InX_widget i Format>Radix>ASCII Ctrl+Shift+A Simulation>Step F5 Explore>PreviousEdge {Ctrl+[} BottomOfPage End}
+preferences set plugin-enable-interleaveandcompare 0
+preferences set plugin-enable-waveformfrequencyplot 0
+preferences set toolbar-SimControl-WatchWindow {
+  usual
+  shown 0
+}
+preferences set toolbar-Windows-WaveWindow {
+  usual
+  position -pos 2
+}
+preferences set txe-navigate-waveform-next-child 1
+preferences set vhdl-colors {H #00ffff L #00ffff 0 {} X #ff0000 - {} 1 {} U #9900ff Z #ff9900 W #ff0000}
+preferences set txe-locate-scroll-x 1
+preferences set txe-locate-scroll-y 1
+preferences set txe-locate-pop-waveform 1
+preferences set toolbar-TimeSearch-WatchWindow {
+  usual
+  shown 0
+}
+preferences set key-bindings {PageUp PageUp Edit>Undo Ctrl+z View>Zoom>In Alt+i View>Zoom>Next {Alt+Right arrow} PageDown PageDown ScrollDown {Down arrow} Edit>Copy Ctrl+c Edit>Select>All Ctrl+a Simulation>NextInScope F7 View>Zoom>FullY_widget y Edit>Create>Group Ctrl+g Format>Radix>Decimal Ctrl+Shift+D Edit>Ungroup Ctrl+Shift+G TopOfPage Home Edit>Create>Condition Ctrl+e {command -console SimVision {%w sidebar access designbrowser selectall}} Alt+a ScrollLeft {Left arrow} Edit>SelectAllText Alt+a Edit>TextSearchConsole Alt+s View>Zoom>FullX_widget = Windows>SendTo>Waveform Ctrl+w Simulation>Return Shift+F5 View>CallstackDown {Ctrl+Down arrow} Select>All Ctrl+a Edit>Delete Del Format>Radix>Octal Ctrl+Shift+O Edit>Cut Ctrl+x Simulation>Run F2 Edit>Create>Marker Ctrl+m View>Center Alt+c View>CallstackInWindow Ctrl+k Edit>SelectAll Ctrl+a File>OpenDatabase Ctrl+o Edit>Redo Ctrl+y Format>Radix>Binary Ctrl+Shift+B View>ExpandSequenceTime>AtCursor Alt+x ScrollUp {Up arrow} File>CloseWindow Ctrl+Shift+w ScrollRight {Right arrow} View>Zoom>FullX Alt+= Edit>Create>Bus Ctrl+b Explore>NextEdge Ctrl+\] View>Zoom>Cursor-Baseline Alt+z View>Zoom>OutX Alt+o Edit>GoToLine Ctrl+g View>Zoom>Fit Alt+= View>Zoom>OutX_widget o View>CallstackUp {Ctrl+Up arrow} View>Bookmarks>Add Ctrl+b Format>Radix>Hexadecimal Ctrl+Shift+H Edit>Search Ctrl+f Simulation>Next F6 View>ShowValues Ctrl+s View>Zoom>InX Alt+i Edit>Create>MarkerAtCursor Ctrl+Shift+M View>Zoom>Out Alt+o Edit>TextSearch Ctrl+f Format>Signed Ctrl+Shift+S Edit>Paste Ctrl+v View>Zoom>Previous {Alt+Left arrow} View>CollapseSequenceTime>AtCursor Alt+s Format>Radix>ASCII Ctrl+Shift+A View>Zoom>InX_widget i BottomOfPage End Explore>PreviousEdge {Ctrl+[} Simulation>Step F5}
+
+#
+# Simulator
+#
+database require simulator -hints {
+	simulator "xrun -sv -gui -timescale 1ns/1ps -F synth.f -top testbench -define SYNTH -sdf_cmd_file sdf_cmd_worst.cmd -access r -input restore.tcl -input restore.tcl"
+}
+#
+# Groups
+#
+catch {group new -name {Group 1} -overlay 0}
+group using {Group 1}
+group set -overlay 0
+group set -comment {}
+group clear 0 end
+
+
+#
+# Mnemonic Maps
+#
+mmap new  -reuse -name {Boolean as Logic} -radix %b -contents {{%c=FALSE -edgepriority 1 -shape low}
+{%c=TRUE -edgepriority 1 -shape high}}
+mmap new  -reuse -name {Example Map} -radix %x -contents {{%b=11???? -bgcolor orange -label REG:%x -linecolor yellow -shape bus}
+{%x=1F -bgcolor red -label ERROR -linecolor white -shape EVENT}
+{%x=2C -bgcolor red -label ERROR -linecolor white -shape EVENT}
+{%x=* -label %x -linecolor gray -shape bus}}
+
+#
+# Design Browser windows
+#
+if {[catch {window new WatchList -name "Design Browser 1" -geometry 1920x995+2278+588}] != ""} {
+    window geometry "Design Browser 1" 1920x995+2278+588
+}
+window target "Design Browser 1" on
+browser using {Design Browser 1}
+browser set -scope [subst  {simulator::[format {testbench}]} ]
+browser set \
+    -signalfilter sum_result \
+    -signalsort name
+browser yview see [subst  {simulator::[format {testbench}]} ]
+browser timecontrol set -lock 0
+
+#
+# Waveform windows
+#
+if {[catch {window new WaveWindow -name "Waveform 1" -geometry 3840x2032+-2+52}] != ""} {
+    window geometry "Waveform 1" 3840x2032+-2+52
+}
+window target "Waveform 1" on
+waveform using {Waveform 1}
+waveform sidebar visibility partial
+waveform set \
+    -primarycursor TimeA \
+    -signalnames name \
+    -signalwidth 467 \
+    -units ps \
+    -valuewidth 75
+waveform baseline set -time 0
+
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.fetch1.bp_ack_o}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.fetch1.bp_take_i}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.fetch1.bp_target_i[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.fetch1.busy_i}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.fetch1.clk}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.fetch1.compressed_o}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.fetch1.ctx_switch_i}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.fetch1.ctx_switch_target_i[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.fetch1.enable_i}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.fetch1.instruction_address_o[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.fetch1.instruction_data_i[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.fetch1.instruction_o[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.fetch1.jump_i}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.fetch1.jump_rollback_i}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.fetch1.jump_target_i[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.fetch1.jumping_o}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.fetch1.mem_operation_en_o}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.fetch1.pc_o[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.fetch1.reset_n}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.fetch1.should_jump_i}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.fetch1.sys_reset}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.fetch1.valid_o}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.fetch1.jump_misaligned_o}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.fetch1.jumped}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.fetch1.iaddr_jumped[31:0]}]}
+	} ]]
+set id [waveform add -cdivider divider]
+set id [waveform add -cdivider divider]
+set id [waveform add -cdivider divider]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.atomic_operation_i[9:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.bp_ack_i}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.bp_taken_i}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.clk}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.compressed_i}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.csr_address_i[11:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.csr_data_o[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.csr_data_read_i[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.csr_operation_o[1:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.csr_read_enable_o}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.csr_write_enable_o}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.ctx_switch_o}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.ctx_switch_target_o[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.exc_ilegal_inst_i}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.exc_load_access_fault_i}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.exception_code_o[4:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.hold_o}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.instruction_i[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.instruction_operation_i[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.instruction_operation_o[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.interrupt_ack_o}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.interrupt_pending_i}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.jump_o}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.jump_rollback_o}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.sum_result[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.jump_target_o[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.jump_imm_target_i[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.machine_return_o}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.mem_address_exec_o[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.mem_address_o[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.mem_enable_o}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.mem_read_data_i[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.mem_data_read[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.mem_write_data_o[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.mem_write_enable_o[3:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.mepc_i[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.mtvec_i[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.pc_exc_o[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.pc_i[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.pc_irq_o[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.privilege_i[1:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.raise_exception_o}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.rd_i[4:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.rd_o[4:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.reservation_data_i[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.reset_n}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.result_fwd_o[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.result_o[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.rs1_data_i[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.rs1_i[4:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.rs2_data_i[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.second_operand_i[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.should_jump_o}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.stall}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.valid_i}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.vector_operation_i[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.vlen_o[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.vtype_o[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.write_enable_fwd_o}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.write_enable_o}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.execute1.exc_inst_access_fault_i}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.fetch1.jump_confirmed_r}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.fetch1.valid}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.fetch1.pc_jumped[31:0]}]}
+	} ]]
+set id [waveform add -cdivider divider]
+set id [waveform add -cdivider divider]
+set id [waveform add -cdivider divider]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.atomic_operation_o[9:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.bp_take_o}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.bp_taken_o}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.bp_target_o[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.clk}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.compressed_i}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.compressed_o}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.csr_address_o[11:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.dec_hazard_o}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.enable}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.exc_ilegal_inst_o}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.exc_inst_access_fault_i}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.exc_inst_access_fault_o}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.execute_we_i}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.hazard_o}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.instr_rs1_o[4:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.instruction_i[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.instruction_o[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.instruction_operation_o[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.jump_imm_target_o[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.jump_misaligned_i}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.jump_rollback_i}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.jumping_i}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.killed_o}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.mem_access_result_i[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.mem_access_we_i}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.pc_i[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.pc_o[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.rd_mem_access_i[4:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.rd_o[4:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.rd_retire_i[4:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.regbank_we_i}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.reset_n}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.result_i[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.rs1_data_o[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.rs1_data_read_i[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.rs1_o[4:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.rs2_data_o[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.rs2_data_read_i[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.rs2_o[4:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.second_operand_o[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.should_jump_i}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.sys_reset}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.valid_i}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.vector_operation_o[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.writeback_i[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.decoder1.enable}]}
+	} ]]
+set id [waveform add -cdivider divider]
+set id [waveform add -cdivider divider]
+set id [waveform add -cdivider divider]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.\RegFileFF_blk.regbankff .clk}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.\RegFileFF_blk.regbankff .data1_o[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.\RegFileFF_blk.regbankff .data2_o[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.\RegFileFF_blk.regbankff .data_i[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.\RegFileFF_blk.regbankff .enable}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.\RegFileFF_blk.regbankff .rd[4:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.\RegFileFF_blk.regbankff .reset_n}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.\RegFileFF_blk.regbankff .rs1[4:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dut.\RegFileFF_blk.regbankff .rs2[4:0]}]}
+	} ]]
+set id [waveform add -cdivider divider]
+set id [waveform add -cdivider divider]
+set id [waveform add -cdivider divider]
+set id [waveform add -cdivider divider]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.clk}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.AMOEXT}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.BIN_FILE}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.BRANCHPRED}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.BUS_WIDTH}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.COMPRESSED}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.DUALPORT_MEM}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.FORWARDING}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.IQUEUE_SIZE}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.LLEN}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.MEM_ADDR_BITS}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.MEM_WIDTH}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.MULEXT}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.OUTPUT_FILE}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.PROFILING_FILE}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.RAM_DELAY_CYCLES}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.USE_HPMCOUNTER}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.USE_XKYBER}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.USE_XOSVM}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.USE_ZCB}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.USE_ZICOND}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.USE_ZKNE}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.USE_ZKNH}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.VEnable}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.VLEN}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.addrA[16:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.addrB[16:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.enB}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.weB[3:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.busy}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.char}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dataAi[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dataAo[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dataBi[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.dataBo[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.data_plic[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.data_ram[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.data_rtc[63:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.data_tb[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.enA}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.enable_imem}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.enable_plic}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.enable_plic_r}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.enable_ram}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.enable_ram_delayed}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.enable_rtc}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.enable_rtc_r}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.enable_tb}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.enable_tb_r}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.fd}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.i_cnt}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.iack_periph[1:1]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.instruction[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.instruction_address[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.interrupt_ack}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.mei}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.mem_address[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.mem_data_read[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.mem_data_write[31:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.mem_operation_enable}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.mem_write_enable[3:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.mti}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.mtime[63:0]}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.reset_n}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.stall}]}
+	} ]]
+set id [waveform add -signals [subst  {
+	{simulator::[format {testbench.weA[3:0]}]}
+	} ]]
+
+waveform xview limits 23271014ps 23333986ps
+
+#
+# Waveform Window Links
+#
+
+#
+# Console windows
+#
+console set -windowname Console
+window geometry Console 1128x826+261+564
+
+#
+# Layout selection
+#
+

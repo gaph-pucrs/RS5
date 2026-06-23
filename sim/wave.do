@@ -1,4 +1,5 @@
 add wave -noupdate -group TESTBENCH     -color {Turquoise}      /*
+add wave -noupdate -group CRYPTO        -color {Orange}         /dut/execute1/gen_zmmul_on/gen_mul_rs5/mul1/*
 add wave -noupdate -group RAM_MEM       -color {Violet}         /RAM_MEM/*
 add wave -noupdate -group DUT           -color {Blue Violet}    /dut/*
 add wave -noupdate -group FETCH         -color {Salmon}         /dut/fetch1/*
