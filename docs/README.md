@@ -5,10 +5,12 @@ For a general overview of the processor, see the [main README](../README.md).
 
 ## Table of Contents
 
-- [Architecture Overview](#architecture-overview)
-- [Processor Interface](#processor-interface)
-- [Extensions](#extensions)
-- [Parameters](#parameters)
+- [RS5 Documentation](#rs5-documentation)
+  - [Table of Contents](#table-of-contents)
+  - [Architecture Overview](#architecture-overview)
+  - [Processor interface](#processor-interface)
+  - [Extensions](#extensions)
+  - [Parameters](#parameters)
 
 ---
 
@@ -70,8 +72,9 @@ Extensions are enabled via parameters in [../rtl/RS5.sv](../../rtl/RS5.sv).
 | Zcb | `ZCBEnable = 1` | Additional compressed instructions (requires C) | — |
 | Zicond | `ZICONDEnable = 1` | Integer conditional operations | — |
 | Zihpm | `HPMCOUNTEREnable = 1` | Hardware performance-monitoring counters | — |
+| Zbkb | `ZBKBEnable = 1` | Bit-manipulation for cryptography | — |
 | Zkne | `ZKNEEnable = 1` | AES encryption (scalar, 32-bit) | — |
-| V (Zve32x subset) | `VEnable = 1` | Vector extension (configurable VLEN, LLEN) | — |
+| Zve32x | `VEnable = 1` | Vector extension (configurable VLEN, LLEN) | — |
 | Xosvm | `XOSVMEnable = 1` | Offset and size virtual memory (non-standard) | [Xosvm.md](extensions/Xosvm.md) |
 
 ---
