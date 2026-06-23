@@ -42,8 +42,7 @@ module riscof_tb
     parameter bit          FORWARDING       = 1'b0,
     parameter bit          DUALPORT_MEM     = 1'b1,
     parameter int          DELAY_CYCLES     = 0,
-    parameter bit          CACHE_EN         = 1'b0,
-    parameter write_mode_t WMODE            = WRITE_BACK
+    parameter bit          CACHE_EN         = 1'b0
 )
 (
 );
@@ -65,9 +64,10 @@ module riscof_tb
 
     /* Parameters used only when cache is on */
     /* verilator lint_off UNUSEDPARAM */
-    localparam int CACHE_WIDTH = 12;
-    localparam int CACHE_OFF_W = 6;
-    localparam int MEM_ADDR_BITS = $clog2(MEM_WIDTH);
+    localparam write_mode_t WMODE = WRITE_THROUGH;
+    localparam int CACHE_WIDTH    = 12;
+    localparam int CACHE_OFF_W    = 6;
+    localparam int MEM_ADDR_BITS  = $clog2(MEM_WIDTH);
     /* verilator lint_on UNUSEDPARAM */
 
 ///////////////////////////////////////// Clock generator //////////////////////////////
