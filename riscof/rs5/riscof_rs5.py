@@ -62,6 +62,7 @@ class rs5(pluginTemplate):
             -I{dut_dir}/rtl/\
             -I{dut_dir}/sim/\
             -I{dut_dir}/rtl/aes\
+            -I{dut_dir}/CacheControllers/rtl/\
             {dut_dir}/riscof/riscof_tb.sv'
 
     def build(self, isa_yaml, platform_yaml):
@@ -102,6 +103,9 @@ class rs5(pluginTemplate):
         self.verilatecmd += " -GDUALPORT_MEM=1\\'b" + os.environ["DUALPORT_MEM"]
         self.verilatecmd += " -GIQUEUE_SIZE=" + os.environ["IQUEUE_SIZE"]
         self.verilatecmd += " -GDELAY_CYCLES=" + os.environ["DELAY_CYCLES"]
+        self.verilatecmd += " -GCACHE_EN=1\\'b" + os.environ["CACHE_ENABLE"]
+        wmode_bit = "1" if os.environ["WMODE"] == "WRITE_BACK" else "0"
+        self.verilatecmd += " -GWMODE=1\\'b" + wmode_bit
 
         self.compile_cmd = self.compile_cmd+' -mabi='+('lp64 ' if 64 in ispec['supported_xlen'] else 'ilp32 ')
 

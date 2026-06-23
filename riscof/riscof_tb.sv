@@ -16,6 +16,7 @@
  */
 
 `include "RS5_pkg.sv"
+`include "../CacheControllers/rtl/DMPkg.sv"
 
 //////////////////////////////////////////////////////////////////////////////
 // CPU TESTBENCH
@@ -23,23 +24,26 @@
 
 module riscof_tb
     import RS5_pkg::*;
+    import DMPkg::*;
 #(
-    parameter logic[31:0] SIG_START        = 0,
-    parameter logic[31:0] SIG_END          = 0,
-    parameter logic[31:0] TOHOST_ADDR      = 0,
-    parameter string      SIG_PATH         = "",
-    parameter bit         MEnable          = 1'b0,
-    parameter bit         AEnable          = 1'b0,
-    parameter bit         COMPRESSED       = 1'b0,
-    parameter bit         ZICONDEnable     = 1'b0,
-    parameter bit         HPMCOUNTEREnable = 1'b0,
-    parameter bit         ZKNEEnable       = 1'b0,
-    parameter bit         ZCBEnable        = 1'b0,
-    parameter int         IQUEUE_SIZE      = 2,
-    parameter bit         BRANCHPRED       = 1'b0,
-    parameter bit         FORWARDING       = 1'b0,
-    parameter bit         DUALPORT_MEM     = 1'b1,
-    parameter int         DELAY_CYCLES     = 0
+    parameter logic[31:0]  SIG_START        = 0,
+    parameter logic[31:0]  SIG_END          = 0,
+    parameter logic[31:0]  TOHOST_ADDR      = 0,
+    parameter string       SIG_PATH         = "",
+    parameter bit          MEnable          = 1'b0,
+    parameter bit          AEnable          = 1'b0,
+    parameter bit          COMPRESSED       = 1'b0,
+    parameter bit          ZICONDEnable     = 1'b0,
+    parameter bit          HPMCOUNTEREnable = 1'b0,
+    parameter bit          ZKNEEnable       = 1'b0,
+    parameter bit          ZCBEnable        = 1'b0,
+    parameter int          IQUEUE_SIZE      = 2,
+    parameter bit          BRANCHPRED       = 1'b0,
+    parameter bit          FORWARDING       = 1'b0,
+    parameter bit          DUALPORT_MEM     = 1'b1,
+    parameter int          DELAY_CYCLES     = 0,
+    parameter bit          CACHE_EN         = 1'b0,
+    parameter write_mode_t WMODE            = WRITE_BACK
 )
 (
 );
@@ -58,6 +62,13 @@ module riscof_tb
     localparam bit      DEBUG     = 1'b0;
     localparam mul_e    MULEXT    = MEnable ? MUL_M : MUL_OFF;
     localparam atomic_e AMOEXT    = AEnable ? AMO_A : AMO_OFF;
+
+    /* Parameters used only when cache is on */
+    /* verilator lint_off UNUSEDPARAM */
+    localparam int CACHE_WIDTH = 12;
+    localparam int CACHE_OFF_W = 6;
+    localparam int MEM_ADDR_BITS = $clog2(MEM_WIDTH);
+    /* verilator lint_on UNUSEDPARAM */
 
 ///////////////////////////////////////// Clock generator //////////////////////////////
 
@@ -110,6 +121,8 @@ module riscof_tb
 // Control
 //////////////////////////////////////////////////////////////////////////////
 
+    logic [31:0] dmem_dataR;
+
     assign enable_rtc  = (mem_address[31:28] == 4'h2) && mem_operation_enable;
     assign enable_plic = (mem_address[31:28] == 4'h4) && mem_operation_enable;
     assign enable_ram  = (mem_address[31:28] == 4'h8) && mem_operation_enable;
@@ -127,7 +140,7 @@ module riscof_tb
             mem_data_read = data_plic;
         end
         else begin
-            mem_data_read = data_ram;
+            mem_data_read = dmem_dataR;
         end
     end
 
@@ -137,7 +150,7 @@ module riscof_tb
 
     logic busy;
     logic stall;
-    logic instruction_enable;
+    logic enable_imem;
 
     RS5 #(
     `ifndef SYNTH
@@ -169,7 +182,7 @@ module riscof_tb
         .mtime_i                (mtime),
         .tip_i                  (mti),
         .eip_i                  (mei),
-        .imem_operation_enable_o(instruction_enable),
+        .imem_operation_enable_o(enable_imem),
         .instruction_address_o  (instruction_address),
         .dmem_operation_enable_o(mem_operation_enable),
         .mem_write_enable_o     (mem_write_enable),
@@ -178,6 +191,148 @@ module riscof_tb
         .interrupt_ack_o        (interrupt_ack)
     );
 
+//////////////////////////////////////////////////////////////////////////////
+// Cache
+//////////////////////////////////////////////////////////////////////////////
+
+    logic        imem_busy;
+    logic        imem_ce;
+    logic [31:0] imem_data;
+
+    logic        dmem_busy;
+    logic        dmem_ce;
+    logic [3:0]  dmem_we;
+    logic [31:0] dmem_dataW;
+
+    /* Number of used bits is defined by the memory size */
+    /* verilator lint_off UNUSEDSIGNAL */
+    logic [31:0] imem_addr;
+    logic [31:0] dmem_addr;
+    /* verilator lint_on UNUSEDSIGNAL */
+
+    if (CACHE_EN) begin : gen_cache_on
+        logic                    icache_ce;
+        logic [3:0]              icache_we;
+        logic [CACHE_WIDTH-1:0]  icache_addr;
+        logic [31:0]             icache_dataR;
+        logic [31:0]             icache_dataW;
+
+        DMCtrl #(
+            .ADDR_WIDTH  (MEM_ADDR_BITS),
+            .CACHE_WIDTH (CACHE_WIDTH  ),
+            .OFFSET_WIDTH(CACHE_OFF_W  ),
+            .WMODE       (WMODE        )
+        ) icache_ctrl (
+            .clk         (clk                ),
+            .rst_n       (reset_n            ),
+            .ce_i        (enable_imem        ),
+            .we_i        ('0                 ),
+            .address_i   (instruction_address[MEM_ADDR_BITS-1:0]),
+            .data_i      ('0                 ),
+            .data_o      (instruction        ),
+            .busy_o      (busy               ),
+            .cache_ce_o  (icache_ce          ),
+            .cache_we_o  (icache_we          ),
+            .cache_addr_o(icache_addr        ),
+            .cache_data_i(icache_dataR       ),
+            .cache_data_o(icache_dataW       ),
+            .mem_ce_o    (imem_ce            ),
+            .mem_addr_o  (imem_addr[MEM_ADDR_BITS-1:0]),
+            .mem_data_i  (imem_data          ),
+            .mem_busy_i  (imem_busy          ),
+            /* verilator lint_off PINCONNECTEMPTY */
+            .mem_we_o    (/* Unconnected */  ),
+            .mem_data_o  (/* Unconnected */  )
+            /* verilator lint_on PINCONNECTEMPTY */
+        );
+
+        RAM_mem #(
+            .MEM_WIDTH(1 << CACHE_WIDTH),
+            .BIN_FILE("")
+        ) icache_sram (
+            .clk    (clk),
+            .enA_i  (icache_ce),
+            .weA_i  (icache_we),
+            .addrA_i(icache_addr),
+            .dataA_i(icache_dataW),
+            .dataA_o(icache_dataR),
+            .enB_i  (1'b0),
+            .weB_i  ('0),
+            .addrB_i('0),
+            .dataB_i('0),
+            /* verilator lint_off PINCONNECTEMPTY */
+            .dataB_o(/* Unconnected */)
+            /* verilator lint_on PINCONNECTEMPTY */
+        );
+
+        logic                    dcache_ce;
+        logic [3:0]              dcache_we;
+        logic [CACHE_WIDTH-1:0]  dcache_addr;
+        logic [31:0]             dcache_dataR;
+        logic [31:0]             dcache_dataW;
+
+        logic dcache_busy;
+        assign stall = dcache_busy && enable_ram;
+
+        DMCtrl #(
+            .ADDR_WIDTH  (MEM_ADDR_BITS),
+            .CACHE_WIDTH (CACHE_WIDTH  ),
+            .OFFSET_WIDTH(CACHE_OFF_W  ),
+            .WMODE       (WMODE        )
+        ) dcache_ctrl (
+            .clk         (clk                ),
+            .rst_n       (reset_n            ),
+            .ce_i        (enable_ram         ),
+            .we_i        (mem_write_enable   ),
+            .address_i   (mem_address[MEM_ADDR_BITS-1:0]),
+            .data_i      (mem_data_write     ),
+            .data_o      (dmem_dataR         ),
+            .busy_o      (dcache_busy        ),
+            .cache_ce_o  (dcache_ce          ),
+            .cache_we_o  (dcache_we          ),
+            .cache_addr_o(dcache_addr        ),
+            .cache_data_i(dcache_dataR       ),
+            .cache_data_o(dcache_dataW       ),
+            .mem_ce_o    (dmem_ce            ),
+            .mem_addr_o  (dmem_addr[MEM_ADDR_BITS-1:0]),
+            .mem_data_i  (data_ram           ),
+            .mem_busy_i  (dmem_busy          ),
+            .mem_we_o    (dmem_we            ),
+            .mem_data_o  (dmem_dataW         )
+        );
+
+        RAM_mem #(
+            .MEM_WIDTH(1 << CACHE_WIDTH),
+            .BIN_FILE("")
+        ) dcache_sram (
+            .clk    (clk),
+            .enA_i  (dcache_ce),
+            .weA_i  (dcache_we),
+            .addrA_i(dcache_addr),
+            .dataA_i(dcache_dataW),
+            .dataA_o(dcache_dataR),
+            .enB_i  (1'b0),
+            .weB_i  ('0),
+            .addrB_i('0),
+            .dataB_i('0),
+            /* verilator lint_off PINCONNECTEMPTY */
+            .dataB_o(/* Unconnected */)
+            /* verilator lint_on PINCONNECTEMPTY */
+        );
+    end
+    else begin : gen_cache_off
+        assign imem_ce     = enable_imem;
+        assign imem_addr   = instruction_address;
+        assign instruction = imem_data;
+        assign busy        = imem_busy;
+
+        assign dmem_ce    = enable_ram;
+        assign dmem_we    = mem_write_enable;
+        assign dmem_addr  = mem_address;
+        assign dmem_dataW = mem_data_write;
+        assign dmem_dataR = data_ram;
+        assign stall      = dmem_busy;
+    end
 
 //////////////////////////////////////////////////////////////////////////////
 // RAM
@@ -222,58 +377,58 @@ module riscof_tb
 
     logic enable_ram_delayed;
     initial begin
-        stall = 1'b0;
+        dmem_busy = 1'b0;
         enable_ram_delayed = 1'b0;
 
         forever begin
             // 1. Wait for enable_ram to go high
-            @(negedge clk iff enable_ram);
+            @(negedge clk iff dmem_ce);
 
             // 2. Assert stall
-            stall = 1'b1;
+            dmem_busy = 1'b1;
 
             // 3. Wait for some cycles (to simulate delay)
             repeat (DELAY_CYCLES) @(negedge clk);
 
             // 4. Deassert stall, assert delayed signal
-            stall = 1'b0;
+            dmem_busy = 1'b0;
             enable_ram_delayed = 1'b1;
 
             // 5. Wait for enable_ram to go low to finish
-            @(negedge clk iff !enable_ram);
+            @(negedge clk iff !dmem_ce);
             enable_ram_delayed = 1'b0;
         end
     end
 
     if (DUALPORT_MEM) begin : dual_port
-        assign enA         = instruction_enable;
-        assign weA         = 4'h0;
-        assign addrA       = instruction_address[($clog2(MEM_WIDTH) - 1):0];
-        assign dataAi      = 32'h00000000;
-        assign instruction = dataAo;
+        assign enA         = imem_ce;
+        assign weA         = '0;
+        assign addrA       = imem_addr[($clog2(MEM_WIDTH) - 1):0];
+        assign dataAi      = '0;
+        assign imem_data   = dataAo;
 
         assign enB         = enable_ram_delayed;
-        assign weB         = mem_write_enable;
-        assign addrB       = mem_address[($clog2(MEM_WIDTH) - 1):0];
-        assign dataBi      = mem_data_write;
+        assign weB         = dmem_we;
+        assign addrB       = dmem_addr[($clog2(MEM_WIDTH) - 1):0];
+        assign dataBi      = dmem_dataW;
         assign data_ram    = dataBo;
 
-        assign busy        = 1'b0;
+        assign imem_busy   = 1'b0;
     end
     else begin : single_port
-        assign enA         = enable_ram_delayed || instruction_enable;
-        assign weA         = enable_ram_delayed ? mem_write_enable : 4'h0;
-        assign addrA       = enable_ram_delayed ? mem_address[($clog2(MEM_WIDTH) - 1):0] : instruction_address[($clog2(MEM_WIDTH) - 1):0];
-        assign dataAi      = mem_data_write;
-        assign instruction = dataAo;
+        assign enA         = imem_ce || enable_ram_delayed;
+        assign weA         = enable_ram_delayed ? dmem_we : '0;
+        assign addrA       = enable_ram_delayed ? dmem_addr[($clog2(MEM_WIDTH) - 1):0] : imem_addr[($clog2(MEM_WIDTH) - 1):0];
+        assign dataAi      = dmem_dataW;
+        assign imem_data   = dataAo;
         assign data_ram    = dataAo;
 
-        assign enB         = 1'b0;
-        assign weB         = 4'h0000;
+        assign enB         = '0;
+        assign weB         = '0;
         assign addrB       = '0;
-        assign dataBi      = 32'h00000000;
+        assign dataBi      = '0;
 
-        assign busy        = enable_ram;
+        assign imem_busy   = dmem_ce;
     end
 
 //////////////////////////////////////////////////////////////////////////////
