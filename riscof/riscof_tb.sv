@@ -64,7 +64,7 @@ module riscof_tb
 
     /* Parameters used only when cache is on */
     /* verilator lint_off UNUSEDPARAM */
-    localparam write_mode_t WMODE = WRITE_THROUGH;
+    localparam write_mode_t WMODE = WRITE_BACK;
     localparam int CACHE_WIDTH    = 12;
     localparam int CACHE_OFF_W    = 6;
     localparam int MEM_ADDR_BITS  = $clog2(MEM_WIDTH);
@@ -489,9 +489,40 @@ module riscof_tb
         $finish();
     end
 
+    /* Cache-coherent signature read: a word is taken from the cache SRAM when it
+     * is currently resident (valid tag), otherwise from main memory. This is the
+     * value the core would observe, so it captures still-dirty write-back data. */
+    if (CACHE_EN) begin : gen_sig_word
+        function automatic logic [31:0] sig_word(input logic [31:0] a);
+            logic [MEM_ADDR_BITS-1:0]             ma;
+            logic [MEM_ADDR_BITS-CACHE_WIDTH-1:0] tg;
+            logic [CACHE_WIDTH-CACHE_OFF_W-1:0]   ix;
+            logic [CACHE_WIDTH-1:0]                cb;
+            ma = a[MEM_ADDR_BITS-1:0];
+            tg = ma[MEM_ADDR_BITS-1 -: MEM_ADDR_BITS-CACHE_WIDTH];
+            ix = ma[CACHE_WIDTH-1 -: CACHE_WIDTH-CACHE_OFF_W];
+            cb = ma[CACHE_WIDTH-1:0];
+            if (gen_cache_on.dcache_ctrl.entries[ix].valid &&
+                    gen_cache_on.dcache_ctrl.entries[ix].tag == tg)
+                return {gen_cache_on.dcache_sram.RAM[cb+3], gen_cache_on.dcache_sram.RAM[cb+2],
+                        gen_cache_on.dcache_sram.RAM[cb+1], gen_cache_on.dcache_sram.RAM[cb+0]};
+            else
+                return {RAM_MEM.RAM[ma+3], RAM_MEM.RAM[ma+2],
+                        RAM_MEM.RAM[ma+1], RAM_MEM.RAM[ma+0]};
+        endfunction
+    end
+    else begin : gen_sig_word
+        function automatic logic [31:0] sig_word(input logic [31:0] a);
+            logic [MEM_ADDR_BITS-1:0] ma;
+            ma = a[MEM_ADDR_BITS-1:0];
+            return {RAM_MEM.RAM[ma+3], RAM_MEM.RAM[ma+2],
+                    RAM_MEM.RAM[ma+1], RAM_MEM.RAM[ma+0]};
+        endfunction
+    end
+
     final begin
         for (int i = SIG_START; i < SIG_END; i=i+4)
-            $fwrite(fd, "%x\n", {RAM_MEM.RAM[i+3],RAM_MEM.RAM[i+2],RAM_MEM.RAM[i+1],RAM_MEM.RAM[i]});
+            $fwrite(fd, "%x\n", gen_sig_word.sig_word(i[31:0]));
         $fclose(fd);
         $display("# %t END OF SIMULATION",$time);
     end
