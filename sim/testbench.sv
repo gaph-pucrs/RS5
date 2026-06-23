@@ -19,6 +19,7 @@
  */
 
 `include "../rtl/RS5_pkg.sv"
+`include "../CacheControllers/rtl/DMPkg.sv"
 
 //////////////////////////////////////////////////////////////////////////////
 // CPU TESTBENCH
@@ -26,6 +27,7 @@
 
 module testbench
     import RS5_pkg::*;
+    import DMPkg::*;
 (
 );
 
@@ -46,7 +48,7 @@ module testbench
     localparam bit           BRANCHPRED      = 1'b1;
     localparam bit           FORWARDING      = 1'b1;
     localparam int           IQUEUE_SIZE     = 2;
-    localparam bit           DUALPORT_MEM    = 1'b0;
+    localparam bit           DUALPORT_MEM    = 1'b1;
     localparam int           RAM_DELAY_CYCLES= 0;
 
     localparam bit           VEnable         = 1'b0;
@@ -64,15 +66,17 @@ module testbench
     localparam int           MEM_ADDR_BITS   = 28;
     localparam string        BIN_FILE        = "../app/riscv-tests/test.bin";
 
-    localparam bit           ICACHE_EN       = 1'b1;
-    localparam bit           DCACHE_EN       = 1'b1;
+    localparam bit           ICACHE_EN       = 1'b0;
+    localparam bit           DCACHE_EN       = 1'b0;
 
     /* Parameters used only when cache is on */
     /* verilator lint_off UNUSEDPARAM */
     localparam int           ICACHE_WIDTH    = 12;
     localparam int           ICACHE_OFF_W    = 6;
+    localparam write_mode_t  IWRITE_MODE     = WRITE_THROUGH;
     localparam int           DCACHE_WIDTH    = 12;
     localparam int           DCACHE_OFF_W    = 6;
+    localparam write_mode_t  DWRITE_MODE     = WRITE_BACK;
     /* verilator lint_on UNUSEDPARAM */
 
     localparam int           i_cnt = 1;
@@ -230,10 +234,11 @@ module testbench
         logic [31:0]             icache_dataR;
         logic [31:0]             icache_dataW;
 
-        DMWTCtrl #(
+        DMCtrl #(
             .ADDR_WIDTH  (MEM_ADDR_BITS),
             .CACHE_WIDTH (ICACHE_WIDTH ),
-            .OFFSET_WIDTH(ICACHE_OFF_W )
+            .OFFSET_WIDTH(ICACHE_OFF_W ),
+            .WMODE       (IWRITE_MODE  )
         ) icache_ctrl (
             .clk         (clk                ),
             .rst_n       (reset_n            ),
@@ -287,17 +292,18 @@ module testbench
     if (DCACHE_EN) begin : gen_dcache_on
         logic                    dcache_ce;
         logic [3:0]              dcache_we;
-        logic [ICACHE_WIDTH-1:0] dcache_addr;
+        logic [DCACHE_WIDTH-1:0] dcache_addr;
         logic [31:0]             dcache_dataR;
         logic [31:0]             dcache_dataW;
 
         logic dcache_busy;
         assign stall = dcache_busy && enable_ram;
 
-        DMWTCtrl #(
+        DMCtrl #(
             .ADDR_WIDTH  (MEM_ADDR_BITS),
             .CACHE_WIDTH (DCACHE_WIDTH ),
-            .OFFSET_WIDTH(DCACHE_OFF_W )
+            .OFFSET_WIDTH(DCACHE_OFF_W ),
+            .WMODE       (DWRITE_MODE  )
         ) dcache_ctrl (
             .clk         (clk                ),
             .rst_n       (reset_n            ),
