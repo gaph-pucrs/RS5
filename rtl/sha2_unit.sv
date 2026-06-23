@@ -1,3 +1,20 @@
+/*!\file sha2_unit.sv
+ * RS5 VERSION - 1.1.0 - Pipeline Simplified and Core Renamed
+ *
+ * Distribution:  October 2023
+ *
+ * Vitor Balbinot Zanini <vitor.balbinot@edu.pucrs.br>
+ * Carlos Gewehr         <carlos.gewehr@edu.pucrs.br>
+ *
+ * Research group: GAPH-PUCRS  <>
+ *
+ * \brief
+ * Module to implement ZKNH instructions
+ *
+ * \detailed
+ * Module to implement ZKNH instructions
+ */
+
 module sha2_unit import RS5_pkg::*;  #(
     parameter LOGIC_GATING = 1  // Gate sub-module inputs to save toggling
 )(
