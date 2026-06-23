@@ -122,7 +122,17 @@ package RS5_pkg;
         ALU_ZIP,
         ALU_BREV8,
         ALU_REV8,
-        ALU_UNZIP
+        ALU_UNZIP,
+        SIG0H,
+        SIG0L,
+        SIG1H,
+        SIG1L,
+        SUM0R,
+        SUM1R,
+        SIG0, 
+        SIG1, 
+        SUM0,
+        SUM1
     } iType_e;
 
     typedef enum logic[1:0] {

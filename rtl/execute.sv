@@ -33,6 +33,7 @@ module execute
     parameter bit           COMPRESSED   = 1'b1,
     parameter bit           ZKNEEnable   = 1'b0,
     parameter bit           ZBKBEnable   = 1'b0,
+    parameter bit           ZKNHEnable   = 1'b0,
     parameter bit           ZICONDEnable = 1'b0,
     parameter bit           VEnable      = 1'b0,
     parameter int           VLEN         = 64,
@@ -479,6 +480,32 @@ module execute
     end
 
 //////////////////////////////////////////////////////////////////////////////
+// SHA2
+//////////////////////////////////////////////////////////////////////////////
+
+    logic [31:0] sha2_result;
+
+    if (ZKNHEnable) begin: zknh_gen_on
+        
+        logic sha2_en;
+
+        assign sha2_en = (instruction_operation_i inside {SIG0H,SIG0L,SIG1H,SIG1L,SUM0R,SUM1R,SIG0,SIG1,SUM0,SUM1});
+
+        sha2_unit #(
+            .LOGIC_GATING(1'b1)
+        ) u_sha2_unit (
+            .sha2_en_i(sha2_en),
+            .sha2_op_i(instruction_operation_i),
+            .op_a_i(first_operand),
+            .op_b_i(second_operand_i),
+            .sha2_result_o(sha2_result)
+        );
+    end
+    else begin : zknh_gen_off
+        assign sha2_result = '0;
+    end
+
+//////////////////////////////////////////////////////////////////////////////
 // Vector Extension
 //////////////////////////////////////////////////////////////////////////////
     logic [31:0] vector_scalar_result;
@@ -834,6 +861,8 @@ module execute
             VECTOR, VLOAD, VSTORE:          result = VEnable             ? vector_scalar_result                 : sum_result;
             CZERO_EQZ, CZERO_NEZ:           result = ZICONDEnable        ? result_zicond                        : sum_result;
             SC_W:                           result = (AMOEXT inside {AMO_ZALRSC, AMO_A}) ? {31'h0, lrsc_result} : sum_result;
+            SIG0H,SIG0L,SIG1H,SIG1L,SUM0R,
+            SUM1R,SIG0,SIG1,SUM0,SUM1:      result = (ZKNHEnable) ? sha2_result    : sum_result;
             ALU_ROR, ALU_ROL:               result = (ZBKBEnable) ? shift_result   : sum_result;
             ALU_PACK, ALU_PACKH:            result = (ZBKBEnable) ? pack_result    : sum_result; 
             ALU_XNOR, ALU_ORN, ALU_ANDN:    result = (ZBKBEnable) ? bwlogic_result : sum_result;

@@ -33,6 +33,7 @@ module decode
     parameter bit           COMPRESSED   = 1'b1,
     parameter bit           ZKNEEnable   = 1'b0,
     parameter bit           ZBKBEnable   = 1'b0,
+    parameter bit           ZKNHEnable   = 1'b0,
     parameter bit           ZICONDEnable = 1'b0,
     parameter bit           VEnable      = 1'b0,
     parameter bit           BRANCHPRED   = 1'b1,
@@ -153,6 +154,17 @@ module decode
         endcase
     end
 
+    iType_e sha2_type;
+    always_comb begin 
+        unique case (instruction_i[26:20])
+            7'b000_0010: sha2_type = SIG0; // sha256sig0
+            7'b000_0011: sha2_type = SIG1; // sha256sig1
+            7'b000_0000: sha2_type = SUM0; // sha256sum0
+            7'b000_0001: sha2_type = SUM1; // sha256sum1
+            default: sha2_type = INVALID;
+        endcase
+    end
+
 
     iType_e brev_op;
     always_comb begin
@@ -176,6 +188,7 @@ module decode
             10'b0100000101:     decode_op_imm = SRA;    /* SRAI */
             10'b???????110:     decode_op_imm = OR;     /* ORI */
             10'b???????111:     decode_op_imm = AND;    /* ANDI */
+            10'b00010??001:     decode_op_imm = (ZKNHEnable) ? sha2_type  : INVALID; 
             10'b01100??101:     decode_op_imm = (ZBKBEnable) ? ALU_ROR    : INVALID;  
             10'b0000100001:     decode_op_imm = (ZBKBEnable) ? ALU_ZIP    : INVALID;
             10'b01101??101:     decode_op_imm = (ZBKBEnable) ? brev_op    : INVALID;
@@ -209,6 +222,13 @@ module decode
             10'b??10011000:     decode_op = ZKNEEnable   ? AES32ESMI : INVALID;
             10'b0000111101:     decode_op = ZICONDEnable ? CZERO_EQZ : INVALID;
             10'b0000111111:     decode_op = ZICONDEnable ? CZERO_NEZ : INVALID;
+
+            10'b0101110000:     decode_op = ZKNHEnable   ? SIG0H : INVALID; //sha512sig0h 
+            10'b0101010000:     decode_op = ZKNHEnable   ? SIG0L : INVALID; //sha512sig0l 
+            10'b0101111000:     decode_op = ZKNHEnable   ? SIG1H : INVALID; //sha512sig1h
+            10'b0101011000:     decode_op = ZKNHEnable   ? SIG1L : INVALID; //sha512sig1l
+            10'b0101000000:     decode_op = ZKNHEnable   ? SUM0R : INVALID; //sha512sum0r
+            10'b0101001000:     decode_op = ZKNHEnable   ? SUM1R : INVALID; //sha512sum1r
             // ZBKB ALU Operations
             10'b0110000001:     decode_op = (ZBKBEnable) ? ALU_ROL   : INVALID;
             10'b0110000101:     decode_op = (ZBKBEnable) ? ALU_ROR   : INVALID; 
