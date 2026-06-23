@@ -42,6 +42,7 @@ module testbench
     localparam bit           USE_ZKNE        = 1'b1;
     localparam bit           USE_ZICOND      = 1'b1;
     localparam bit           USE_ZCB         = 1'b1;
+    localparam bit           USE_ZBKB        = 1'b0;
     localparam bit           USE_HPMCOUNTER  = 1'b1;
     localparam bit           BRANCHPRED      = 1'b1;
     localparam bit           FORWARDING      = 1'b1;
@@ -167,6 +168,7 @@ module testbench
         .ZKNEEnable      (USE_ZKNE      ),
         .ZICONDEnable    (USE_ZICOND    ),
         .ZCBEnable       (USE_ZCB       ),
+        .ZBKBEnable      (USE_ZBKB      ),
         .HPMCOUNTEREnable(USE_HPMCOUNTER),
         .IQUEUE_SIZE     (IQUEUE_SIZE   ),
         .BRANCHPRED      (BRANCHPRED    ),
