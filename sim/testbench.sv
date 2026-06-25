@@ -39,10 +39,10 @@ module testbench
     localparam atomic_e      AMOEXT          = AMO_A;
     localparam bit           COMPRESSED      = 1'b1;
     localparam bit           USE_XOSVM       = 1'b0;
-    localparam bit           USE_ZKNE        = 1'b1;
-    localparam bit           USE_ZICOND      = 1'b1;
-    localparam bit           USE_ZCB         = 1'b1;
-    localparam bit           USE_ZBKB        = 1'b0;
+    localparam bit           USE_ZKNE        = 1'b0;
+    localparam bit           USE_ZICOND      = 1'b0;
+    localparam bit           USE_ZCB         = 1'b0;
+    localparam bit           USE_ZBKB        = 1'b1;
     localparam bit           USE_ZKNH        = 1'b0;
     localparam bit           USE_HPMCOUNTER  = 1'b1;
     localparam bit           BRANCHPRED      = 1'b1;
