@@ -169,8 +169,8 @@ module decode
     iType_e brev_op;
     always_comb begin
         unique case (instruction_i[26:20])
-            7'b000_0111: brev_op = ALU_BREV8;  // brev8: imm[11:5] = 0000111
-            7'b001_1000: brev_op = ALU_REV8;   // rev8:  imm[11:5] = 0110100  
+            7'b000_0111: brev_op = ALU_BREV8;  // brev8: imm[6:0] = 0000111 (imm = 0x687)
+            7'b001_1000: brev_op = ALU_REV8;   // rev8:  imm[6:0] = 0011000 (imm = 0x698)
             default:     brev_op = INVALID;
         endcase
     end
