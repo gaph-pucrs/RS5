@@ -199,8 +199,7 @@ module testbench
 // RAM
 //////////////////////////////////////////////////////////////////////////////
 
-    //localparam int MEM_WIDTH = 1 << MEM_ADDR_BITS;
-    localparam int MEM_WIDTH = 131072;
+    localparam int MEM_WIDTH = 1 << MEM_ADDR_BITS;
 
 
     logic                             enA;
