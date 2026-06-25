@@ -18,10 +18,10 @@
 `include "RS5_pkg.sv"
 
 module sha2_unit 
+    import RS5_pkg::*;
 #(
     parameter LOGIC_GATING = 1  // Gate sub-module inputs to save toggling
 )
-    import RS5_pkg::*;
 (
     input  logic       sha2_en_i,
     input  iType_e     sha2_op_i,
