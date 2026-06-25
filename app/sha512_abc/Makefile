@@ -1,5 +1,5 @@
-MEM_SIZE = 131072
-#MEM_SIZE = 65536
-ARCH     = rv32imc_zicsr_zkne_zknh
+MEM_SIZE = 65536
+ARCH     = rv32imac_zicsr_zknh
+# ARCH     = rv32imac_zicsr
 
 include ../common/common.mk
