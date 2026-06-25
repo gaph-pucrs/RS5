@@ -188,7 +188,7 @@ module decode
             10'b0100000101:     decode_op_imm = SRA;    /* SRAI */
             10'b???????110:     decode_op_imm = OR;     /* ORI */
             10'b???????111:     decode_op_imm = AND;    /* ANDI */
-            10'b00010??001:     decode_op_imm = (ZKNHEnable) ? sha2_type  : INVALID; 
+            10'b0001000001:     decode_op_imm = (ZKNHEnable) ? sha2_type  : INVALID; 
             10'b01100??101:     decode_op_imm = (ZBKBEnable) ? ALU_ROR    : INVALID;  
             10'b0000100001:     decode_op_imm = (ZBKBEnable) ? ALU_ZIP    : INVALID;
             10'b01101??101:     decode_op_imm = (ZBKBEnable) ? brev_op    : INVALID;
