@@ -74,6 +74,7 @@ Extensions are enabled via parameters in [../rtl/RS5.sv](../../rtl/RS5.sv).
 | Zihpm | `HPMCOUNTEREnable = 1` | Hardware performance-monitoring counters | — |
 | Zbkb | `ZBKBEnable = 1` | Bit-manipulation for cryptography | — |
 | Zkne | `ZKNEEnable = 1` | AES encryption (scalar, 32-bit) | — |
+| Zknh | `ZKNHEnable = 1` | SHA2 hash function instructions | — |
 | Zve32x | `VEnable = 1` | Vector extension (configurable VLEN, LLEN) | — |
 | Xosvm | `XOSVMEnable = 1` | Offset and size virtual memory (non-standard) | [Xosvm.md](extensions/Xosvm.md) |
 

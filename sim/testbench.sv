@@ -39,10 +39,11 @@ module testbench
     localparam atomic_e      AMOEXT          = AMO_A;
     localparam bit           COMPRESSED      = 1'b1;
     localparam bit           USE_XOSVM       = 1'b0;
-    localparam bit           USE_ZKNE        = 1'b1;
-    localparam bit           USE_ZICOND      = 1'b1;
-    localparam bit           USE_ZCB         = 1'b1;
-    localparam bit           USE_ZBKB        = 1'b0;
+    localparam bit           USE_ZKNE        = 1'b0;
+    localparam bit           USE_ZICOND      = 1'b0;
+    localparam bit           USE_ZCB         = 1'b0;
+    localparam bit           USE_ZBKB        = 1'b1;
+    localparam bit           USE_ZKNH        = 1'b0;
     localparam bit           USE_HPMCOUNTER  = 1'b1;
     localparam bit           BRANCHPRED      = 1'b1;
     localparam bit           FORWARDING      = 1'b1;
@@ -169,6 +170,7 @@ module testbench
         .ZICONDEnable    (USE_ZICOND    ),
         .ZCBEnable       (USE_ZCB       ),
         .ZBKBEnable      (USE_ZBKB      ),
+        .ZKNHEnable      (USE_ZKNH      ),
         .HPMCOUNTEREnable(USE_HPMCOUNTER),
         .IQUEUE_SIZE     (IQUEUE_SIZE   ),
         .BRANCHPRED      (BRANCHPRED    ),
@@ -198,6 +200,7 @@ module testbench
 //////////////////////////////////////////////////////////////////////////////
 
     localparam int MEM_WIDTH = 1 << MEM_ADDR_BITS;
+
 
     logic                             enA;
     logic [BUS_WIDTH/8-1:0]           weA;

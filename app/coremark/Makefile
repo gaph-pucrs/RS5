@@ -1,6 +1,6 @@
 TRIPLET = riscv64-elf
 CC = $(TRIPLET)-gcc
-CFLAGS = -IbareOS/include -O2 -fno-builtin -march=rv32im -fdata-sections -ffunction-sections -mabi=ilp32 -nostdinc -mbranch-cost=7 -DITERATIONS=1 -DCORE_DEBUG=0
+CFLAGS = -O2 -fno-builtin -march=rv32im -fdata-sections -ffunction-sections -mabi=ilp32 -nostdinc -mbranch-cost=7 -DITERATIONS=1 -DCORE_DEBUG=0
 AS = $(TRIPLET)-as
 ASFLAGS = -march=rv32im_zicsr -mabi=ilp32
 CPP = $(TRIPLET)-g++

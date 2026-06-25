@@ -98,6 +98,8 @@ class rs5(pluginTemplate):
             self.verilatecmd += " -GZCBEnable=1\\'b1"
         if "Zbkb" in ispec["ISA"]:
             self.verilatecmd += " -GZBKBEnable=1\\'b1"
+        if "Zknh" in ispec["ISA"]:
+            self.verilatecmd += " -GZKNHEnable=1\\'b1"
 
         self.verilatecmd += " -GBRANCHPRED=1\\'b" + os.environ["BRANCHPRED"]
         self.verilatecmd += " -GFORWARDING=1\\'b" + os.environ["FORWARDING"]
