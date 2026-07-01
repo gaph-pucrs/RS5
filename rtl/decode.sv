@@ -34,6 +34,7 @@ module decode
     parameter bit           ZKNEEnable   = 1'b0,
     parameter bit           ZBKBEnable   = 1'b0,
     parameter bit           ZKNHEnable   = 1'b0,
+    parameter bit           XKYBEREnable = 1'b1,
     parameter bit           ZICONDEnable = 1'b0,
     parameter bit           VEnable      = 1'b0,
     parameter bit           BRANCHPRED   = 1'b1,
@@ -241,6 +242,22 @@ module decode
         endcase
     end
 
+    iType_e decode_xkyber;
+    always_comb begin
+        
+        unique case (funct7)
+
+          7'd0: decode_xkyber = KYBER_ADD;
+          7'd1: decode_xkyber = KYBER_SUB;
+          7'd2: decode_xkyber = KYBER_MUL;
+          7'd3: decode_xkyber = KYBER_COMPRESS;
+          7'd4: decode_xkyber = (instruction_i[24:20] == 5'd3) ? KYBER_CBD3 : KYBER_CBD2;
+          default: decode_xkyber = SLTU;
+
+        endcase
+
+    end
+
     iType_e decode_misc_mem;
     always_comb begin
         unique case (funct3)
@@ -332,6 +349,7 @@ module decode
             5'b00001: instruction_operation = VEnable ? VLOAD  : INVALID; /* LOAD-FP */
             5'b01001: instruction_operation = VEnable ? VSTORE : INVALID; /* STORE-FP */
             5'b01011: instruction_operation = decode_atomic;
+            5'b01010: instruction_operation = XKYBEREnable ? decode_xkyber : INVALID; 
             default:  instruction_operation = INVALID;
         endcase
     end

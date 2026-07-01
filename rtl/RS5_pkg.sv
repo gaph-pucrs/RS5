@@ -132,7 +132,13 @@ package RS5_pkg;
         SIG0, 
         SIG1, 
         SUM0,
-        SUM1
+        SUM1,
+        KYBER_ADD, 
+        KYBER_SUB,
+        KYBER_CBD2,
+        KYBER_CBD3, 
+        KYBER_MUL, 
+        KYBER_COMPRESS
     } iType_e;
 
     typedef enum logic[1:0] {
