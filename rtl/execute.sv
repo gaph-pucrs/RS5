@@ -373,87 +373,125 @@ module execute
 /////////////////////////////////////////////////////////////////////////////
 // Multiplication signals
 //////////////////////////////////////////////////////////////////////////////
+
     logic [31:0] mul_result;
     logic        hold_mul;
     logic        hold_div;
 
 
-    logic [31:0] multdiv_alu_operand_a;
-    logic [31:0] multdiv_alu_operand_b;
+/////////////////////////////////////////////////////////////////////////////
+// Xkyber signals
+//////////////////////////////////////////////////////////////////////////////
+
+    logic hold_xkyber;
+    logic [31:0] xkyber_result;
 
     logic is_xkyber;
 
-    if (MULEXT != MUL_OFF) begin : gen_zmmul_on
+    assign is_xkyber = (instruction_operation_i inside {KYBER_ADD, KYBER_SUB,KYBER_CBD2, KYBER_CBD3, KYBER_MUL, KYBER_COMPRESS});
 
-            logic [2:0]  cbd_result_high;
-            logic [2:0]  cbd_result_low;
+    logic [15:0] mult_kyber_op_a, mult_kyber_op_b;
 
-            logic [1:0] signed_mode_mul;
-            logic       enable_mul;
-            logic       mul_low;
+    logic [31:0] xkyber_alu_operand_a, xkyber_alu_operand_b;
 
-            always_comb begin
-                unique case (instruction_operation_i)
-                    MULH:    signed_mode_mul = 2'b11;
-                    MULHSU:  signed_mode_mul = 2'b01;
-                    default: signed_mode_mul = 2'b00;
-                endcase
-            end
+    if (XKYBEREnable) begin : gen_xkyber_on
 
-            logic eta_is_3;
-            assign eta_is_3 = (instruction_operation_i == KYBER_CBD3);
+        logic [2:0]  cbd_result_high;
+        logic [2:0]  cbd_result_low;
 
-            assign cbd_result_high = eta_is_3 ? (first_operand[6] + first_operand[7] + first_operand[8]) - (first_operand[9] + first_operand[10] + first_operand[11]) : 
-                                        (first_operand[4] + first_operand[5])                  - (first_operand[6] + first_operand[7]);
+        logic       enable_xkyber;
 
-            assign cbd_result_low = eta_is_3 ? (first_operand[0] + first_operand[1] + first_operand[2]) - (first_operand[3] + first_operand[4] + first_operand[5]) : 
-                                       (first_operand[0] + first_operand[1])                  - (first_operand[2] + first_operand[3]);
+        logic eta_is_3;
+        assign eta_is_3 = (instruction_operation_i == KYBER_CBD3);
 
-            logic [3:0] kyber_compress_bits;
+        assign cbd_result_high = eta_is_3 ? (first_operand[6] + first_operand[7] + first_operand[8]) - (first_operand[9] + first_operand[10] + first_operand[11]) : 
+                                    (first_operand[4] + first_operand[5])                  - (first_operand[6] + first_operand[7]);
 
-            assign kyber_compress_bits = second_operand_i[3:0] & {4{instruction_operation_i == KYBER_COMPRESS}};
+        assign cbd_result_low = eta_is_3 ? (first_operand[0] + first_operand[1] + first_operand[2]) - (first_operand[3] + first_operand[4] + first_operand[5]) : 
+                                    (first_operand[0] + first_operand[1])                  - (first_operand[2] + first_operand[3]);
 
-            assign mul_low    = (instruction_operation_i == MUL);
+        logic [3:0] kyber_compress_bits;
 
-            assign is_xkyber  = (instruction_operation_i inside {KYBER_ADD, KYBER_SUB,KYBER_CBD2, KYBER_CBD3, KYBER_MUL, KYBER_COMPRESS});
+        assign kyber_compress_bits = second_operand_i[3:0] & {4{instruction_operation_i == KYBER_COMPRESS}};
 
-            assign enable_mul = (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU, KYBER_MUL, KYBER_COMPRESS});
+        assign enable_xkyber = (instruction_operation_i inside {KYBER_MUL, KYBER_COMPRESS});
 
-            mul mul1 (
-                .clk                   (clk),
-                .reset_n               (reset_n),
-                .stall                 (stall),
-                .alu_adder_i           (sum_result),
-                .operator_i            (instruction_operation_i),
-                .is_xkyber_i           (is_xkyber),
-                .first_operand_i       (rs1_data_i),
-                .second_operand_i      (rs2_data_i),
-                .signed_mode_i         (signed_mode_mul),
-                .enable_i              (enable_mul),
-                .mul_low_i             (mul_low),
-                .hold_o                (hold_mul),
-                .single_cycle_i        (1'b0),
-                .alu_operand_a_kyber   (multdiv_alu_operand_a),
-                .alu_operand_b_kyber   (multdiv_alu_operand_b),
-                .alu_cbd_high_i        (cbd_result_high),
-                .alu_cbd_low_i         (cbd_result_low),
-                .kyber_compress_bits_i (kyber_compress_bits),
-                .result_o              (mul_result)
-            );            
-        end
-
-    else begin : gen_zmmul_off
-        assign hold_mul   = 1'b0;
-        assign mul_result = '0;
+        xkyber xkyber1 (
+            .clk                   (clk),
+            .reset_n               (reset_n),
+            .stall                 (stall),
+            .alu_adder_i           (sum_result),
+            .operator_i            (instruction_operation_i),
+            .first_operand_i       (rs1_data_i),
+            .second_operand_i      (rs2_data_i),
+            .is_xkyber_i           (is_xkyber),
+            .enable_i              (enable_xkyber),
+            .hold_o                (hold_xkyber),
+            .single_cycle_i        (1'b0),
+            .alu_operand_a_kyber   (xkyber_alu_operand_a),
+            .alu_operand_b_kyber   (xkyber_alu_operand_b),
+            .result_mul_i          (mul_result),
+            .alu_cbd_high_i        (cbd_result_high),
+            .alu_cbd_low_i         (cbd_result_low),
+            .mult_kyber_op_a       (mult_kyber_op_a),
+            .mult_kyber_op_b       (mult_kyber_op_b),
+            .kyber_compress_bits_i (kyber_compress_bits),
+            .result_o              (xkyber_result)
+        );     
+    end
+    else begin : gen_xkyber_off
+        assign hold_xkyber   = 1'b0;
+        assign xkyber_result = '0;
     end
 
     always_comb begin
         unique case (instruction_operation_i)
-            KYBER_SUB, KYBER_MUL, KYBER_COMPRESS: sum2_opB = multdiv_alu_operand_b;
+            KYBER_SUB, KYBER_MUL, KYBER_COMPRESS: sum2_opB = xkyber_alu_operand_b;
             SUB:       sum2_opB = -second_operand_i;
             default:   sum2_opB =  second_operand_i; // AMO_W
         endcase
     end
+
+    if (MULEXT != MUL_OFF) begin : gen_zmmul_on
+        logic [1:0] signed_mode_mul;
+        logic       enable_mul;
+        logic       mul_low;
+
+        always_comb begin
+            unique case (instruction_operation_i)
+                MULH:    signed_mode_mul = 2'b11;
+                MULHSU:  signed_mode_mul = 2'b01;
+                default: signed_mode_mul = 2'b00;
+            endcase
+        end
+
+        assign enable_mul = (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU});
+        assign mul_low    = (instruction_operation_i == MUL);
+
+        logic [31:0] mul_first_operand, mul_second_operand;
+
+        assign mul_first_operand  = (is_xkyber) ? mult_kyber_op_a : rs1_data_i;
+        assign mul_second_operand = (is_xkyber) ? mult_kyber_op_b : rs2_data_i; 
+
+        mul mul1 (
+            .clk              (clk),
+            .reset_n          (reset_n),
+            .stall            (stall),
+            .first_operand_i  (mul_first_operand),
+            .second_operand_i (mul_second_operand),
+            .signed_mode_i    (signed_mode_mul),
+            .enable_i         (enable_mul),
+            .mul_low_i        (mul_low),
+            .hold_o           (hold_mul),
+            .single_cycle_i   (1'b0),
+            .result_o         (mul_result)
+        );
+    end
+    else begin : gen_zmmul_off
+        assign hold_mul   = 1'b0;
+        assign mul_result = '0;
+    end    
+
 
 /////////////////////////////////////////////////////////////////////////////
 // Division
@@ -701,13 +739,13 @@ module execute
                 .opA_o             (amo_operand            )
             );
 
-            assign first_operand = (instruction_operation_i == AMO_W) ? amo_operand : ((is_xkyber) ? multdiv_alu_operand_a  : rs1_data_i);
+            assign first_operand = (instruction_operation_i == AMO_W) ? amo_operand : ((is_xkyber) ? xkyber_alu_operand_a  : rs1_data_i);
         end
         else begin : gen_zaamo_off
             assign amo_hold             = 1'b0;
             assign amo_mem_read_enable  = 1'b0;
             assign amo_mem_write_enable = 1'b0;
-            assign first_operand        = (is_xkyber) ? multdiv_alu_operand_a  : rs1_data_i;
+            assign first_operand        = (is_xkyber) ? xkyber_alu_operand_a  : rs1_data_i;
             assign amo_operand          = '0;
             assign amo_write_enable     = 1'b0;
         end
@@ -718,7 +756,7 @@ module execute
         assign atomic_mem_write_enable = lrsc_mem_write_enable || amo_mem_write_enable;
     end
     else begin : gen_atomic_off
-        assign first_operand           = (is_xkyber) ? multdiv_alu_operand_a  : rs1_data_i;
+        assign first_operand           = (is_xkyber) ? xkyber_alu_operand_a  : rs1_data_i;
         assign amo_operand             = '0;
         assign atomic_hold             = 1'b0;
         assign atomic_mem_read_enable  = 1'b0;
@@ -899,14 +937,14 @@ module execute
             CZERO_EQZ, CZERO_NEZ:                   result = ZICONDEnable        ? result_zicond                        : sum_result;
             SC_W:                                   result = (AMOEXT inside {AMO_ZALRSC, AMO_A}) ? {31'h0, lrsc_result} : sum_result;
             SIG0H,SIG0L,SIG1H,SIG1L,SUM0R,
-            SUM1R,SIG0,SIG1,SUM0,SUM1:              result = (ZKNHEnable) ? sha2_result    : sum_result;
-            ALU_ROR, ALU_ROL:                       result = (ZBKBEnable) ? shift_result   : sum_result;
-            ALU_PACK, ALU_PACKH:                    result = (ZBKBEnable) ? pack_result    : sum_result; 
-            ALU_XNOR, ALU_ORN, ALU_ANDN:            result = (ZBKBEnable) ? bwlogic_result : sum_result;
-            ALU_REV8, ALU_BREV8:                    result = (ZBKBEnable) ? rev_result     : sum_result;
-            ALU_ZIP, ALU_UNZIP:                     result = (ZBKBEnable) ? shuffle_result : sum_result;        
+            SUM1R,SIG0,SIG1,SUM0,SUM1:              result = (ZKNHEnable)   ? sha2_result    : sum_result;
+            ALU_ROR, ALU_ROL:                       result = (ZBKBEnable)   ? shift_result   : sum_result;
+            ALU_PACK, ALU_PACKH:                    result = (ZBKBEnable)   ? pack_result    : sum_result; 
+            ALU_XNOR, ALU_ORN, ALU_ANDN:            result = (ZBKBEnable)   ? bwlogic_result : sum_result;
+            ALU_REV8, ALU_BREV8:                    result = (ZBKBEnable)   ? rev_result     : sum_result;
+            ALU_ZIP, ALU_UNZIP:                     result = (ZBKBEnable)   ? shuffle_result : sum_result;        
             KYBER_ADD, KYBER_SUB, KYBER_CBD2, 
-            KYBER_CBD3, KYBER_MUL, KYBER_COMPRESS:  result = (XKYBEREnable)      ? mul_result : sum_result;  
+            KYBER_CBD3, KYBER_MUL, KYBER_COMPRESS:  result = (XKYBEREnable) ? xkyber_result  : sum_result;  
             default:                                result = sum_result;
         endcase
     end
@@ -939,7 +977,7 @@ module execute
 // Output Registers
 ////////////////////////////////////////////////////////////////////////////////
 
-    assign hold_o = (hold_div || hold_mul || hold_vector || atomic_hold) && !exc_load_access_fault_i;
+    assign hold_o = (hold_div || hold_mul  || hold_xkyber || hold_vector || atomic_hold) && !exc_load_access_fault_i;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
