@@ -127,11 +127,9 @@ module mul
 
     always_comb begin
         unique case (mul_state)
-            ALBL,
-            AHBH:    mac_result_partial = mac_result;
             ALBH,
             AHBL:    mac_result_partial = mul_low_i ? {3'b0, mac_result[15:0], mac_result_r} : mac_result;
-            default: mac_result_partial = '0;
+            default: mac_result_partial = mac_result;
         endcase
     end
 
