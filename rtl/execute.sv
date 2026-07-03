@@ -193,11 +193,11 @@ module execute
         endcase
     end
 
-        always_comb begin
+    always_comb begin
         unique case (instruction_operation_i)
-            KYBER_SUB, KYBER_MUL, KYBER_COMPRESS: sum2_opB = (XKYBEREnable) ? xkyber_alu_operand_b : second_operand_i;
-            SUB:                                  sum2_opB = -second_operand_i;
-            default:                              sum2_opB =  second_operand_i; // AMO_W
+            KYBER_SUB, KYBER_MUL, KYBER_COMPRESS:   sum2_opB = (XKYBEREnable) ? xkyber_alu_operand_b : second_operand_i;
+            SUB:                                    sum2_opB = -second_operand_i;
+            default:                                sum2_opB =  second_operand_i; // AMO_W
         endcase
     end
 
