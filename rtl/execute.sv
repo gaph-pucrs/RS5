@@ -180,6 +180,27 @@ module execute
     assign srl_result              = rs1_data_i >> second_operand_i[4:0];
     assign sra_result              = $signed(rs1_data_i) >>> second_operand_i[4:0];
 
+    logic [31:0] amo_operand;
+
+    logic [31:0] xkyber_alu_operand_a, xkyber_alu_operand_b;
+
+    always_comb begin
+        unique case (instruction_operation_i)
+            AMO_W:                                  first_operand = (AMOEXT != AMO_ZALRSC) ? amo_operand : rs1_data_i;
+            KYBER_ADD, KYBER_SUB, KYBER_CBD2, 
+            KYBER_CBD3, KYBER_MUL, KYBER_COMPRESS:  first_operand = (XKYBEREnable) ? xkyber_alu_operand_a : rs1_data_i;
+            default:                                first_operand = rs1_data_i;
+        endcase
+    end
+
+        always_comb begin
+        unique case (instruction_operation_i)
+            KYBER_SUB, KYBER_MUL, KYBER_COMPRESS: sum2_opB = (XKYBEREnable) ? xkyber_alu_operand_b : second_operand_i;
+            SUB:                                  sum2_opB = -second_operand_i;
+            default:                              sum2_opB =  second_operand_i; // AMO_W
+        endcase
+    end
+
     /* Muxed operators */
     assign sum_result              = first_operand + sum2_opB;
     assign and_result              = first_operand & second_operand_i;
@@ -195,8 +216,6 @@ module execute
 //////////////////////////////////////////////////////////////////////////////
 // Load/Store signals
 //////////////////////////////////////////////////////////////////////////////
-
-    logic [31:0] amo_operand;
 
     /* verilator lint_off UNUSEDSIGNAL */
     logic [31:0] mem_address_vector;
@@ -392,8 +411,6 @@ module execute
 
     logic [15:0] mult_kyber_op_a, mult_kyber_op_b;
 
-    logic [31:0] xkyber_alu_operand_a, xkyber_alu_operand_b;
-
     if (XKYBEREnable) begin : gen_xkyber_on
 
         logic [2:0]  cbd_result_high;
@@ -444,15 +461,7 @@ module execute
         assign xkyber_result = '0;
     end
 
-    always_comb begin
-        unique case (instruction_operation_i)
-            KYBER_SUB, KYBER_MUL, KYBER_COMPRESS: sum2_opB = xkyber_alu_operand_b;
-            SUB:       sum2_opB = -second_operand_i;
-            default:   sum2_opB =  second_operand_i; // AMO_W
-        endcase
-    end
-
-    if (MULEXT != MUL_OFF) begin : gen_zmmul_on
+    if ((MULEXT != MUL_OFF) || XKYBEREnable) begin : gen_zmmul_on
         logic [1:0] signed_mode_mul;
         logic       enable_mul;
         logic       mul_low;
@@ -739,13 +748,11 @@ module execute
                 .opA_o             (amo_operand            )
             );
 
-            assign first_operand = (instruction_operation_i == AMO_W) ? amo_operand : ((is_xkyber) ? xkyber_alu_operand_a  : rs1_data_i);
         end
         else begin : gen_zaamo_off
             assign amo_hold             = 1'b0;
             assign amo_mem_read_enable  = 1'b0;
             assign amo_mem_write_enable = 1'b0;
-            assign first_operand        = (is_xkyber) ? xkyber_alu_operand_a  : rs1_data_i;
             assign amo_operand          = '0;
             assign amo_write_enable     = 1'b0;
         end
@@ -756,7 +763,6 @@ module execute
         assign atomic_mem_write_enable = lrsc_mem_write_enable || amo_mem_write_enable;
     end
     else begin : gen_atomic_off
-        assign first_operand           = (is_xkyber) ? xkyber_alu_operand_a  : rs1_data_i;
         assign amo_operand             = '0;
         assign atomic_hold             = 1'b0;
         assign atomic_mem_read_enable  = 1'b0;
