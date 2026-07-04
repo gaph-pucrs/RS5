@@ -349,7 +349,6 @@ module RS5
         .second_operand_i        (second_operand_execute       ),
         .jump_imm_target_i       (jump_imm_target_exec         ),
         .instruction_i           (instruction_execute          ),
-        .instruction_operation_i (instruction_operation_execute),
         .vector_operation_i      (vector_operation_execute     ),
 
         .exc_load_access_fault_i (load_access_fault            ),

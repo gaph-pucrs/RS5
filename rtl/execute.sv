@@ -62,7 +62,6 @@ module execute
     input   exec_ctrl_t             ctrl_i,
     input   logic [11:0]            csr_address_i,
     input   logic [31:0]            instruction_i,
-    input   iType_e                 instruction_operation_i,
     input   iTypeVector_e           vector_operation_i,
     /* verilator lint_on UNUSEDSIGNAL */
 
@@ -555,7 +554,7 @@ module execute
             .clk                    (clk),
             .reset_n                (reset_n),
             .instruction_i          (instruction_i),
-            .instruction_operation_i(instruction_operation_i),
+            .enable_i               (ctrl_i.is_vector),
             .vector_operation_i     (vector_operation_i),
             .op1_scalar_i           (rs1_data_i),
             .op2_scalar_i           (rs2_data_i),

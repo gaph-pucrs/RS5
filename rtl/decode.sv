@@ -441,6 +441,12 @@ module decode
                     default:             vector_operation = VNOP;
                 endcase
             end
+            else if (instruction_operation == VLOAD) begin
+                vector_operation = VLD;
+            end
+            else if (instruction_operation == VSTORE) begin
+                vector_operation = VST;
+            end
             else begin
                 vector_operation = VNOP;
             end

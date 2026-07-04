@@ -76,6 +76,9 @@ module fetch
     logic bp_taken_r;
     logic [31:0] iaddr_jumped;
 
+    logic jumping_r;
+    logic jump_misaligned_r;
+
     logic is_jumping;
     assign is_jumping = (jumping_r && !jump_rollback_i) || jump_misaligned_r;
 
@@ -298,8 +301,6 @@ module fetch
 ////////////////////////////////////////////////////////////////////////////////
 
     logic valid_r;
-    logic jumping_r;
-    logic jump_misaligned_r;
     logic compressed;
 
     always_ff @(posedge clk or negedge reset_n) begin

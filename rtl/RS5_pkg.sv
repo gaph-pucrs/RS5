@@ -422,7 +422,9 @@ package RS5_pkg;
         VMVXS,
         VMERGE,
         VSLIDE1UP,
-        VSLIDE1DOWN
+        VSLIDE1DOWN,
+        VLD,            // Vector load  (was iType_e VLOAD)
+        VST             // Vector store (was iType_e VSTORE)
     } iTypeVector_e;
 
 
