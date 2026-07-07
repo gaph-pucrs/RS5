@@ -34,7 +34,7 @@ module execute
     parameter bit           ZKNEEnable   = 1'b0,
     parameter bit           ZBKBEnable   = 1'b0,
     parameter bit           ZKNHEnable   = 1'b0,
-    parameter bit           XKYBEREnable = 1'b1,
+    parameter bit           XKYBEREnable = 1'b0,
     parameter bit           ZICONDEnable = 1'b0,
     parameter bit           VEnable      = 1'b0,
     parameter int           VLEN         = 64,
@@ -186,18 +186,30 @@ module execute
 
     always_comb begin
         unique case (instruction_operation_i)
-            AMO_W:                                  first_operand = (AMOEXT != AMO_ZALRSC) ? amo_operand : rs1_data_i;
-            KYBER_ADD, KYBER_SUB, KYBER_CBD2, 
-            KYBER_CBD3, KYBER_MUL, KYBER_COMPRESS:  first_operand = (XKYBEREnable) ? xkyber_alu_operand_a : rs1_data_i;
-            default:                                first_operand = rs1_data_i;
+            AMO_W:
+                first_operand = (AMOEXT inside {AMO_A, AMO_ZAAMO}) ? amo_operand : rs1_data_i;
+            KYBER_ADD, 
+            KYBER_SUB, 
+            KYBER_CBD2, 
+            KYBER_CBD3, 
+            KYBER_MUL, 
+            KYBER_COMPRESS:
+                first_operand = (XKYBEREnable) ? xkyber_alu_operand_a : rs1_data_i;
+            default:
+                first_operand = rs1_data_i;
         endcase
     end
 
     always_comb begin
         unique case (instruction_operation_i)
-            KYBER_SUB, KYBER_MUL, KYBER_COMPRESS:   sum2_opB = (XKYBEREnable) ? xkyber_alu_operand_b : second_operand_i;
-            SUB:                                    sum2_opB = -second_operand_i;
-            default:                                sum2_opB =  second_operand_i; // AMO_W
+            SUB:
+                sum2_opB = -second_operand_i;
+            KYBER_SUB, 
+            KYBER_MUL, 
+            KYBER_COMPRESS:
+                sum2_opB = (XKYBEREnable) ? xkyber_alu_operand_b : second_operand_i;
+            default:
+                sum2_opB = second_operand_i; // AMO_W
         endcase
     end
 
@@ -479,8 +491,8 @@ module execute
 
         logic [31:0] mul_first_operand, mul_second_operand;
 
-        assign mul_first_operand  = (is_xkyber) ? mult_kyber_op_a : rs1_data_i;
-        assign mul_second_operand = (is_xkyber) ? mult_kyber_op_b : rs2_data_i; 
+        assign mul_first_operand  = (XKYBEREnable && is_xkyber) ? mult_kyber_op_a : rs1_data_i;
+        assign mul_second_operand = (XKYBEREnable && is_xkyber) ? mult_kyber_op_b : rs2_data_i; 
 
         mul mul1 (
             .clk              (clk),

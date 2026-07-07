@@ -34,7 +34,7 @@ module decode
     parameter bit           ZKNEEnable   = 1'b0,
     parameter bit           ZBKBEnable   = 1'b0,
     parameter bit           ZKNHEnable   = 1'b0,
-    parameter bit           XKYBEREnable = 1'b1,
+    parameter bit           XKYBEREnable = 1'b0,
     parameter bit           ZICONDEnable = 1'b0,
     parameter bit           VEnable      = 1'b0,
     parameter bit           BRANCHPRED   = 1'b1,
