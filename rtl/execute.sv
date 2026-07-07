@@ -469,8 +469,12 @@ module execute
         );     
     end
     else begin : gen_xkyber_off
-        assign hold_xkyber   = 1'b0;
-        assign xkyber_result = '0;
+        assign hold_xkyber          = 1'b0;
+        assign xkyber_result        = '0;
+        assign mult_kyber_op_a      = '0;
+        assign mult_kyber_op_b      = '0;
+        assign xkyber_alu_operand_a = '0;
+        assign xkyber_alu_operand_b = '0;
     end
 
     if ((MULEXT != MUL_OFF) || XKYBEREnable) begin : gen_zmmul_on
@@ -491,8 +495,8 @@ module execute
 
         logic [31:0] mul_first_operand, mul_second_operand;
 
-        assign mul_first_operand  = (XKYBEREnable && is_xkyber) ? mult_kyber_op_a : rs1_data_i;
-        assign mul_second_operand = (XKYBEREnable && is_xkyber) ? mult_kyber_op_b : rs2_data_i; 
+        assign mul_first_operand  = (XKYBEREnable && is_xkyber) ? {16'b0, mult_kyber_op_a} : rs1_data_i;
+        assign mul_second_operand = (XKYBEREnable && is_xkyber) ? {16'b0, mult_kyber_op_b} : rs2_data_i; 
 
         mul mul1 (
             .clk              (clk),
