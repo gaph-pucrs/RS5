@@ -12,7 +12,9 @@ module xkyber
     input   logic        reset_n,
     input   logic        stall,
 
+    /* verilator lint_off UNUSEDSIGNAL */
     input   logic [31:0] alu_adder_i,
+    /* verilator lint_on UNUSEDSIGNAL */
 
     input   logic         is_xkyber_i,
 
@@ -27,8 +29,6 @@ module xkyber
     input   logic [31:0] second_operand_i,
 
     input   logic        enable_i,
-
-    input   logic        single_cycle_i,
 
     input   logic [31:0] result_mul_i,    
 
@@ -54,11 +54,11 @@ module xkyber
 
       unique case (kyber_compress_bits_i)
 
-        4'd4:    alu_adder_compress_shifted = alu_adder_i[23:0] >> (24 - 4 - 1);
-        4'd5:    alu_adder_compress_shifted = alu_adder_i[23:0] >> (24 - 5 - 1);
-        4'd10:   alu_adder_compress_shifted = alu_adder_i[23:0] >> (24 - 10 - 1);
-        4'd11:   alu_adder_compress_shifted = alu_adder_i[23:0] >> (24 - 11 - 1);
-        default: alu_adder_compress_shifted = alu_adder_i[23:0] >> (24 - 1 - 1);
+        4'd4:    alu_adder_compress_shifted = 13'(alu_adder_i[23:0] >> (24 - 4 - 1));
+        4'd5:    alu_adder_compress_shifted = 13'(alu_adder_i[23:0] >> (24 - 5 - 1));
+        4'd10:   alu_adder_compress_shifted = 13'(alu_adder_i[23:0] >> (24 - 10 - 1));
+        4'd11:   alu_adder_compress_shifted = 13'(alu_adder_i[23:0] >> (24 - 11 - 1));
+        default: alu_adder_compress_shifted = 13'(alu_adder_i[23:0] >> (24 - 1 - 1));
 
       endcase
 
@@ -79,7 +79,11 @@ module xkyber
     logic adjust_result_high_mux_sel;  // 0 for passthrough from ALU adder, 1 for "adjust_adder_high"
 
     logic[12:0] adjust_adder_low_op_a, adjust_adder_low_op_b;
+
+    /* verilator lint_off UNUSEDSIGNAL */
     logic[13:0] adjust_adder_low;
+    /* verilator lint_on UNUSEDSIGNAL */
+
     logic adjust_adder_low_carry_in;
     logic[11:0] adjust_result_low_mask;
     logic[11:0] adjust_result_low;
@@ -92,7 +96,7 @@ module xkyber
     assign adjust_adder_high_op_a = (operator_i inside {KYBER_CBD2, KYBER_CBD3}) ? {{10{alu_cbd_high_i[2]}}, alu_cbd_high_i} : alu_adder_i[28:16];
     assign adjust_adder_high_op_b = adjust_adder_op_b_inv ? (13'd3329 ^ {13{1'b1}}) : 13'd3329;
     assign adjust_adder_high_carry_in = adjust_adder_op_b_inv;
-    assign adjust_adder_high = adjust_adder_high_op_a + adjust_adder_high_op_b + adjust_adder_high_carry_in;
+    assign adjust_adder_high = adjust_adder_high_op_a + adjust_adder_high_op_b + 13'(adjust_adder_high_carry_in);
 
     // Select "adjust_adder" when:
     //  ALU subtraction underflows (meaning addition to 3329 brings result back to [0, 3328] range)
@@ -122,25 +126,25 @@ module xkyber
 
       unique case (kyber_compress_bits_i)
 
-        1: adjust_result_low_mask = 13'h001;
-        4: adjust_result_low_mask = 13'h00F;
-        5: adjust_result_low_mask = 13'h01F;
-        10: adjust_result_low_mask = 13'h3FF;
-        11: adjust_result_low_mask = 13'h7FF;
-        default: adjust_result_low_mask = 13'hFFF;
+        1: adjust_result_low_mask = 12'h001;
+        4: adjust_result_low_mask = 12'h00F;
+        5: adjust_result_low_mask = 12'h01F;
+        10: adjust_result_low_mask = 12'h3FF;
+        11: adjust_result_low_mask = 12'h7FF;
+        default: adjust_result_low_mask = 12'hFFF;
 
       endcase
 
     end
 
-    assign adjust_adder_low_op_a = (operator_i == KYBER_COMPRESS)              ? {2'b00, alu_adder_compress_shifted[12:1]} :
+    assign adjust_adder_low_op_a = (operator_i == KYBER_COMPRESS)              ? {1'b0, alu_adder_compress_shifted[12:1]} :
                                    (operator_i inside {KYBER_CBD2, KYBER_CBD3} ? {{10{alu_cbd_low_i[2]}}, alu_cbd_low_i} :
                                                                                              alu_adder_i[12:0]);
 
     // assign adjust_adder_low_op_b = (operator_i == KYBER_COMPRESS) ? 13'd0 : (adjust_adder_op_b_inv ? !(13'd3329): 13'd3329);
     assign adjust_adder_low_op_b = (operator_i == KYBER_COMPRESS) ? 13'd0 : (adjust_adder_op_b_inv ? (13'd3329 ^ {13{1'b1}}): 13'd3329);
     assign adjust_adder_low_carry_in = (operator_i == KYBER_COMPRESS) ? compress_carry_in : adjust_adder_op_b_inv;
-    assign adjust_adder_low = (adjust_adder_low_op_a + adjust_adder_low_op_b + adjust_adder_low_carry_in);
+    assign adjust_adder_low = (adjust_adder_low_op_a + adjust_adder_low_op_b + 13'(adjust_adder_low_carry_in));
 
     // Select "adjust_adder" when:
     //  ALU subtraction underflows (meaning addition to 3329 brings result back to [0, 3328] range)
@@ -291,14 +295,16 @@ module xkyber
 
 //kyber part!
 
+    /* verilator lint_off UNUSEDSIGNAL */
     logic [34:0] temp0;
+    /* verilator lint_on UNUSEDSIGNAL */
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin 
             temp0 <= '0;
         end else begin 
-            if (mul_state == L1_STAGE0_WAIT) temp0 <= result_mul_i; //in idle mac_res_d will hold the temp0 value
-            else if(is_compress && mul_state == L1_STAGE0_WAIT2) temp0 <= result_mul_i;
+            if (mul_state == L1_STAGE0_WAIT) temp0 <= {3'b000,result_mul_i}; //in idle mac_res_d will hold the temp0 value
+            else if(is_compress && mul_state == L1_STAGE0_WAIT2) temp0 <= {3'b000,result_mul_i};
         end
     end
 
@@ -308,23 +314,25 @@ module xkyber
         if (!reset_n) begin 
             temp1 <= '0;
         end else begin 
-            if (mul_state == L1_STAGE0_HIGH) temp1 <= ({2'b00, result_mul_i[20:0]} << 16) + temp1;
+            if (mul_state == L1_STAGE0_HIGH) temp1 <= (37'({2'b00, result_mul_i[20:0]}) << 16) + temp1;
             else begin
                 if(!is_compress) begin
-                    if (mul_state != KYBER_BARRETT_L2) temp1 <= {2'b00, result_mul_i};
+                    if (mul_state != KYBER_BARRETT_L2) temp1 <= {5'b00000, result_mul_i};
                 end
                 else begin 
-                    if (mul_state == L1_STAGE0_LOW) temp1 <= {2'b00, result_mul_i}; //testar se essa condição não funciona para o mul tbm
+                    if (mul_state == L1_STAGE0_LOW) temp1 <= {5'b00000, result_mul_i}; //testar se essa condição não funciona para o mul tbm
                 end
             end
         end
     end 
 
+    /* verilator lint_off UNUSEDSIGNAL */
     logic [31:0] second_operand_neg, second_value_sub;
+    /* verilator lint_on UNUSEDSIGNAL */
 
     assign second_operand_neg = second_operand_i ^ {32{1'b1}};
 
-    assign second_value_sub = {{3{1'b0}}, 13'(second_operand_neg[27:16] + 1), {3{1'b0}}, 13'(second_operand_neg[11:0] + 1)};
+    assign second_value_sub = {{3{1'b0}}, 13'(second_operand_neg[27:16] + 12'd1), {3{1'b0}}, 13'(second_operand_neg[11:0] + 12'd1)};
 
     logic [31:0] alu_operand_a_kyber_mul, alu_operand_b_kyber_mul;
 

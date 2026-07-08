@@ -433,11 +433,17 @@ module execute
         logic eta_is_3;
         assign eta_is_3 = (instruction_operation_i == KYBER_CBD3);
 
-        assign cbd_result_high = eta_is_3 ? (first_operand[6] + first_operand[7] + first_operand[8]) - (first_operand[9] + first_operand[10] + first_operand[11]) : 
-                                    (first_operand[4] + first_operand[5])                  - (first_operand[6] + first_operand[7]);
+        assign cbd_result_high = eta_is_3 ?
+            (3'(first_operand[6]) + 3'(first_operand[7]) + 3'(first_operand[8])) -
+            (3'(first_operand[9]) + 3'(first_operand[10]) + 3'(first_operand[11])) :
+            (3'(first_operand[4]) + 3'(first_operand[5])) -
+            (3'(first_operand[6]) + 3'(first_operand[7]));
 
-        assign cbd_result_low = eta_is_3 ? (first_operand[0] + first_operand[1] + first_operand[2]) - (first_operand[3] + first_operand[4] + first_operand[5]) : 
-                                    (first_operand[0] + first_operand[1])                  - (first_operand[2] + first_operand[3]);
+        assign cbd_result_low = eta_is_3 ?
+            (3'(first_operand[0]) + 3'(first_operand[1]) + 3'(first_operand[2])) -
+            (3'(first_operand[3]) + 3'(first_operand[4]) + 3'(first_operand[5])) :
+            (3'(first_operand[0]) + 3'(first_operand[1])) -
+            (3'(first_operand[2]) + 3'(first_operand[3]));
 
         logic [3:0] kyber_compress_bits;
 
@@ -456,7 +462,6 @@ module execute
             .is_xkyber_i           (is_xkyber),
             .enable_i              (enable_xkyber),
             .hold_o                (hold_xkyber),
-            .single_cycle_i        (1'b0),
             .alu_operand_a_kyber   (xkyber_alu_operand_a),
             .alu_operand_b_kyber   (xkyber_alu_operand_b),
             .result_mul_i          (mul_result),
