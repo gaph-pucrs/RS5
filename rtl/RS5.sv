@@ -544,6 +544,7 @@ module RS5
     `endif
         .HPMCOUNTEREnable(HPMCOUNTEREnable),
         .XOSVMEnable     (XOSVMEnable     ),
+        .XKYBEREnable    (XKYBEREnable    ),
         .COMPRESSED      (COMPRESSED      ),
         .MULEXT          (MULEXT          ),
         .VEnable         (VEnable         ),
