@@ -34,9 +34,9 @@ $(shell \
 
 SRCDIR  = src
 INCDIR  = $(SRCDIR)/include
-HEADERS = $(wildcard $(INCDIR)/*.h) $(wildcard $(COMMON_DIR)/include/*.h) $(wildcard $(COMMON_DIR)/include/tinycrypt/*.h)
+HEADERS = $(wildcard $(INCDIR)/*.h) $(wildcard $(COMMON_DIR)/include/*.h) $(wildcard $(COMMON_DIR)/include/tinycrypt/*.h) $(wildcard $(COMMON_DIR)/include/kyber_round3_ref/*.h)
 
-DEFS += -DTC_AES_256 -DRVK_ALGTEST_VERBOSE_SIO
+DEFS += -DTC_AES_256 -DRVK_ALGTEST_VERBOSE_SIO -DKYBER_K=2
 
 # Zkne -> AES_RISCV_ASM; without -> don't define
 DEFS += $(if $(findstring zkne,$(ARCH_LOWER)), -DAES_RISCV_ASM)
@@ -44,11 +44,15 @@ DEFS += $(if $(findstring zkne,$(ARCH_LOWER)), -DAES_RISCV_ASM)
 DEFS += $(if $(findstring zknh,$(ARCH_LOWER)), -DSHA256_ZKNH -DSHA512_ZKNH)
 # Zbkb -> assembler; without -> emulate
 DEFS += $(if $(findstring zbkb,$(ARCH_LOWER)), -DRVKINTRIN_ASSEMBLER, -DRVKINTRIN_EMULATE)
+# Xkyber -> assembler; without -> emulate
+DEFS += $(if $(findstring xkyber,$(ARCH_LOWER)), -DKYBER_ISE)
 
-CFLAGS  = -march=$(ARCH) -mabi=ilp32 -Os -fdata-sections -ffunction-sections -Wall -std=c23 -I$(INCDIR) -I$(COMMON_DIR)/include -I$(COMMON_DIR)/include/tinycrypt $(DEFS)
+ARCH := $(subst _xkyber,,$(ARCH))
+
+CFLAGS  = -march=$(ARCH) -mabi=ilp32 -Os -fdata-sections -ffunction-sections -Wall -std=c23 -I$(INCDIR) -I$(COMMON_DIR)/include -I$(COMMON_DIR)/include/tinycrypt -I$(COMMON_DIR)/include/kyber_round3_ref $(DEFS)
 LDFLAGS = --specs=nano.specs -T $(COMMON_DIR)/link.ld -Wl,--gc-sections -march=$(ARCH) -mabi=ilp32 -nostartfiles -lm -u _printf_float
 
-CCSRC = $(wildcard $(SRCDIR)/*.c) $(wildcard $(COMMON_DIR)/*.c) $(wildcard $(COMMON_DIR)/tinycrypt/*.c) $(wildcard $(COMMON_DIR)/keccak/*.c)
+CCSRC = $(wildcard $(SRCDIR)/*.c) $(wildcard $(COMMON_DIR)/*.c) $(wildcard $(COMMON_DIR)/tinycrypt/*.c) $(wildcard $(COMMON_DIR)/keccak/*.c) $(wildcard $(COMMON_DIR)/kyber_round3_ref/*.c)
 CCOBJ = $(patsubst %.c, %.o, $(CCSRC))
 
 ASSRC = $(wildcard $(SRCDIR)/*.S) $(wildcard $(COMMON_DIR)/*.S)

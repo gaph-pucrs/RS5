@@ -45,7 +45,7 @@
 | Multiply/divide extensions | M or Zmmul (multiply subset) |
 | Atomic extensions | A, Zalrsc (conditional subset), or Zaamo (AMO subset) |
 | Compressed extensions | C and Zcb (additional compressed) |
-| Cryptography | Zkne (AES), Zbkb (bit-manip), Zknh (SHA2) |
+| Cryptography | Zkne (AES), Zbkb (bit-manip), Zknh (SHA2), Xkyber(Kyber) |
 | Vector extension | Zve32x and Zvl64b subsets (configurable VLEN, LLEN) |
 | Non-standard | Xosvm (offset and size virtual memory support) |
 
