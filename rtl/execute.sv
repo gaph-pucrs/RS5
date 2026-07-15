@@ -428,8 +428,6 @@ module execute
         logic [2:0]  cbd_result_high;
         logic [2:0]  cbd_result_low;
 
-        logic       enable_xkyber;
-
         logic eta_is_3;
         assign eta_is_3 = (instruction_operation_i == KYBER_CBD3);
 
@@ -449,8 +447,6 @@ module execute
 
         assign kyber_compress_bits = second_operand_i[3:0] & {4{instruction_operation_i == KYBER_COMPRESS}};
 
-        assign enable_xkyber = (instruction_operation_i inside {KYBER_MUL, KYBER_COMPRESS});
-
         xkyber xkyber1 (
             .clk                   (clk),
             .reset_n               (reset_n),
@@ -460,7 +456,7 @@ module execute
             .first_operand_i       (rs1_data_i),
             .second_operand_i      (rs2_data_i),
             .is_xkyber_i           (is_xkyber),
-            .enable_i              (enable_xkyber),
+            .enable_i              (is_xkyber),
             .hold_o                (hold_xkyber),
             .alu_operand_a_kyber_o (xkyber_alu_operand_a),
             .alu_operand_b_kyber_o (xkyber_alu_operand_b),

@@ -167,14 +167,14 @@ int main() {
     int test_arith_fail_count    = 0;
     int test_compress_fail_count = 0;
 
-    //test_cbd_fail_count = test_cbd();
+    test_cbd_fail_count = test_cbd();
     test_arith_fail_count = test_arith();
-    //test_compress_fail_count = test_compress();
+    test_compress_fail_count = test_compress();
 
     printf("\n");
-    //printf("test_cbd() fail count: %d\n", test_cbd_fail_count);
+    printf("test_cbd() fail count: %d\n", test_cbd_fail_count);
     printf("test_arith() fail count: %d\n", test_arith_fail_count);
-    //printf("test_compress() fail count: %d\n", test_compress_fail_count);
+    printf("test_compress() fail count: %d\n", test_compress_fail_count);
 
     return test_cbd_fail_count + test_arith_fail_count + test_compress_fail_count;
 }
