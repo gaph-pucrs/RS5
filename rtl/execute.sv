@@ -449,7 +449,7 @@ module execute
 
         assign kyber_compress_bits = second_operand_i[3:0] & {4{instruction_operation_i == KYBER_COMPRESS}};
 
-        assign enable_xkyber = (instruction_operation_i inside {KYBER_ADD, KYBER_SUB,KYBER_CBD2, KYBER_CBD3, KYBER_MUL, KYBER_COMPRESS});
+        assign enable_xkyber = is_xkyber;
 
         xkyber xkyber1 (
             .clk                   (clk),
