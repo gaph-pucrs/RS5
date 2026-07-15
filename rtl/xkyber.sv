@@ -28,8 +28,6 @@ module xkyber
     input   logic [31:0] first_operand_i,
     input   logic [31:0] second_operand_i,
 
-    input   logic        enable_i,
-
     input   logic [31:0] result_mul_i,    
 
     output  logic [31:0] alu_operand_a_kyber_o,
@@ -236,7 +234,7 @@ module xkyber
     mul_states_e stage;
 
     always_comb begin
-        if(enable_i) begin
+        if(is_xkyber_i) begin
             unique case (operator_i)
                 KYBER_MUL: 
                     stage = L1_STAGE0_WAIT;
@@ -291,7 +289,7 @@ module xkyber
 
     logic xkyber_valid;
 
-    assign hold_o = enable_i && !xkyber_valid;
+    assign hold_o = is_xkyber_i && !xkyber_valid;
 
     // synthesis translate_off
 
