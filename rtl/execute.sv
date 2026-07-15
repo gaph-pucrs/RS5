@@ -456,7 +456,6 @@ module execute
             .first_operand_i       (rs1_data_i),
             .second_operand_i      (rs2_data_i),
             .is_xkyber_i           (is_xkyber),
-            .enable_i              (is_xkyber),
             .hold_o                (hold_xkyber),
             .alu_operand_a_kyber_o (xkyber_alu_operand_a),
             .alu_operand_b_kyber_o (xkyber_alu_operand_b),
