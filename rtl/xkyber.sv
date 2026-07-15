@@ -240,6 +240,7 @@ module xkyber
         if(enable_i) begin 
             if(operator_i == KYBER_MUL) stage = L1_STAGE0_WAIT; 
             else if(operator_i == KYBER_COMPRESS) stage = COMPRESS_STAGE0;
+            else if(operator_i inside {KYBER_ADD, KYBER_SUB, KYBER_CBD2, KYBER_CBD3}) stage = FINAL_STAGE_SUB_CBD_SUM_STAGE0;
         end
     end
 
