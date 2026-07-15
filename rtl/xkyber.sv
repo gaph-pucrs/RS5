@@ -423,7 +423,7 @@ module xkyber
         if (!reset_n) begin
             alu_operand_a_kyber_o <= '0;
             alu_operand_b_kyber_o <= '0;
-        end begin 
+        end else begin 
             alu_operand_a_kyber_o <= alu_operand_a_kyber;
             alu_operand_b_kyber_o <= alu_operand_b_kyber;
         end 
