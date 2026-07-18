@@ -26,7 +26,7 @@ module vectorUnit
     input   logic                  reset_n,
 
     input   logic [31:0]           instruction_i,
-    input   iType_e                instruction_operation_i,
+    input   logic                  enable_i,
     input   iTypeVector_e          vector_operation_i,
 
     input   logic [31:0]           op1_scalar_i,
@@ -54,6 +54,7 @@ module vectorUnit
     logic [10:0] zimm;
     logic        vm;
     opCat_e      opCat;
+    logic        op_vector, op_vload, op_vstore;
     logic        accumulate_instruction;
     logic        mask_instruction;
     logic        multiply_instruction;
@@ -107,12 +108,16 @@ module vectorUnit
     assign zimm     = {instruction_i[30:20]};
     assign opCat    = opCat_e'(instruction_i[14:12]);
 
+    assign op_vload  = enable_i && (vector_operation_i == VLD);
+    assign op_vstore = enable_i && (vector_operation_i == VST);
+    assign op_vector = enable_i && !(vector_operation_i == VLD) && !(vector_operation_i == VST);
+
     assign accumulate_instruction = (vector_operation_i inside {VMACC, VNMSAC, VMADD, VNMSUB});
     assign multiply_instruction   = (vector_operation_i inside {VMUL, VMULH, VMULHSU, VMULHU} | accumulate_instruction | widening_instruction);
     assign reduction_instruction  = (vector_operation_i inside {VREDSUM, VREDMAXU, VREDMAX, VREDMINU, VREDMIN, VREDAND, VREDOR, VREDXOR});
     assign widening_instruction   = (vector_operation_i inside {VWMUL, VWMULU, VWMULSU});
-    assign whole_reg_load_store   = (instruction_i[24:20] == 5'b01000 && instruction_operation_i inside {VLOAD, VSTORE} && instruction_i[27:26] == 2'b00);
-    assign mask_load_store        = (instruction_i[24:20] == 5'b01011 && instruction_operation_i inside {VLOAD, VSTORE} && instruction_i[27:26] == 2'b00);
+    assign whole_reg_load_store   = (instruction_i[24:20] == 5'b01000 && (op_vload || op_vstore) && instruction_i[27:26] == 2'b00);
+    assign mask_load_store        = (instruction_i[24:20] == 5'b01011 && (op_vload || op_vstore) && instruction_i[27:26] == 2'b00);
     assign mask_instruction       = (vector_operation_i inside {VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT});
 
     assign elements_per_reg = VLENB >> vsew;
@@ -151,7 +156,7 @@ module vectorUnit
     ) vectorCSRs1 (
         .clk                    (clk),
         .reset_n                (reset_n),
-        .instruction_operation_i(instruction_operation_i),
+        .is_vector_op_i         (enable_i),
         .vector_operation_i     (vector_operation_i),
         .op1_scalar_i           (op1_scalar_i),
         .op2_scalar_i           (op2_scalar_i),
@@ -188,7 +193,7 @@ module vectorUnit
 
     assign hazard_detected = (state == V_IDLE && |write_enable == 1'b1 && (vs1_addr == vd_addr_r || vs2_addr == vd_addr_r));
 
-    assign hold_o = (instruction_operation_i inside {VECTOR, VLOAD, VSTORE}) && (next_state == V_EXEC || hazard_detected == 1'b1);
+    assign hold_o = enable_i && (next_state == V_EXEC || hazard_detected == 1'b1);
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
@@ -203,8 +208,8 @@ module vectorUnit
         unique case (state)
             V_IDLE:
                 if ((
-                    (instruction_operation_i == VECTOR && !(vector_operation_i inside {VNOP, VSETVL, VSETVLI, VSETIVLI}))
-                ||  (instruction_operation_i inside {VLOAD, VSTORE})
+                    (op_vector && !(vector_operation_i inside {VNOP, VSETVL, VSETVLI, VSETIVLI}))
+                ||  (op_vload || op_vstore)
                 ) && !hazard_detected)
                     next_state = V_EXEC;
                 else
@@ -354,7 +359,7 @@ module vectorUnit
         else if (!hold)
             total_elements_processed <= total_elements_processed + elements_per_reg;
 
-    assign vector_process_done = (total_elements_processed >= vl && !whole_reg_load_store && instruction_operation_i == VECTOR);
+    assign vector_process_done = (total_elements_processed >= vl && !whole_reg_load_store && op_vector);
 
 //////////////////////////////////////////////////////////////////////////////
 // Register Bank
@@ -367,7 +372,7 @@ module vectorUnit
 
     always_comb begin
         // VS1 Address
-        if (instruction_operation_i == VSTORE) begin
+        if (op_vstore) begin
             vs1_addr = rd_addr;
         end
         else if (vector_operation_i inside {VSLIDE1UP, VSLIDE1DOWN}) begin
@@ -415,7 +420,7 @@ module vectorUnit
         if (!reset_n) begin
             write_enable <= '0;
         end
-        else if ((state == V_EXEC) && (!hold || hold_widening) && instruction_operation_i != VSTORE && vector_operation_i != VMVXS) begin
+        else if ((state == V_EXEC) && (!hold || hold_widening) && !op_vstore && vector_operation_i != VMVXS) begin
             if (reduction_instruction || vector_operation_i == VMVSX) begin
                 unique case (vsew_effective)
                     EW8:     write_enable <= {'0, 1'b1};
@@ -531,10 +536,10 @@ module vectorUnit
             second_operand <= '0;
         end
         else if (!hold) begin
-            if (instruction_operation_i == VSTORE) begin
+            if (op_vstore) begin
                 second_operand <= vs1_data;
             end
-            else if (instruction_operation_i == VECTOR && vector_operation_i inside {VSLIDE1UP, VSLIDE1DOWN}) begin
+            else if (op_vector && vector_operation_i inside {VSLIDE1UP, VSLIDE1DOWN}) begin
                 second_operand <= vs1_data;
             end
             else begin
@@ -565,7 +570,8 @@ module vectorUnit
         .write_data_i           (second_operand),
         .current_state          (state),
         .hazard_detected_i      (hazard_detected),
-        .instruction_operation_i(instruction_operation_i),
+        .is_vload_i             (op_vload),
+        .is_vstore_i            (op_vstore),
         .whole_reg_load_store   (whole_reg_load_store),
         .vlmul                  (vlmul_effective),
         .cycle_count_r          (cycle_count_r),
@@ -633,22 +639,22 @@ module vectorUnit
 // Result Demux
 //////////////////////////////////////////////////////////////////////////////
 
-    iType_e instruction_operation_r;
+    logic   op_vload_r;
     logic   mask_instruction_r;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
-            instruction_operation_r <= NOP;
-            mask_instruction_r      <= '0;
+            op_vload_r         <= 1'b0;
+            mask_instruction_r <= '0;
         end
         else begin
-            instruction_operation_r <= instruction_operation_i;
-            mask_instruction_r      <= mask_instruction;
+            op_vload_r         <= op_vload;
+            mask_instruction_r <= mask_instruction;
         end
     end
 
     always_comb begin
-        if (instruction_operation_r == VLOAD)
+        if (op_vload_r)
             result = result_lsu;
         else if (mask_instruction_r)
             result = result_alu_mask;
