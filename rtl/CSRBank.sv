@@ -55,9 +55,11 @@ module CSRBank
     input   logic [31:0]        data_i,
     output  logic [31:0]        data_o,
 
+    /* Some bits of the control signals are not used depending on the ISEs */
+    /* verilator lint_off UNUSEDSIGNAL */
     input   exec_ctrl_t         ctrl_i,
-
     input   logic               stall,
+    /* verilator lint_on UNUSEDSIGNAL */
     input   logic               hold,
 
     input   logic [31:0]        vtype_i,

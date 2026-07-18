@@ -48,7 +48,6 @@ module execute
     input   logic                   stall,
 
     /* Registered inputs from decode */
-    input   logic                   bp_ack_i,
     input   logic                   valid_i,
     input   logic  [4:0]            rd_i,
     input   logic  [4:0]            rs1_i,
@@ -57,9 +56,17 @@ module execute
     input   logic [31:0]            rs2_data_i,
     input   logic [31:0]            second_operand_i,
     input   logic [31:0]            jump_imm_target_i,
+    /* Not used without branch prediction */
+    /* verilator lint_off UNUSEDSIGNAL */
+    input   logic                   bp_ack_i,
+    /* verilator lint_on UNUSEDSIGNAL */
+
+    /* Some bits of the control signals are not used depending on the ISEs */
+    /* verilator lint_off UNUSEDSIGNAL */
     input   exec_ctrl_t             ctrl_i,
     input   logic [11:0]            csr_address_i,
     input   logic [31:0]            instruction_i,
+    /* verilator lint_on UNUSEDSIGNAL */
 
     /* Combinational inputs from mem_access */
     input   logic                   exc_load_access_fault_i,
@@ -157,23 +164,26 @@ module execute
 
     logic [31:0] xkyber_alu_operand_a, xkyber_alu_operand_b;
 
+    /* Both arms fold to constant 0 when AMO and XKYBER are disabled */
+    /* verilator lint_off CASEOVERLAP */
     always_comb begin
         unique case (1'b1)
             (AMOEXT inside {AMO_A, AMO_ZAAMO} && ctrl_i.is_amo):
                 first_operand = amo_operand;
-            (XKYBEREnable && ctrl_i.is_kyber): 
+            (XKYBEREnable && ctrl_i.is_kyber):
                 first_operand = xkyber_alu_operand_a;
             default:
                 first_operand = rs1_data_i;
         endcase
     end
+    /* verilator lint_on CASEOVERLAP */
 
     logic kyber_uses_opB;
     assign kyber_uses_opB = ctrl_i.kyber_op inside {KYBSUB, KYBMUL, KYBCOMPRESS};
 
     always_comb begin
         unique case (1'b1)
-            ctrl.is_sub:
+            ctrl_i.is_sub:
                 sum_opB = -second_operand_i;
             (XKYBEREnable && kyber_uses_opB):
                 sum_opB = xkyber_alu_operand_b;

@@ -68,20 +68,17 @@ module decode
     input   logic [31:0]    rs2_data_read_i,
 
     /* Combinational forwarding */
+    input   logic           regbank_we_i,
+    input   logic [ 4:0]    rd_retire_i,
+    input   logic [31:0]    writeback_i,
     /* Not used without forwarding */
     /* verilator lint_off UNUSEDSIGNAL */
     input   logic           execute_we_i,
-    /* verilator lint_on UNUSEDSIGNAL */
     input   logic           mem_access_we_i,
-    input   logic           regbank_we_i,
     input   logic [ 4:0]    rd_mem_access_i,
-    input   logic [ 4:0]    rd_retire_i,
-    /* Not used without forwarding */
-    /* verilator lint_off UNUSEDSIGNAL */
     input   logic [31:0]    result_i,
-    /* verilator lint_on UNUSEDSIGNAL */
     input   logic [31:0]    mem_access_result_i,
-    input   logic [31:0]    writeback_i,  
+    /* verilator lint_on UNUSEDSIGNAL */  
     
     /* Combinational outputs to fetch */
     output  logic           dec_hazard_o,

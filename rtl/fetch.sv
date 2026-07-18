@@ -37,7 +37,6 @@ module fetch
     input   logic           enable_i,
 
     /* Jump control */
-    input   logic           jump_i,
     input   logic           ctx_switch_i,
     input   logic           should_jump_i,
     input   logic [31:0]    jump_target_i,
@@ -45,6 +44,7 @@ module fetch
     
     /* Branch prediction */
     /* verilator lint_off UNUSEDSIGNAL */
+    input   logic           jump_i,
     input   logic           bp_take_i,
     input   logic [31:0]    bp_target_i,
     /* verilator lint_on UNUSEDSIGNAL */
