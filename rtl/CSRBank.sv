@@ -55,20 +55,13 @@ module CSRBank
     input   logic [31:0]        data_i,
     output  logic [31:0]        data_o,
 
-    /* Signals enabled with ZIHPM */
-    /* verilator lint_off UNUSEDSIGNAL */
-    input   logic               instruction_compressed_i,
-    input   iType_e             instruction_operation_i,
-    input   iTypeVector_e       vector_operation_i,
+    input   exec_ctrl_t         ctrl_i,
 
-    input   logic               hazard,
     input   logic               stall,
     input   logic               hold,
-    input   logic               killed,
 
     input   logic [31:0]        vtype_i,
     input   logic [31:0]        vlen_i,
-    /* verilator lint_on UNUSEDSIGNAL */
 
     input   logic               raise_exception_i,
     input   logic               machine_return_i,
@@ -421,7 +414,7 @@ module CSRBank
         else if (sys_reset)
             minstret <= '0;
         else begin
-            if (!mcountinhibit[2] && !(hold || instruction_operation_i == NOP))
+            if (!mcountinhibit[2] && !(hold || ctrl_i.is_nop))
                 minstret <= minstret + 1'b1;
 
             if (write_enable_i) begin
@@ -481,7 +474,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_killed <= '0;
             else begin
-                if (!mcountinhibit[3] && killed)
+                if (!mcountinhibit[3] && ctrl_i.killed)
                     cntr_killed <= cntr_killed + 1'b1;
 
                 if (write_enable_i && address_i == MHPMCOUNTER3)
@@ -495,7 +488,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_scalar <= '0;
             else begin
-                if (!mcountinhibit[3] && !(instruction_operation_i inside {NOP, VECTOR, VLOAD, VSTORE}))
+                if (!mcountinhibit[3] && !(ctrl_i.is_nop || ctrl_i.is_vector))
                     cntr_scalar <= cntr_scalar + 1'b1;
 
                 if (write_enable_i && address_i == MHPMCOUNTER3H)
@@ -551,7 +544,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_hazard <= '0;
             else begin
-                if (!mcountinhibit[7] && hazard && !hold)
+                if (!mcountinhibit[7] && ctrl_i.hazard && !hold)
                     cntr_hazard <= cntr_hazard + 1'b1;
 
                 if (write_enable_i && address_i == MHPMCOUNTER7)
@@ -579,7 +572,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_nop <= '0;
             else begin
-                if (!mcountinhibit[9] && (!hold && instruction_operation_i inside {NOP}))
+                if (!mcountinhibit[9] && (!hold && ctrl_i.is_nop))
                     cntr_nop <= cntr_nop + 1'b1;
 
                 if (write_enable_i && address_i == MHPMCOUNTER9)
@@ -593,7 +586,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_logic <= '0;
             else begin
-                if (!mcountinhibit[10] && (!hold && instruction_operation_i inside {XOR, OR, AND}))
+                if (!mcountinhibit[10] && (!hold && (ctrl_i.is_xor || ctrl_i.is_or || ctrl_i.is_and)))
                     cntr_logic <= cntr_logic + 1'b1;
 
                 if (write_enable_i && address_i == MHPMCOUNTER10)
@@ -607,7 +600,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_addsub <= '0;
             else begin
-                if (!mcountinhibit[11] && (!hold && instruction_operation_i inside {ADD, SUB}))
+                if (!mcountinhibit[11] && (!hold && (ctrl_i.is_add || ctrl_i.is_sub)))
                     cntr_addsub <= cntr_addsub + 1'b1;
 
                 if (write_enable_i && address_i == MHPMCOUNTER11)
@@ -621,7 +614,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_shift <= '0;
             else begin
-                if (!mcountinhibit[12] && (!hold && instruction_operation_i inside {SLL, SRL, SRA}))
+                if (!mcountinhibit[12] && (!hold && (ctrl_i.is_sll || ctrl_i.is_srl || ctrl_i.is_sra)))
                     cntr_shift <= cntr_shift + 1'b1;
 
                 if (write_enable_i && address_i == MHPMCOUNTER12)
@@ -635,7 +628,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_branch <= '0;
             else begin
-                if (!mcountinhibit[13] && (!hold && instruction_operation_i inside {BEQ, BNE, BLT, BLTU, BGE, BGEU}))
+                if (!mcountinhibit[13] && (!hold && (ctrl_i.is_beq || ctrl_i.is_bne || ctrl_i.is_blt || ctrl_i.is_bltu || ctrl_i.is_bge || ctrl_i.is_bgeu)))
                     cntr_branch <= cntr_branch + 1'b1;
 
                 if (write_enable_i && address_i == MHPMCOUNTER13)
@@ -649,7 +642,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_jump <= '0;
             else begin
-                if (!mcountinhibit[14] && (!hold && instruction_operation_i inside {JAL, JALR}))
+                if (!mcountinhibit[14] && (!hold && ctrl_i.is_jal_jalr))
                     cntr_jump <= cntr_jump + 1'b1;
 
                 if (write_enable_i && address_i == MHPMCOUNTER14)
@@ -663,7 +656,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_load <= '0;
             else begin
-                if (!mcountinhibit[15] && (!hold && instruction_operation_i inside {LB, LBU, LH, LHU, LW}))
+                if (!mcountinhibit[15] && (!hold && ctrl_i.is_load))
                     cntr_load <= cntr_load + 1'b1;
 
                 if (write_enable_i && address_i == MHPMCOUNTER15)
@@ -677,7 +670,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_store <= '0;
             else begin
-                if (!mcountinhibit[16] && (!hold && instruction_operation_i inside {SB, SH, SW}))
+                if (!mcountinhibit[16] && (!hold && ctrl_i.is_store))
                     cntr_store <= cntr_store + 1'b1;
 
                 if (write_enable_i && address_i == MHPMCOUNTER16)
@@ -691,7 +684,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_sys <= '0;
             else begin
-                if (!mcountinhibit[17] && (!hold && instruction_operation_i inside {MRET, WFI, ECALL, EBREAK}))
+                if (!mcountinhibit[17] && (!hold && (ctrl_i.is_mret || ctrl_i.is_wfi || ctrl_i.is_ecall || ctrl_i.is_ebreak)))
                     cntr_sys <= cntr_sys + 1'b1;
 
                 if (write_enable_i && address_i == MHPMCOUNTER17)
@@ -708,7 +701,7 @@ module CSRBank
                 if (
                         !mcountinhibit[18] && 
                         (
-                            !hold && instruction_operation_i inside {CSRRW, CSRRWI, CSRRS, CSRRSI, CSRRC, CSRRCI}
+                            !hold && ctrl_i.is_csr
                         )
                     )
                     cntr_csr <= cntr_csr + 1'b1;
@@ -724,7 +717,7 @@ module CSRBank
             else if (sys_reset)
                 cntr_luislt <= '0;
             else begin
-                if (!mcountinhibit[19] && (!hold && instruction_operation_i inside {SLTU, SLT, LUI}))
+                if (!mcountinhibit[19] && (!hold && (ctrl_i.is_sltu || ctrl_i.is_slt || ctrl_i.is_lui)))
                     cntr_luislt <= cntr_luislt + 1'b1;
 
                 if (write_enable_i && address_i == MHPMCOUNTER19)
@@ -739,7 +732,7 @@ module CSRBank
                 else if (sys_reset)
                     cntr_compressed <= '0;
                 else begin
-                    if (!mcountinhibit[20] && (!hold && instruction_compressed_i))
+                    if (!mcountinhibit[20] && (!hold && ctrl_i.compressed))
                         cntr_compressed <= cntr_compressed + 1'b1;
 
                     if (write_enable_i && address_i == MHPMCOUNTER20)
@@ -753,7 +746,7 @@ module CSRBank
                 else if (sys_reset)
                     cntr_misaligned <= '0;
                 else begin
-                    if (!mcountinhibit[21] && (!stall && !hold && !hazard && jump_misaligned_i))
+                    if (!mcountinhibit[21] && (!stall && !hold && !ctrl_i.hazard && jump_misaligned_i))
                         cntr_misaligned <= cntr_misaligned + 1'b1;
 
                     if (write_enable_i && address_i == MHPMCOUNTER21)
@@ -773,7 +766,7 @@ module CSRBank
                 else if (sys_reset)
                     cntr_mul <= '0;
                 else begin
-                    if (!mcountinhibit[22] && (!hold && instruction_operation_i inside {MUL, MULH, MULHU, MULHSU}))
+                    if (!mcountinhibit[22] && (!hold && ctrl_i.is_mul))
                         cntr_mul <= cntr_mul + 1'b1;
 
                     if (write_enable_i && address_i == MHPMCOUNTER22)
@@ -792,7 +785,7 @@ module CSRBank
                 else if (sys_reset)
                     cntr_div <= '0;
                 else begin
-                    if (!mcountinhibit[23] && (!hold && instruction_operation_i inside {DIV, DIVU, REM, REMU}))
+                    if (!mcountinhibit[23] && (!hold && (ctrl_i.is_div || ctrl_i.is_rem)))
                         cntr_div <= cntr_div + 1'b1;
 
                     if (write_enable_i && address_i == MHPMCOUNTER23)
@@ -815,8 +808,8 @@ module CSRBank
                             !mcountinhibit[24] && 
                             (
                                 !hold && 
-                                instruction_operation_i inside {VECTOR} && 
-                                vector_operation_i inside {VADD, VSUB, VRSUB}
+                                (ctrl_i.is_vector && !ctrl_i.is_vector_mem) && 
+                                ctrl_i.vector_op inside {VADD, VSUB, VRSUB}
                             )
                         )
                         cntr_vaddsub <= cntr_vaddsub + 1'b1;
@@ -836,7 +829,7 @@ module CSRBank
                             !mcountinhibit[24] &&
                             (
                                 !hold &&
-                                instruction_operation_i inside {VECTOR, VLOAD, VSTORE}
+                                ctrl_i.is_vector
                             )
                         )
                         cntr_vinst <= cntr_vinst + 1'b1;
@@ -856,8 +849,8 @@ module CSRBank
                             !mcountinhibit[25] && 
                             (
                                 !hold && 
-                                instruction_operation_i inside {VECTOR} && 
-                                vector_operation_i inside {VMUL, VMULH, VMULHU, VMULHSU, VWMUL, VWMULU, VWMULSU}
+                                (ctrl_i.is_vector && !ctrl_i.is_vector_mem) && 
+                                ctrl_i.vector_op inside {VMUL, VMULH, VMULHU, VMULHSU, VWMUL, VWMULU, VWMULSU}
                             )
                         )
                         cntr_vmul <= cntr_vmul + 1'b1;
@@ -875,7 +868,7 @@ module CSRBank
                 else begin
                     if (
                             !mcountinhibit[25] &&
-                            instruction_operation_i == VECTOR
+                            (ctrl_i.is_vector && !ctrl_i.is_vector_mem)
                         )
                         cntr_vcycles <= cntr_vcycles + 1'b1;
 
@@ -894,8 +887,8 @@ module CSRBank
                             !mcountinhibit[26] && 
                             (
                                 !hold && 
-                                instruction_operation_i inside {VECTOR} && 
-                                vector_operation_i inside {VDIV, VDIVU, VREM, VREMU}
+                                (ctrl_i.is_vector && !ctrl_i.is_vector_mem) && 
+                                ctrl_i.vector_op inside {VDIV, VDIVU, VREM, VREMU}
                             )
                         )
                         cntr_vdiv <= cntr_vdiv + 1'b1;
@@ -915,8 +908,8 @@ module CSRBank
                             !mcountinhibit[27] && 
                             (
                                 !hold && 
-                                instruction_operation_i inside {VECTOR} && 
-                                vector_operation_i inside {VMACC, VNMSAC, VMADD, VNMSUB}
+                                (ctrl_i.is_vector && !ctrl_i.is_vector_mem) && 
+                                ctrl_i.vector_op inside {VMACC, VNMSAC, VMADD, VNMSUB}
                             )
                         )
                         cntr_vmac <= cntr_vmac + 1'b1;
@@ -936,8 +929,8 @@ module CSRBank
                             !mcountinhibit[28] && 
                             (
                                 !hold && 
-                                instruction_operation_i inside {VECTOR} && 
-                                vector_operation_i inside {VREDMIN, VREDMINU, VREDMAX, VREDMAXU}
+                                (ctrl_i.is_vector && !ctrl_i.is_vector_mem) && 
+                                ctrl_i.vector_op inside {VREDMIN, VREDMINU, VREDMAX, VREDMAXU}
                             )
                         )
                         cntr_vred <= cntr_vred + 1'b1;
@@ -953,7 +946,7 @@ module CSRBank
                 else if (sys_reset)
                     cntr_vloadstore <= '0;
                 else begin
-                    if (!mcountinhibit[29] && (!hold && instruction_operation_i inside {VLOAD, VSTORE}))
+                    if (!mcountinhibit[29] && (!hold && ctrl_i.is_vector_mem))
                         cntr_vloadstore <= cntr_vloadstore + 1'b1;
 
                     if (write_enable_i && address_i == MHPMCOUNTER29)
@@ -967,7 +960,7 @@ module CSRBank
                 else if (sys_reset)
                     cntr_vlscycles <= '0;
                 else begin
-                    if (!mcountinhibit[29] && (instruction_operation_i inside {VLOAD, VSTORE}))
+                    if (!mcountinhibit[29] && (ctrl_i.is_vector_mem))
                         cntr_vlscycles <= cntr_vlscycles + 1'b1;
 
                     if (write_enable_i && address_i == MHPMCOUNTER29H)
@@ -985,8 +978,8 @@ module CSRBank
                             !mcountinhibit[30] && 
                             (
                                 !hold && 
-                                instruction_operation_i inside {VECTOR} && 
-                                vector_operation_i inside {
+                                (ctrl_i.is_vector && !ctrl_i.is_vector_mem) && 
+                                ctrl_i.vector_op inside {
                                     VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT,  // mask compares
                                     VREDAND, VREDOR, VREDXOR,                                   // logic reduction
                                     VMV, VMVR, VMVSX, VMVXS,                                    // register moves

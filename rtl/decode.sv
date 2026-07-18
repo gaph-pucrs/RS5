@@ -98,9 +98,7 @@ module decode
     output  logic [31:0]    rs2_data_o,
     output  logic [31:0]    second_operand_o,
     output  logic [31:0]    instruction_o,
-    output  logic [31:0]    jump_imm_target_o,
-    output  iType_e         instruction_operation_o,
-    output  iTypeVector_e   vector_operation_o
+    output  logic [31:0]    jump_imm_target_o
 );
 
 //////////////////////////////////////////////////////////////////////////////
@@ -350,8 +348,9 @@ module decode
 //  Decode Vector Instruction
 //////////////////////////////////////////////////////////////////////////////
 
+    iTypeVector_e vector_operation;
+
     if (VEnable) begin : v_enable_decode_gen_on
-        iTypeVector_e vector_operation;
         iTypeVector_e decode_vector_opcfg;
         iTypeVector_e decode_vector_opi;
         iTypeVector_e decode_vector_opm;
@@ -452,24 +451,9 @@ module decode
             end
         end
 
-        always_ff @(posedge clk)
-            if (instruction_operation_o == VECTOR && vector_operation_o == VNOP)
-                $display("%0t - INVALID VECTOR INST!!! - %h", $time, instruction_o);
-
-        always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n) begin
-                vector_operation_o <= VNOP;
-            end
-            else if (enable) begin
-                if (hazard || killed)
-                    vector_operation_o <= VNOP;
-                else
-                    vector_operation_o <= vector_operation;
-            end
-        end
     end
-    else begin : v_enable_decode_gen_on
-        assign vector_operation_o = VNOP;
+    else begin : v_enable_decode_gen_off
+        assign vector_operation = VNOP;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -794,22 +778,6 @@ module decode
             instruction_o <= (!COMPRESSED && ctrl_i.compressed) ? {16'h0000, instruction_i[15:0]} : instruction_i;
     end
 
-
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            instruction_operation_o <= NOP;
-        end
-        else if (sys_reset) begin
-            instruction_operation_o <= NOP;
-        end
-        else if (enable) begin
-            if (hazard || killed)
-                instruction_operation_o <= NOP;
-            else
-                instruction_operation_o <= instruction_operation;
-        end
-    end
-
 //////////////////////////////////////////////////////////////////////////////
 // Control struct combinational decode
 //////////////////////////////////////////////////////////////////////////////
@@ -818,6 +786,9 @@ module decode
 
     always_comb begin
         ctrl = '0;
+
+        ctrl.is_nop          = instruction_operation == NOP;
+        ctrl.is_add          = instruction_operation == ADD;
 
         // Result select
         ctrl.is_csr          = instruction_operation inside {CSRRW, CSRRS, CSRRC, CSRRWI, CSRRSI, CSRRCI};
@@ -844,11 +815,16 @@ module decode
         ctrl.is_aes          = ZKNEEnable   && instruction_operation inside {AES32ESI, AES32ESMI};
         ctrl.aes_is_mix      = ZKNEEnable   && instruction_operation == AES32ESMI;
         ctrl.is_vector       = VEnable      && instruction_operation inside {VECTOR, VLOAD, VSTORE};
+        ctrl.is_vector_mem   = VEnable      && instruction_operation inside {VLOAD, VSTORE};
         ctrl.is_zicond       = ZICONDEnable && instruction_operation inside {CZERO_EQZ, CZERO_NEZ};
         ctrl.zicond_is_eqz   = ZICONDEnable && instruction_operation == CZERO_EQZ;
-        ctrl.is_zbkb         = ZBKBEnable   && instruction_operation inside {ALU_ROL, ALU_ROR, ALU_PACK, ALU_PACKH,
-                                                                             ALU_XNOR, ALU_ORN, ALU_ANDN,
-                                                                             ALU_ZIP, ALU_UNZIP, ALU_BREV8, ALU_REV8};
+        ctrl.is_sha2         = ZKNHEnable   && instruction_operation inside {SIG0, SIG1, SUM0, SUM1, SIG0H, SIG0L,
+                                                                             SIG1H, SIG1L, SUM0R, SUM1R};
+        ctrl.is_zbkb         = ZBKBEnable   && instruction_operation inside {ALU_ROR, ALU_ROL, ALU_PACK, ALU_PACKH,
+                                                                             ALU_XNOR, ALU_ORN, ALU_ANDN, ALU_ZIP,
+                                                                             ALU_UNZIP, ALU_BREV8, ALU_REV8};
+        ctrl.is_kyber        = XKYBEREnable && instruction_operation inside {KYBER_ADD, KYBER_SUB, KYBER_CBD2,
+                                                                             KYBER_CBD3, KYBER_MUL, KYBER_COMPRESS};
         ctrl.is_sc           = (AMOEXT inside {AMO_ZALRSC, AMO_A}) && instruction_operation == SC_W;
 
         // Memory
@@ -893,19 +869,50 @@ module decode
         ctrl.csr_rd_uses_rs1 = instruction_operation inside {CSRRW, CSRRS, CSRRC};
         ctrl.csr_wr_uses_rs1 = instruction_operation inside {CSRRS, CSRRC, CSRRSI, CSRRCI};
 
-        // Zbkb sub-ops
-        ctrl.zbkb_is_ror     = ZBKBEnable && instruction_operation == ALU_ROR;
-        ctrl.zbkb_is_rol     = ZBKBEnable && instruction_operation == ALU_ROL;
-        ctrl.zbkb_is_packh   = ZBKBEnable && instruction_operation == ALU_PACKH;
-        ctrl.zbkb_is_orn     = ZBKBEnable && instruction_operation == ALU_ORN;
-        ctrl.zbkb_is_andn    = ZBKBEnable && instruction_operation == ALU_ANDN;
-        ctrl.zbkb_is_rev8    = ZBKBEnable && instruction_operation == ALU_REV8;
-        ctrl.zbkb_is_brev8   = ZBKBEnable && instruction_operation == ALU_BREV8;
-        ctrl.zbkb_is_zip     = ZBKBEnable && instruction_operation == ALU_ZIP;
-        ctrl.zbkb_is_unzip   = ZBKBEnable && instruction_operation == ALU_UNZIP;
-        ctrl.zbkb_is_xnor    = ZBKBEnable && instruction_operation == ALU_XNOR;
+        // Zbkb sub-op
+        unique case (instruction_operation)
+            ALU_ROR:   ctrl.zbkb_op = ZBKBROR;
+            ALU_ROL:   ctrl.zbkb_op = ZBKBROL;
+            ALU_PACK:  ctrl.zbkb_op = ZBKBPACK;
+            ALU_PACKH: ctrl.zbkb_op = ZBKBPACKH;
+            ALU_XNOR:  ctrl.zbkb_op = ZBKBXNOR;
+            ALU_ORN:   ctrl.zbkb_op = ZBKBORN;
+            ALU_ANDN:  ctrl.zbkb_op = ZBKBANDN;
+            ALU_ZIP:   ctrl.zbkb_op = ZBKBZIP;
+            ALU_UNZIP: ctrl.zbkb_op = ZBKBUNZIP;
+            ALU_BREV8: ctrl.zbkb_op = ZBKBBREV8;
+            ALU_REV8:  ctrl.zbkb_op = ZBKBREV8;
+            default:   ctrl.zbkb_op = ZBKBNOP;
+        endcase
 
         ctrl.amo_op          = amo_op_next;
+        ctrl.vector_op       = vector_operation;
+
+        // SHA2 sub-op
+        unique case (instruction_operation)
+            SIG0:    ctrl.sha2_op = SHA2SIG0;
+            SIG1:    ctrl.sha2_op = SHA2SIG1;
+            SUM0:    ctrl.sha2_op = SHA2SUM0;
+            SUM1:    ctrl.sha2_op = SHA2SUM1;
+            SIG0H:   ctrl.sha2_op = SHA2SIG0H;
+            SIG0L:   ctrl.sha2_op = SHA2SIG0L;
+            SIG1H:   ctrl.sha2_op = SHA2SIG1H;
+            SIG1L:   ctrl.sha2_op = SHA2SIG1L;
+            SUM0R:   ctrl.sha2_op = SHA2SUM0R;
+            SUM1R:   ctrl.sha2_op = SHA2SUM1R;
+            default: ctrl.sha2_op = SHA2NOP;
+        endcase
+
+        // Kyber sub-op
+        unique case (instruction_operation)
+            KYBER_ADD:      ctrl.kyber_op = KYBADD;
+            KYBER_SUB:      ctrl.kyber_op = KYBSUB;
+            KYBER_CBD2:     ctrl.kyber_op = KYBCBD2;
+            KYBER_CBD3:     ctrl.kyber_op = KYBCBD3;
+            KYBER_MUL:      ctrl.kyber_op = KYBMUL;
+            KYBER_COMPRESS: ctrl.kyber_op = KYBCOMPRESS;
+            default:        ctrl.kyber_op = KYBNOP;
+        endcase
 
         // Pipeline status fields
         ctrl.compressed            = ctrl_i.compressed;
@@ -924,8 +931,14 @@ module decode
         else if (enable) begin
             if (hazard || killed) begin
                 ctrl_o        <= '0;
+                /* A bubble behaves as a NOP (e.g. for instruction counters) */
+                ctrl_o.is_nop <= 1'b1;
                 ctrl_o.hazard <= hazard;
                 ctrl_o.killed <= killed;
+                /* An excepting instruction is killed (turned into a NOP) */
+                /* but its exception must still reach execute             */
+                ctrl_o.exc_ilegal_inst       <= invalid_inst;
+                ctrl_o.exc_inst_access_fault <= exc_inst_access_fault;
             end
             else
                 ctrl_o <= ctrl;

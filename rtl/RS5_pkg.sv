@@ -162,9 +162,116 @@ package RS5_pkg;
         AMOMAXU = 10'b1000000000
     } iTypeAtomic_e;
 
+    typedef enum logic[10:0] {
+        SHA2NOP   = 11'b00000000001,
+        SHA2SIG0  = 11'b00000000010,
+        SHA2SIG1  = 11'b00000000100,
+        SHA2SUM0  = 11'b00000001000,
+        SHA2SUM1  = 11'b00000010000,
+        SHA2SIG0H = 11'b00000100000,
+        SHA2SIG0L = 11'b00001000000,
+        SHA2SIG1H = 11'b00010000000,
+        SHA2SIG1L = 11'b00100000000,
+        SHA2SUM0R = 11'b01000000000,
+        SHA2SUM1R = 11'b10000000000
+    } iTypeSha2_e;
+
+    typedef enum logic[6:0] {
+        KYBNOP      = 7'b0000001,
+        KYBADD      = 7'b0000010,
+        KYBSUB      = 7'b0000100,
+        KYBCBD2     = 7'b0001000,
+        KYBCBD3     = 7'b0010000,
+        KYBMUL      = 7'b0100000,
+        KYBCOMPRESS = 7'b1000000
+    } iTypeKyber_e;
+
+    typedef enum logic[11:0] {
+        ZBKBNOP   = 12'b000000000001,
+        ZBKBROR   = 12'b000000000010,
+        ZBKBROL   = 12'b000000000100,
+        ZBKBPACK  = 12'b000000001000,
+        ZBKBPACKH = 12'b000000010000,
+        ZBKBXNOR  = 12'b000000100000,
+        ZBKBORN   = 12'b000001000000,
+        ZBKBANDN  = 12'b000010000000,
+        ZBKBZIP   = 12'b000100000000,
+        ZBKBUNZIP = 12'b001000000000,
+        ZBKBBREV8 = 12'b010000000000,
+        ZBKBREV8  = 12'b100000000000
+    } iTypeZbkb_e;
+
+    typedef enum logic [5:0] {
+        VNOP,
+        VSETVL,
+        VSETVLI,
+        VSETIVLI,
+        VADD,
+        VSUB,
+        VRSUB,
+        VAND,
+        VOR,
+        VXOR,
+        VSLL,
+        VSRL,
+        VSRA,
+        VMSEQ,
+        VMSNE,
+        VMSLTU,
+        VMSLT,
+        VMSLEU,
+        VMSLE,
+        VMSGTU,
+        VMSGT,
+        VMINU,
+        VMIN,
+        VMAXU,
+        VMAX,
+        VMUL,
+        VMULH,
+        VMULHU,
+        VMULHSU,
+        VWMUL,
+        VWMULU,
+        VWMULSU,
+        VDIVU,
+        VDIV,
+        VREMU,
+        VREM,
+        VMACC,
+        VNMSAC,
+        VMADD,
+        VNMSUB,
+        VREDSUM,
+        VREDMAXU,
+        VREDMAX,
+        VREDMINU,
+        VREDMIN,
+        VREDAND,
+        VREDOR,
+        VREDXOR,
+        VMV,
+        VMVR,
+        VMVSX,
+        VMVXS,
+        VMERGE,
+        VSLIDE1UP,
+        VSLIDE1DOWN,
+        VLD,            // Vector load  (was iType_e VLOAD)
+        VST             // Vector store (was iType_e VSTORE)
+    } iTypeVector_e;
+
     typedef struct packed {
         // AMO operation select (one-hot, AMONOP when unused)
         iTypeAtomic_e amo_op;
+        // SHA2 operation select (one-hot, SHA2NOP when unused)
+        iTypeSha2_e  sha2_op;
+        // Kyber operation select (one-hot, KYBNOP when unused)
+        iTypeKyber_e kyber_op;
+        // Zbkb operation select (one-hot, ZBKBNOP when unused)
+        iTypeZbkb_e  zbkb_op;
+        // Vector operation select (VNOP when unused)
+        iTypeVector_e vector_op;
         // Pipeline status
         logic        hazard;
         logic        killed;
@@ -173,6 +280,8 @@ package RS5_pkg;
         logic        exc_ilegal_inst;
         logic        exc_inst_access_fault;
         // Result select
+        logic        is_nop;
+        logic        is_add;
         logic        is_csr;
         logic        is_jal_jalr;
         logic        is_lui;
@@ -190,8 +299,12 @@ package RS5_pkg;
         logic        is_rem;
         logic        is_aes;
         logic        is_vector;
+        // Vector loads/stores (subset of is_vector)
+        logic        is_vector_mem;
         logic        is_zicond;
+        logic        is_sha2;
         logic        is_zbkb;
+        logic        is_kyber;
         logic        is_sc;
         // Memory
         logic        is_load;
@@ -234,17 +347,6 @@ package RS5_pkg;
         csrOperation_e csr_op;
         logic        csr_rd_uses_rs1;
         logic        csr_wr_uses_rs1;
-        // Zbkb sub-op
-        logic        zbkb_is_ror;
-        logic        zbkb_is_rol;
-        logic        zbkb_is_packh;
-        logic        zbkb_is_orn;
-        logic        zbkb_is_andn;
-        logic        zbkb_is_rev8;
-        logic        zbkb_is_brev8;
-        logic        zbkb_is_zip;
-        logic        zbkb_is_unzip;
-        logic        zbkb_is_xnor;
     } exec_ctrl_t;
 
     typedef struct packed {
@@ -366,66 +468,6 @@ package RS5_pkg;
         LMUL_1_4  = 3'b110,
         LMUL_1_2  = 3'b111
     } vlmul_e;
-
-    typedef enum {
-        VNOP,
-        VSETVL,
-        VSETVLI,
-        VSETIVLI,
-        VADD,
-        VSUB,
-        VRSUB,
-        VAND,
-        VOR,
-        VXOR,
-        VSLL,
-        VSRL,
-        VSRA,
-        VMSEQ,
-        VMSNE,
-        VMSLTU,
-        VMSLT,
-        VMSLEU,
-        VMSLE,
-        VMSGTU,
-        VMSGT,
-        VMINU,
-        VMIN,
-        VMAXU,
-        VMAX,
-        VMUL,
-        VMULH,
-        VMULHU,
-        VMULHSU,
-        VWMUL,
-        VWMULU,
-        VWMULSU,
-        VDIVU,
-        VDIV,
-        VREMU,
-        VREM,
-        VMACC,
-        VNMSAC,
-        VMADD,
-        VNMSUB,
-        VREDSUM,
-        VREDMAXU,
-        VREDMAX,
-        VREDMINU,
-        VREDMIN,
-        VREDAND,
-        VREDOR,
-        VREDXOR,
-        VMV,
-        VMVR,
-        VMVSX,
-        VMVXS,
-        VMERGE,
-        VSLIDE1UP,
-        VSLIDE1DOWN,
-        VLD,            // Vector load  (was iType_e VLOAD)
-        VST             // Vector store (was iType_e VSTORE)
-    } iTypeVector_e;
 
 
     typedef enum  logic[2:0] {

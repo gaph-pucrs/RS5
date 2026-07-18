@@ -57,13 +57,9 @@ module execute
     input   logic [31:0]            rs2_data_i,
     input   logic [31:0]            second_operand_i,
     input   logic [31:0]            jump_imm_target_i,
-    /* We do not use some bits of these fields if some extensions are off */
-    /* verilator lint_off UNUSEDSIGNAL */
     input   exec_ctrl_t             ctrl_i,
     input   logic [11:0]            csr_address_i,
     input   logic [31:0]            instruction_i,
-    input   iTypeVector_e           vector_operation_i,
-    /* verilator lint_on UNUSEDSIGNAL */
 
     /* Combinational inputs from mem_access */
     input   logic                   exc_load_access_fault_i,
@@ -141,7 +137,7 @@ module execute
     logic           greater_equal;
     logic           greater_equal_unsigned;
 
-    logic [31:0] sum2_opB;
+    logic [31:0] sum_opB;
 
     // Can be assigned by atomic instructions or rs1_data_i
     logic [31:0] first_operand;
@@ -149,53 +145,49 @@ module execute
     logic [31:0] equal_opB;
 
     /* Unmuxed operators */
-    assign less_than_unsigned      = rs1_data_i <  second_operand_i;
-    assign greater_equal_unsigned  = rs1_data_i >= second_operand_i;
-    assign less_than               = $signed(rs1_data_i) <  $signed(second_operand_i);
-    assign greater_equal           = $signed(rs1_data_i) >= $signed(second_operand_i);
-    assign sll_result              = rs1_data_i << second_operand_i[4:0];
-    assign srl_result              = rs1_data_i >> second_operand_i[4:0];
-    assign sra_result              = $signed(rs1_data_i) >>> second_operand_i[4:0];
+    assign less_than_unsigned     = rs1_data_i <  second_operand_i;
+    assign greater_equal_unsigned = rs1_data_i >= second_operand_i;
+    assign less_than              = $signed(rs1_data_i) <  $signed(second_operand_i);
+    assign greater_equal          = $signed(rs1_data_i) >= $signed(second_operand_i);
+    assign sll_result             = rs1_data_i << second_operand_i[4:0];
+    assign srl_result             = rs1_data_i >> second_operand_i[4:0];
+    assign sra_result             = $signed(rs1_data_i) >>> second_operand_i[4:0];
 
     logic [31:0] amo_operand;
 
     logic [31:0] xkyber_alu_operand_a, xkyber_alu_operand_b;
 
     always_comb begin
-        unique case (instruction_operation_i)
-            AMO_W:
-                first_operand = (AMOEXT inside {AMO_A, AMO_ZAAMO}) ? amo_operand : rs1_data_i;
-            KYBER_ADD, 
-            KYBER_SUB, 
-            KYBER_CBD2, 
-            KYBER_CBD3, 
-            KYBER_MUL, 
-            KYBER_COMPRESS:
-                first_operand = (XKYBEREnable) ? xkyber_alu_operand_a : rs1_data_i;
+        unique case (1'b1)
+            (AMOEXT inside {AMO_A, AMO_ZAAMO} && ctrl_i.is_amo):
+                first_operand = amo_operand;
+            (XKYBEREnable && ctrl_i.is_kyber): 
+                first_operand = xkyber_alu_operand_a;
             default:
                 first_operand = rs1_data_i;
         endcase
     end
 
+    logic kyber_uses_opB;
+    assign kyber_uses_opB = ctrl_i.kyber_op inside {KYBSUB, KYBMUL, KYBCOMPRESS};
+
     always_comb begin
-        unique case (instruction_operation_i)
-            SUB:
-                sum2_opB = -second_operand_i;
-            KYBER_SUB, 
-            KYBER_MUL, 
-            KYBER_COMPRESS:
-                sum2_opB = (XKYBEREnable) ? xkyber_alu_operand_b : second_operand_i;
+        unique case (1'b1)
+            ctrl.is_sub:
+                sum_opB = -second_operand_i;
+            (XKYBEREnable && kyber_uses_opB):
+                sum_opB = xkyber_alu_operand_b;
             default:
-                sum2_opB = second_operand_i; // AMO_W
+                sum_opB = second_operand_i;
         endcase
     end
 
     /* Muxed operators */
-    assign sum_result              = first_operand + sum2_opB;
-    assign and_result              = first_operand & second_operand_i;
-    assign or_result               = first_operand | second_operand_i;
-    assign xor_result              = first_operand ^ second_operand_i;
-    assign equal                   = equal_opA == equal_opB;
+    assign sum_result = first_operand + sum_opB;
+    assign and_result = first_operand & second_operand_i;
+    assign or_result  = first_operand | second_operand_i;
+    assign xor_result = first_operand ^ second_operand_i;
+    assign equal      = equal_opA == equal_opB;
 
     /* We can't obtain the PC from fetch stage because it can be modified due */
     /* to load/store stalls when the current instruction is JAL[R]            */
@@ -224,7 +216,7 @@ module execute
 
     always_comb begin
         unique case (1'b1)
-            ctrl_i.is_amo_w: mem_address = rs1_data_i;
+            ctrl_i.is_amo_w:  mem_address = rs1_data_i;
             ctrl_i.is_vector: mem_address = mem_address_vector;
             default:          mem_address = sum_result;
         endcase
@@ -238,13 +230,13 @@ module execute
     end
 
     logic misaligned_sh;
-    assign misaligned_sh = mem_address[0]        && ctrl_i.is_half && ctrl_i.is_store;
+    assign misaligned_sh = mem_address[0] && ctrl_i.is_half && ctrl_i.is_store;
 
     logic misaligned_sw;
     assign misaligned_sw = (mem_address[1:0] != '0) && (ctrl_i.is_amo_w || (ctrl_i.is_store && !ctrl_i.is_half && !ctrl_i.is_byte));
 
     logic misaligned_lh;
-    assign misaligned_lh = mem_address[0]        && ctrl_i.is_half && ctrl_i.is_load;
+    assign misaligned_lh = mem_address[0] && ctrl_i.is_half && ctrl_i.is_load;
 
     logic misaligned_lw;
     assign misaligned_lw = (mem_address[1:0] != '0) && ctrl_i.is_load && !ctrl_i.is_half && !ctrl_i.is_byte;
@@ -291,7 +283,7 @@ module execute
             unique case (1'b1)
                 ctrl_i.is_byte: mem_write_enable[sum_result[1:0]]      = 1'b1;
                 ctrl_i.is_half: mem_write_enable[sum_result[1:0]+1-:2] = 2'b11;
-                default:        mem_write_enable                        = 4'b1111;
+                default:        mem_write_enable                       = 4'b1111;
             endcase
         end
     end
@@ -325,12 +317,12 @@ module execute
 // CSR access signals
 //////////////////////////////////////////////////////////////////////////////
 
-    logic       csr_read_enable, csr_write_enable;
+    logic csr_read_enable, csr_write_enable;
 
     assign csr_read_enable_o  = csr_read_enable  && !exc_ilegal_csr_inst && !stall;
     assign csr_write_enable_o = csr_write_enable && !exc_ilegal_csr_inst && !stall;
 
-    assign csr_read_enable  = ctrl_i.is_csr && (ctrl_i.csr_op == WRITE ? (rd_i != '0) : 1'b1);
+    assign csr_read_enable  = ctrl_i.is_csr && (ctrl_i.csr_op == WRITE ? (rd_i  != '0) : 1'b1);
     assign csr_write_enable = ctrl_i.is_csr && (ctrl_i.csr_wr_uses_rs1 ? (rs1_i != '0) : 1'b1);
     assign csr_data_o       = ctrl_i.csr_rd_uses_rs1 ? rs1_data_i : {27'b0, rs1_i};
     assign csr_operation_o  = ctrl_i.csr_op;
@@ -348,18 +340,12 @@ module execute
     logic        hold_mul;
     logic        hold_div;
 
-
 /////////////////////////////////////////////////////////////////////////////
 // Xkyber signals
 //////////////////////////////////////////////////////////////////////////////
 
     logic hold_xkyber;
     logic [31:0] xkyber_result;
-
-    logic is_xkyber;
-
-    assign is_xkyber = (instruction_operation_i inside {KYBER_ADD, KYBER_SUB,KYBER_CBD2, KYBER_CBD3, KYBER_MUL, KYBER_COMPRESS});
-
     logic [15:0] mult_kyber_op_a, mult_kyber_op_b;
 
     if (XKYBEREnable) begin : gen_xkyber_on
@@ -368,7 +354,7 @@ module execute
         logic [2:0]  cbd_result_low;
 
         logic eta_is_3;
-        assign eta_is_3 = (instruction_operation_i == KYBER_CBD3);
+        assign eta_is_3 = (ctrl_i.kyber_op == KYBCBD3);
 
         assign cbd_result_high = eta_is_3 ?
             (3'(first_operand[6]) + 3'(first_operand[7]) + 3'(first_operand[8])) -
@@ -383,18 +369,17 @@ module execute
             (3'(first_operand[2]) + 3'(first_operand[3]));
 
         logic [3:0] kyber_compress_bits;
-
-        assign kyber_compress_bits = second_operand_i[3:0] & {4{instruction_operation_i == KYBER_COMPRESS}};
+        assign kyber_compress_bits = second_operand_i[3:0] & {4{ctrl_i.kyber_op == KYBCOMPRESS}};
 
         xkyber xkyber1 (
             .clk                   (clk),
             .reset_n               (reset_n),
             .stall                 (stall),
             .alu_adder_i           (sum_result),
-            .operator_i            (instruction_operation_i),
+            .operator_i            (ctrl_i.kyber_op),
             .first_operand_i       (rs1_data_i),
             .second_operand_i      (rs2_data_i),
-            .is_xkyber_i           (is_xkyber),
+            .is_xkyber_i           (ctrl_i.is_kyber),
             .hold_o                (hold_xkyber),
             .alu_operand_a_kyber_o (xkyber_alu_operand_a),
             .alu_operand_b_kyber_o (xkyber_alu_operand_b),
@@ -427,8 +412,8 @@ module execute
 
         logic [31:0] mul_first_operand, mul_second_operand;
 
-        assign mul_first_operand  = (XKYBEREnable && is_xkyber) ? {16'b0, mult_kyber_op_a} : rs1_data_i;
-        assign mul_second_operand = (XKYBEREnable && is_xkyber) ? {16'b0, mult_kyber_op_b} : rs2_data_i; 
+        assign mul_first_operand  = (XKYBEREnable && ctrl_i.is_kyber) ? {16'b0, mult_kyber_op_a} : rs1_data_i;
+        assign mul_second_operand = (XKYBEREnable && ctrl_i.is_kyber) ? {16'b0, mult_kyber_op_b} : rs2_data_i; 
 
         mul mul1 (
             .clk              (clk),
@@ -518,16 +503,11 @@ module execute
     logic [31:0] sha2_result;
 
     if (ZKNHEnable) begin: zknh_gen_on
-        
-        logic sha2_en;
-
-        assign sha2_en = (instruction_operation_i inside {SIG0H,SIG0L,SIG1H,SIG1L,SUM0R,SUM1R,SIG0,SIG1,SUM0,SUM1});
-
         sha2_unit #(
             .LOGIC_GATING(1'b1)
         ) u_sha2_unit (
-            .sha2_en_i(sha2_en),
-            .sha2_op_i(instruction_operation_i),
+            .sha2_en_i(ctrl_i.is_sha2),
+            .sha2_op_i(ctrl_i.sha2_op),
             .op_a_i(first_operand),
             .op_b_i(second_operand_i),
             .sha2_result_o(sha2_result)
@@ -555,7 +535,7 @@ module execute
             .reset_n                (reset_n),
             .instruction_i          (instruction_i),
             .enable_i               (ctrl_i.is_vector),
-            .vector_operation_i     (vector_operation_i),
+            .vector_operation_i     (ctrl_i.vector_op),
             .op1_scalar_i           (rs1_data_i),
             .op2_scalar_i           (rs2_data_i),
             .hold_o                 (hold_vector),
@@ -740,23 +720,9 @@ module execute
     // ZBKB Extension
     ////////////////////////////////////////////////////////////////////////////////
 
-    logic [31:0] shift_result;   
-    logic [31:0] pack_result;   
-    logic [31:0] bwlogic_result; 
-    logic [31:0] rev_result;   
-    logic [31:0] shuffle_result;    
+    logic [31:0] zbkb_result;
 
     if (ZBKBEnable) begin: zbkb_gen_on
-
-        //////////
-        // Pack //
-        //////////
-        always_comb begin
-            unique case (1'b1)
-                ctrl_i.zbkb_is_packh: pack_result = {16'h0, second_operand_i[7:0], rs1_data_i[7:0]};
-                default:              pack_result = {second_operand_i[15:0], rs1_data_i[15:0]};
-            endcase
-        end
 
         ///////////////////
         // Bitwise Logic //
@@ -772,14 +738,9 @@ module execute
         assign bwlogic_and_result = rs1_data_i & bwlogic_operand_b;
         assign bwlogic_xor_result = rs1_data_i ^ bwlogic_operand_b;
 
-        always_comb begin
-            unique case (1'b1)
-                ctrl_i.zbkb_is_orn:  bwlogic_result = bwlogic_or_result;
-                ctrl_i.zbkb_is_andn: bwlogic_result = bwlogic_and_result;
-                default:             bwlogic_result = bwlogic_xor_result;
-            endcase
-        end
-
+        /////////////////
+        // Bit reverse //
+        /////////////////
         logic [4:0] shift_amt;
         assign shift_amt[4:0] = second_operand_i[4:0];
 
@@ -787,6 +748,7 @@ module execute
         assign zbp_shift_amt[2:0] = shift_amt[2:0];
         assign zbp_shift_amt[4:3] = shift_amt[4:3];
 
+        logic [31:0] rev_result;
         always_comb begin
             rev_result = rs1_data_i;
 
@@ -816,38 +778,48 @@ module execute
             end
         end
 
+        ///////////////
+        // Zip/Unzip //
+        ///////////////
+        logic [31:0] zip_result;
+        logic [31:0] unzip_result;
         always_comb begin
-            if (ctrl_i.zbkb_is_zip) begin
-                for (int i = 0; i < 16; i++) begin
-                    shuffle_result[2*i] = rs1_data_i[i];
-                    shuffle_result[2*i + 1] = rs1_data_i[i + 16];
-                end
-            end
-
-            else begin
-                for (int i = 0; i < 16; i++) begin
-                    shuffle_result[i]   = rs1_data_i[2*i];
-                    shuffle_result[i + 16] = rs1_data_i[2*i + 1];
-                end
+            for (int i = 0; i < 16; i++) begin
+                zip_result[2*i]        = rs1_data_i[i];
+                zip_result[2*i + 1]    = rs1_data_i[i + 16];
+                unzip_result[i]        = rs1_data_i[2*i];
+                unzip_result[i + 16]   = rs1_data_i[2*i + 1];
             end
         end
 
+        ////////////
+        // Rotate //
+        ////////////
         logic [4:0] shift_amt_compl; // complementary shift amount (32 - shift_amt)
-
         assign shift_amt_compl = 5'(6'd32 - {1'b0, second_operand_i[4:0]});
 
         logic [31:0] ror_result, rol_result;
-
         assign ror_result   =  srl_result | (rs1_data_i << shift_amt_compl);
         assign rol_result   =  sll_result | (rs1_data_i >> shift_amt_compl);
-        assign shift_result = ctrl_i.zbkb_is_rol ? rol_result : ror_result;
+
+        always_comb begin
+            unique case (ctrl_i.zbkb_op)
+                ZBKBROR:   zbkb_result = ror_result;
+                ZBKBROL:   zbkb_result = rol_result;
+                ZBKBORN:   zbkb_result = bwlogic_or_result;
+                ZBKBANDN:  zbkb_result = bwlogic_and_result;
+                ZBKBXNOR:  zbkb_result = bwlogic_xor_result;
+                ZBKBREV8,
+                ZBKBBREV8: zbkb_result = rev_result;
+                ZBKBZIP:   zbkb_result = zip_result;
+                ZBKBUNZIP: zbkb_result = unzip_result;
+                ZBKBPACKH: zbkb_result = {16'h0, second_operand_i[7:0], rs1_data_i[7:0]};
+                default:   zbkb_result = {second_operand_i[15:0], rs1_data_i[15:0]};
+            endcase
+        end
     end
     else begin : gen_zbkb_off
-        assign shift_result   = '0;   
-        assign pack_result    = '0;   
-        assign bwlogic_result = '0;
-        assign rev_result     = '0;
-        assign shuffle_result = '0;    
+        assign zbkb_result = '0;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -856,44 +828,29 @@ module execute
 
     always_comb begin
         unique case (1'b1)
-            ctrl_i.is_csr:          result = csr_data_read_i;
-            ctrl_i.is_jal_jalr:     result = pc_next;
-            ctrl_i.is_slt:          result = {31'b0, less_than};
-            ctrl_i.is_sltu:         result = {31'b0, less_than_unsigned};
-            ctrl_i.is_xor:          result = xor_result;
-            ctrl_i.is_or:           result = or_result;
-            ctrl_i.is_and:          result = and_result;
-            ctrl_i.is_sll:          result = sll_result;
-            ctrl_i.is_srl:          result = srl_result;
-            ctrl_i.is_sra:          result = sra_result;
-            ctrl_i.is_lui:          result = second_operand_i;
-            ctrl_i.is_auipc:        result = jump_imm_target_i;
-            ctrl_i.is_div:          result = (MULEXT == MUL_M)          ? div_result                           : sum_result;
-            ctrl_i.is_rem:          result = (MULEXT == MUL_M)          ? rem_result                           : sum_result;
-            ctrl_i.is_mul:          result = (MULEXT != MUL_OFF)        ? mul_result                           : sum_result;
-            ctrl_i.is_aes:          result = ZKNEEnable                 ? aes_result                           : sum_result;
-            ctrl_i.is_vector:       result = VEnable                    ? vector_scalar_result                 : sum_result;
-            ctrl_i.is_zicond:       result = ZICONDEnable               ? result_zicond                        : sum_result;
-            ctrl_i.is_sc:           result = (AMOEXT inside {AMO_ZALRSC, AMO_A}) ? {31'h0, lrsc_result}       : sum_result;
-            ctrl_i.zbkb_is_ror:     result = ZBKBEnable                 ? shift_result                         : sum_result;
-            ctrl_i.zbkb_is_rol:     result = ZBKBEnable                 ? shift_result                         : sum_result;
-            ctrl_i.zbkb_is_orn:     result = ZBKBEnable                 ? bwlogic_result                       : sum_result;
-            ctrl_i.zbkb_is_andn:    result = ZBKBEnable                 ? bwlogic_result                       : sum_result;
-            ctrl_i.zbkb_is_rev8:    result = ZBKBEnable                 ? rev_result                           : sum_result;
-            ctrl_i.zbkb_is_brev8:   result = ZBKBEnable                 ? rev_result                           : sum_result;
-            ctrl_i.zbkb_is_zip:     result = ZBKBEnable                 ? shuffle_result                       : sum_result;
-            ctrl_i.zbkb_is_unzip:   result = ZBKBEnable                 ? shuffle_result                       : sum_result;
-            ctrl_i.zbkb_is_xnor:    result = ZBKBEnable                 ? bwlogic_result                       : sum_result;
-            ctrl_i.is_zbkb:         result = ZBKBEnable                 ? pack_result                          : sum_result;
-            default: begin
-                /* SHA2/Kyber ops set no ctrl one-hot bit, so they land here */
-                if (ZKNHEnable && instruction_operation_i inside {SIG0H, SIG0L, SIG1H, SIG1L, SUM0R, SUM1R, SIG0, SIG1, SUM0, SUM1})
-                    result = sha2_result;
-                else if (XKYBEREnable && is_xkyber)
-                    result = xkyber_result;
-                else
-                    result = sum_result;
-            end
+            ctrl_i.is_csr:                                       result = csr_data_read_i;
+            ctrl_i.is_jal_jalr:                                  result = pc_next;
+            ctrl_i.is_slt:                                       result = {31'b0, less_than};
+            ctrl_i.is_sltu:                                      result = {31'b0, less_than_unsigned};
+            ctrl_i.is_xor:                                       result = xor_result;
+            ctrl_i.is_or:                                        result = or_result;
+            ctrl_i.is_and:                                       result = and_result;
+            ctrl_i.is_sll:                                       result = sll_result;
+            ctrl_i.is_srl:                                       result = srl_result;
+            ctrl_i.is_sra:                                       result = sra_result;
+            ctrl_i.is_lui:                                       result = second_operand_i;
+            ctrl_i.is_auipc:                                     result = jump_imm_target_i;
+            (MULEXT == MUL_M && ctrl_i.is_div):                  result = div_result;
+            (MULEXT == MUL_M && ctrl_i.is_rem):                  result = rem_result;
+            (MULEXT != MUL_OFF && ctrl_i.is_mul):                result = mul_result;
+            (AMOEXT inside {AMO_ZALRSC, AMO_A} && ctrl_i.is_sc): result = {31'h0, lrsc_result};
+            (ZICONDEnable && ctrl_i.is_zicond):                  result = result_zicond;
+            (ZBKBEnable && ctrl_i.is_zbkb):                      result = zbkb_result;
+            (ZKNEEnable && ctrl_i.is_aes):                       result = aes_result;
+            (ZKNHEnable && ctrl_i.is_sha2):                      result = sha2_result;
+            (VEnable && ctrl_i.is_vector):                       result = vector_scalar_result;
+            (XKYBEREnable && ctrl_i.is_kyber):                   result = xkyber_result;
+            default:                                             result = sum_result;
         endcase
     end
 

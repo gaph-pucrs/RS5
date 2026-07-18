@@ -23,8 +23,8 @@ module sha2_unit
     parameter LOGIC_GATING = 1  // Gate sub-module inputs to save toggling
 )
 (
-    input  logic       sha2_en_i,
-    input  iType_e     sha2_op_i,
+    input  logic        sha2_en_i,
+    input  iTypeSha2_e  sha2_op_i,
 
     input  logic[31:0] op_a_i,
     input  logic[31:0] op_b_i,
@@ -40,18 +40,18 @@ module sha2_unit
     always_comb begin
         unique case (sha2_op_i)
             // SHA256 instructions
-            SIG0: sha2_result_o = `ROTR(op_a_gated, 7) ^ `ROTR(op_a_gated, 18) ^ (op_a_gated >> 3);
-            SIG1: sha2_result_o = `ROTR(op_a_gated, 17) ^ `ROTR(op_a_gated, 19) ^ (op_a_gated >> 10);
-            SUM0: sha2_result_o = `ROTR(op_a_gated, 2) ^ `ROTR(op_a_gated, 13) ^ `ROTR(op_a_gated, 22);
-            SUM1: sha2_result_o = `ROTR(op_a_gated, 6) ^ `ROTR(op_a_gated, 11) ^ `ROTR(op_a_gated, 25);
+            SHA2SIG0: sha2_result_o = `ROTR(op_a_gated, 7) ^ `ROTR(op_a_gated, 18) ^ (op_a_gated >> 3);
+            SHA2SIG1: sha2_result_o = `ROTR(op_a_gated, 17) ^ `ROTR(op_a_gated, 19) ^ (op_a_gated >> 10);
+            SHA2SUM0: sha2_result_o = `ROTR(op_a_gated, 2) ^ `ROTR(op_a_gated, 13) ^ `ROTR(op_a_gated, 22);
+            SHA2SUM1: sha2_result_o = `ROTR(op_a_gated, 6) ^ `ROTR(op_a_gated, 11) ^ `ROTR(op_a_gated, 25);
 
             // SHA512 instructions
-            SIG0H: sha2_result_o = (op_a_gated >> 1) ^ (op_a_gated >> 7) ^ (op_a_gated >> 8) ^ (op_b_gated << 31) ^ (op_b_gated << 24);
-            SIG0L: sha2_result_o = (op_a_gated >> 1) ^ (op_a_gated >> 7) ^ (op_a_gated >> 8) ^ (op_b_gated << 31) ^ (op_b_gated << 25) ^ (op_b_gated << 24);
-            SIG1H: sha2_result_o = (op_a_gated << 3) ^ (op_a_gated >> 6) ^ (op_a_gated >> 19) ^ (op_b_gated >> 29) ^ (op_b_gated << 13);
-            SIG1L: sha2_result_o = (op_a_gated << 3) ^ (op_a_gated >> 6) ^ (op_a_gated >> 19) ^ (op_b_gated >> 29) ^ (op_b_gated << 26) ^ (op_b_gated << 13);
-            SUM0R: sha2_result_o = (op_a_gated << 25) ^ (op_a_gated << 30) ^ (op_a_gated >> 28) ^ (op_b_gated >> 7) ^ (op_b_gated >> 2) ^ (op_b_gated << 4);
-            SUM1R: sha2_result_o = (op_a_gated << 23) ^ (op_a_gated >> 14) ^ (op_a_gated >> 18) ^ (op_b_gated >> 9) ^ (op_b_gated << 18) ^ (op_b_gated << 14);
+            SHA2SIG0H: sha2_result_o = (op_a_gated >> 1) ^ (op_a_gated >> 7) ^ (op_a_gated >> 8) ^ (op_b_gated << 31) ^ (op_b_gated << 24);
+            SHA2SIG0L: sha2_result_o = (op_a_gated >> 1) ^ (op_a_gated >> 7) ^ (op_a_gated >> 8) ^ (op_b_gated << 31) ^ (op_b_gated << 25) ^ (op_b_gated << 24);
+            SHA2SIG1H: sha2_result_o = (op_a_gated << 3) ^ (op_a_gated >> 6) ^ (op_a_gated >> 19) ^ (op_b_gated >> 29) ^ (op_b_gated << 13);
+            SHA2SIG1L: sha2_result_o = (op_a_gated << 3) ^ (op_a_gated >> 6) ^ (op_a_gated >> 19) ^ (op_b_gated >> 29) ^ (op_b_gated << 26) ^ (op_b_gated << 13);
+            SHA2SUM0R: sha2_result_o = (op_a_gated << 25) ^ (op_a_gated << 30) ^ (op_a_gated >> 28) ^ (op_b_gated >> 7) ^ (op_b_gated >> 2) ^ (op_b_gated << 4);
+            SHA2SUM1R: sha2_result_o = (op_a_gated << 23) ^ (op_a_gated >> 14) ^ (op_a_gated >> 18) ^ (op_b_gated >> 9) ^ (op_b_gated << 18) ^ (op_b_gated << 14);
 
             default: sha2_result_o = `ROTR(op_a_gated, 7) ^ `ROTR(op_a_gated, 18) ^ (op_a_gated >> 3);
         endcase

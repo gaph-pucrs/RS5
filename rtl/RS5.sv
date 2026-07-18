@@ -185,8 +185,6 @@ module RS5
     logic         [11:0] csr_addr;
     logic         [31:0] pc_execute, rs1_data_execute, rs2_data_execute;
     logic         [31:0] second_operand_execute, instruction_execute, jump_imm_target_exec;
-    iType_e              instruction_operation_execute;
-    iTypeVector_e        vector_operation_execute;
 
 
     assign enable_decode = !(stall || hold);
@@ -245,9 +243,7 @@ module RS5
         .rs2_data_o                 (rs2_data_execute             ),
         .second_operand_o           (second_operand_execute       ),
         .instruction_o              (instruction_execute          ),
-        .jump_imm_target_o          (jump_imm_target_exec         ),
-        .instruction_operation_o    (instruction_operation_execute),
-        .vector_operation_o         (vector_operation_execute     )
+        .jump_imm_target_o          (jump_imm_target_exec         )
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -349,7 +345,6 @@ module RS5
         .second_operand_i        (second_operand_execute       ),
         .jump_imm_target_i       (jump_imm_target_exec         ),
         .instruction_i           (instruction_execute          ),
-        .vector_operation_i      (vector_operation_execute     ),
 
         .exc_load_access_fault_i (load_access_fault            ),
         .reservation_data_i      (reservation_data             ),
@@ -496,11 +491,8 @@ module RS5
         .operation_i                (csr_operation),
         .address_i                  (CSRs'(csr_addr)),
         .data_i                     (csr_data_to_write),
-        .killed                     (ctrl_execute.killed),
         .data_o                     (csr_data_read),
-        .instruction_operation_i    (instruction_operation_execute),
-        .vector_operation_i         (vector_operation_execute),
-        .hazard                     (ctrl_execute.hazard),
+        .ctrl_i                     (ctrl_execute),
         .stall                      (stall),
         .hold                       (hold),
         .vtype_i                    (vtype),
@@ -514,7 +506,6 @@ module RS5
         .pc_irq_i                   (pc_irq),
         .pc_exc_i                   (pc_exc),
         .instruction_i              (instruction_execute),
-        .instruction_compressed_i   (ctrl_execute.compressed),
         .jump_misaligned_i          (decode_ctrl.jump_misaligned),
         .jump_target_i              (jump_target),
         .mtime_i                    (mtime_i),
