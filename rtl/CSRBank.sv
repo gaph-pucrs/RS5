@@ -36,6 +36,7 @@ module CSRBank
 `endif
     parameter bit       HPMCOUNTEREnable = 1'b0,
     parameter bit       XOSVMEnable      = 1'b0,
+    parameter bit       XKYBEREnable     = 1'b0,
     parameter bit       COMPRESSED       = 1'b0,
     parameter mul_e     MULEXT           = MUL_M,
     parameter atomic_e  AMOEXT           = AMO_A,
@@ -118,31 +119,31 @@ module CSRBank
 
     logic [31:0] misa;
     assign misa = {
-        2'b1,           // MXL
-        4'b0,           // 0
-        2'b0,           // YZ - Reserved
-        XOSVMEnable,    // X - Non-standard extensions present
-        1'b0,           // W - Reserved
-        VEnable,        // V - Vector extension
-        1'b1,           // U - User mode implemented
-        1'b0,           // T - Reserved
-        1'b0,           // S - Supervisor mode implemented
-        1'b0,           // R - Reserved
-        1'b0,           // Q - Quad-precision floating-point extension
-        1'b0,           // P - Packed-SIMD extension
-        1'b0,           // O - Reserved
-        1'b0,           // N - User level interrupts supported
-        (MULEXT==MUL_M),// M - Integer Multiply/Divide extension
-        3'b0,           // JKL - Reserved
-        1'b1,           // I - RV32I/64I/128I base ISA
-        1'b0,           // H - Hypervisor extension
-        1'b0,           // G - Reserved
-        1'b0,           // F - Single precision floating-point extension
-        1'b0,           // E - RV32E base ISA
-        1'b0,           // D - Double precision floating-point extension
-        (COMPRESSED),   // C - Compressed extension
-        1'b0,           // B - Bit-Manipulation extension
-        (AMOEXT==AMO_A) // A - Atomic Extension
+        2'b1,                        // MXL
+        4'b0,                        // 0
+        2'b0,                        // YZ - Reserved
+        XOSVMEnable || XKYBEREnable, // X - Non-standard extensions present
+        1'b0,                        // W - Reserved
+        VEnable,                     // V - Vector extension
+        1'b1,                        // U - User mode implemented
+        1'b0,                        // T - Reserved
+        1'b0,                        // S - Supervisor mode implemented
+        1'b0,                        // R - Reserved
+        1'b0,                        // Q - Quad-precision floating-point extension
+        1'b0,                        // P - Packed-SIMD extension
+        1'b0,                        // O - Reserved
+        1'b0,                        // N - User level interrupts supported
+        (MULEXT==MUL_M),             // M - Integer Multiply/Divide extension
+        3'b0,                        // JKL - Reserved
+        1'b1,                        // I - RV32I/64I/128I base ISA
+        1'b0,                        // H - Hypervisor extension
+        1'b0,                        // G - Reserved
+        1'b0,                        // F - Single precision floating-point extension
+        1'b0,                        // E - RV32E base ISA
+        1'b0,                        // D - Double precision floating-point extension
+        (COMPRESSED),                // C - Compressed extension
+        1'b0,                        // B - Bit-Manipulation extension
+        (AMOEXT==AMO_A)              // A - Atomic Extension
     };
 
 ////////////////////////////////////////////////////////////////////////////////
