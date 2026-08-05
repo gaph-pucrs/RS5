@@ -44,5 +44,3 @@ sim/obj_dir
 riscof/*_work
 riscof/**/__pycache__
 riscof/riscv-arch-test
-.arch_stamp
-.mem_size_stamp

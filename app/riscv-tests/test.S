@@ -103,21 +103,6 @@ _entry:
 	/* RV32UC */
 	TEST(rvc)
 
-	/* RV32ZBKB */
-	TEST(rol)
-	TEST(ror)
-	TEST(rori)
-	TEST(andn)
-	TEST(orn)
-	TEST(xnor)
-	TEST(pack)
-	TEST(packh)
-	TEST(brev8)
-	TEST(rev8)
-	TEST(zip)
-	TEST(unzip)
-
-
 	/* RV32UA */
 	TEST(amoadd_w)
 	TEST(amoand_w)

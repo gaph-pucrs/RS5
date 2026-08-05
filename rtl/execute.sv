@@ -32,9 +32,6 @@ module execute
     parameter atomic_e      AMOEXT       = AMO_A,
     parameter bit           COMPRESSED   = 1'b1,
     parameter bit           ZKNEEnable   = 1'b0,
-    parameter bit           ZBKBEnable   = 1'b0,
-    parameter bit           ZKNHEnable   = 1'b0,
-    parameter bit           XKYBEREnable = 1'b0,
     parameter bit           ZICONDEnable = 1'b0,
     parameter bit           VEnable      = 1'b0,
     parameter int           VLEN         = 64,
@@ -165,6 +162,12 @@ module execute
     logic           greater_equal_unsigned;
 
     logic [31:0] sum2_opB;
+    always_comb begin
+        unique case (instruction_operation_i)
+            SUB:       sum2_opB = -second_operand_i;
+            default:   sum2_opB =  second_operand_i; // AMO_W
+        endcase
+    end
 
     // Can be assigned by atomic instructions or rs1_data_i
     logic [31:0] first_operand;
@@ -179,39 +182,6 @@ module execute
     assign sll_result              = rs1_data_i << second_operand_i[4:0];
     assign srl_result              = rs1_data_i >> second_operand_i[4:0];
     assign sra_result              = $signed(rs1_data_i) >>> second_operand_i[4:0];
-
-    logic [31:0] amo_operand;
-
-    logic [31:0] xkyber_alu_operand_a, xkyber_alu_operand_b;
-
-    always_comb begin
-        unique case (instruction_operation_i)
-            AMO_W:
-                first_operand = (AMOEXT inside {AMO_A, AMO_ZAAMO}) ? amo_operand : rs1_data_i;
-            KYBER_ADD, 
-            KYBER_SUB, 
-            KYBER_CBD2, 
-            KYBER_CBD3, 
-            KYBER_MUL, 
-            KYBER_COMPRESS:
-                first_operand = (XKYBEREnable) ? xkyber_alu_operand_a : rs1_data_i;
-            default:
-                first_operand = rs1_data_i;
-        endcase
-    end
-
-    always_comb begin
-        unique case (instruction_operation_i)
-            SUB:
-                sum2_opB = -second_operand_i;
-            KYBER_SUB, 
-            KYBER_MUL, 
-            KYBER_COMPRESS:
-                sum2_opB = (XKYBEREnable) ? xkyber_alu_operand_b : second_operand_i;
-            default:
-                sum2_opB = second_operand_i; // AMO_W
-        endcase
-    end
 
     /* Muxed operators */
     assign sum_result              = first_operand + sum2_opB;
@@ -228,6 +198,8 @@ module execute
 //////////////////////////////////////////////////////////////////////////////
 // Load/Store signals
 //////////////////////////////////////////////////////////////////////////////
+
+    logic [31:0] amo_operand;
 
     /* verilator lint_off UNUSEDSIGNAL */
     logic [31:0] mem_address_vector;
@@ -409,75 +381,7 @@ module execute
     logic        hold_mul;
     logic        hold_div;
 
-
-/////////////////////////////////////////////////////////////////////////////
-// Xkyber signals
-//////////////////////////////////////////////////////////////////////////////
-
-    logic hold_xkyber;
-    logic [31:0] xkyber_result;
-
-    logic is_xkyber;
-
-    assign is_xkyber = (instruction_operation_i inside {KYBER_ADD, KYBER_SUB,KYBER_CBD2, KYBER_CBD3, KYBER_MUL, KYBER_COMPRESS});
-
-    logic [15:0] mult_kyber_op_a, mult_kyber_op_b;
-
-    if (XKYBEREnable) begin : gen_xkyber_on
-
-        logic [2:0]  cbd_result_high;
-        logic [2:0]  cbd_result_low;
-
-        logic eta_is_3;
-        assign eta_is_3 = (instruction_operation_i == KYBER_CBD3);
-
-        assign cbd_result_high = eta_is_3 ?
-            (3'(first_operand[6]) + 3'(first_operand[7]) + 3'(first_operand[8])) -
-            (3'(first_operand[9]) + 3'(first_operand[10]) + 3'(first_operand[11])) :
-            (3'(first_operand[4]) + 3'(first_operand[5])) -
-            (3'(first_operand[6]) + 3'(first_operand[7]));
-
-        assign cbd_result_low = eta_is_3 ?
-            (3'(first_operand[0]) + 3'(first_operand[1]) + 3'(first_operand[2])) -
-            (3'(first_operand[3]) + 3'(first_operand[4]) + 3'(first_operand[5])) :
-            (3'(first_operand[0]) + 3'(first_operand[1])) -
-            (3'(first_operand[2]) + 3'(first_operand[3]));
-
-        logic [3:0] kyber_compress_bits;
-
-        assign kyber_compress_bits = second_operand_i[3:0] & {4{instruction_operation_i == KYBER_COMPRESS}};
-
-        xkyber xkyber1 (
-            .clk                   (clk),
-            .reset_n               (reset_n),
-            .stall                 (stall),
-            .alu_adder_i           (sum_result),
-            .operator_i            (instruction_operation_i),
-            .first_operand_i       (rs1_data_i),
-            .second_operand_i      (rs2_data_i),
-            .is_xkyber_i           (is_xkyber),
-            .hold_o                (hold_xkyber),
-            .alu_operand_a_kyber_o (xkyber_alu_operand_a),
-            .alu_operand_b_kyber_o (xkyber_alu_operand_b),
-            .result_mul_i          (mul_result),
-            .alu_cbd_high_i        (cbd_result_high),
-            .alu_cbd_low_i         (cbd_result_low),
-            .mult_kyber_op_a       (mult_kyber_op_a),
-            .mult_kyber_op_b       (mult_kyber_op_b),
-            .kyber_compress_bits_i (kyber_compress_bits),
-            .result_o              (xkyber_result)
-        );     
-    end
-    else begin : gen_xkyber_off
-        assign hold_xkyber          = 1'b0;
-        assign xkyber_result        = '0;
-        assign mult_kyber_op_a      = '0;
-        assign mult_kyber_op_b      = '0;
-        assign xkyber_alu_operand_a = '0;
-        assign xkyber_alu_operand_b = '0;
-    end
-
-    if ((MULEXT != MUL_OFF) || XKYBEREnable) begin : gen_zmmul_on
+    if (MULEXT != MUL_OFF) begin : gen_zmmul_on
         logic [1:0] signed_mode_mul;
         logic       enable_mul;
         logic       mul_low;
@@ -493,17 +397,12 @@ module execute
         assign enable_mul = (instruction_operation_i inside {MUL, MULH, MULHU, MULHSU});
         assign mul_low    = (instruction_operation_i == MUL);
 
-        logic [31:0] mul_first_operand, mul_second_operand;
-
-        assign mul_first_operand  = (XKYBEREnable && is_xkyber) ? {16'b0, mult_kyber_op_a} : rs1_data_i;
-        assign mul_second_operand = (XKYBEREnable && is_xkyber) ? {16'b0, mult_kyber_op_b} : rs2_data_i; 
-
         mul mul1 (
             .clk              (clk),
             .reset_n          (reset_n),
             .stall            (stall),
-            .first_operand_i  (mul_first_operand),
-            .second_operand_i (mul_second_operand),
+            .first_operand_i  (rs1_data_i),
+            .second_operand_i (rs2_data_i),
             .signed_mode_i    (signed_mode_mul),
             .enable_i         (enable_mul),
             .mul_low_i        (mul_low),
@@ -515,8 +414,7 @@ module execute
     else begin : gen_zmmul_off
         assign hold_mul   = 1'b0;
         assign mul_result = '0;
-    end    
-
+    end
 
 /////////////////////////////////////////////////////////////////////////////
 // Division
@@ -577,32 +475,6 @@ module execute
     end
     else begin : zkne_gen_off
         assign aes_result = '0;
-    end
-
-//////////////////////////////////////////////////////////////////////////////
-// SHA2
-//////////////////////////////////////////////////////////////////////////////
-
-    logic [31:0] sha2_result;
-
-    if (ZKNHEnable) begin: zknh_gen_on
-        
-        logic sha2_en;
-
-        assign sha2_en = (instruction_operation_i inside {SIG0H,SIG0L,SIG1H,SIG1L,SUM0R,SUM1R,SIG0,SIG1,SUM0,SUM1});
-
-        sha2_unit #(
-            .LOGIC_GATING(1'b1)
-        ) u_sha2_unit (
-            .sha2_en_i(sha2_en),
-            .sha2_op_i(instruction_operation_i),
-            .op_a_i(first_operand),
-            .op_b_i(second_operand_i),
-            .sha2_result_o(sha2_result)
-        );
-    end
-    else begin : zknh_gen_off
-        assign sha2_result = '0;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -764,11 +636,13 @@ module execute
                 .opA_o             (amo_operand            )
             );
 
+            assign first_operand = (instruction_operation_i == AMO_W) ? amo_operand : rs1_data_i;
         end
         else begin : gen_zaamo_off
             assign amo_hold             = 1'b0;
             assign amo_mem_read_enable  = 1'b0;
             assign amo_mem_write_enable = 1'b0;
+            assign first_operand        = rs1_data_i;
             assign amo_operand          = '0;
             assign amo_write_enable     = 1'b0;
         end
@@ -779,6 +653,7 @@ module execute
         assign atomic_mem_write_enable = lrsc_mem_write_enable || amo_mem_write_enable;
     end
     else begin : gen_atomic_off
+        assign first_operand           = rs1_data_i;
         assign amo_operand             = '0;
         assign atomic_hold             = 1'b0;
         assign atomic_mem_read_enable  = 1'b0;
@@ -807,131 +682,6 @@ module execute
         assign result_zicond = '0;
     end
 
-    ////////////////////////////////////////////////////////////////////////////////
-    // ZBKB Extension
-    ////////////////////////////////////////////////////////////////////////////////
-
-    logic [31:0] shift_result;   
-    logic [31:0] pack_result;   
-    logic [31:0] bwlogic_result; 
-    logic [31:0] rev_result;   
-    logic [31:0] shuffle_result;    
-
-    if (ZBKBEnable) begin: zbkb_gen_on
-
-        //////////
-        // Pack //
-        //////////
-        logic packh;
-        assign packh = (instruction_operation_i == ALU_PACKH);
-
-        always_comb begin
-            unique case (1'b1)
-                packh:   pack_result = {16'h0, second_operand_i[7:0], rs1_data_i[7:0]};
-                default: pack_result = {second_operand_i[15:0], rs1_data_i[15:0]};
-            endcase
-        end
-
-        ///////////////////
-        // Bitwise Logic //
-        ///////////////////
-        logic bwlogic_or;
-        logic bwlogic_and;
-        logic [31:0] bwlogic_operand_b;
-        logic [31:0] bwlogic_or_result;
-        logic [31:0] bwlogic_and_result;
-        logic [31:0] bwlogic_xor_result;
-
-        assign bwlogic_operand_b = second_operand_i ^ {32{1'b1}};
-
-        assign bwlogic_or_result  = rs1_data_i | bwlogic_operand_b;
-        assign bwlogic_and_result = rs1_data_i & bwlogic_operand_b;
-        assign bwlogic_xor_result = rs1_data_i ^ bwlogic_operand_b;
-
-        assign bwlogic_or  = (instruction_operation_i == ALU_ORN);
-        assign bwlogic_and = (instruction_operation_i == ALU_ANDN);
-
-        always_comb begin
-            unique case (1'b1)
-                bwlogic_or:  bwlogic_result = bwlogic_or_result;
-                bwlogic_and: bwlogic_result = bwlogic_and_result;
-                default:     bwlogic_result = bwlogic_xor_result;
-            endcase
-        end
-
-        logic [4:0] shift_amt;
-        assign shift_amt[4:0] = second_operand_i[4:0];
-
-        logic [4:0] zbp_shift_amt;
-        assign zbp_shift_amt[2:0] = shift_amt[2:0];
-        assign zbp_shift_amt[4:3] = shift_amt[4:3];
-
-        always_comb begin
-            rev_result = rs1_data_i;
-
-            if (zbp_shift_amt[0]) begin
-                rev_result = ((rev_result & 32'h5555_5555) <<  1) |
-                            ((rev_result & 32'haaaa_aaaa) >>  1);
-            end
-
-            if (zbp_shift_amt[1]) begin
-                rev_result = ((rev_result & 32'h3333_3333) <<  2) |
-                            ((rev_result & 32'hcccc_cccc) >>  2);
-            end
-
-            if (zbp_shift_amt[2]) begin
-                rev_result = ((rev_result & 32'h0f0f_0f0f) <<  4) |
-                            ((rev_result & 32'hf0f0_f0f0) >>  4);
-            end
-
-            if (zbp_shift_amt[3]) begin
-                rev_result = ((rev_result & 32'h00ff_00ff) <<  8) |
-                            ((rev_result & 32'hff00_ff00) >>  8);
-            end
-
-            if (zbp_shift_amt[4]) begin
-                rev_result = ((rev_result & 32'h0000_ffff) << 16) |
-                            ((rev_result & 32'hffff_0000) >> 16);
-            end
-        end
-
-        always_comb begin
-            logic is_zip;
-            is_zip = instruction_operation_i == ALU_ZIP;
-
-            if (is_zip) begin
-                for (int i = 0; i < 16; i++) begin
-                    shuffle_result[2*i] = rs1_data_i[i];
-                    shuffle_result[2*i + 1] = rs1_data_i[i + 16];
-                end
-            end
-
-            else begin
-                for (int i = 0; i < 16; i++) begin
-                    shuffle_result[i]   = rs1_data_i[2*i];
-                    shuffle_result[i + 16] = rs1_data_i[2*i + 1];
-                end
-            end
-        end
-
-        logic [4:0] shift_amt_compl; // complementary shift amount (32 - shift_amt)
-
-        assign shift_amt_compl = 5'(6'd32 - {1'b0, second_operand_i[4:0]});
-
-        logic [31:0] ror_result, rol_result;
-
-        assign ror_result   =  srl_result | (rs1_data_i << shift_amt_compl);
-        assign rol_result   =  sll_result | (rs1_data_i >> shift_amt_compl);
-        assign shift_result = (instruction_operation_i == ALU_ROL) ? rol_result : ror_result;
-    end
-    else begin : gen_zbkb_off
-        assign shift_result   = '0;   
-        assign pack_result    = '0;   
-        assign bwlogic_result = '0;
-        assign rev_result     = '0;
-        assign shuffle_result = '0;    
-    end
-
 //////////////////////////////////////////////////////////////////////////////
 // Demux
 //////////////////////////////////////////////////////////////////////////////
@@ -939,35 +689,26 @@ module execute
     always_comb begin
         unique case (instruction_operation_i)
             CSRRW, CSRRS, CSRRC,
-            CSRRWI,CSRRSI,CSRRCI:                   result = csr_data_read_i;
-            JAL,JALR:                               result = pc_next;
-            SLT:                                    result = {31'b0, less_than};
-            SLTU:                                   result = {31'b0, less_than_unsigned};
-            XOR:                                    result = xor_result;
-            OR:                                     result = or_result;
-            AND:                                    result = and_result;
-            SLL:                                    result = sll_result;
-            SRL:                                    result = srl_result;
-            SRA:                                    result = sra_result;
-            LUI:                                    result = second_operand_i;
-            AUIPC:                                  result = jump_imm_target_i;
-            DIV,DIVU:                               result = (MULEXT == MUL_M)   ? div_result                           : sum_result;
-            REM,REMU:                               result = (MULEXT == MUL_M)   ? rem_result                           : sum_result;
-            MUL,MULH,MULHU,MULHSU:                  result = (MULEXT != MUL_OFF) ? mul_result                           : sum_result;
-            AES32ESI, AES32ESMI:                    result = ZKNEEnable          ? aes_result                           : sum_result;
-            VECTOR, VLOAD, VSTORE:                  result = VEnable             ? vector_scalar_result                 : sum_result;
-            CZERO_EQZ, CZERO_NEZ:                   result = ZICONDEnable        ? result_zicond                        : sum_result;
-            SC_W:                                   result = (AMOEXT inside {AMO_ZALRSC, AMO_A}) ? {31'h0, lrsc_result} : sum_result;
-            SIG0H,SIG0L,SIG1H,SIG1L,SUM0R,
-            SUM1R,SIG0,SIG1,SUM0,SUM1:              result = (ZKNHEnable)   ? sha2_result    : sum_result;
-            ALU_ROR, ALU_ROL:                       result = (ZBKBEnable)   ? shift_result   : sum_result;
-            ALU_PACK, ALU_PACKH:                    result = (ZBKBEnable)   ? pack_result    : sum_result; 
-            ALU_XNOR, ALU_ORN, ALU_ANDN:            result = (ZBKBEnable)   ? bwlogic_result : sum_result;
-            ALU_REV8, ALU_BREV8:                    result = (ZBKBEnable)   ? rev_result     : sum_result;
-            ALU_ZIP, ALU_UNZIP:                     result = (ZBKBEnable)   ? shuffle_result : sum_result;        
-            KYBER_ADD, KYBER_SUB, KYBER_CBD2, 
-            KYBER_CBD3, KYBER_MUL, KYBER_COMPRESS:  result = (XKYBEREnable) ? xkyber_result  : sum_result;  
-            default:                                result = sum_result;
+            CSRRWI,CSRRSI,CSRRCI:   result = csr_data_read_i;
+            JAL,JALR:               result = pc_next;
+            SLT:                    result = {31'b0, less_than};
+            SLTU:                   result = {31'b0, less_than_unsigned};
+            XOR:                    result = xor_result;
+            OR:                     result = or_result;
+            AND:                    result = and_result;
+            SLL:                    result = sll_result;
+            SRL:                    result = srl_result;
+            SRA:                    result = sra_result;
+            LUI:                    result = second_operand_i;
+            AUIPC:                  result = jump_imm_target_i;
+            DIV,DIVU:               result = (MULEXT == MUL_M)   ? div_result                           : sum_result;
+            REM,REMU:               result = (MULEXT == MUL_M)   ? rem_result                           : sum_result;
+            MUL,MULH,MULHU,MULHSU:  result = (MULEXT != MUL_OFF) ? mul_result                           : sum_result;
+            AES32ESI, AES32ESMI:    result = ZKNEEnable          ? aes_result                           : sum_result;
+            VECTOR, VLOAD, VSTORE:  result = VEnable             ? vector_scalar_result                 : sum_result;
+            CZERO_EQZ, CZERO_NEZ:   result = ZICONDEnable        ? result_zicond                        : sum_result;
+            SC_W:                   result = (AMOEXT inside {AMO_ZALRSC, AMO_A}) ? {31'h0, lrsc_result} : sum_result;
+            default:                result = sum_result;
         endcase
     end
 
@@ -999,7 +740,7 @@ module execute
 // Output Registers
 ////////////////////////////////////////////////////////////////////////////////
 
-    assign hold_o = (hold_div || hold_mul  || hold_xkyber || hold_vector || atomic_hold) && !exc_load_access_fault_i;
+    assign hold_o = (hold_div || hold_mul || hold_vector || atomic_hold) && !exc_load_access_fault_i;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
