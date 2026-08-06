@@ -13,16 +13,17 @@
 #include "../dataset/image1.h"
 
 typedef struct {
-    uint64_t to;
-    uint64_t tf;
-    uint64_t lapsed;
+    uint32_t to;
+    uint32_t tf;
+    uint32_t lapsed;
 } time;
 
 static time stemBlock_time;
 static time mfBlock_time[19];
 static time tran_conv_time[5];
 static time fc_time;
-static uint64_t data[24] = {0};
+static uint32_t data[24] = {0};
+static time total_cycles;
 
 #define PRINT_DATA()                                                \
     do {                                                            \
@@ -49,42 +50,44 @@ int main()
     uint32_t vlenb;
     __asm__ volatile("csrr %0, vlenb" : "=r"(vlenb));
 
-    printf("Running LMFRNet on image1... (vlen = %d)\n", vlenb*8);
+    printf("Running LMFRNet on image1... (vlen = %lu)\n", vlenb*8);
 
 //{{{
-    type out_stemBlock[32*32*32] = {0};
+    static type out_stemBlock[32*32*32] = {0};
 
-    type out_mf1[32*32*56] = {0};
-    type out_mf2[32*32*80] = {0};
-    type out_mf3[32*32*104] = {0};
-    type out_tran1[32*32*104] = {0};
-    type out_pool1[16*16*104] = {0};
+    static type out_mf1[32*32*56] = {0};
+    static type out_mf2[32*32*80] = {0};
+    static type out_mf3[32*32*104] = {0};
+    static type out_tran1[32*32*104] = {0};
+    static type out_pool1[16*16*104] = {0};
 
-    type out_mf4[16*16*128] = {0};
-    type out_mf5[16*16*152] = {0};
-    type out_mf6[16*16*176] = {0};
-    type out_mf7[16*16*200] = {0};
-    type out_tran2[16*16*200] = {0};
-    type out_pool2[8*8*200] = {0};
+    static type out_mf4[16*16*128] = {0};
+    static type out_mf5[16*16*152] = {0};
+    static type out_mf6[16*16*176] = {0};
+    static type out_mf7[16*16*200] = {0};
+    static type out_tran2[16*16*200] = {0};
+    static type out_pool2[8*8*200] = {0};
 
-    type out_mf8[8*8*224] = {0};
-    type out_mf9[8*8*248] = {0};
-    type out_mf10[8*8*272] = {0};
-    type out_mf11[8*8*296] = {0};
-    type out_mf12[8*8*320] = {0};
-    type out_mf13[8*8*344] = {0};
-    type out_mf14[8*8*368] = {0};
-    type out_mf15[8*8*392] = {0};
-    type out_tran3[8*8*392] = {0};
-    type out_pool3[4*4*392] = {0};
+    static type out_mf8[8*8*224] = {0};
+    static type out_mf9[8*8*248] = {0};
+    static type out_mf10[8*8*272] = {0};
+    static type out_mf11[8*8*296] = {0};
+    static type out_mf12[8*8*320] = {0};
+    static type out_mf13[8*8*344] = {0};
+    static type out_mf14[8*8*368] = {0};
+    static type out_mf15[8*8*392] = {0};
+    static type out_tran3[8*8*392] = {0};
+    static type out_pool3[4*4*392] = {0};
 
-    type out_mf16[4*4*416] = {0};
-    type out_mf17[4*4*440] = {0};
-    type out_mf18[4*4*464] = {0};
-    type out_tran4[4*4*464] = {0};
-    type out_gap[464] = {0};
-    type out_fc[10] = {0};
+    static type out_mf16[4*4*416] = {0};
+    static type out_mf17[4*4*440] = {0};
+    static type out_mf18[4*4*464] = {0};
+    static type out_tran4[4*4*464] = {0};
+    static type out_gap[464] = {0};
+    static type out_fc[10] = {0};
 //}}}
+
+    total_cycles.to = csr_read_mcycle();
 
     stemBlock_time.to = csr_read_mcycle();
         stemBlock(&stemBlock_shape, &stemBlock_params, image1, out_stemBlock);
@@ -245,9 +248,15 @@ int main()
         }
     }
 
+    total_cycles.tf = csr_read_mcycle();
+    total_cycles.lapsed = total_cycles.tf - total_cycles.to;
+
     printf("predicted class: %d (val = %d)\n", class, argmax);
 
-    PRINT_DATA();
+    // PRINT_DATA();
+
+    printf("total_cycles: %lu\n", total_cycles.lapsed);
+
     PRINT_PIPELINE();
 
     return 0;
