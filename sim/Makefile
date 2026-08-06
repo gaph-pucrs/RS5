@@ -45,4 +45,28 @@ clean:
 	@echo "-- CLEAN -------------------"
 	rm -rf obj_dir debug results
 
+VERILATOR_SIM_FLAGS  = -I../rtl -I../rtl/aes -I../rtl/vector -I../RingBuffer/rtl --timescale 1ns/1ns
+# -GVEnable=1 passes a 32-bit literal to a bit parameter; suppress the benign width warning
+VERILATOR_CONV_FLAGS = $(VERILATOR_FLAGS) -Wno-WIDTHTRUNC
+
+compile-%:
+	@echo "-- COMPILE $* ---"
+	@$(MAKE) -C ../app/$* clean all VLEN=$(VLEN) VEn=$(VEn)
+
+run-%:
+	@echo
+	@echo "-- VERILATE $* (VLEN=$(VLEN)) --"
+	@$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_INPUT) --binary -j 0 $(VERILATOR_SIM_FLAGS) \
+		-Wno-WIDTHTRUNC -GVEnable=$(VEn) -GVLEN=$(VLEN) -GBIN_FILE='"../app/$*/$*.bin"'
+	@echo
+	@echo "-- RUN $* (VLEN=$(VLEN)) -------"
+	@rm -rf debug results
+	@mkdir -p debug results
+	@obj_dir/Vtestbench
+	@echo
+	@echo "-- DONE $* (VLEN=$(VLEN)) ------"
+
+config:
+	echo $(VEn) $(VLEN)
+
 .PHONY: run clean

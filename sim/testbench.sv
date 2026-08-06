@@ -49,8 +49,8 @@ module testbench
     localparam bit           DUALPORT_MEM    = 1'b1;
     localparam int           RAM_DELAY_CYCLES= 0;
 
-    localparam bit           VEnable         = 1'b0;
-    localparam int           VLEN            = 512;
+    parameter  bit           VEnable         = 1'b0;
+    parameter  int           VLEN            = 512;
     localparam int           LLEN            = 32;
 
 `ifndef SYNTH
@@ -60,9 +60,9 @@ module testbench
     localparam string        PROFILING_FILE  = "./results/Report.txt";
     localparam string        OUTPUT_FILE     = "./results/Output.txt";
 
-    localparam int           BUS_WIDTH       = 32;
+    parameter  int           BUS_WIDTH       = 32;
     localparam int           MEM_ADDR_BITS   = 28;
-    localparam string        BIN_FILE        = "../app/riscv-tests/test.bin";
+    parameter  string        BIN_FILE        = "../app/riscv-tests/test.bin";
 
     localparam int           i_cnt = 1;
 
