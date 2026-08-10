@@ -34,7 +34,8 @@ module vectorLSU
     input  vector_states_e            current_state,
     input  logic                      hazard_detected_i,
 
-    input  iType_e                    instruction_operation_i,
+    input  logic                      is_vload_i,
+    input  logic                      is_vstore_i,
     input  logic                      whole_reg_load_store,
     input  vlmul_e                    vlmul,
 
@@ -142,7 +143,7 @@ module vectorLSU
     always_comb begin
         unique case (state)
             VLSU_IDLE:
-                if (instruction_operation_i inside {VLOAD, VSTORE} && current_state == V_IDLE && !hazard_detected_i)
+                if ((is_vload_i || is_vstore_i) && current_state == V_IDLE && !hazard_detected_i)
                     next_state = VLSU_FIRST_CYCLE;
                 else
                     next_state = VLSU_IDLE;
@@ -653,7 +654,7 @@ module vectorLSU
 // Output Control
 //////////////////////////////////////////////////////////////////////////////
 
-    assign hold_o = (instruction_operation_i == VSTORE)
+    assign hold_o = (is_vstore_i)
                     ? (state inside {VLSU_FIRST_CYCLE, VLSU_EXEC, VLSU_LAST_CYCLE})
                     : ((state == VLSU_FIRST_CYCLE && state_r == VLSU_IDLE) || (state_r inside {VLSU_FIRST_CYCLE, VLSU_EXEC, VLSU_LAST_CYCLE}));
 
@@ -662,7 +663,7 @@ module vectorLSU
     assign mem_write_data_o   = write_data << shift_amount;
 
     always_comb begin
-        if (instruction_operation_i == VSTORE) begin
+        if (is_vstore_i) begin
             if (addrMode == UNIT_STRIDED)
                 mem_write_enable_o = (state inside{VLSU_FIRST_CYCLE, VLSU_EXEC, VLSU_LAST_CYCLE})
                                     ? mem_write_enable

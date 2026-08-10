@@ -45,63 +45,57 @@ module decode
     input   logic           reset_n,
     input   logic           enable,
     input   logic           sys_reset,
-    input   logic           valid_i,
 
-    input   logic [31:0]    instruction_i,
+    /* Registered inputs from fetch */
+    input   decode_ctrl_t   ctrl_i,
     input   logic [31:0]    pc_i,
-    input   logic [31:0]    rs1_data_read_i,
-    input   logic [31:0]    rs2_data_read_i,
-    input   logic [31:0]    mem_access_result_i,
-    input   logic [31:0]    writeback_i,
-    input   logic [ 4:0]    rd_mem_access_i,
-    input   logic [ 4:0]    rd_retire_i,
-    input   logic           mem_access_we_i,
-    input   logic           regbank_we_i,
-    input   logic           compressed_i,
+    input   logic [31:0]    instruction_i,
+
+    /* Combinational inputs from execute */
     input   logic           should_jump_i,
-
-    /* Not used without forwarding */
-    /* verilator lint_off UNUSEDSIGNAL */
-    input   logic [31:0]    result_i,
-    input   logic           execute_we_i,
-    /* verilator lint_on UNUSEDSIGNAL */
-
-    output  logic  [4:0]    rs1_o,
-    output  logic  [4:0]    rs2_o,
-    output  logic  [4:0]    rd_o,
-    output  logic  [4:0]    instr_rs1_o,
-    output  logic [11:0]    csr_address_o,
-    output  logic [31:0]    rs1_data_o,
-    output  logic [31:0]    rs2_data_o,
-    output  logic [31:0]    second_operand_o,
-    output  logic [31:0]    pc_o,
-    output  logic [31:0]    instruction_o,
-    output  logic [31:0]    jump_imm_target_o,
-
-    output  logic           compressed_o,
-    output  iType_e         instruction_operation_o,
-    output  iTypeAtomic_e   atomic_operation_o,
-    output  iTypeVector_e   vector_operation_o,
-    output  logic           dec_hazard_o,
-    output  logic           hazard_o,
-    output  logic           killed_o,
-
     /* Not used without BP */
     /* verilator lint_off UNUSEDSIGNAL */
     input   logic           jump_rollback_i,
     /* verilator lint_on UNUSEDSIGNAL */
-    input   logic           jumping_i,
-    /* Not used without C */
+
+    /* Combinational inputs from mem_access */
+    input   logic           exc_inst_access_fault_i,
+
+    /* Combinational regbank access */
+    output  logic  [4:0]    rs1_o,
+    output  logic  [4:0]    rs2_o,
+    input   logic [31:0]    rs1_data_read_i,
+    input   logic [31:0]    rs2_data_read_i,
+
+    /* Combinational forwarding */
+    input   logic           regbank_we_i,
+    input   logic [ 4:0]    rd_retire_i,
+    input   logic [31:0]    writeback_i,
+    /* Not used without forwarding */
     /* verilator lint_off UNUSEDSIGNAL */
-    input   logic           jump_misaligned_i,
-    /* verilator lint_off UNUSEDSIGNAL */
+    input   logic           execute_we_i,
+    input   logic           mem_access_we_i,
+    input   logic [ 4:0]    rd_mem_access_i,
+    input   logic [31:0]    result_i,
+    input   logic [31:0]    mem_access_result_i,
+    /* verilator lint_on UNUSEDSIGNAL */  
+    
+    /* Combinational outputs to fetch */
+    output  logic           dec_hazard_o,
     output  logic           bp_take_o,
-    output  logic           bp_taken_o,
     output  logic [31:0]    bp_target_o,
 
-    input   logic           exc_inst_access_fault_i,
-    output  logic           exc_inst_access_fault_o,
-    output  logic           exc_ilegal_inst_o
+    /* Registered outputs to execute */
+    output  exec_ctrl_t     ctrl_o,
+    output  logic  [4:0]    rd_o,
+    output  logic  [4:0]    instr_rs1_o,
+    output  logic [11:0]    csr_address_o,
+    output  logic [31:0]    pc_o,
+    output  logic [31:0]    rs1_data_o,
+    output  logic [31:0]    rs2_data_o,
+    output  logic [31:0]    second_operand_o,
+    output  logic [31:0]    instruction_o,
+    output  logic [31:0]    jump_imm_target_o
 );
 
 //////////////////////////////////////////////////////////////////////////////
@@ -166,7 +160,6 @@ module decode
         endcase
     end
 
-
     iType_e brev_op;
     always_comb begin
         unique case (instruction_i[26:20])
@@ -175,7 +168,6 @@ module decode
             default:     brev_op = INVALID;
         endcase
     end
-
 
     iType_e decode_op_imm;
     always_comb begin
@@ -286,6 +278,7 @@ module decode
 
     logic         amo_invalid;
     iType_e       decode_atomic;
+    iTypeAtomic_e amo_op_next;
     if (AMOEXT != AMO_OFF) begin : gen_amo_on
         always_comb begin
             unique case (funct7[6:2])
@@ -313,23 +306,17 @@ module decode
             end
 
             assign amo_invalid = (instruction_operation == AMO_W) && (decode_amo == AMONOP);
-
-            always_ff @(posedge clk or negedge reset_n) begin
-                if (!reset_n)
-                    atomic_operation_o <= AMONOP;
-                else if (enable)
-                    atomic_operation_o <= decode_amo;
-            end
+            assign amo_op_next = decode_amo;
         end
         else begin : gen_zaamo_off
-            assign amo_invalid        = 1'b0;
-            assign atomic_operation_o = AMONOP;
+            assign amo_invalid = 1'b0;
+            assign amo_op_next = AMONOP;
         end
     end
     else begin : gen_amo_off
-        assign decode_atomic      = INVALID;
-        assign amo_invalid        = 1'b0;
-        assign atomic_operation_o = AMONOP;
+        assign decode_atomic = INVALID;
+        assign amo_invalid   = 1'b0;
+        assign amo_op_next   = AMONOP;
     end
 
     always_comb begin
@@ -450,30 +437,20 @@ module decode
                     default:             vector_operation = VNOP;
                 endcase
             end
+            else if (instruction_operation == VLOAD) begin
+                vector_operation = VLD;
+            end
+            else if (instruction_operation == VSTORE) begin
+                vector_operation = VST;
+            end
             else begin
                 vector_operation = VNOP;
             end
         end
 
-        always_ff @(posedge clk)
-            if (instruction_operation_o == VECTOR && vector_operation_o == VNOP)
-                $display("%0t - INVALID VECTOR INST!!! - %h", $time, instruction_o);
-
-        always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n) begin
-                vector_operation_o <= VNOP;
-            end
-            else if (enable) begin
-                if (hazard || killed)
-                    vector_operation_o <= VNOP;
-                else
-                    vector_operation_o <= vector_operation;
-            end
-        end
     end
-    else begin : v_enable_decode_gen_on
+    else begin : v_enable_decode_gen_off
         assign vector_operation = VNOP;
-        assign vector_operation_o = VNOP;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -544,23 +521,13 @@ module decode
         assign bp_branch_taken = (opcode == 5'b11000 && imm_b[31]);
         assign bp_jump_taken   = (opcode == 5'b11011);
 
-        assign bp_take_o   = (bp_jump_taken || bp_branch_taken) && !jumping_i && !killed;
+        assign bp_take_o   = (bp_jump_taken || bp_branch_taken) && !ctrl_i.jumping && !killed;
 
-        assign jump_confirmed = should_jump_i || (jumping_i && !jump_rollback_i);
-        
-        always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n)
-                bp_taken_o <= 1'b0;
-            else if (sys_reset)
-                bp_taken_o <= 1'b0;
-            else if (enable && !hazard)
-                bp_taken_o <= bp_take_o;
-        end
+        assign jump_confirmed = should_jump_i || (ctrl_i.jumping && !jump_rollback_i);
     end
     else begin : gen_bp_off
         assign bp_take_o   = 1'b0;
-        assign bp_taken_o  = 1'b0;
-        assign jump_confirmed = should_jump_i || jumping_i;
+        assign jump_confirmed = should_jump_i || ctrl_i.jumping;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -694,24 +661,11 @@ module decode
     assign hazard_rs2 = locked_rs2 && use_rs2;
 
     logic invalid;
-    assign invalid      = jump_confirmed || jump_misaligned_i || !valid_i;
+    assign invalid      = jump_confirmed || ctrl_i.jump_misaligned || !ctrl_i.valid;
     assign killed       = invalid || exception;
     assign hazard       = (hazard_mem || hazard_rs1 || hazard_rs2) && !killed;
     assign dec_hazard_o = hazard;
 
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            killed_o <= 1'b0;
-        else if (enable)
-            killed_o <= killed;
-    end
-
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            hazard_o <= 1'b0;
-        else if (enable)
-            hazard_o <= hazard;
-    end
 
 //////////////////////////////////////////////////////////////////////////////
 // Exception Detection
@@ -725,19 +679,6 @@ module decode
 
     assign exception = exc_inst_access_fault || invalid_inst;
 
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            exc_ilegal_inst_o <= 1'b0;
-        else if (enable)
-            exc_ilegal_inst_o <= invalid_inst;
-    end
-
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            exc_inst_access_fault_o <= 1'b0;
-        else if (enable)
-            exc_inst_access_fault_o <= exc_inst_access_fault;
-    end
 
 //////////////////////////////////////////////////////////////////////////////
 // Control of the operands based on format
@@ -831,28 +772,173 @@ module decode
         if (!reset_n)
             instruction_o <= '0;
         else if (enable)
-            instruction_o <= (!COMPRESSED && compressed_i) ? {16'h0000, instruction_i[15:0]} : instruction_i;
+            instruction_o <= (!COMPRESSED && ctrl_i.compressed) ? {16'h0000, instruction_i[15:0]} : instruction_i;
+    end
+
+//////////////////////////////////////////////////////////////////////////////
+// Control struct combinational decode
+//////////////////////////////////////////////////////////////////////////////
+
+    exec_ctrl_t ctrl;
+
+    always_comb begin
+        ctrl = '0;
+
+        ctrl.is_nop          = instruction_operation == NOP;
+        ctrl.is_add          = instruction_operation == ADD;
+
+        // Result select
+        ctrl.is_csr          = instruction_operation inside {CSRRW, CSRRS, CSRRC, CSRRWI, CSRRSI, CSRRCI};
+        ctrl.is_jal_jalr     = instruction_operation inside {JAL, JALR};
+        ctrl.is_jalr         = instruction_operation == JALR;
+        ctrl.is_lui          = instruction_operation == LUI;
+        ctrl.is_auipc        = instruction_operation == AUIPC;
+        ctrl.is_slt          = instruction_operation == SLT;
+        ctrl.is_sltu         = instruction_operation == SLTU;
+        ctrl.is_xor          = instruction_operation == XOR;
+        ctrl.is_or           = instruction_operation == OR;
+        ctrl.is_and          = instruction_operation == AND;
+        ctrl.is_sll          = instruction_operation == SLL;
+        ctrl.is_srl          = instruction_operation == SRL;
+        ctrl.is_sra          = instruction_operation == SRA;
+        ctrl.is_sub          = instruction_operation == SUB;
+        ctrl.is_mul          = (MULEXT != MUL_OFF) && instruction_operation inside {MUL, MULH, MULHU, MULHSU};
+        ctrl.mul_low         = (MULEXT != MUL_OFF) && instruction_operation == MUL;
+        ctrl.mul_signed_mode = (MULEXT != MUL_OFF) && instruction_operation == MULH   ? 2'b11 :
+                               (MULEXT != MUL_OFF) && instruction_operation == MULHSU ? 2'b01 : 2'b00;
+        ctrl.is_div          = (MULEXT == MUL_M)   && instruction_operation inside {DIV, DIVU};
+        ctrl.is_rem          = (MULEXT == MUL_M)   && instruction_operation inside {REM, REMU};
+        ctrl.div_signed      = (MULEXT == MUL_M)   && instruction_operation inside {DIV, REM};
+        ctrl.is_aes          = ZKNEEnable   && instruction_operation inside {AES32ESI, AES32ESMI};
+        ctrl.aes_is_mix      = ZKNEEnable   && instruction_operation == AES32ESMI;
+        ctrl.is_vector       = VEnable      && instruction_operation inside {VECTOR, VLOAD, VSTORE};
+        ctrl.is_vector_mem   = VEnable      && instruction_operation inside {VLOAD, VSTORE};
+        ctrl.is_zicond       = ZICONDEnable && instruction_operation inside {CZERO_EQZ, CZERO_NEZ};
+        ctrl.zicond_is_eqz   = ZICONDEnable && instruction_operation == CZERO_EQZ;
+        ctrl.is_sha2         = ZKNHEnable   && instruction_operation inside {SIG0, SIG1, SUM0, SUM1, SIG0H, SIG0L,
+                                                                             SIG1H, SIG1L, SUM0R, SUM1R};
+        ctrl.is_zbkb         = ZBKBEnable   && instruction_operation inside {ALU_ROR, ALU_ROL, ALU_PACK, ALU_PACKH,
+                                                                             ALU_XNOR, ALU_ORN, ALU_ANDN, ALU_ZIP,
+                                                                             ALU_UNZIP, ALU_BREV8, ALU_REV8};
+        ctrl.is_kyber        = XKYBEREnable && instruction_operation inside {KYBER_ADD, KYBER_SUB, KYBER_CBD2,
+                                                                             KYBER_CBD3, KYBER_MUL, KYBER_COMPRESS};
+        ctrl.is_sc           = (AMOEXT inside {AMO_ZALRSC, AMO_A}) && instruction_operation == SC_W;
+
+        // Memory
+        ctrl.is_load         = instruction_operation inside {LB, LBU, LH, LHU, LW};
+        ctrl.is_store        = instruction_operation inside {SB, SH, SW};
+        ctrl.is_lr           = (AMOEXT inside {AMO_ZALRSC, AMO_A}) && instruction_operation == LR_W;
+        ctrl.is_amo          = (AMOEXT inside {AMO_ZAAMO,  AMO_A}) && instruction_operation == AMO_W;
+        ctrl.is_amo_w        = (AMOEXT != AMO_OFF)                 && instruction_operation inside {AMO_W, SC_W, LR_W};
+
+        // Memory width/sign
+        ctrl.is_byte         = instruction_operation inside {LB, LBU, SB};
+        ctrl.is_half         = instruction_operation inside {LH, LHU, SH};
+        ctrl.is_unsigned     = instruction_operation inside {LBU, LHU};
+
+        // Branch
+        ctrl.is_beq          = instruction_operation == BEQ;
+        ctrl.is_bne          = instruction_operation == BNE;
+        ctrl.is_blt          = instruction_operation == BLT;
+        ctrl.is_bltu         = instruction_operation == BLTU;
+        ctrl.is_bge          = instruction_operation == BGE;
+        ctrl.is_bgeu         = instruction_operation == BGEU;
+
+        // Write-back suppress (instructions that never write rd)
+        ctrl.rd_we           = !(instruction_operation inside {NOP, SB, SH, SW,
+                                                           BEQ, BNE, BLT, BLTU, BGE, BGEU});
+
+        // Opcode-derived system/exception flags
+        ctrl.is_ecall        = instruction_operation == ECALL;
+        ctrl.is_ebreak       = instruction_operation == EBREAK;
+        ctrl.is_mret         = instruction_operation == MRET;
+        ctrl.is_sret         = instruction_operation == SRET;
+        ctrl.is_wfi          = instruction_operation == WFI;
+
+        // CSR operation type
+        unique case (instruction_operation)
+            CSRRW, CSRRWI: ctrl.csr_op = WRITE;
+            CSRRS, CSRRSI: ctrl.csr_op = SET;
+            CSRRC, CSRRCI: ctrl.csr_op = CLEAR;
+            default:       ctrl.csr_op = NONE;
+        endcase
+
+        ctrl.csr_rd_uses_rs1 = instruction_operation inside {CSRRW, CSRRS, CSRRC};
+        ctrl.csr_wr_uses_rs1 = instruction_operation inside {CSRRS, CSRRC, CSRRSI, CSRRCI};
+
+        // Zbkb sub-op
+        unique case (instruction_operation)
+            ALU_ROR:   ctrl.zbkb_op = ZBKBROR;
+            ALU_ROL:   ctrl.zbkb_op = ZBKBROL;
+            ALU_PACK:  ctrl.zbkb_op = ZBKBPACK;
+            ALU_PACKH: ctrl.zbkb_op = ZBKBPACKH;
+            ALU_XNOR:  ctrl.zbkb_op = ZBKBXNOR;
+            ALU_ORN:   ctrl.zbkb_op = ZBKBORN;
+            ALU_ANDN:  ctrl.zbkb_op = ZBKBANDN;
+            ALU_ZIP:   ctrl.zbkb_op = ZBKBZIP;
+            ALU_UNZIP: ctrl.zbkb_op = ZBKBUNZIP;
+            ALU_BREV8: ctrl.zbkb_op = ZBKBBREV8;
+            ALU_REV8:  ctrl.zbkb_op = ZBKBREV8;
+            default:   ctrl.zbkb_op = ZBKBNOP;
+        endcase
+
+        ctrl.amo_op          = amo_op_next;
+        ctrl.vector_op       = vector_operation;
+
+        // SHA2 sub-op
+        unique case (instruction_operation)
+            SIG0:    ctrl.sha2_op = SHA2SIG0;
+            SIG1:    ctrl.sha2_op = SHA2SIG1;
+            SUM0:    ctrl.sha2_op = SHA2SUM0;
+            SUM1:    ctrl.sha2_op = SHA2SUM1;
+            SIG0H:   ctrl.sha2_op = SHA2SIG0H;
+            SIG0L:   ctrl.sha2_op = SHA2SIG0L;
+            SIG1H:   ctrl.sha2_op = SHA2SIG1H;
+            SIG1L:   ctrl.sha2_op = SHA2SIG1L;
+            SUM0R:   ctrl.sha2_op = SHA2SUM0R;
+            SUM1R:   ctrl.sha2_op = SHA2SUM1R;
+            default: ctrl.sha2_op = SHA2NOP;
+        endcase
+
+        // Kyber sub-op
+        unique case (instruction_operation)
+            KYBER_ADD:      ctrl.kyber_op = KYBADD;
+            KYBER_SUB:      ctrl.kyber_op = KYBSUB;
+            KYBER_CBD2:     ctrl.kyber_op = KYBCBD2;
+            KYBER_CBD3:     ctrl.kyber_op = KYBCBD3;
+            KYBER_MUL:      ctrl.kyber_op = KYBMUL;
+            KYBER_COMPRESS: ctrl.kyber_op = KYBCOMPRESS;
+            default:        ctrl.kyber_op = KYBNOP;
+        endcase
+
+        // Pipeline status fields
+        ctrl.compressed            = ctrl_i.compressed;
+        ctrl.bp_taken              = bp_take_o;
+        ctrl.exc_ilegal_inst       = invalid_inst;
+        ctrl.exc_inst_access_fault = exc_inst_access_fault;
+        ctrl.hazard                = hazard;
+        ctrl.killed                = killed;
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
-            compressed_o <= 1'b0;
-        else if (enable)
-            compressed_o <= compressed_i;
-    end
-
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            instruction_operation_o <= NOP;
-        end
-        else if (sys_reset) begin
-            instruction_operation_o <= NOP;
-        end
+            ctrl_o <= '0;
+        else if (sys_reset)
+            ctrl_o <= '0;
         else if (enable) begin
-            if (hazard || killed)
-                instruction_operation_o <= NOP;
+            if (hazard || killed) begin
+                ctrl_o        <= '0;
+                /* A bubble behaves as a NOP (e.g. for instruction counters) */
+                ctrl_o.is_nop <= 1'b1;
+                ctrl_o.hazard <= hazard;
+                ctrl_o.killed <= killed;
+                /* An excepting instruction is killed (turned into a NOP) */
+                /* but its exception must still reach execute             */
+                ctrl_o.exc_ilegal_inst       <= invalid_inst;
+                ctrl_o.exc_inst_access_fault <= exc_inst_access_fault;
+            end
             else
-                instruction_operation_o <= instruction_operation;
+                ctrl_o <= ctrl;
         end
     end
 
