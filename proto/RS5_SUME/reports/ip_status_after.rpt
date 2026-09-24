@@ -1,0 +1,48 @@
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2026 Advanced Micro Devices, Inc. All Rights Reserved.
+---------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2025.2.1 (lin64) Build 6403652 Thu Mar 19 13:47:00 MDT 2026
+| Date         : Wed Sep 23 17:13:19 2026
+| Host         : gaphs23.portoalegre.pucrsnet.br running 64-bit Rocky Linux release 8.10 (Green Obsidian)
+| Command      : report_ip_status
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+IP Status Summary
+
+1. Project IP Status
+--------------------
+Your project uses 5 IP. Some of these IP may have undergone changes in this release of the software. Please review the recommended actions.
+
+More information on the Xilinx versioning policy is available at www.xilinx.com.
+
+Project IP Instances
++---------------------+------------+---------------------+-----------+--------------------+---------+----------------+------------+----------------------+
+| Instance Name       | Status     | Recommendation      | Change    | IP Name            | IP      | New Version    | New        | Original Part        |
+|                     |            |                     | Log       |                    | Version |                | License    |                      |
++---------------------+------------+---------------------+-----------+--------------------+---------+----------------+------------+----------------------+
+| BRAM                | Up-to-date | No changes required |  *(1)     | Block Memory       | 8.4     | 8.4 (Rev. 12)  | Included   | xc7vx690tffg1761-3   |
+|                     |            |                     |           | Generator          | (Rev.   |                |            |                      |
+|                     |            |                     |           |                    | 12)     |                |            |                      |
++---------------------+------------+---------------------+-----------+--------------------+---------+----------------+------------+----------------------+
+| DRAM_RegBank        | Up-to-date | No changes required |  *(2)     | Distributed Memory | 8.0     | 8.0 (Rev. 17)  | Included   | xc7vx690tffg1761-3   |
+|                     |            |                     |           | Generator          | (Rev.   |                |            |                      |
+|                     |            |                     |           |                    | 17)     |                |            |                      |
++---------------------+------------+---------------------+-----------+--------------------+---------+----------------+------------+----------------------+
+| DRAM_Vector_RegBank | Up-to-date | No changes required |  *(3)     | Distributed Memory | 8.0     | 8.0 (Rev. 17)  | Included   | xc7vx690tffg1761-3   |
+|                     |            |                     |           | Generator          | (Rev.   |                |            |                      |
+|                     |            |                     |           |                    | 17)     |                |            |                      |
++---------------------+------------+---------------------+-----------+--------------------+---------+----------------+------------+----------------------+
+| FIFO_BUFFER_UART    | Up-to-date | No changes required |  *(4)     | FIFO Generator     | 13.2    | 13.2 (Rev. 14) | Included   | xc7vx690tffg1761-3   |
+|                     |            |                     |           |                    | (Rev.   |                |            |                      |
+|                     |            |                     |           |                    | 14)     |                |            |                      |
++---------------------+------------+---------------------+-----------+--------------------+---------+----------------+------------+----------------------+
+| clk_wiz_0           | Up-to-date | No changes required |  *(5)     | Clocking Wizard    | 6.0     | 6.0 (Rev. 18)  | Included   | xc7vx690tffg1761-3   |
+|                     |            |                     |           |                    | (Rev.   |                |            |                      |
+|                     |            |                     |           |                    | 18)     |                |            |                      |
++---------------------+------------+---------------------+-----------+--------------------+---------+----------------+------------+----------------------+
+*(1) /soft64/xilinx/ferramentas/Vivado/2025.2.1/data/ip/xilinx/blk_mem_gen_v8_4/doc/blk_mem_gen_v8_4_changelog.txt
+*(2) /soft64/xilinx/ferramentas/Vivado/2025.2.1/data/ip/xilinx/dist_mem_gen_v8_0/doc/dist_mem_gen_v8_0_changelog.txt
+*(3) /soft64/xilinx/ferramentas/Vivado/2025.2.1/data/ip/xilinx/dist_mem_gen_v8_0/doc/dist_mem_gen_v8_0_changelog.txt
+*(4) /soft64/xilinx/ferramentas/Vivado/2025.2.1/data/ip/xilinx/fifo_generator_v13_2/doc/fifo_generator_v13_2_changelog.txt
+*(5) /soft64/xilinx/ferramentas/Vivado/2025.2.1/data/ip/xilinx/clk_wiz_v6_0/doc/clk_wiz_v6_0_changelog.txt
+
+
