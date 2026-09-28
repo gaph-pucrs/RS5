@@ -236,18 +236,14 @@ module decode
 
     iType_e decode_xkyber;
     always_comb begin
-        
         unique case (funct7)
-
-          7'd0: decode_xkyber = KYBER_ADD;
-          7'd1: decode_xkyber = KYBER_SUB;
-          7'd2: decode_xkyber = KYBER_MUL;
-          7'd3: decode_xkyber = KYBER_COMPRESS;
-          7'd4: decode_xkyber = (instruction_i[24:20] == 5'd3) ? KYBER_CBD3 : KYBER_CBD2;
-          default: decode_xkyber = SLTU;
-
+          7'b0000000: decode_xkyber = KYBER_ADD;
+          7'b0000001: decode_xkyber = KYBER_SUB;
+          7'b0000010: decode_xkyber = KYBER_MUL;
+          7'b0000011: decode_xkyber = KYBER_COMPRESS;
+          7'b0000100: decode_xkyber = (instruction_i[24:20] == 5'd3) ? KYBER_CBD3 : KYBER_CBD2;
+          default:    decode_xkyber = INVALID;
         endcase
-
     end
 
     iType_e decode_misc_mem;
