@@ -24,10 +24,6 @@
 module riscof_tb
     import RS5_pkg::*;
 #(
-    parameter logic[31:0] SIG_START        = 0,
-    parameter logic[31:0] SIG_END          = 0,
-    parameter logic[31:0] TOHOST_ADDR      = 0,
-    parameter string      SIG_PATH         = "",
     parameter bit         MEnable          = 1'b0,
     parameter bit         AEnable          = 1'b0,
     parameter bit         COMPRESSED       = 1'b0,
@@ -327,21 +323,35 @@ module riscof_tb
 
     int fd;
 
+    logic [31:0] SIG_START, SIG_END, TOHOST_ADDR;
+    string       SIG_PATH;
+
     always_ff @(posedge clk) begin
         if (mem_address == TOHOST_ADDR && mem_write_enable != '0)
             $finish();
     end
 
     initial begin
+        if (!$value$plusargs("SIG_START=%h", SIG_START))
+            $fatal(1, "Missing +SIG_START=<hex>");
+        if (!$value$plusargs("SIG_END=%h", SIG_END))
+            $fatal(1, "Missing +SIG_END=<hex>");
+        if (!$value$plusargs("TOHOST_ADDR=%h", TOHOST_ADDR))
+            $fatal(1, "Missing +TOHOST_ADDR=<hex>");
+        if (!$value$plusargs("SIG_PATH=%s", SIG_PATH))
+            $fatal(1, "Missing +SIG_PATH=<path>");
+
         fd = $fopen(SIG_PATH, "w");
         #10ms;
         $finish();
     end
 
     final begin
-        for (int i = SIG_START; i < SIG_END; i=i+4)
-            $fwrite(fd, "%x\n", {RAM_MEM.RAM[i+3],RAM_MEM.RAM[i+2],RAM_MEM.RAM[i+1],RAM_MEM.RAM[i]});
-        $fclose(fd);
+        if (fd != 0) begin
+            for (int i = SIG_START; i < SIG_END; i=i+4)
+                $fwrite(fd, "%x\n", {RAM_MEM.RAM[i+3],RAM_MEM.RAM[i+2],RAM_MEM.RAM[i+1],RAM_MEM.RAM[i]});
+            $fclose(fd);
+        end
         $display("# %t END OF SIMULATION",$time);
     end
 

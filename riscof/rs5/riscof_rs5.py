@@ -57,7 +57,9 @@ class rs5(pluginTemplate):
         
         # set up the simulation command
         dut_dir = self.pluginpath + '/../../'
+        self.obj_dir = os.path.join(self.work_dir, 'obj_dir')
         self.verilatecmd = f'verilator --cc --exe --binary --timescale 1ns/1ns -j 0\
+            --Mdir {self.obj_dir}\
             -I{dut_dir}/RingBuffer/rtl/\
             -I{dut_dir}/rtl/\
             -I{dut_dir}/sim/\
@@ -108,6 +110,11 @@ class rs5(pluginTemplate):
         self.verilatecmd += " -GDELAY_CYCLES=" + os.environ["DELAY_CYCLES"]
 
         self.compile_cmd = self.compile_cmd+' -mabi='+('lp64 ' if 64 in ispec['supported_xlen'] else 'ilp32 ')
+
+        # compile the testbench once; per-test values are passed as plusargs
+        if self.target_run:
+            logger.info("Verilating riscof_tb: " + self.verilatecmd)
+            subprocess.run(self.verilatecmd, shell=True, check=True)
 
     def runTests(self, testList):
         # Delete Makefile if it already exists.
@@ -166,20 +173,17 @@ class rs5(pluginTemplate):
                 # generate .bin
                 objcopycmd = f'{self.triplet}-objcopy {elf} test.bin -O binary' 
 
-                verilatecmd = self.verilatecmd + f"\
-                    -GSIG_START=32\\'h{signature_start}\
-                    -GSIG_END=32\\'h{signature_end}\
-                    -GTOHOST_ADDR=32\\'h{tohost_addr}\
-                    -GSIG_PATH='\"{sig_file}\"'"
-
-                simcmd = './obj_dir/Vriscof_tb'
+                simcmd = f'{self.obj_dir}/Vriscof_tb\
+                    +SIG_START={signature_start}\
+                    +SIG_END={signature_end}\
+                    +TOHOST_ADDR={tohost_addr}\
+                    +SIG_PATH={sig_file}'
             else:
                 simcmd = 'echo "NO RUN"'
-                verilatecmd = ''
                 objcopycmd = ''
 
             # concatenate all commands that need to be executed within a make-target.
-            execute = 'cd {}; {}; {}; {}; {};'.format(testentry['work_dir'], cmd, objcopycmd, verilatecmd, simcmd)
+            execute = 'cd {}; {}; {}; {};'.format(testentry['work_dir'], cmd, objcopycmd, simcmd)
 
             # create a target
             make.add_target(execute)
