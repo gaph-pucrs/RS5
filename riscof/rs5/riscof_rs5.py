@@ -58,7 +58,7 @@ class rs5(pluginTemplate):
         # set up the simulation command
         dut_dir = self.pluginpath + '/../../'
         self.obj_dir = os.path.join(self.work_dir, 'obj_dir')
-        self.verilatecmd = f'verilator --cc --exe --binary --timescale 1ns/1ns -j 0\
+        self.verilatecmd = f'verilator --cc --exe --binary --quiet --timescale 1ns/1ns -j 0\
             --Mdir {self.obj_dir}\
             -I{dut_dir}/RingBuffer/rtl/\
             -I{dut_dir}/rtl/\
