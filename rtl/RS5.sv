@@ -76,112 +76,72 @@ module RS5
     input  logic [BUS_WIDTH-1:0]    mem_data_i
 );
 
-//////////////////////////////////////////////////////////////////////////////
-// Global signals
-//////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////// FETCH //////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    logic            jump;
-    logic            hazard;
-    logic            fetch_hazard;
-    logic            hold;
+    logic                hold;
+    logic                fetch_hazard;
 
-    logic            mmu_inst_fault;
-    logic            mmu_data_fault;
+    logic                enable_fetch;
+
+    logic                jump, ctx_switch, should_jump;
+    logic         [31:0] jump_target, ctx_switch_target;
+
+    logic                bp_take_fetch, jump_rollback, bp_ack;
+    logic         [31:0] bp_target;
+
+    logic         [31:0] instruction_address;
+
+    decode_ctrl_t        decode_ctrl;
+    logic         [31:0] instruction_decode, pc_decode;
+
+    assign enable_fetch  = !(stall || hold || fetch_hazard);
+
+    fetch #(
+        .start_address(START_ADDR ),
+        .IQUEUE_SIZE  (IQUEUE_SIZE),
+        .MULEXT       (MULEXT     ),
+        .ZCBEnable    (ZCBEnable  ),
+        .COMPRESSED   (COMPRESSED ),
+        .BRANCHPRED   (BRANCHPRED )
+    ) fetch1 (
+        .clk                  (clk                    ),
+        .reset_n              (reset_n                ),
+        .sys_reset            (sys_reset_i            ),
+        .enable_i             (enable_fetch           ),
+
+        .jump_i               (jump                   ),
+        .ctx_switch_i         (ctx_switch             ),
+        .should_jump_i        (should_jump            ),
+        .jump_target_i        (jump_target            ),
+        .ctx_switch_target_i  (ctx_switch_target      ),
+
+        .bp_take_i            (bp_take_fetch          ),
+        .bp_target_i          (bp_target              ),
+        .jump_rollback_i      (jump_rollback          ),
+        .bp_ack_o             (bp_ack                 ),
+
+        .mem_operation_en_o   (imem_operation_enable_o),
+        .busy_i               (busy_i                 ),
+        .instruction_address_o(instruction_address    ),
+        .instruction_data_i   (instruction_i          ),
+
+        .ctrl_o               (decode_ctrl            ),
+        .instruction_o        (instruction_decode     ),
+        .pc_o                 (pc_decode              )
+    );
 
     privilegeLevel_e privilege;
-    logic   [31:0]   jump_target;
-
-    logic                   mem_enable;
-    logic [31:0]            mem_address_exec;
-    logic [31:0]            instruction_address;
-
-    /* We always mask the two lsbs */
-    /* verilator lint_off UNUSEDSIGNAL */
-    logic   [31:0]   mem_address;
-    /* verilator lint_on UNUSEDSIGNAL */
-
-//////////////////////////////////////////////////////////////////////////////
-// Fetch signals
-//////////////////////////////////////////////////////////////////////////////
-
-    logic           enable_fetch;
-
-//////////////////////////////////////////////////////////////////////////////
-// Decoder signals
-//////////////////////////////////////////////////////////////////////////////
-
-    logic   [31:0]  pc_decode;
-    logic           enable_decode;
-    logic           jump_misaligned;
-
-//////////////////////////////////////////////////////////////////////////////
-// RegBank signals
-//////////////////////////////////////////////////////////////////////////////
-
-    logic    [4:0]  rs1, rs2;
-    logic   [31:0]  regbank_data1, regbank_data2;
-    logic    [4:0]  rd_retire;
-    logic   [31:0]  regbank_data_writeback;
-    logic           regbank_write_enable;
-
-//////////////////////////////////////////////////////////////////////////////
-// Execute signals
-//////////////////////////////////////////////////////////////////////////////
-
-    iType_e         instruction_operation_execute;
-    iTypeAtomic_e   atomic_operation_execute;
-    iTypeVector_e   vector_operation_execute;
-    logic   [31:0]  rs1_data_execute, rs2_data_execute, second_operand_execute;
-    logic   [31:0]  instruction_execute;
-    logic   [31:0]  pc_execute;
-    logic    [4:0]  rd_execute;
-    logic    [4:0]  rs1_execute;
-    logic           exc_ilegal_inst_execute;
-    logic           exc_inst_access_fault_execute;
-    logic           instruction_compressed_execute;
-    logic   [31:0]  vtype, vlen;
-
-//////////////////////////////////////////////////////////////////////////////
-// Mem Access Signals
-//////////////////////////////////////////////////////////////////////////////
-
-    iType_e         instruction_operation_mem_access;
-    logic   [31:0]  result_mem_access;
-    logic    [4:0]  rd_mem_access;
-    logic           write_enable_mem_access;
-
-
-//////////////////////////////////////////////////////////////////////////////
-// Retire signals
-//////////////////////////////////////////////////////////////////////////////
-
-    iType_e         instruction_operation_retire;
-    logic   [31:0]  result_retire;
-    logic           killed;
-
-//////////////////////////////////////////////////////////////////////////////
-// CSR Bank signals
-//////////////////////////////////////////////////////////////////////////////
-
-    logic           csr_read_enable, csr_write_enable;
-    csrOperation_e  csr_operation;
-    logic   [11:0]  csr_addr;
-    logic   [31:0]  csr_data_to_write, csr_data_read;
-    logic   [31:0]  mepc, mtvec;
-    logic           RAISE_EXCEPTION, MACHINE_RETURN;
-    logic           interrupt_pending;
-    exceptionCode_e Exception_Code;
 
     /* Signals enabled with XOSVM */
     /* verilator lint_off UNUSEDSIGNAL */
-    logic   [31:0]  mvmdo, mvmio, mvmds, mvmis, mvmdm, mvmim;
-    logic           mvmctl;
-    logic           mmu_en;
+    logic            mmu_en;
+    logic            mvmctl;
+    logic     [31:0] mvmio, mvmis, mvmim;
     /* verilator lint_on UNUSEDSIGNAL */
 
-//////////////////////////////////////////////////////////////////////////////
-// Assigns
-//////////////////////////////////////////////////////////////////////////////
+    logic            mmu_inst_fault;
 
     if (XOSVMEnable == 1'b1) begin : gen_xosvm_mmu_on
         assign mmu_en = privilege != privilegeLevel_e'(2'b11) && mvmctl == 1'b1;
@@ -189,58 +149,6 @@ module RS5
     else begin : gen_xosvm_mmu_off
         assign mmu_en = 1'b0;
     end
-
-    assign enable_fetch  = !(stall || hold || fetch_hazard);
-    assign enable_decode = !(stall || hold);
-
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////// FETCH //////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-    logic        bp_ack;
-    logic        valid_fetch;
-    logic        should_jump;
-    logic        jump_rollback;
-    logic        jumping;
-    logic        ctx_switch;
-    logic        bp_take_fetch;
-    logic        compressed_decode;
-    logic [31:0] bp_target;
-    logic [31:0] ctx_switch_target;
-    logic [31:0] instruction_decode;
-
-    fetch #(
-        .start_address(START_ADDR),
-        .IQUEUE_SIZE  (IQUEUE_SIZE),
-        .MULEXT       (MULEXT),
-        .ZCBEnable    (ZCBEnable),
-        .COMPRESSED   (COMPRESSED),
-        .BRANCHPRED   (BRANCHPRED)
-    ) fetch1 (
-        .clk                  (clk                    ),
-        .reset_n              (reset_n                ),
-        .sys_reset            (sys_reset_i            ),
-        .enable_i             (enable_fetch           ),
-        .busy_i               (busy_i                 ),
-        .valid_o              (valid_fetch            ),
-        .bp_ack_o             (bp_ack                 ),
-        .jump_i               (jump                   ),
-        .should_jump_i        (should_jump            ),
-        .jump_rollback_i      (jump_rollback          ),
-        .jump_target_i        (jump_target            ),
-        .ctx_switch_i         (ctx_switch             ),
-        .ctx_switch_target_i  (ctx_switch_target      ),
-        .bp_take_i            (bp_take_fetch          ),
-        .bp_target_i          (bp_target              ),
-        .jumping_o            (jumping                ),
-        .jump_misaligned_o    (jump_misaligned        ),
-        .compressed_o         (compressed_decode      ),
-        .mem_operation_en_o   (imem_operation_enable_o),
-        .instruction_address_o(instruction_address    ),
-        .instruction_data_i   (instruction_i          ),
-        .instruction_o        (instruction_decode     ),
-        .pc_o                 (pc_decode              )
-    );
 
     if (XOSVMEnable == 1'b1) begin : gen_xosvm_i_mmu_on
         mmu i_mmu (
@@ -262,10 +170,24 @@ module RS5
 /////////////////////////////////////////////////////////// DECODER /////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    logic        bp_taken_exec;
-    logic        write_enable_exec;
-    logic [31:0] result_exec;
-    logic [31:0] jump_imm_target_exec;
+    logic               enable_decode;
+
+    logic         [4:0] rs1, rs2;
+    logic        [31:0] regbank_data1, regbank_data2;
+
+    wb_ctrl_t           ctrl_mem_access, ctrl_retire;
+    logic               write_enable_exec;
+    logic         [4:0] rd_mem_access, rd_retire;
+    logic        [31:0] result_exec, result_mem_access, regbank_data_writeback;
+
+    exec_ctrl_t          ctrl_execute;
+    logic          [4:0] rd_execute, rs1_execute;
+    logic         [11:0] csr_addr;
+    logic         [31:0] pc_execute, rs1_data_execute, rs2_data_execute;
+    logic         [31:0] second_operand_execute, instruction_execute, jump_imm_target_exec;
+
+
+    assign enable_decode = !(stall || hold);
 
     decode # (
         .MULEXT       (MULEXT      ),
@@ -280,52 +202,48 @@ module RS5
         .BRANCHPRED   (BRANCHPRED  ),
         .FORWARDING   (FORWARDING  )
     ) decoder1 (
-        .clk                        (clk),
-        .reset_n                    (reset_n),
-        .enable                     (enable_decode),
-        .sys_reset                  (sys_reset_i),
-        .valid_i                    (valid_fetch),
-        .instruction_i              (instruction_decode),
-        .pc_i                       (pc_decode),
-        .rs1_data_read_i            (regbank_data1),
-        .rs2_data_read_i            (regbank_data2),
-        .rd_mem_access_i            (rd_mem_access),
-        .rd_retire_i                (rd_retire),
-        .mem_access_result_i        (result_mem_access),
-        .writeback_i                (regbank_data_writeback),
-        .result_i                   (result_exec),
-        .mem_access_we_i            (write_enable_mem_access),
-        .regbank_we_i               (regbank_write_enable),
-        .execute_we_i               (write_enable_exec),
-        .rs1_o                      (rs1),
-        .rs2_o                      (rs2),
-        .rd_o                       (rd_execute),
-        .instr_rs1_o                (rs1_execute),
-        .csr_address_o              (csr_addr),
-        .rs1_data_o                 (rs1_data_execute),
-        .rs2_data_o                 (rs2_data_execute),
-        .second_operand_o           (second_operand_execute),
-        .pc_o                       (pc_execute),
-        .instruction_o              (instruction_execute),
-        .jump_imm_target_o          (jump_imm_target_exec),
-        .compressed_o               (instruction_compressed_execute),
-        .instruction_operation_o    (instruction_operation_execute),
-        .atomic_operation_o         (atomic_operation_execute),
-        .vector_operation_o         (vector_operation_execute),
-        .dec_hazard_o               (fetch_hazard),
-        .hazard_o                   (hazard),
-        .killed_o                   (killed),
-        .should_jump_i              (should_jump),
-        .jumping_i                  (jumping),
-        .jump_rollback_i            (jump_rollback),
-        .compressed_i               (compressed_decode),
-        .jump_misaligned_i          (jump_misaligned),
-        .bp_take_o                  (bp_take_fetch),
-        .bp_taken_o                 (bp_taken_exec),
-        .bp_target_o                (bp_target),
-        .exc_inst_access_fault_i    (mmu_inst_fault),
-        .exc_inst_access_fault_o    (exc_inst_access_fault_execute),
-        .exc_ilegal_inst_o          (exc_ilegal_inst_execute)
+        .clk                        (clk                          ),
+        .reset_n                    (reset_n                      ),
+        .enable                     (enable_decode                ),
+        .sys_reset                  (sys_reset_i                  ),
+
+        .ctrl_i                     (decode_ctrl                  ),
+        .pc_i                       (pc_decode                    ),
+        .instruction_i              (instruction_decode           ),
+
+        .should_jump_i              (should_jump                  ),
+        .jump_rollback_i            (jump_rollback                ),
+        
+        .exc_inst_access_fault_i    (mmu_inst_fault               ),
+
+        .rs1_o                      (rs1                          ),
+        .rs2_o                      (rs2                          ),
+        .rs1_data_read_i            (regbank_data1                ),
+        .rs2_data_read_i            (regbank_data2                ),
+
+        .execute_we_i               (write_enable_exec            ),
+        .mem_access_we_i            (ctrl_mem_access.rd_we        ),
+        .regbank_we_i               (ctrl_retire.rd_we            ),
+        .rd_mem_access_i            (rd_mem_access                ),
+        .rd_retire_i                (rd_retire                    ),
+        .result_i                   (result_exec                  ),
+        .mem_access_result_i        (result_mem_access            ),
+        .writeback_i                (regbank_data_writeback       ),
+
+        .dec_hazard_o               (fetch_hazard                 ),
+        .bp_take_o                  (bp_take_fetch                ),
+        .bp_target_o                (bp_target                    ),
+
+        .ctrl_o                     (ctrl_execute                 ),
+        .rd_o                       (rd_execute                   ),
+        .instr_rs1_o                (rs1_execute                  ),
+        .csr_address_o              (csr_addr                     ),
+        .pc_o                       (pc_execute                   ),
+        .rs1_data_o                 (rs1_data_execute             ),
+        .rs2_data_o                 (rs2_data_execute             ),
+        .second_operand_o           (second_operand_execute       ),
+        .instruction_o              (instruction_execute          ),
+        .jump_imm_target_o          (jump_imm_target_exec         )
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -334,21 +252,21 @@ module RS5
 
     if (Environment == FPGA) begin :RegFileFPGA_blk
         DRAM_RegBank RegBankA (
-            .clk        (clk),
-            .we         (regbank_write_enable),
-            .a          (rd_retire),
+            .clk        (clk                   ),
+            .we         (ctrl_retire.rd_we     ),
+            .a          (rd_retire             ),
             .d          (regbank_data_writeback),
-            .dpra       (rs1),
-            .dpo        (regbank_data1)
+            .dpra       (rs1                   ),
+            .dpo        (regbank_data1         )
         );
 
         DRAM_RegBank RegBankB (
-            .clk        (clk),
-            .we         (regbank_write_enable),
-            .a          (rd_retire),
+            .clk        (clk                   ),
+            .we         (ctrl_retire.rd_we     ),
+            .a          (rd_retire             ),
             .d          (regbank_data_writeback),
-            .dpra       (rs2),
-            .dpo        (regbank_data2)
+            .dpra       (rs2                   ),
+            .dpo        (regbank_data2         )
         );
     end
     else begin : RegFileFF_blk
@@ -358,28 +276,42 @@ module RS5
             .DBG_FILE   (DBG_REG_FILE)
         `endif
         ) regbankff (
-            .clk        (clk),
-            .reset_n    (reset_n),
-            .rs1        (rs1),
-            .rs2        (rs2),
-            .rd         (rd_retire),
-            .enable     (regbank_write_enable),
+            .clk        (clk                   ),
+            .reset_n    (reset_n               ),
+            .rs1        (rs1                   ),
+            .rs2        (rs2                   ),
+            .rd         (rd_retire             ),
+            .enable     (ctrl_retire.rd_we     ),
             .data_i     (regbank_data_writeback),
-            .data1_o    (regbank_data1),
-            .data2_o    (regbank_data2)
+            .data1_o    (regbank_data1         ),
+            .data2_o    (regbank_data2         )
         );
     end
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// EXECUTE /////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    
+    logic                  exec_valid;
 
-    logic [31:0] reservation_data;
-    logic [31:0] pc_irq;
-    logic [31:0] pc_exc;
-    logic        exec_valid;
-    logic        load_access_fault;
-    assign exec_valid = !(killed || hazard);
+    logic                  load_access_fault;
+    logic           [31:0] reservation_data;
+
+    csrOperation_e         csr_operation;
+    exceptionCode_e        Exception_Code;
+    logic                  interrupt_pending, csr_read_enable, csr_write_enable;
+    logic                  RAISE_EXCEPTION, MACHINE_RETURN;
+    logic           [31:0] csr_data_to_write, csr_data_read;
+    logic           [31:0] mepc, mtvec, vtype, vlen, pc_irq, pc_exc;
+
+    logic                   mem_enable;
+    logic            [31:0] mem_address_exec;
+    /* We always mask the two lsbs */
+    /* verilator lint_off UNUSEDSIGNAL */
+    logic            [31:0] mem_address;
+    /* verilator lint_on UNUSEDSIGNAL */
+
+    assign exec_valid = !(ctrl_execute.killed || ctrl_execute.hazard);
 
     execute #(
         .Environment  (Environment ),
@@ -397,124 +329,122 @@ module RS5
         .BUS_WIDTH    (BUS_WIDTH   ),
         .BRANCHPRED   (BRANCHPRED  )
     ) execute1 (
-        .clk                     (clk),
-        .reset_n                 (reset_n),
-        .stall                   (stall),
-        .bp_ack_i                (bp_ack),
-        .instruction_i           (instruction_execute),
-        .rs1_data_i              (rs1_data_execute),
-        .rs2_data_i              (rs2_data_execute),
-        .second_operand_i        (second_operand_execute),
-        .rd_i                    (rd_execute),
-        .rs1_i                   (rs1_execute),
-        .instruction_operation_i (instruction_operation_execute),
-        .atomic_operation_i      (atomic_operation_execute),
-        .vector_operation_i      (vector_operation_execute),
-        .privilege_i             (privilege),
-        .valid_i                 (exec_valid),
-        .exc_ilegal_inst_i       (exc_ilegal_inst_execute),
-        .exc_inst_access_fault_i (exc_inst_access_fault_execute),
-        .exc_load_access_fault_i (load_access_fault),
-        .hold_o                  (hold),
-        .write_enable_o          (write_enable_mem_access),
-        .write_enable_fwd_o      (write_enable_exec),
-        .instruction_operation_o (instruction_operation_mem_access),
-        .result_o                (result_mem_access),
-        .result_fwd_o            (result_exec),
-        .rd_o                    (rd_mem_access),
-        .mem_address_exec_o      (mem_address_exec),
-        .mem_address_o           (mem_address),
-        .mem_enable_o            (mem_enable),
-        .mem_write_enable_o      (mem_write_enable_o),
-        .mem_write_data_o        (mem_data_o),
-        .mem_read_data_i         (mem_data_i),
-        .csr_address_i           (csr_addr),
-        .csr_read_enable_o       (csr_read_enable),
-        .csr_data_read_i         (csr_data_read),
-        .csr_write_enable_o      (csr_write_enable),
-        .csr_operation_o         (csr_operation),
-        .csr_data_o              (csr_data_to_write),
-        .vtype_o                 (vtype),
-        .vlen_o                  (vlen),
-        .bp_taken_i              (bp_taken_exec),
-        .ctx_switch_o            (ctx_switch),
-        .jump_rollback_o         (jump_rollback),
-        .ctx_switch_target_o     (ctx_switch_target),
-        .jump_imm_target_i       (jump_imm_target_exec),
-        .reservation_data_i      (reservation_data),
-        .jump_target_o           (jump_target),
-        .compressed_i            (instruction_compressed_execute),
-        .pc_i                    (pc_execute),
-        .interrupt_pending_i     (interrupt_pending),
-        .mtvec_i                 (mtvec),
-        .mepc_i                  (mepc),
-        .pc_irq_o                (pc_irq),
-        .pc_exc_o                (pc_exc),
-        .jump_o                  (jump),
-        .should_jump_o           (should_jump),
-        .interrupt_ack_o         (interrupt_ack_o),
-        .machine_return_o        (MACHINE_RETURN),
-        .raise_exception_o       (RAISE_EXCEPTION),
-        .exception_code_o        (Exception_Code)
+        .clk                     (clk                          ),
+        .reset_n                 (reset_n                      ),
+        .stall                   (stall                        ),
+
+        .ctrl_i                  (ctrl_execute                 ),
+        .valid_i                 (exec_valid                   ),
+        .bp_ack_i                (bp_ack                       ),
+        .rd_i                    (rd_execute                   ),
+        .rs1_i                   (rs1_execute                  ),
+        .csr_address_i           (csr_addr                     ),
+        .pc_i                    (pc_execute                   ),
+        .rs1_data_i              (rs1_data_execute             ),
+        .rs2_data_i              (rs2_data_execute             ),
+        .second_operand_i        (second_operand_execute       ),
+        .jump_imm_target_i       (jump_imm_target_exec         ),
+        .instruction_i           (instruction_execute          ),
+
+        .exc_load_access_fault_i (load_access_fault            ),
+        .reservation_data_i      (reservation_data             ),
+
+        .privilege_i             (privilege                    ),
+        .interrupt_pending_i     (interrupt_pending            ),
+        .interrupt_ack_o         (interrupt_ack_o              ),
+        .machine_return_o        (MACHINE_RETURN               ),
+        .raise_exception_o       (RAISE_EXCEPTION              ),
+        .csr_read_enable_o       (csr_read_enable              ),
+        .csr_write_enable_o      (csr_write_enable             ),
+        .csr_operation_o         (csr_operation                ),
+        .exception_code_o        (Exception_Code               ),
+        .csr_data_read_i         (csr_data_read                ),
+        .csr_data_o              (csr_data_to_write            ),
+        .mtvec_i                 (mtvec                        ),
+        .mepc_i                  (mepc                         ),
+        .vtype_o                 (vtype                        ),
+        .vlen_o                  (vlen                         ),
+        .pc_irq_o                (pc_irq                       ),
+        .pc_exc_o                (pc_exc                       ),
+        
+        .mem_address_exec_o      (mem_address_exec             ),
+        .mem_address_o           (mem_address                  ),
+        .mem_enable_o            (mem_enable                   ),
+        .mem_write_enable_o      (mem_write_enable_o           ),
+        .mem_write_data_o        (mem_data_o                   ),
+        .mem_read_data_i         (mem_data_i                   ),
+        
+        .hold_o                  (hold                         ),
+        .write_enable_fwd_o      (write_enable_exec            ),
+        .jump_rollback_o         (jump_rollback                ),
+        .ctx_switch_o            (ctx_switch                   ),
+        .jump_o                  (jump                         ),
+        .should_jump_o           (should_jump                  ),
+        .ctx_switch_target_o     (ctx_switch_target            ),
+        .jump_target_o           (jump_target                  ),
+        .result_fwd_o            (result_exec                  ),
+
+        .ctrl_o                  (ctrl_mem_access              ),
+        .rd_o                    (rd_mem_access                ),
+        .result_o                (result_mem_access            ) 
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// MEMORY ACCESS ///////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            instruction_operation_retire <= NOP;
-            result_retire        <= '0;
-            rd_retire            <= '0;
-        end
-        else if (!stall) begin
-            instruction_operation_retire <= instruction_operation_mem_access;
-            result_retire                <= result_mem_access;
-            rd_retire                    <= rd_mem_access;
-        end
-    end
+    logic [31:0] result_retire;
 
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            regbank_write_enable <= '0;
-        else
-            regbank_write_enable <= (
-                write_enable_mem_access 
-                && !load_access_fault /* Disable write on load mmu exception     */
-                && !stall             /* Disable writing immediately after stall */
-            ); 
-    end
+    mem_access mem_access1 (
+        .clk                    (clk              ),
+        .reset_n                (reset_n          ),
+        .stall                  (stall            ),
 
-    if (XOSVMEnable == 1'b1) begin : gen_d_mmu_on
+        .ctrl_i                 (ctrl_mem_access  ),
+        .rd_i                   (rd_mem_access    ),
+        .result_i               (result_mem_access),
+
+        .load_access_fault_i    (load_access_fault),
+        
+        .ctrl_o                 (ctrl_retire      ),
+        .result_o               (result_retire    ),
+        .rd_o                   (rd_retire        )
+    );
+
+    /* Unused without MMU */
+    /* verilator lint_off UNUSEDSIGNAL */
+    logic     [31:0] mvmdo, mvmds, mvmdm;
+    /* verilator lint_on UNUSEDSIGNAL */
+
+    if (XOSVMEnable) begin : gen_d_mmu_on
         logic mmu_en_r;
+        logic mmu_data_fault;
+
         always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n) begin
+            if (!reset_n)
                 mmu_en_r <= 1'b0;
-            end
-            else if (!stall) begin
+            else if (!stall)
                 mmu_en_r <= mmu_en;
-            end
         end
 
         mmu d_mmu (
-            .en_i           (mmu_en_r                  ),
-            .mask_i         (mvmdm                     ),
-            .offset_i       (mvmdo                     ),
-            .size_i         (mvmds                     ),
-            .address_i      ({mem_address[31:2], 2'b00}),
-            .exception_o    (mmu_data_fault            ),
-            .address_o      (mem_address_o             )
+            .en_i       (mmu_en_r                       ),
+            .mask_i     (mvmdm                          ),
+            .offset_i   (mvmdo                          ),
+            .size_i     (mvmds                          ),
+            .address_i  ({mem_address[31:2], 2'b00}     ),
+            .exception_o(mmu_data_fault                 ),
+            .address_o  (mem_address_o                  )
         );
-        assign load_access_fault = mem_enable && mmu_data_fault;
+
+        assign load_access_fault    = mem_enable && mmu_data_fault;
+        assign dmem_operation_enable_o = mem_enable && !mmu_data_fault;
     end
     else begin : gen_d_mmu_off
-        assign load_access_fault = 1'b0;
-        assign mmu_data_fault    = 1'b0;
-        assign mem_address_o     = {mem_address[31:2], 2'b00};
+        assign load_access_fault       = 1'b0;
+        assign mem_address_o           = {mem_address[31:2], 2'b00};
+        assign dmem_operation_enable_o = mem_enable;
     end
-
-    assign dmem_operation_enable_o = mem_enable && !mmu_data_fault;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// RETIRE //////////////////////////////////////////////////////////////////////////////////
@@ -523,14 +453,17 @@ module RS5
     retire #(
         .AMOEXT      (AMOEXT)
     ) retire1 (
-        .clk                    (clk),
-        .reset_n                (reset_n),
-        .regbank_we_i           (regbank_write_enable),
-        .instruction_operation_i(instruction_operation_retire),
-        .result_i               (result_retire),
-        .mem_data_i             (mem_data_i[31:0]),
-        .reservation_data_o     (reservation_data),
-        .regbank_data_o         (regbank_data_writeback)
+        .clk               (clk                   ),
+        .reset_n           (reset_n               ),
+
+        .ctrl_i            (ctrl_retire           ),
+        .result_i          (result_retire         ),
+
+        .mem_data_i        (mem_data_i[31:0]      ),
+
+        .regbank_data_o    (regbank_data_writeback),
+
+        .reservation_data_o(reservation_data      )
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -558,11 +491,8 @@ module RS5
         .operation_i                (csr_operation),
         .address_i                  (CSRs'(csr_addr)),
         .data_i                     (csr_data_to_write),
-        .killed                     (killed),
         .data_o                     (csr_data_read),
-        .instruction_operation_i    (instruction_operation_execute),
-        .vector_operation_i         (vector_operation_execute),
-        .hazard                     (hazard),
+        .ctrl_i                     (ctrl_execute),
         .stall                      (stall),
         .hold                       (hold),
         .vtype_i                    (vtype),
@@ -576,8 +506,7 @@ module RS5
         .pc_irq_i                   (pc_irq),
         .pc_exc_i                   (pc_exc),
         .instruction_i              (instruction_execute),
-        .instruction_compressed_i   (instruction_compressed_execute),
-        .jump_misaligned_i          (jump_misaligned),
+        .jump_misaligned_i          (decode_ctrl.jump_misaligned),
         .jump_target_i              (jump_target),
         .mtime_i                    (mtime_i),
         .tip_i                      (tip_i),

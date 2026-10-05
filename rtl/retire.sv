@@ -34,15 +34,20 @@ module retire
     /* verilator lint_off UNUSEDSIGNAL */
     input   logic           clk,
     input   logic           reset_n,
-    input   logic           regbank_we_i,
     /* verilator lint_on UNUSEDSIGNAL */
 
-    input   iType_e         instruction_operation_i,
+    /* Registered input from mem_access */
+    input   wb_ctrl_t       ctrl_i,
     input   logic [31:0]    result_i,
+
+    /* Memory interface */
     input   logic [31:0]    mem_data_i,
 
-    output  logic [31:0]    reservation_data_o,
-    output  logic [31:0]    regbank_data_o
+    /* Regbank interface */
+    output  logic [31:0]    regbank_data_o,
+
+    /* Registered output to execute */
+    output  logic [31:0]    reservation_data_o
 );
 
     logic [31:0]    memory_data;
@@ -51,62 +56,29 @@ module retire
 // Memory Signal Generation
 //////////////////////////////////////////////////////////////////////////////
 
+    logic [7:0]  byte_data;
+    logic        byte_sign;
+    logic [15:0] half_data;
+    logic        half_sign;
+
     always_comb begin
-        unique case (instruction_operation_i)
-            LB: begin
-                case (result_i[1:0])
-                    2'b11: begin
-                        memory_data[31:8] = {24{mem_data_i[31]}};
-                        memory_data[7:0]  = mem_data_i[31:24];
-                    end
-                    2'b10: begin
-                        memory_data[31:8] = {24{mem_data_i[23]}};
-                        memory_data[7:0]  = mem_data_i[23:16];
-                    end
-                    2'b01: begin
-                        memory_data[31:8] = {24{mem_data_i[15]}};
-                        memory_data[7:0]  = mem_data_i[15:8];
-                    end
-                    default: begin
-                        memory_data[31:8] = {24{mem_data_i[7]}};
-                        memory_data[7:0]  = mem_data_i[7:0];
-                    end
-                endcase
-            end
+        case (result_i[1:0])
+            2'b11:   byte_data = mem_data_i[31:24];
+            2'b10:   byte_data = mem_data_i[23:16];
+            2'b01:   byte_data = mem_data_i[15:8];
+            default: byte_data = mem_data_i[7:0];
+        endcase
+        byte_sign = ctrl_i.is_unsigned ? 1'b0 : byte_data[7];
 
-            LBU: begin
-                memory_data[31:8] = '0;
-                case (result_i[1:0])
-                    2'b11:   memory_data[7:0]  = mem_data_i[31:24];
-                    2'b10:   memory_data[7:0]  = mem_data_i[23:16];
-                    2'b01:   memory_data[7:0]  = mem_data_i[15:8];
-                    default: memory_data[7:0]  = mem_data_i[7:0];
-                endcase
-            end
+        half_data = result_i[1] ? mem_data_i[31:16] : mem_data_i[15:0];
+        half_sign = ctrl_i.is_unsigned ? 1'b0 : half_data[15];
+    end
 
-            LH: begin
-                case (result_i[1])
-                    1'b1: begin
-                        memory_data[31:16] = {16{mem_data_i[31]}};
-                        memory_data[15:0]  = mem_data_i[31:16];
-                    end
-                    default: begin
-                        memory_data[31:16] = {16{mem_data_i[15]}};
-                        memory_data[15:0]  = mem_data_i[15:0];
-                    end
-                endcase
-            end
-
-            LHU: begin
-                memory_data[31:16] = '0;
-                case (result_i[1])
-                    1'b1:    memory_data[15:0] = mem_data_i[31:16];
-                    default: memory_data[15:0] = mem_data_i[15:0];
-                endcase
-            end
-
-            // LW, LR_W
-            default: memory_data = mem_data_i;
+    always_comb begin
+        unique case (1'b1)
+            ctrl_i.is_byte: memory_data = {{24{byte_sign}}, byte_data};
+            ctrl_i.is_half: memory_data = {{16{half_sign}}, half_data};
+            default:        memory_data = mem_data_i;
         endcase
     end
 
@@ -114,12 +86,7 @@ module retire
 // Assign to Register Bank Write Back
 //////////////////////////////////////////////////////////////////////////////
 
-    always_comb begin
-        unique case (instruction_operation_i)
-            LB,LBU,LH,LHU,LW,LR_W: regbank_data_o = memory_data;
-            default:               regbank_data_o = result_i;
-        endcase
-    end
+    assign regbank_data_o = (ctrl_i.is_load || ctrl_i.is_lr) ? memory_data : result_i;
 
 ////////////////////////////////////////////////////////////////////////////////
 // LR/SC registers
@@ -130,10 +97,10 @@ module retire
             if (!reset_n) begin
                 reservation_data_o <= '0;
             end
-            else if (regbank_we_i) begin    /* Avoid writing on MMU exceptions */
-                unique case (instruction_operation_i)
-                    LR_W:    reservation_data_o <= mem_data_i;
-                    SC_W:    reservation_data_o <= '0;
+            else if (ctrl_i.rd_we) begin    /* Avoid writing on MMU exceptions */
+                unique case (1'b1)
+                    ctrl_i.is_lr: reservation_data_o <= mem_data_i;
+                    ctrl_i.is_sc: reservation_data_o <= '0;
                     default: ;
                 endcase
             end
