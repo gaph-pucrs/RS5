@@ -1,16 +1,16 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#include <riscv-csr.h>
+// #include <riscv-csr.h>
 
-// uint64_t csr_read_mcycle(void) { return 0; }
+uint64_t csr_read_mcycle(void) { return 0; }
 
 // #define VECTOR
 
 #include "./lmfrnet_common.h"
 #include "./lmfrnet_params.h"
 
-#include "../dataset/image1.h"
+#include "./images.h"
 
 typedef struct {
     uint32_t to;
@@ -48,7 +48,7 @@ static time total_cycles;
 int main()
 {
     uint32_t vlenb;
-    __asm__ volatile("csrr %0, vlenb" : "=r"(vlenb));
+    // __asm__ volatile("csrr %0, vlenb" : "=r"(vlenb));
 
     printf("Running LMFRNet on image1... (vlen = %lu)\n", vlenb*8);
 
@@ -90,7 +90,7 @@ int main()
     total_cycles.to = csr_read_mcycle();
 
     stemBlock_time.to = csr_read_mcycle();
-        stemBlock(&stemBlock_shape, &stemBlock_params, image1, out_stemBlock);
+        stemBlock(&stemBlock_shape, &stemBlock_params, images[0], out_stemBlock);
     stemBlock_time.tf = csr_read_mcycle();
     stemBlock_time.lapsed = stemBlock_time.tf - stemBlock_time.to;
     data[0] = stemBlock_time.lapsed;
