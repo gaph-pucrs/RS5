@@ -3,6 +3,7 @@
 ################################################################################
 
 MEM_SIZE ?= 65536
+OPT      ?= -Os
 ARCH     ?= rv32im_zicsr_zkne_zknh
 
 ################################################################################
@@ -49,7 +50,7 @@ DEFS += $(if $(findstring xkyber,$(ARCH_LOWER)), -DKYBER_ISE)
 
 ARCH := $(subst _xkyber,,$(ARCH))
 
-CFLAGS  = -march=$(ARCH) -mabi=ilp32 -Os -fdata-sections -ffunction-sections -Wall -std=c23 -I$(INCDIR) -I$(COMMON_DIR)/include -I$(COMMON_DIR)/include/tinycrypt -I$(COMMON_DIR)/include/kyber_round3_ref $(DEFS)
+CFLAGS  = -march=$(ARCH) -mabi=ilp32 $(OPT) -fdata-sections -ffunction-sections -Wall -std=c23 -I$(INCDIR) -I$(COMMON_DIR)/include -I$(COMMON_DIR)/include/tinycrypt -I$(COMMON_DIR)/include/kyber_round3_ref $(DEFS)
 LDFLAGS = --specs=nano.specs -T $(COMMON_DIR)/link.ld -Wl,--gc-sections -march=$(ARCH) -mabi=ilp32 -nostartfiles -lm -u _printf_float
 
 CCSRC = $(wildcard $(SRCDIR)/*.c) $(wildcard $(COMMON_DIR)/*.c) $(wildcard $(COMMON_DIR)/tinycrypt/*.c) $(wildcard $(COMMON_DIR)/keccak/*.c) $(wildcard $(COMMON_DIR)/kyber_round3_ref/*.c)
