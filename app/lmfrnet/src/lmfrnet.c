@@ -1,9 +1,11 @@
 #include <stdio.h>
 #include <stdint.h>
 
-// #include <riscv-csr.h>
-
-uint64_t csr_read_mcycle(void) { return 0; }
+#ifdef NO_RISCV
+    uint64_t csr_read_mcycle(void) { return 0; }
+#else
+    #include <riscv-csr.h>
+#endif
 
 // #define VECTOR
 
@@ -27,18 +29,6 @@ static time total_cycles;
 
 #define PRINT_DATA()                                                \
     do {                                                            \
-        printf("--- STATS ----\n");                                 \
-        printf("task,cycles\n");                                    \
-        printf("p1,%lu\n", stemBlock_time.lapsed);                  \
-        for (int i = 1; i <= 18; i++)                               \
-            printf("p%d,%lu\n", i+1, mfBlock_time[i].lapsed);       \
-        for (int i = 1; i <= 4; i++)                                \
-            printf("p%d,%lu\n", i+19, tran_conv_time[i].lapsed);    \
-        printf("p24,%lu\n", fc_time.lapsed);                        \
-    } while(0)
-
-#define PRINT_PIPELINE()                                            \
-    do {                                                            \
         printf("--- PIPELINE STATS ----\n");                        \
         printf("task,cycles\n");                                    \
         for (int i = 0; i < 24; i++)                                \
@@ -47,10 +37,13 @@ static time total_cycles;
 
 int main()
 {
-    uint32_t vlenb;
-    // __asm__ volatile("csrr %0, vlenb" : "=r"(vlenb));
+    uint32_t vlen = 0;
+#ifdef VECTOR
+    __asm__ volatile("csrr %0, vlenb" : "=r"(vlen));
+    vlen *= 8;
+#endif
 
-    printf("Running LMFRNet on image1... (vlen = %lu)\n", vlenb*8);
+    printf("Running LMFRNet on image1... (vlen = %lu)\n", vlen);
 
 //{{{
     static type out_stemBlock[32*32*32] = {0};
@@ -253,11 +246,9 @@ int main()
 
     printf("predicted class: %d (val = %d)\n", class, argmax);
 
-    // PRINT_DATA();
-
     printf("total_cycles: %lu\n", total_cycles.lapsed);
 
-    PRINT_PIPELINE();
+    PRINT_DATA();
 
     return 0;
 }
