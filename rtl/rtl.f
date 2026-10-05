@@ -28,6 +28,8 @@
 ./mmu.sv
 ./mulNbits.sv
 ./mul.sv
+./sha2_unit.sv
+./xkyber.sv
 ./plic.sv
 ./regbank.sv
 ./retire.sv

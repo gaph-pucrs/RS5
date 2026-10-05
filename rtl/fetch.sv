@@ -123,24 +123,25 @@ module fetch
     /* verilator lint_on UNUSEDSIGNAL */
 
     /* Buffer signals */
+    logic valid_fetch;
     logic pop;
     logic almost_full;
     logic buffer_not_full;
     logic buffer_tx;
-    logic push;
     logic empty_buffer;
     logic [31:0] inst_buffered;
 
     RingBuffer #(
-        .DATA_SIZE             (32         ),
-        .BUFFER_SIZE           (IQUEUE_SIZE),
-        .ALMOST_FULL_THRESHOLD (1          ), 
-        .ALMOST_EMPTY_THRESHOLD(0          )
+        .DATA_SIZE              (32         ),
+        .BUFFER_SIZE            (IQUEUE_SIZE),
+        .FIRST_WORD_FALL_THROUGH(1          ),
+        .ALMOST_FULL_THRESHOLD  (1          ),
+        .ALMOST_EMPTY_THRESHOLD (0          )
     ) ibuf (
         .clk_i         (clk),
         .rst_ni        (reset_n),
         .buf_rst_i     (empty_buffer),
-        .rx_i          (push),
+        .rx_i          (valid_fetch),
         .rx_ack_o      (buffer_not_full),
         .data_i        (instruction_data_i),
         .tx_o          (buffer_tx),
@@ -166,7 +167,6 @@ module fetch
 
     /* A valid fetch happens only when memory answers and the requested */
     /* address is still valid. A jump invalidates the request.          */
-    logic valid_fetch;
     assign valid_fetch = !busy_r && !jumped_fetch;
 
     /* Read from memory everytime we can consume an instruction */
@@ -182,11 +182,6 @@ module fetch
     /* Read when enabled and not prefetched               */
     /* A misaligned jump will always have to read 2 times */
     assign pop = ((enable_i && !instruction_prefetched) || is_jumping);
-
-    /* Insert instruction from memory into buffer      */
-    /* Only insert when fetched instruction is valid   */
-    /* Do not insert when being pasthrough from memory */
-    assign push = valid_fetch && (!pop || valid_buffer);
 
     /* Do not update instruction address if memory can't answer       */
     /* Do not update if the present request will make the buffer full */
@@ -221,15 +216,12 @@ module fetch
         else begin
             if (jumped || (jump_rollback_i && bp_taken_r))
                 instruction_address <= iaddr_jumped;
-            else if (!iaddr_hold || (iaddr_hold_r && push && buffer_not_full))
+            else if (!iaddr_hold || (iaddr_hold_r && valid_fetch && buffer_not_full))
                 instruction_address <= next_instruction_address;
         end
     end
 
     assign instruction_address_o = {instruction_address[31:2], 2'b00};
-
-    logic [31:0] next_instruction;
-    assign next_instruction = valid_buffer ? inst_buffered : instruction_data_i;
     
     assign valid = valid_fetch || valid_buffer || instruction_prefetched;
 
@@ -387,7 +379,7 @@ module fetch
             else if (sys_reset)
                 instruction_r <= 32'h00000013;
             else if (pop && (valid_fetch || valid_buffer))
-                instruction_r <= next_instruction;
+                instruction_r <= inst_buffered;
         end
 
         logic compressed;
@@ -397,14 +389,14 @@ module fetch
         always_comb begin
             if (jump_confirmed_r)
                 /* On jump, last valid instruction is the next one */
-                instruction_built = next_instruction;
+                instruction_built = inst_buffered;
             else if (jump_misaligned_o || (unaligned ^ compressed))
                 /* When next instruction is unaligned we also need two fetches */
                 /* Shift the last instruction msbs and join with the next lsbs */
-                instruction_built = {next_instruction[15:0], instruction_r[31:16]};
+                instruction_built = {inst_buffered[15:0], instruction_r[31:16]};
             else if (!(unaligned || compressed))
                 /* Normal flow of 4-byte aligned instructions */
-                instruction_built = next_instruction;
+                instruction_built = inst_buffered;
             else   // unaligned &&  compressed
                 /* After an unaligned compressed, the instruction we want was */
                 /* already removed from the buffer/memory                     */
@@ -463,7 +455,7 @@ module fetch
         assign instruction_prefetched = 1'b0;
         assign compressed_o           = 1'b0;
         assign next_pc                = pc_o + 32'd4;
-        assign instruction            = next_instruction;
+        assign instruction            = inst_buffered;
         assign jump_misaligned_o      = 1'b0;
     end
 endmodule
