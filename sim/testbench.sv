@@ -51,6 +51,7 @@ module testbench
     localparam int           IQUEUE_SIZE     = 2;
     localparam bit           DUALPORT_MEM    = 1'b1;
     localparam int           RAM_DELAY_CYCLES= 0;
+    localparam int           STALL_INJECT    = 0;    // > 0: also stall ~1 in STALL_INJECT cycles, see below
 
     localparam bit           VEnable         = 1'b0;
     localparam int           VLEN            = 512;
@@ -151,6 +152,7 @@ module testbench
     logic busy;
     logic enable_imem;
     logic stall;
+    logic [BUS_WIDTH-1:0] mem_data_cpu;
 
     RS5 #(
     `ifndef SYNTH
@@ -184,7 +186,7 @@ module testbench
         .stall                  (stall),
         .busy_i                 (busy),
         .instruction_i          (instruction[31:0]),
-        .mem_data_i             (mem_data_read),
+        .mem_data_i             (mem_data_cpu ),
         .mtime_i                (mtime),
         .tip_i                  (mti),
         .eip_i                  (mei),
@@ -242,30 +244,94 @@ module testbench
         .dataB_o    (dataBo)
     );
 
-    logic enable_ram_delayed;
-    initial begin
-        stall = 1'b0;
-        enable_ram_delayed = 1'b0;
+    /* Every RAM request stalls the core for RAM_DELAY_CYCLES, like a slow
+     * device behind the SoC bus (soc axil2axi4):
+     *   IDLE/RESP  new request: stall (combinational)
+     *   WAIT       stall
+     *   DONE       no stall, RAM accessed; the request still on the bus is
+     *              the same one
+     *   RESP       read data valid; a request here is a new one
+     * RAM_DELAY_CYCLES = 0 never stalls.
+     *
+     * STALL_INJECT > 0 also stalls the core for 1-4 cycles, starting on about
+     * 1 in STALL_INJECT cycles chosen independently of the core's requests,
+     * like another bus master holding the bus. The RAM waits while it lasts.
+     * RAM stalls only ever hit an instruction's first cycle (the request
+     * comes from the previous one); injected stalls also hit multi-cycle
+     * operations mid-way. STALL_INJECT = 0 never injects. */
+    typedef enum logic [1:0] {RAM_IDLE, RAM_WAIT, RAM_DONE, RAM_RESP} ram_state_e;
 
-        forever begin
-            // 1. Wait for enable_ram to go high
-            @(negedge clk iff enable_ram);
+    ram_state_e ram_state;
+    int         ram_delay_cnt;
+    logic       ram_new_request;
+    logic       enable_ram_delayed;
+    logic       ram_stall;
+    int         inject_cnt;
+    logic       inject_stall;
 
-            // 2. Assert stall
-            stall = 1'b1;
+    assign ram_new_request    = (ram_state inside {RAM_IDLE, RAM_RESP}) && enable_ram;
+    assign ram_stall          = (RAM_DELAY_CYCLES > 0) && (ram_new_request || ram_state == RAM_WAIT);
+    assign enable_ram_delayed = (RAM_DELAY_CYCLES > 0) ? (ram_state == RAM_DONE) : enable_ram;
+    assign inject_stall       = (inject_cnt != 0);
+    assign stall              = ram_stall || inject_stall;
 
-            // 3. Wait for some cycles (to simulate delay)
-            repeat (RAM_DELAY_CYCLES) @(negedge clk);
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            inject_cnt <= 0;
+        else if (inject_cnt != 0)
+            inject_cnt <= inject_cnt - 1;
+        else if (STALL_INJECT > 0 && $urandom_range(STALL_INJECT - 1) == 0)
+            inject_cnt <= $urandom_range(4, 1);
+    end
 
-            // 4. Deassert stall, assert delayed signal
-            stall = 1'b0;
-            enable_ram_delayed = 1'b1;
-
-            // 5. Wait for enable_ram to go low to finish
-            @(negedge clk iff !enable_ram);
-            enable_ram_delayed = 1'b0;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            ram_state     <= RAM_IDLE;
+            ram_delay_cnt <= 0;
+        end
+        else if (inject_stall) begin
+            /* the bus is held: the RAM request in progress waits */
+        end
+        else begin
+            unique case (ram_state)
+                RAM_IDLE, RAM_RESP: begin
+                    if (ram_new_request && RAM_DELAY_CYCLES > 0) begin
+                        ram_delay_cnt <= RAM_DELAY_CYCLES - 1;
+                        ram_state     <= (RAM_DELAY_CYCLES > 1) ? RAM_WAIT : RAM_DONE;
+                    end
+                    else begin
+                        ram_state     <= RAM_IDLE;
+                    end
+                end
+                RAM_WAIT: begin
+                    ram_delay_cnt <= ram_delay_cnt - 1;
+                    if (ram_delay_cnt <= 1)
+                        ram_state <= RAM_DONE;
+                end
+                RAM_DONE: ram_state <= RAM_RESP;
+                default:  ram_state <= RAM_IDLE;
+            endcase
         end
     end
+
+    /* The core's regbank write is not gated by stall: hold the read data seen
+     * on the first stall cycle until the stall ends (soc dig_top) */
+    logic                 stall_r;
+    logic [BUS_WIDTH-1:0] mem_data_read_r;
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            stall_r         <= 1'b0;
+            mem_data_read_r <= '0;
+        end
+        else begin
+            stall_r <= stall;
+            if (!stall_r)
+                mem_data_read_r <= mem_data_read;
+        end
+    end
+
+    assign mem_data_cpu = stall_r ? mem_data_read_r : mem_data_read;
 
     if (DUALPORT_MEM) begin : dual_port
         assign enA         = enable_imem;
@@ -348,7 +414,11 @@ module testbench
     end
 
     always_ff @(posedge clk) begin
-        if (enable_tb) begin
+        /* A store stalled on the bus is still there on the first cycle after
+         * the stall: act on it only then, once */
+        if (enable_tb && stall) begin
+        end
+        else if (enable_tb) begin
             // OUTPUT REG
             if ((mem_address == 32'h80004000 || mem_address == 32'h80001000) && mem_write_enable != '0) begin
                 char <= mem_data_write[7:0];

@@ -25,6 +25,7 @@ module vectorReductionTree
     /* verilator lint_off UNUSEDSIGNAL */
     input  logic                                 clk,
     input  logic                                 reset_n,
+    input  logic                                 stall,
     /* verilator lint_on UNUSEDSIGNAL  */
     input  logic [ELEMENTS_PER_REG-1:0][SEW-1:0] first_operand,
     input  logic [SEW-1:0]                       second_operand,
@@ -207,6 +208,7 @@ module vectorReductionTree
             if (!reset_n) begin
                 operand <= '{default: '0};
             end
+            else if (stall) begin end
             else if (cycle == '0) begin // First Level
                 for (int i = 0; i < ELEMENTS_PER_REG; i++) begin
                     if (i == 0) begin

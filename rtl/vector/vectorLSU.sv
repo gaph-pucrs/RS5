@@ -22,6 +22,7 @@ module vectorLSU
 ) (
     input  logic                      clk,
     input  logic                      reset_n,
+    input  logic                      stall,
 
     /* verilator lint_off UNUSEDSIGNAL */
     input  logic [31:0]               instruction_i,
@@ -135,6 +136,7 @@ module vectorLSU
         if (!reset_n) begin
             state <= VLSU_IDLE;
         end
+        else if (stall) begin end
         else begin
             state <= next_state;
         end
@@ -205,6 +207,7 @@ module vectorLSU
         if (!reset_n) begin
             offset_strided <= '0;
         end
+        else if (stall) begin end
         else if (state == VLSU_IDLE) begin
             offset_strided <= '0;
         end
@@ -249,6 +252,7 @@ module vectorLSU
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             elementsProcessedRegister <= '0;
+        else if (stall) begin end
         else if (!indexed_wait_update_index_reg)
             elementsProcessedRegister <= nextElementsProcessedRegister;
     end
@@ -256,6 +260,7 @@ module vectorLSU
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             elementsProcessedTotal <= 0;
+        else if (stall) begin end
         else if (state == VLSU_IDLE)
             elementsProcessedTotal <= 0;
         else if (!indexed_wait_update_index_reg && state != VLSU_DELAY)
@@ -318,6 +323,7 @@ module vectorLSU
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             reg_count <= '0;
+        else if (stall) begin end
         else if (next_state == VLSU_IDLE)
             reg_count <= '0;
         else if (next_state == VLSU_DELAY)
@@ -508,9 +514,11 @@ module vectorLSU
     logic [$bits(VLENB)-1:0] elementsProcessedRegister_2r;
 
     always @(posedge clk) begin
-        address_r  <= address[1:0];
-        address_2r <= address_r;
-        addrMode_r <= addrMode;
+        if (!stall) begin
+            address_r  <= address[1:0];
+            address_2r <= address_r;
+            addrMode_r <= addrMode;
+        end
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
@@ -518,6 +526,7 @@ module vectorLSU
             state_r  <= VLSU_IDLE;
             state_2r <= VLSU_IDLE;
         end
+        else if (stall) begin end
         else begin
             state_r  <= state;
             state_2r <= state_r;
@@ -529,6 +538,7 @@ module vectorLSU
             elementsProcessedCycle_r    <= '0;
             elementsProcessedRegister_r <= '0;
         end
+        else if (stall) begin end
         else if (state == VLSU_IDLE) begin
             elementsProcessedCycle_r    <= '0;
             elementsProcessedRegister_r <= '0;
@@ -544,6 +554,7 @@ module vectorLSU
             elementsProcessedCycle_2r    <= '0;
             elementsProcessedRegister_2r <= '0;
         end
+        else if (stall) begin end
         else begin
             elementsProcessedCycle_2r    <= elementsProcessedCycle_r;
             elementsProcessedRegister_2r <= elementsProcessedRegister_r;
@@ -620,7 +631,8 @@ module vectorLSU
     end
 
     always @(posedge clk) begin
-        if (state_2r != VLSU_IDLE) begin
+        if (stall) begin end
+        else if (state_2r != VLSU_IDLE) begin
             unique case (width)
                 EW8: begin
                     for (int i = 0; i < ELEMENTS_PER_ACCESS_EW8;  i++) begin
@@ -659,7 +671,7 @@ module vectorLSU
                     : ((state == VLSU_FIRST_CYCLE && state_r == VLSU_IDLE) || (state_r inside {VLSU_FIRST_CYCLE, VLSU_EXEC, VLSU_LAST_CYCLE}));
 
     assign mem_address_o      = address;
-    assign mem_read_enable_o  = 1'b1;
+    assign mem_read_enable_o  = is_vload_i && (state inside {VLSU_FIRST_CYCLE, VLSU_EXEC, VLSU_LAST_CYCLE});
     assign mem_write_data_o   = write_data << shift_amount;
 
     always_comb begin

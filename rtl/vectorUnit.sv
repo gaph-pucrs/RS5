@@ -24,6 +24,7 @@ module vectorUnit
 (
     input   logic                  clk,
     input   logic                  reset_n,
+    input   logic                  stall,
 
     input   logic [31:0]           instruction_i,
     input   logic                  enable_i,
@@ -130,6 +131,7 @@ module vectorUnit
             reduction_instruction_r  <= 1'b0;
             widening_instruction_r   <= 1'b0;
         end
+        else if (stall) begin end
         else if (next_state == V_EXEC) begin
             accumulate_instruction_r <= accumulate_instruction;
             mask_instruction_nr      <= mask_instruction;
@@ -199,6 +201,7 @@ module vectorUnit
         if (!reset_n) begin
             state <= V_IDLE;
         end
+        else if (stall) begin end
         else if (!hold) begin
             state <= next_state;
         end
@@ -308,6 +311,7 @@ module vectorUnit
     always_ff @(posedge clk or negedge reset_n)
         if (!reset_n)
             cycle_count <= 0;
+        else if (stall) begin end
         else if (next_state == V_IDLE)
             cycle_count <= 0;
         else if (next_state == V_EXEC && !hold)
@@ -316,6 +320,7 @@ module vectorUnit
     always_ff @(posedge clk or negedge reset_n)
         if (!reset_n)
             cycle_count_vd <= 0;
+        else if (stall) begin end
         else if (next_state == V_IDLE)
             cycle_count_vd <= 0;
         else if (next_state == V_EXEC && (!hold || hold_widening))
@@ -324,6 +329,7 @@ module vectorUnit
     always_ff @(posedge clk or negedge reset_n)
         if (!reset_n)
             cycle_count_r <= 0;
+        else if (stall) begin end
         else if (widening_instruction && (!hold || hold_widening))
             cycle_count_r <= cycle_count_vd;
         else if (!hold)
@@ -340,6 +346,7 @@ module vectorUnit
     always_ff @(posedge clk or negedge reset_n)
         if (!reset_n)
             vl_curr_reg <= '0;
+        else if (stall) begin end
         else if (next_state == V_IDLE)
             vl_curr_reg <= 0;
         else if (whole_reg_load_store)
@@ -354,6 +361,7 @@ module vectorUnit
     always_ff @(posedge clk or negedge reset_n)
         if (!reset_n)
             total_elements_processed <= 0;
+        else if (stall) begin end
         else if (next_state == V_IDLE)
             total_elements_processed <= 0;
         else if (!hold)
@@ -407,6 +415,7 @@ module vectorUnit
             vd_addr   <= '0;
             vd_addr_r <= '0;
         end
+        else if (stall) begin end
         else if (!hold || hold_widening) begin
             vd_addr   <= (reduction_instruction || mask_instruction)
                         ? rd
@@ -420,6 +429,7 @@ module vectorUnit
         if (!reset_n) begin
             write_enable <= '0;
         end
+        else if (stall) begin end
         else if ((state == V_EXEC) && (!hold || hold_widening) && !op_vstore && vector_operation_i != VMVXS) begin
             if (reduction_instruction || vector_operation_i == VMVSX) begin
                 unique case (vsew_effective)
@@ -470,7 +480,7 @@ module vectorUnit
         .reset_n  (reset_n),
         .vs1_addr (vs1_addr),
         .vs2_addr (vs2_addr),
-        .enable   (write_enable),
+        .enable   (stall ? '0 : write_enable),
         .vd_addr  (vd_addr_r),
         .result   (result),
         .v0_mask  (v0_mask),
@@ -517,6 +527,7 @@ module vectorUnit
         if (!reset_n) begin
             first_operand <= '0;
         end
+        else if (stall) begin end
         else if (!hold) begin
             first_operand  <= vs2_data;
         end
@@ -526,6 +537,7 @@ module vectorUnit
         if (!reset_n) begin
             third_operand <= '0;
         end
+        else if (stall) begin end
         else if (hold) begin
             third_operand <= vs2_data;
         end
@@ -535,6 +547,7 @@ module vectorUnit
         if (!reset_n) begin
             second_operand <= '0;
         end
+        else if (stall) begin end
         else if (!hold) begin
             if (op_vstore) begin
                 second_operand <= vs1_data;
@@ -563,6 +576,7 @@ module vectorUnit
     ) vectorLSU1 (
         .clk                    (clk),
         .reset_n                (reset_n),
+        .stall                  (stall),
         .instruction_i          (instruction_i),
         .base_address_i         (op1_scalar_i),
         .stride_i               (op2_scalar_i),
@@ -608,6 +622,7 @@ module vectorUnit
     ) vectorALU1 (
         .clk                   (clk),
         .reset_n               (reset_n),
+        .stall                 (stall),
         .first_operand         (first_operand),
         .second_operand        (second_operand),
         .third_operand         (third_operand),
@@ -647,6 +662,7 @@ module vectorUnit
             op_vload_r         <= 1'b0;
             mask_instruction_r <= '0;
         end
+        else if (stall) begin end
         else begin
             op_vload_r         <= op_vload;
             mask_instruction_r <= mask_instruction;

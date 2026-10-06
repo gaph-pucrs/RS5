@@ -7,6 +7,11 @@
 
 module mul
     import RS5_pkg::*;
+#(
+    /* 0: on stall, finish the multiply and hold the result (scalar pipeline)
+     * 1: on stall, hold all state (vector lanes, whose control is frozen) */
+    parameter bit FREEZE_ON_STALL = 1'b0
+)
 (
     input   logic        clk,
     input   logic        reset_n,
@@ -49,7 +54,7 @@ module mul
     assign last_cycle = (mul_state == AHBH) || (mul_state == AHBL && mul_low_i) || (mul_state == ALBL && single_cycle_i);
 
     logic should_stall;
-    assign should_stall = stall && last_cycle;
+    assign should_stall = stall && (FREEZE_ON_STALL || last_cycle);
 
     always_ff@(posedge clk or negedge reset_n) begin
         if (!reset_n)
@@ -70,7 +75,7 @@ module mul
         if (!reset_n) begin
             op_a <= '0;
         end
-        else begin
+        else if (!should_stall) begin
             unique case (mul_state)
                 IDLE: op_a <= op_al;
                 ALBH: op_a <= op_ah;
@@ -89,7 +94,7 @@ module mul
         if (!reset_n) begin
             op_b <= '0;
         end
-        else begin
+        else if (!should_stall) begin
             unique case (mul_state)
                 IDLE,
                 ALBH: op_b <= op_bl;
