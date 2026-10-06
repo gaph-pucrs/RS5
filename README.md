@@ -106,10 +106,16 @@ cd sim
 xrun -f sim.xrun
 ```
 
-The testbench's `VEnable` and `BIN_FILE` come from the `VENABLE` and `BIN_FILE` macros, so you can override them without editing the testbench:
+The testbench's `VEnable`, `VLEN` and `LLEN` are parameters, and the program comes from the `BIN_FILE_PATH` macro, so you can override them without editing the testbench:
 
 ```bash
-xrun -f sim.xrun +define+VENABLE=1 +define+BIN_FILE=\"../app/vector-tests/test.bin\"
+xrun -f sim.xrun -defparam testbench.VEnable=1 +define+BIN_FILE_PATH=\"../app/vector-tests/test.bin\"
+```
+
+With Verilator, pass them through the Makefile:
+
+```bash
+make -C sim VENABLE=1 VLEN=256 BIN_FILE_PATH=../app/vector-tests/test.bin
 ```
 
 ### Vector regression tests
@@ -120,7 +126,7 @@ Each log goes to `app/vector-tests/results/passed` or `app/vector-tests/results/
 The tests' expected results assume a specific configuration. Before running the script:
 
 1. Keep `VLEN = 512` in [sim/testbench.sv](sim/testbench.sv) (the default). Any other VLEN makes the tests report false failures.
-   The script enables the vector unit and selects the vector test binary through simulator defines, so `VEnable` and `BIN_FILE` need no editing.
+   The script enables the vector unit and selects the vector test binary on the xrun command line, so `VEnable` and the program path need no editing.
 2. Build the tests with **GCC 13**, or turn off auto-vectorization.
    Newer GCC releases auto-vectorize the test code with RVV instructions, which changes the code under test and breaks the tests.
    If you use a newer GCC, add `-fno-tree-vectorize` to `GCC_RISCV` in [app/vector-tests/Makefile](app/vector-tests/Makefile).

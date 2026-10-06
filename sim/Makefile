@@ -5,6 +5,17 @@ VERILATOR_FLAGS =
 VERILATOR_FLAGS += --cc --exe
 # Warn abount lint issues; may not want this on less solid designs
 VERILATOR_FLAGS += -Wall
+VERILATOR_FLAGS += -Wno-WIDTHTRUNC
+# Top-level parameter overrides (only applied when passed via command line)
+ifeq ($(origin VENABLE),command line)
+VERILATOR_FLAGS += -GVEnable=$(VENABLE)
+endif
+ifeq ($(origin VLEN),command line)
+VERILATOR_FLAGS += -GVLEN=$(VLEN)
+endif
+ifeq ($(origin BIN_FILE_PATH),command line)
+VERILATOR_FLAGS += -DBIN_FILE_PATH=\"$(BIN_FILE_PATH)\"
+endif
 # Make waveforms
 #VERILATOR_FLAGS += --trace
 # Check SystemVerilog assertions
@@ -24,6 +35,7 @@ default: run
 run:
 	@echo
 	@echo "-- VERILATE ----------------"
+	@rm -rf obj_dir
 	@$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_INPUT) --binary -j 0 -I../rtl -I../rtl/aes -I../rtl/vector -I../RingBuffer/rtl --timescale 1ns/1ns
 
 	@echo

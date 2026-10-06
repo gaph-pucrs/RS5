@@ -52,12 +52,10 @@ module testbench
     localparam bit           DUALPORT_MEM    = 1'b1;
     localparam int           RAM_DELAY_CYCLES= 0;
 
-`ifndef VENABLE
-    `define VENABLE 1'b0
-`endif
-    localparam bit           VEnable         = `VENABLE;
-    localparam int           VLEN            = 512;
-    localparam int           LLEN            = 32;
+    /* Overridable from the simulator command line, e.g. Verilator -GVEnable=1 -GVLEN=256 */
+    parameter  bit           VEnable         = 1'b0;
+    parameter  int           VLEN            = 512;
+    parameter  int           LLEN            = 32;
 
 `ifndef SYNTH
     localparam bit           PROFILING       = 1'b1;
@@ -66,12 +64,13 @@ module testbench
     localparam string        PROFILING_FILE  = "./results/Report.txt";
     localparam string        OUTPUT_FILE     = "./results/Output.txt";
 
-    localparam int           BUS_WIDTH       = 32;
+    parameter  int           BUS_WIDTH       = 32;
     localparam int           MEM_ADDR_BITS   = 28;
-`ifndef BIN_FILE
-    `define BIN_FILE "../app/riscv-tests/test.bin"
+    /* Program to load: override with -DBIN_FILE_PATH=\"path\" (Verilator) or +define+BIN_FILE_PATH=\"path\" (Xcelium) */
+`ifndef BIN_FILE_PATH
+    `define BIN_FILE_PATH "../app/riscv-tests/test.bin"
 `endif
-    localparam string        BIN_FILE        = `BIN_FILE;
+    parameter  string        BIN_FILE        = `BIN_FILE_PATH;
 
     localparam int           i_cnt = 1;
 
