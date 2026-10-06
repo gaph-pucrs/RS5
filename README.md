@@ -21,6 +21,7 @@
     - [Simulate with Verilator](#simulate-with-verilator)
     - [Simulate with Modelsim/Questa](#simulate-with-modelsimquesta)
     - [Simulate with Xcelium](#simulate-with-xcelium)
+    - [Vector regression tests](#vector-regression-tests)
   - [FPGA Prototyping](#fpga-prototyping)
     - [Prototyping steps](#prototyping-steps)
   - [Architectural compliance (RISCOF)](#architectural-compliance-riscof)
@@ -103,6 +104,33 @@ vsim -c -do sim.do
 ```bash
 cd sim
 xrun -f sim.xrun
+```
+
+The testbench's `VEnable` and `BIN_FILE` come from the `VENABLE` and `BIN_FILE` macros, so you can override them without editing the testbench:
+
+```bash
+xrun -f sim.xrun +define+VENABLE=1 +define+BIN_FILE=\"../app/vector-tests/test.bin\"
+```
+
+### Vector regression tests
+
+[sim/vector_regression.sh](sim/vector_regression.sh) builds and simulates each test in [app/vector-tests/operations](app/vector-tests/operations) with Xcelium.
+Each log goes to `app/vector-tests/results/passed` or `app/vector-tests/results/failed`.
+
+The tests' expected results assume a specific configuration. Before running the script:
+
+1. Keep `VLEN = 512` in [sim/testbench.sv](sim/testbench.sv) (the default). Any other VLEN makes the tests report false failures.
+   The script enables the vector unit and selects the vector test binary through simulator defines, so `VEnable` and `BIN_FILE` need no editing.
+2. Build the tests with **GCC 13**, or turn off auto-vectorization.
+   Newer GCC releases auto-vectorize the test code with RVV instructions, which changes the code under test and breaks the tests.
+   If you use a newer GCC, add `-fno-tree-vectorize` to `GCC_RISCV` in [app/vector-tests/Makefile](app/vector-tests/Makefile).
+   Check your version with `riscv64-elf-gcc --version`.
+
+Then run:
+
+```bash
+cd sim
+./vector_regression.sh
 ```
 
 ---

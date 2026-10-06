@@ -52,7 +52,10 @@ module testbench
     localparam bit           DUALPORT_MEM    = 1'b1;
     localparam int           RAM_DELAY_CYCLES= 0;
 
-    localparam bit           VEnable         = 1'b0;
+`ifndef VENABLE
+    `define VENABLE 1'b0
+`endif
+    localparam bit           VEnable         = `VENABLE;
     localparam int           VLEN            = 512;
     localparam int           LLEN            = 32;
 
@@ -65,7 +68,10 @@ module testbench
 
     localparam int           BUS_WIDTH       = 32;
     localparam int           MEM_ADDR_BITS   = 28;
-    localparam string        BIN_FILE        = "../app/riscv-tests/test.bin";
+`ifndef BIN_FILE
+    `define BIN_FILE "../app/riscv-tests/test.bin"
+`endif
+    localparam string        BIN_FILE        = `BIN_FILE;
 
     localparam int           i_cnt = 1;
 
