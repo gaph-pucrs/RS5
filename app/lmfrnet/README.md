@@ -1,6 +1,6 @@
 # LMFRNet setup
 
-The **setup.sh** script does every step below. To run it with:
+The **setup.sh** script does every step below. Run it with:
 
 ```sh
 sh ./setup.sh
