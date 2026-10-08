@@ -28,6 +28,10 @@ module mem_access
             ctrl_o        <= ctrl_i;
             ctrl_o.rd_we  <= ctrl_i.rd_we && !load_access_fault_i;
         end
+        else begin
+            /* rd was already written on the first stalled cycle: don't rewrite it with stale bus data */
+            ctrl_o.rd_we  <= 1'b0;
+        end
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
