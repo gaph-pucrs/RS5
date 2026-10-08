@@ -24,15 +24,19 @@ BAUD      ?= 115200
 PLATFORM_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 PROTO_DIR    := $(abspath $(PLATFORM_DIR)/..)
 ROOT_DIR     := $(abspath $(PROTO_DIR)/..)
+COMMON_DIR   := $(PROTO_DIR)/common
 
-SCRIPTS_DIR  := $(PROTO_DIR)/scripts
-FILELIST_DIR := $(SCRIPTS_DIR)/filelists
+PROJECT_XPR := $(PLATFORM_DIR)/RS5.xpr
 
+RTL_FILELIST      := $(PLATFORM_DIR)/filelists/nexys.f
+CONSTRAINT_FILELIST   := $(PLATFORM_DIR)/filelists/constraints.f
+IP_MANIFEST   := $(PLATFORM_DIR)/filelists/ips.f
+IP_DIR        := $(PLATFORM_DIR)/ips
 
 APP_DIR   := $(ROOT_DIR)/app/$(APP)
 
 MEM_INPUT := $(APP_DIR)/$(APP).bin
-MEM_COE   := $(PROTO_DIR)/memimage.coe
+MEM_COE   := $(PLATFORM_DIR)/memimage.coe
 
 
 BUILD_DIR := $(PLATFORM_DIR)/build
@@ -42,34 +46,26 @@ BUILD_DIR := $(PLATFORM_DIR)/build
 # Nexys A7 configuration
 # ---------------------------------------------------------------------
 
-PROJECT_XPR := $(PLATFORM_DIR)/RS5.xpr
-
-
 EXPECTED_PART := xc7a100tcsg324-1
+HW_TARGET ?=
 EXPECTED_TOP  := RS5_FPGA_Platform
 EXPECTED_DEVICE := xc7a100t
 
 
-RTL_FILELIST        := $(FILELIST_DIR)/nexys.f
-IP_FILELIST         := $(FILELIST_DIR)/nexys_ips.f
-CONSTRAINT_FILELIST := $(FILELIST_DIR)/nexys_constraints.f
-
-
-IP_DIR := $(SCRIPTS_DIR)/ip/nexys
-
+export HW_TARGET
 
 # ---------------------------------------------------------------------
 # Vivado scripts
 # ---------------------------------------------------------------------
 
-PREPARE_TCL := $(SCRIPTS_DIR)/prepare_project.tcl
-IP_TCL      := $(SCRIPTS_DIR)/ip_manage.tcl
+PREPARE_TCL := $(COMMON_DIR)/prepare_project.tcl
+IP_TCL      := $(COMMON_DIR)/ip_manage.tcl
 
-SYNTH_TCL   := $(SCRIPTS_DIR)/synth.tcl
-IMPL_TCL    := $(SCRIPTS_DIR)/impl.tcl
-BUILD_TCL   := $(SCRIPTS_DIR)/build.tcl
+SYNTH_TCL   := $(COMMON_DIR)/synth.tcl
+IMPL_TCL    := $(COMMON_DIR)/impl.tcl
+BUILD_TCL   := $(COMMON_DIR)/build.tcl
 
-PROGRAM_TCL := $(SCRIPTS_DIR)/program.tcl
+PROGRAM_TCL := $(COMMON_DIR)/program.tcl
 
 
 # ---------------------------------------------------------------------
@@ -106,14 +102,14 @@ RTL_SOURCES += $(shell find "$(ROOT_DIR)/RingBuffer/rtl" \
 
 
 RTL_SOURCES += \
-	$(PROTO_DIR)/Peripherals.sv \
-	$(PROTO_DIR)/UART_RX_CTRL.sv \
-	$(PROTO_DIR)/UART_TX_CTRL.vhd \
-	$(PROTO_DIR)/Debouncer.vhd \
+	$(COMMON_DIR)/Peripherals.sv \
+	$(COMMON_DIR)/UART_RX_CTRL.sv \
+	$(COMMON_DIR)/UART_TX_CTRL.vhd \
+	$(COMMON_DIR)/Debouncer.vhd \
 	$(PLATFORM_DIR)/RS5_FPGA_Platform_NEXYS.sv
 
 
-CONSTRAINTS := $(shell find "$(PLATFORM_DIR)" \
+XDC_SOURCES := $(shell find "$(PLATFORM_DIR)" \
 	-type f -name '*.xdc' 2>/dev/null)
 
 
@@ -122,10 +118,10 @@ IP_RECIPES := $(wildcard $(IP_DIR)/*.tcl)
 
 SOURCES := \
 	$(RTL_SOURCES) \
-	$(CONSTRAINTS) \
+	$(XDC_SOURCES) \
 	$(IP_RECIPES) \
 	$(RTL_FILELIST) \
-	$(IP_FILELIST) \
+	$(IP_MANIFEST) \
 	$(CONSTRAINT_FILELIST)
 
 
@@ -134,7 +130,7 @@ SOURCES := \
 # Targets
 # ---------------------------------------------------------------------
 
-.DEFAULT_GOAL := all
+.DEFAULT_GOAL := impl
 
 
 .PHONY: all help app mem prepare synth impl bit flash monitor clean
@@ -182,14 +178,16 @@ app:
 # Memory image
 # ---------------------------------------------------------------------
 
+
+
 $(MEM_INPUT):
 	$(MAKE) -C "$(APP_DIR)"
 
 
-$(MEM_STAMP): $(MEM_INPUT) $(PROTO_DIR)/init_mem.py
+$(MEM_STAMP): $(MEM_INPUT) $(COMMON_DIR)/init_mem.py
 	@mkdir -p "$(BUILD_DIR)"
 	@rm -f "$(BUILD_DIR)"/.mem-*
-	cd "$(PROTO_DIR)" && "$(PYTHON)" init_mem.py "$(MEM_INPUT)"
+	"$(PYTHON)" "$(COMMON_DIR)/init_mem.py" "$(MEM_INPUT)" "$(MEM_COE)"
 	@touch "$@"
 
 
@@ -222,7 +220,7 @@ prepare:
 	-tclargs \
 	"$(PROJECT_XPR)" \
 	check \
-	"$(IP_FILELIST)" \
+	"$(IP_MANIFEST)" \
 	"$(IP_DIR)"
 
 

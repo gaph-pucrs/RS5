@@ -33,7 +33,7 @@ proto/
 ├── UART_TX_CTRL.vhd
 ├── Debouncer.vhd
 │
-├── scripts/
+├── common/
 │   ├── synth.tcl
 │   ├── impl.tcl
 │   ├── build.tcl
@@ -275,8 +275,8 @@ make prepare
 This stage uses:
 
 ```text
-scripts/prepare_project.tcl
-scripts/ip_manage.tcl
+common/prepare_project.tcl
+common/ip_manage.tcl
 ```
 
 The project preparation script handles:
@@ -311,7 +311,7 @@ build/post_synth.dcp
 The corresponding shared script is:
 
 ```text
-scripts/synth.tcl
+common/synth.tcl
 ```
 
 ---
@@ -333,7 +333,7 @@ build/post_route.dcp
 The corresponding shared script is:
 
 ```text
-scripts/impl.tcl
+common/impl.tcl
 ```
 
 This stage performs the main implementation operations, including placement
@@ -360,7 +360,7 @@ build/RS5.bit
 The corresponding shared script is:
 
 ```text
-scripts/build.tcl
+common/build.tcl
 ```
 
 The default Make target is the bitstream build, so:
@@ -390,7 +390,7 @@ make flash APP=hello
 Programming is performed by:
 
 ```text
-scripts/program.tcl
+common/program.tcl
 ```
 
 Each platform Makefile defines the expected FPGA device.
@@ -755,13 +755,13 @@ Check that the platform-specific IPs are available and generated.
 The automated flow stores IP manifests under:
 
 ```text
-scripts/filelists/
+common/filelists/
 ```
 
 and IP creation recipes under:
 
 ```text
-scripts/ip/
+common/ip/
 ```
 
 These files can be used as a reference when manually restoring or checking
@@ -886,7 +886,7 @@ Open serial terminal            make monitor
 The common automation scripts are stored under:
 
 ```text
-proto/scripts/
+proto/common/
 ```
 
 Their main responsibilities are:
@@ -923,7 +923,7 @@ possible.
 Source organization is defined under:
 
 ```text
-proto/scripts/filelists/
+proto/common/filelists/
 ```
 
 Common FPGA sources can be shared through:
@@ -956,13 +956,13 @@ without hardcoding their source files.
 Platform-specific IP information is stored under:
 
 ```text
-proto/scripts/ip/
+proto/common/ip/
 ```
 
 For example:
 
 ```text
-scripts/ip/
+common/ip/
 ├── nexys/
 └── sume/
 ```
@@ -970,13 +970,13 @@ scripts/ip/
 The corresponding IP manifests are located under:
 
 ```text
-scripts/filelists/
+common/filelists/
 ```
 
 IP verification and preparation are handled by:
 
 ```text
-scripts/ip_manage.tcl
+common/ip_manage.tcl
 ```
 
 during:

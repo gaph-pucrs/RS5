@@ -109,100 +109,81 @@ xrun -f sim.xrun
 
 ## FPGA Prototyping
 
-The [proto/](proto/) folder provides FPGA prototyping support for the
-**Nexys A7** and **NetFPGA SUME** boards.
+RS5 supports FPGA prototyping on the following platforms:
 
-Each platform has its own Vivado project, top-level RTL file and Makefile,
-while sharing the FPGA automation scripts.
+- Digilent Nexys A7
+- NetFPGA SUME
 
-The FPGA environment contains peripherals and a BRAM.
-Peripherals include a UART, real-time clock, PLIC, and a mapped button
-interrupt.
+Each platform has its own Vivado project, top-level RTL and Makefile under
+`proto/`, while the FPGA automation is shared between platforms.
 
-<p align="center">
-    <img src="docs/assets/RS5_Environment.png" alt="FPGA Environment Diagram">
-</p>
+### Quick start
 
-### Automated flow
+Select the target platform:
 
-The recommended FPGA flow uses the platform-specific Makefiles.
-
-For Nexys A7:
+#### Digilent Nexys A7
 
 ```bash
 cd proto/RS5_NEXYS
-make APP=coremark
 ```
 
-For NetFPGA SUME:
+#### NetFPGA SUME
 
 ```bash
 cd proto/RS5_SUME
-make APP=coremark
 ```
 
-The command automatically prepares the project and required IPs, generates
-the BRAM initialization file, runs synthesis and implementation, and
-generates the FPGA bitstream.
+The default application is `coremark`. To build another application, use the
+`APP` variable.
 
-To program the FPGA:
+For example, to build `hello` up to FPGA implementation:
 
 ```bash
-make flash APP=coremark
+make APP=hello
 ```
 
-To open the serial monitor:
+This is equivalent to:
+
+```bash
+make impl APP=hello
+```
+
+To generate the bitstream:
+
+```bash
+make bit APP=hello
+```
+
+To generate the bitstream if necessary and program the FPGA:
+
+```bash
+make flash APP=hello
+```
+
+UART output can be monitored with:
 
 ```bash
 make monitor
 ```
 
-Run:
+The most commonly used targets are:
 
-```bash
-make help
+```text
+make app        Build the selected application
+make mem        Generate the BRAM initialization image
+make prepare    Prepare the Vivado project and IPs
+make synth      Run synthesis
+make impl       Run implementation (default)
+make bit        Generate the bitstream
+make flash      Program the FPGA
+make monitor    Open the UART serial monitor
+make clean      Remove generated build files
 ```
 
-to see all available targets.
-
-### Manual Vivado flow
-
-The FPGA flow can also be executed manually.
-
-1. Compile the desired application:
-
-   ```bash
-   make -C app/coremark
-   ```
-
-2. Generate the BRAM initialization file:
-
-   ```bash
-   cd proto
-   ./init_mem.py ../app/coremark/coremark.bin
-   ```
-
-3. Open the corresponding Vivado project:
-
-   - Nexys A7: `proto/RS5_NEXYS/RS5.xpr`
-   - NetFPGA SUME: `proto/RS5_SUME/RS5.xpr`
-
-4. Ensure that the BRAM uses the generated `memimage.coe`. Reset or
-   regenerate the BRAM output products when the memory image changes.
-
-5. Run synthesis and implementation and generate the bitstream.
-
-6. Program the target FPGA using Vivado Hardware Manager.
-
-7. Capture serial output at 115200 baud, for example:
-
-   ```bash
-   tio /dev/ttyUSB1 -b 115200 --map ICRNL,INLCRNL
-   ```
-
-For detailed information about both flows, available Make targets,
-platform organization and project/IP management, see
-[proto/README.md](proto/README.md).
+For the complete FPGA prototyping documentation, including project structure,
+Vivado requirements, memory initialization, IP management, manual Vivado flow,
+build dependencies and platform-specific details, see
+[`proto/README.md`](proto/README.md).
 
 ## Architectural compliance (RISCOF)
 

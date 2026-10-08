@@ -1,5 +1,11 @@
 SHELL := /bin/bash
 
+# ---------------------------------------------------------------------
+# User configuration
+# ---------------------------------------------------------------------
+
+.DEFAULT_GOAL := impl
+
 APP       ?= coremark
 VIVADO    ?= vivado
 PYTHON    ?= python3
@@ -17,43 +23,45 @@ BAUD      ?= 115200
 PLATFORM_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 PROTO_DIR    := $(abspath $(PLATFORM_DIR)/..)
 ROOT_DIR     := $(abspath $(PROTO_DIR)/..)
+COMMON_DIR   := $(PROTO_DIR)/common
 
-SCRIPTS_DIR  := $(PROTO_DIR)/scripts
-FILELIST_DIR := $(SCRIPTS_DIR)/filelists
+PROJECT_XPR := $(PLATFORM_DIR)/RS5.xpr
 
-APP_DIR      := $(ROOT_DIR)/app/$(APP)
-MEM_INPUT    := $(APP_DIR)/$(APP).bin
-MEM_COE      := $(PROTO_DIR)/memimage.coe
+RTL_FILELIST        := $(PLATFORM_DIR)/filelists/sume.f
+CONSTRAINT_FILELIST := $(PLATFORM_DIR)/filelists/constraints.f
+IP_MANIFEST         := $(PLATFORM_DIR)/filelists/ips.f
+IP_DIR              := $(PLATFORM_DIR)/ips
 
-BUILD_DIR    := $(PLATFORM_DIR)/build
+APP_DIR := $(ROOT_DIR)/app/$(APP)
+
+MEM_INPUT := $(APP_DIR)/$(APP).bin
+MEM_COE   := $(PLATFORM_DIR)/memimage.coe
+
+BUILD_DIR := $(PLATFORM_DIR)/build
 
 # ---------------------------------------------------------------------
 # Platform configuration
 # ---------------------------------------------------------------------
 
-RTL_FILELIST        := $(FILELIST_DIR)/sume.f
-IP_FILELIST         := $(FILELIST_DIR)/sume_ips.f
-CONSTRAINT_FILELIST := $(FILELIST_DIR)/sume_constraints.f
-
-IP_DIR := $(SCRIPTS_DIR)/ip/sume
-
-PROJECT_XPR := $(PLATFORM_DIR)/RS5.xpr
-
-EXPECTED_PART := xc7vx690tffg1761-3
-EXPECTED_TOP  := RS5_FPGA_Platform
+EXPECTED_PART   := xc7vx690tffg1761-3
+EXPECTED_TOP    := RS5_FPGA_Platform
 EXPECTED_DEVICE := xc7vx690t
+
+HW_TARGET ?=
+
+export HW_TARGET
 
 # ---------------------------------------------------------------------
 # Scripts
 # ---------------------------------------------------------------------
 
-PREPARE_TCL := $(SCRIPTS_DIR)/prepare_project.tcl
-IP_TCL      := $(SCRIPTS_DIR)/ip_manage.tcl
+PREPARE_TCL := $(COMMON_DIR)/prepare_project.tcl
+IP_TCL      := $(COMMON_DIR)/ip_manage.tcl
 
-SYNTH_TCL   := $(SCRIPTS_DIR)/synth.tcl
-IMPL_TCL    := $(SCRIPTS_DIR)/impl.tcl
-BUILD_TCL   := $(SCRIPTS_DIR)/build.tcl
-PROGRAM_TCL := $(SCRIPTS_DIR)/program.tcl
+SYNTH_TCL   := $(COMMON_DIR)/synth.tcl
+IMPL_TCL    := $(COMMON_DIR)/impl.tcl
+BUILD_TCL   := $(COMMON_DIR)/build.tcl
+PROGRAM_TCL := $(COMMON_DIR)/program.tcl
 
 # ---------------------------------------------------------------------
 # Generated files
@@ -71,10 +79,10 @@ MEM_STAMP := $(BUILD_DIR)/.mem-$(APP)
 
 RTL_SOURCES := $(shell find "$(ROOT_DIR)/rtl" \
 	-type f \( \
-	-name '*.sv' -o \
-	-name '*.v'  -o \
+	-name '*.sv'  -o \
+	-name '*.v'   -o \
 	-name '*.vhd' -o \
-	-name '*.vh' -o \
+	-name '*.vh'  -o \
 	-name '*.svh' \
 	\) 2>/dev/null)
 
@@ -85,32 +93,30 @@ RTL_SOURCES += $(shell find "$(ROOT_DIR)/RingBuffer/rtl" \
 	\) 2>/dev/null)
 
 RTL_SOURCES += \
-	$(PROTO_DIR)/Peripherals.sv \
-	$(PROTO_DIR)/UART_RX_CTRL.sv \
-	$(PROTO_DIR)/UART_TX_CTRL.vhd \
-	$(PROTO_DIR)/Debouncer.vhd \
+	$(COMMON_DIR)/Peripherals.sv \
+	$(COMMON_DIR)/UART_RX_CTRL.sv \
+	$(COMMON_DIR)/UART_TX_CTRL.vhd \
+	$(COMMON_DIR)/Debouncer.vhd \
 	$(PLATFORM_DIR)/RS5_FPGA_Platform_SUME.sv
 
-CONSTRAINTS := $(shell find "$(PLATFORM_DIR)" \
+XDC_SOURCES := $(shell find "$(PLATFORM_DIR)" \
 	-type f -name '*.xdc' 2>/dev/null)
 
 IP_RECIPES := $(wildcard $(IP_DIR)/*.tcl)
 
 SOURCES := \
 	$(RTL_SOURCES) \
-	$(CONSTRAINTS) \
+	$(XDC_SOURCES) \
 	$(IP_RECIPES) \
 	$(RTL_FILELIST) \
-	$(IP_FILELIST) \
+	$(IP_MANIFEST) \
 	$(CONSTRAINT_FILELIST)
 
 # ---------------------------------------------------------------------
 # Targets
 # ---------------------------------------------------------------------
 
-.DEFAULT_GOAL := all
-
-.PHONY: all app mem synth impl bit flash monitor clean prepare
+.PHONY: all app mem prepare synth impl bit flash monitor clean help
 
 all: bit
 
@@ -132,10 +138,10 @@ bit: $(BITSTREAM)
 $(MEM_INPUT):
 	$(MAKE) -C "$(APP_DIR)"
 
-$(MEM_STAMP): $(MEM_INPUT) $(PROTO_DIR)/init_mem.py
+$(MEM_STAMP): $(MEM_INPUT) $(COMMON_DIR)/init_mem.py
 	@mkdir -p "$(BUILD_DIR)"
 	@rm -f "$(BUILD_DIR)"/.mem-*
-	cd "$(PROTO_DIR)" && "$(PYTHON)" init_mem.py "$(MEM_INPUT)"
+	"$(PYTHON)" "$(COMMON_DIR)/init_mem.py" "$(MEM_INPUT)" "$(MEM_COE)"
 	@touch "$@"
 
 # ---------------------------------------------------------------------
@@ -159,7 +165,7 @@ prepare:
 		-tclargs \
 		"$(PROJECT_XPR)" \
 		check \
-		"$(IP_FILELIST)" \
+		"$(IP_MANIFEST)" \
 		"$(IP_DIR)"
 
 # ---------------------------------------------------------------------
@@ -236,12 +242,12 @@ help:
 	@echo "  make [target] [APP=<application>]"
 	@echo ""
 	@echo "Targets:"
-	@echo "  all       Build the FPGA bitstream (default)"
+	@echo "  all       Build the FPGA bitstream"
 	@echo "  app       Build the selected application"
 	@echo "  mem       Generate memimage.coe"
 	@echo "  prepare   Prepare Vivado project and IPs"
 	@echo "  synth     Run synthesis"
-	@echo "  impl      Run implementation"
+	@echo "  impl      Run implementation (default)"
 	@echo "  bit       Generate the FPGA bitstream"
 	@echo "  flash     Generate and program the FPGA bitstream"
 	@echo "  monitor   Open the serial monitor"
@@ -253,9 +259,11 @@ help:
 	@echo "  SERIAL     Serial device (default: /dev/ttyUSB1)"
 	@echo "  BAUD       Serial baud rate (default: 115200)"
 	@echo "  HW_SERVER  Vivado hardware server (default: localhost:3121)"
+	@echo "  HW_TARGET  Vivado hardware target when more than one is available"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make"
+	@echo "  make impl APP=hello"
 	@echo "  make bit APP=hello"
 	@echo "  make flash APP=coremark"
 	@echo "  make monitor"
