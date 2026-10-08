@@ -1,0 +1,46 @@
+% AlexNet convolutional layer timing results
+% Requires: booktabs, multirow, siunitx (or just compile as-is)
+% Dagger ($^\dagger$) marks rows where a 32-bit accumulator overflow is
+% suspected (converted values are unreliable).
+\begin{table}[htbp]
+  \centering
+  \caption{AlexNet Convolutional Layer Timing Results}
+  \label{tab:alexnet-timing}
+  \resizebox{\textwidth}{!}{%
+  \begin{tabular}{|l|l|l|c|c|c|c|c|}
+    \hline
+    \textbf{Layer} & \textbf{Channels} & \textbf{VLEN} &
+    \textbf{Avg Cyc./Ch. ($\times 10^6$)} & \textbf{Conv/Matmul+Bias ($\times 10^6$ cyc.)} &
+    \textbf{ReLU ($\times 10^6$ cyc.)} & \textbf{MaxPool ($\times 10^6$ cyc.)} &
+    \textbf{Total ($\times 10^6$ cyc.)} \\
+    \hline\hline
+    \multirow{4}{*}{Conv~1} & \multirow{4}{*}{64} & Scalar & $17.79$ & $1138.88$ & $1.93$ & $5.13$ & $1145.94$ \\
+     &  & 64 & $17.79$ $(1.00\times)$ & $1138.88$ $(1.00\times)$ & $1.93$ $(1.00\times)$ & $5.13$ $(1.00\times)$ & $1145.94$ $(1.00\times)$ \\
+     &  & 128 & $17.79$ $(1.00\times)$ & $1138.56$ $(1.00\times)$ & $1.06$ $(1.81\times)$ & $5.13$ $(1.00\times)$ & $1144.76$ $(1.00\times)$ \\
+     &  & 256 & $17.78$ $(1.00\times)$ & $1138.06$ $(1.00\times)$ & $0.73$ $(2.66\times)$ & $5.13$ $(1.00\times)$ & $1143.91$ $(1.00\times)$ \\
+    \hline
+    \multirow{4}{*}{Conv~2} & \multirow{4}{*}{192} & Scalar & $15.81$ & $3036.28$ & $1.36$ & $3.61$ & $3041.25$ \\
+     &  & 64 & $15.81$ $(1.00\times)$ & $3036.23$ $(1.00\times)$ & $1.36$ $(1.00\times)$ & $3.61$ $(1.00\times)$ & $3041.20$ $(1.00\times)$ \\
+     &  & 128 & $12.47$ $(1.27\times)$ & $2394.30$ $(1.27\times)$ & $0.77$ $(1.76\times)$ & $3.61$ $(1.00\times)$ & $2398.68$ $(1.27\times)$ \\
+     &  & 256 & $9.53$ $(1.66\times)$ & $1829.87$ $(1.66\times)$ & $0.52$ $(2.58\times)$ & $3.61$ $(1.00\times)$ & $1834.00$ $(1.66\times)$ \\
+    \hline
+    \multirow{4}{*}{Conv~3} & \multirow{4}{*}{384} & Scalar & $7.91$ & $3037.75$ & $0.63$ & $0.00$ & $3038.38$ \\
+     &  & 64 & $7.91$ $(1.00\times)$ & $3037.75$ $(1.00\times)$ & $0.63$ $(1.00\times)$ & $0.00$ & $3038.38$ $(1.00\times)$ \\
+     &  & 128 & $3.97$ $(1.99\times)$ & $1522.76$ $(1.99\times)$ & $0.36$ $(1.75\times)$ & $0.00$ & $1523.12$ $(1.99\times)$ \\
+     &  & 256 & $2.23$ $(3.55\times)$ & $855.37$ $(3.55\times)$ & $0.24$ $(2.57\times)$ & $0.00$ & $855.61$ $(3.55\times)$ \\
+    \hline
+    \multirow{4}{*}{Conv~4} & \multirow{4}{*}{256} & Scalar & $15.82$ & $4049.93$ & $0.40$ & $0.00$ & $4050.34$ \\
+     &  & 64 & $15.82$ $(1.00\times)$ & $4049.93$ $(1.00\times)$ & $0.40$ $(1.00\times)$ & $0.00$ & $4050.34$ $(1.00\times)$ \\
+     &  & 128 & $7.97$ $(1.99\times)$ & $2039.35$ $(1.99\times)$ & $0.24$ $(1.69\times)$ & $0.00$ & $2039.59$ $(1.99\times)$ \\
+     &  & 256 & $4.45$ $(3.55\times)$ & $1140.26$ $(3.55\times)$ & $0.16$ $(2.48\times)$ & $0.00$ & $1140.42$ $(3.55\times)$ \\
+    \hline
+    \multirow{4}{*}{Conv~5} & \multirow{4}{*}{256} & Scalar & $8.99$ & $2301.30$ & $0.41$ & $1.04$ & $2302.76$ \\
+     &  & 64 & $8.99$ $(1.00\times)$ & $2301.30$ $(1.00\times)$ & $0.41$ $(1.00\times)$ & $1.04$ $(1.00\times)$ & $2302.76$ $(1.00\times)$ \\
+     &  & 128 & $5.28$ $(1.70\times)$ & $1351.03$ $(1.70\times)$ & $0.24$ $(1.73\times)$ & $1.04$ $(1.00\times)$ & $1352.31$ $(1.70\times)$ \\
+     &  & 256 & $2.96$ $(3.04\times)$ & $757.89$ $(3.04\times)$ & $0.16$ $(2.54\times)$ & $1.04$ $(1.00\times)$ & $759.10$ $(3.03\times)$ \\
+    \hline
+    \multirow{4}{*}{FC} & \multirow{4}{*}{---} & Scalar & --- & $703.56$ & $0.08$ & --- & $703.64$ \\
+     &  & 64 & --- & $703.56$ $(1.00\times)$ & $0.08$ $(1.00\times)$ & --- & $703.64$ $(1.00\times)$ \\
+     &  & 128 & --- & $703.56$ $(1.00\times)$ & $0.05$ $(1.79\times)$ & --- & $703.60$ $(1.00\times)$ \\
+     &  & 256 & --- & $241.99$ $(2.91\times)$ & $0.03$ $(2.62\times)$ & --- & $242.02$ $(2.91\times)$ \\
+    \hline
