@@ -19,49 +19,43 @@ module HPMProfiler;
         fd = $fopen(file_name, "w");
     end
 
-
     final begin
-        $fwrite(fd,"Clock Cycles:             %0d\n", CSRBank.mcycle);
-        $fwrite(fd,"Instructions Retired:     %0d\n", CSRBank.minstret);
-        $fwrite(fd,"Instructions Compressed:  %0d\n", CSRBank.cntr_compressed);
-        $fwrite(fd,"Instructions Killed:      %0d\n", CSRBank.cntr_killed);
-        $fwrite(fd,"Context Switches:         %0d\n", CSRBank.cntr_context);
-        $fwrite(fd,"Exceptions Raised:        %0d\n", CSRBank.cntr_exception);
-        $fwrite(fd,"Interrupts Acked:         %0d\n", CSRBank.cntr_irq);
-        $fwrite(fd,"Misaligned Jumps:         %0d\n", CSRBank.cntr_misaligned);
-        $fwrite(fd,"Cycles Scalar Instruct:   %0d\n", CSRBank.cntr_scalar);
+        $fwrite(fd,"Clock Cycles:            %0d\n", CSRBank.mcycle);
+        $fwrite(fd,"Instructions Retired:    %0d\n", CSRBank.minstret);
+        $fwrite(fd,"Instructions Compressed: %0d\n", CSRBank.cntr_compressed);
+        $fwrite(fd,"Instructions Killed:     %0d\n", CSRBank.cntr_killed);
+        $fwrite(fd,"Exceptions Raised:       %0d\n", CSRBank.cntr_exception);
+        $fwrite(fd,"Interrupts Acked:        %0d\n", CSRBank.cntr_irq);
+        $fwrite(fd,"Misaligned Jumps:        %0d\n", CSRBank.cntr_misaligned_jump);
 
-        $fwrite(fd,"\nCYCLES WITH::\n");
-        $fwrite(fd,"HAZARDS:                  %0d\n", CSRBank.cntr_hazard);
-        $fwrite(fd,"STALL:                    %0d\n", CSRBank.cntr_stall);
-        $fwrite(fd,"BUBBLES (INC. HAZARDS):   %0d\n", CSRBank.cntr_nop);
+        $fwrite(fd,"\nCYCLES WITH:\n");
+        $fwrite(fd,"HAZARDS:                 %0d\n", CSRBank.cntr_hazard);
+        $fwrite(fd,"STALL:                   %0d\n", CSRBank.cntr_stall);
 
         $fwrite(fd,"\nINSTRUCTION COUNTERS:\n");
-        $fwrite(fd,"LUI_SLT:                  %0d\n", CSRBank.cntr_luislt);
-        $fwrite(fd,"LOGIC:                    %0d\n", CSRBank.cntr_logic);
-        $fwrite(fd,"ADDSUB:                   %0d\n", CSRBank.cntr_addsub);
-        $fwrite(fd,"SHIFT:                    %0d\n", CSRBank.cntr_shift);
-        $fwrite(fd,"BRANCH:                   %0d\n", CSRBank.cntr_branch);
-        $fwrite(fd,"JUMP:                     %0d\n", CSRBank.cntr_jump);
-        $fwrite(fd,"LOAD:                     %0d\n", CSRBank.cntr_load);
-        $fwrite(fd,"STORE:                    %0d\n", CSRBank.cntr_store);
-        $fwrite(fd,"SYS:                      %0d\n", CSRBank.cntr_sys);
-        $fwrite(fd,"CSR:                      %0d\n", CSRBank.cntr_csr);
-        $fwrite(fd,"MUL:                      %0d\n", CSRBank.cntr_mul);
-        $fwrite(fd,"DIV:                      %0d\n", CSRBank.cntr_div);
+        $fwrite(fd,"LOGIC:                   %0d\n", CSRBank.cntr_logic);
+        $fwrite(fd,"ADDSUB:                  %0d\n", CSRBank.cntr_add_sub);
+        $fwrite(fd,"SHIFT:                   %0d\n", CSRBank.cntr_shift_rotate);
+        $fwrite(fd,"BRANCH:                  %0d\n", CSRBank.cntr_branch);
+        $fwrite(fd,"JUMP:                    %0d\n", CSRBank.cntr_jump);
+        $fwrite(fd,"LOAD:                    %0d\n", CSRBank.cntr_load);
+        $fwrite(fd,"STORE:                   %0d\n", CSRBank.cntr_store);
+        $fwrite(fd,"ATOMIC:                  %0d\n", CSRBank.cntr_atomic);
+        $fwrite(fd,"SYS:                     %0d\n", CSRBank.cntr_sys);
+        $fwrite(fd,"CSR:                     %0d\n", CSRBank.cntr_csr);
+        $fwrite(fd,"LUI_SLT:                 %0d\n", CSRBank.cntr_lui_slt);
+        $fwrite(fd,"MUL:                     %0d\n", CSRBank.cntr_mul);
+        $fwrite(fd,"DIV:                     %0d\n", CSRBank.cntr_div_rem);
+        $fwrite(fd,"AES_SHA:                 %0d\n", CSRBank.cntr_aes_sha);
+        $fwrite(fd,"KYBER:                   %0d\n", CSRBank.cntr_kyber);
 
         $fwrite(fd, "\nVECTOR EXTENSION:\n");
-        $fwrite(fd, "Vector Instructions:     %0d\n", CSRBank.cntr_vinst);
-        // $fwrite(fd, "Vector Cycles Total:     %0d\n", CSRBank.cntr_vcycles + cntr_vlscycles);
-        $fwrite(fd, "Vector Cycles Arith/Cfg: %0d\n", CSRBank.cntr_vcycles);
-        $fwrite(fd, "Vector Cycles Load/Stor: %0d\n", CSRBank.cntr_vlscycles);
-        $fwrite(fd, "VADDSUB:                 %0d\n", CSRBank.cntr_vaddsub);
-        $fwrite(fd, "VMUL:                    %0d\n", CSRBank.cntr_vmul);
-        $fwrite(fd, "VDIV:                    %0d\n", CSRBank.cntr_vdiv);
-        $fwrite(fd, "VMAC:                    %0d\n", CSRBank.cntr_vmac);
-        $fwrite(fd, "VRED:                    %0d\n", CSRBank.cntr_vred);
-        $fwrite(fd, "VLOAD/VSTORE:            %0d\n", CSRBank.cntr_vloadstore);
+        $fwrite(fd, "Vector Cycles:           %0d\n", CSRBank.cntr_vcycles);
+        $fwrite(fd, "VADDSUB:                 %0d\n", CSRBank.cntr_vadd_sub);
+        $fwrite(fd, "VMUL_MAC:                %0d\n", CSRBank.cntr_vmul_mac);
+        $fwrite(fd, "VDIV_REM:                %0d\n", CSRBank.cntr_vdiv_rem);
         $fwrite(fd, "VOTHERS:                 %0d\n", CSRBank.cntr_vothers);
+        $fwrite(fd, "VLOAD_STORE:             %0d\n", CSRBank.cntr_vload_store);
     end
 
 endmodule
