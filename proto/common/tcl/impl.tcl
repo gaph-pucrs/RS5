@@ -31,14 +31,6 @@ route_design
 
 write_checkpoint -force $output
 
-set report_dir [file dirname $output]
-
-report_timing_summary \
-    -file [file join $report_dir timing_summary.rpt]
-
-report_utilization \
-    -file [file join $report_dir utilization.rpt]
-
 close_design
 
 puts ""

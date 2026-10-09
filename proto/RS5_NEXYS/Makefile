@@ -39,7 +39,7 @@ MEM_INPUT := $(APP_DIR)/$(APP).bin
 MEM_COE   := $(PLATFORM_DIR)/memimage.coe
 
 
-BUILD_DIR := $(PLATFORM_DIR)/build
+REPORT_DIR := $(PLATFORM_DIR)/reports
 
 
 # ---------------------------------------------------------------------
@@ -63,6 +63,7 @@ IP_TCL      := $(COMMON_DIR)/tcl/ip_manage.tcl
 
 SYNTH_TCL   := $(COMMON_DIR)/tcl/synth.tcl
 IMPL_TCL    := $(COMMON_DIR)/tcl/impl.tcl
+REPORT_TCL	:= $(COMMON_DIR)/tcl/reports.tcl
 BUILD_TCL   := $(COMMON_DIR)/tcl/build.tcl
 
 PROGRAM_TCL := $(COMMON_DIR)/tcl/program.tcl
@@ -72,13 +73,18 @@ PROGRAM_TCL := $(COMMON_DIR)/tcl/program.tcl
 # Generated files
 # ---------------------------------------------------------------------
 
-SYNTH_DCP := $(BUILD_DIR)/post_synth.dcp
-ROUTE_DCP := $(BUILD_DIR)/post_route.dcp
-BITSTREAM := $(BUILD_DIR)/RS5.bit
+SYNTH_DCP := $(REPORT_DIR)/post_synth.dcp
+ROUTE_DCP := $(REPORT_DIR)/post_route.dcp
+BITSTREAM := $(REPORT_DIR)/RS5.bit
 
 
-MEM_STAMP := $(BUILD_DIR)/.mem-$(APP)
+MEM_STAMP := $(REPORT_DIR)/.mem-$(APP)
 
+TIMING_RPT := $(REPORT_DIR)/timing_summary.rpt
+UTIL_RPT   := $(REPORT_DIR)/utilization.rpt
+POWER_RPT  := $(REPORT_DIR)/power.rpt
+
+REPORT_STAMP := $(REPORT_DIR)/.reports
 
 # ---------------------------------------------------------------------
 # Sources
@@ -133,7 +139,7 @@ SOURCES := \
 .DEFAULT_GOAL := impl
 
 
-.PHONY: all help app mem prepare synth impl bit flash monitor clean
+.PHONY: all help app mem prepare synth impl reports bit flash monitor clean
 
 
 all: bit
@@ -185,8 +191,8 @@ $(MEM_INPUT):
 
 
 $(MEM_STAMP): $(MEM_INPUT) $(COMMON_DIR)/init_mem.py
-	@mkdir -p "$(BUILD_DIR)"
-	@rm -f "$(BUILD_DIR)"/.mem-*
+	@mkdir -p "$(REPORT_DIR)"
+	@rm -f "$(REPORT_DIR)"/.mem-*
 	@"$(PYTHON)" "$(COMMON_DIR)/init_mem.py" "$(MEM_INPUT)" "$(MEM_COE)"
 	@touch "$@"
 
@@ -231,7 +237,7 @@ prepare:
 
 $(SYNTH_DCP): $(MEM_STAMP) $(SOURCES)
 
-	@mkdir -p "$(BUILD_DIR)"
+	@mkdir -p "$(REPORT_DIR)"
 
 	$(MAKE) prepare
 
@@ -257,12 +263,23 @@ $(ROUTE_DCP): $(SYNTH_DCP)
 	"$(SYNTH_DCP)" \
 	"$(ROUTE_DCP)"
 
+$(REPORT_STAMP): $(ROUTE_DCP) $(REPORT_TCL)
 
-impl: $(ROUTE_DCP)
+	"$(VIVADO)" \
+	-mode batch \
+	-source "$(REPORT_TCL)" \
+	-tclargs \
+	"$(ROUTE_DCP)" \
+	"$(REPORT_DIR)"
+
+	@touch "$@"
 
 
+reports: $(REPORT_STAMP)
 
-$(BITSTREAM): $(ROUTE_DCP)
+impl: $(REPORT_STAMP)
+
+$(BITSTREAM): $(ROUTE_DCP) $(REPORT_STAMP)
 
 	"$(VIVADO)" \
 	-mode batch \
@@ -310,7 +327,7 @@ monitor:
 
 clean:
 
-	rm -rf "$(BUILD_DIR)"
+	rm -rf "$(REPORT_DIR)"
 
 	rm -rf "$(PLATFORM_DIR)/.Xil"
 
