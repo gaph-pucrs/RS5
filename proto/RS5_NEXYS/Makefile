@@ -58,14 +58,14 @@ export HW_TARGET
 # Vivado scripts
 # ---------------------------------------------------------------------
 
-PREPARE_TCL := $(COMMON_DIR)/prepare_project.tcl
-IP_TCL      := $(COMMON_DIR)/ip_manage.tcl
+PREPARE_TCL := $(COMMON_DIR)/tcl/prepare_project.tcl
+IP_TCL      := $(COMMON_DIR)/tcl/ip_manage.tcl
 
-SYNTH_TCL   := $(COMMON_DIR)/synth.tcl
-IMPL_TCL    := $(COMMON_DIR)/impl.tcl
-BUILD_TCL   := $(COMMON_DIR)/build.tcl
+SYNTH_TCL   := $(COMMON_DIR)/tcl/synth.tcl
+IMPL_TCL    := $(COMMON_DIR)/tcl/impl.tcl
+BUILD_TCL   := $(COMMON_DIR)/tcl/build.tcl
 
-PROGRAM_TCL := $(COMMON_DIR)/program.tcl
+PROGRAM_TCL := $(COMMON_DIR)/tcl/program.tcl
 
 
 # ---------------------------------------------------------------------
@@ -102,10 +102,10 @@ RTL_SOURCES += $(shell find "$(ROOT_DIR)/RingBuffer/rtl" \
 
 
 RTL_SOURCES += \
-	$(COMMON_DIR)/Peripherals.sv \
-	$(COMMON_DIR)/UART_RX_CTRL.sv \
-	$(COMMON_DIR)/UART_TX_CTRL.vhd \
-	$(COMMON_DIR)/Debouncer.vhd \
+	$(COMMON_DIR)/rtl/Peripherals.sv \
+	$(COMMON_DIR)/rtl/UART_RX_CTRL.sv \
+	$(COMMON_DIR)/rtl/UART_TX_CTRL.vhd \
+	$(COMMON_DIR)/rtl/Debouncer.vhd \
 	$(PLATFORM_DIR)/RS5_FPGA_Platform_NEXYS.sv
 
 
@@ -187,7 +187,7 @@ $(MEM_INPUT):
 $(MEM_STAMP): $(MEM_INPUT) $(COMMON_DIR)/init_mem.py
 	@mkdir -p "$(BUILD_DIR)"
 	@rm -f "$(BUILD_DIR)"/.mem-*
-	"$(PYTHON)" "$(COMMON_DIR)/init_mem.py" "$(MEM_INPUT)" "$(MEM_COE)"
+	@"$(PYTHON)" "$(COMMON_DIR)/init_mem.py" "$(MEM_INPUT)" "$(MEM_COE)"
 	@touch "$@"
 
 
