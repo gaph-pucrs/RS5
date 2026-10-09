@@ -786,12 +786,116 @@ static inline uint64_t csr_read_write_mhpmcounter29h(uint64_t new_value) {
 
 
 /*******************************************
+ * mhpmcounter7H - MRW - Stall High (Upper 32 bits, RV32)
+ */
+static inline uint64_t csr_read_mhpmcounter7h(void) {
+    uint_csr64_t value;
+    __asm__ volatile ("csrr    %0, mhpmcounter7h"
+                      : "=r" (value)
+                      :
+                      :);
+    return value;
+}
+static inline void csr_write_mhpmcounter7h(uint_csr64_t value) {
+    __asm__ volatile ("csrw    mhpmcounter7h, %0"
+                      :
+                      : "r" (value)
+                      :);
+}
+static inline uint64_t csr_read_write_mhpmcounter7h(uint64_t new_value) {
+    uint_csr64_t prev_value;
+    __asm__ volatile ("csrrw    %0, mhpmcounter7h, %1"
+                      : "=r" (prev_value)
+                      : "r" (new_value)
+                      :);
+    return prev_value;
+}
+
+/*******************************************
+ * mhpmcounter9H - MRW - Add/Sub High (Upper 32 bits, RV32)
+ */
+static inline uint64_t csr_read_mhpmcounter9h(void) {
+    uint_csr64_t value;
+    __asm__ volatile ("csrr    %0, mhpmcounter9h"
+                      : "=r" (value)
+                      :
+                      :);
+    return value;
+}
+static inline void csr_write_mhpmcounter9h(uint_csr64_t value) {
+    __asm__ volatile ("csrw    mhpmcounter9h, %0"
+                      :
+                      : "r" (value)
+                      :);
+}
+static inline uint64_t csr_read_write_mhpmcounter9h(uint64_t new_value) {
+    uint_csr64_t prev_value;
+    __asm__ volatile ("csrrw    %0, mhpmcounter9h, %1"
+                      : "=r" (prev_value)
+                      : "r" (new_value)
+                      :);
+    return prev_value;
+}
+
+/*******************************************
+ * mhpmcounter13H - MRW - Load High (Upper 32 bits, RV32)
+ */
+static inline uint64_t csr_read_mhpmcounter13h(void) {
+    uint_csr64_t value;
+    __asm__ volatile ("csrr    %0, mhpmcounter13h"
+                      : "=r" (value)
+                      :
+                      :);
+    return value;
+}
+static inline void csr_write_mhpmcounter13h(uint_csr64_t value) {
+    __asm__ volatile ("csrw    mhpmcounter13h, %0"
+                      :
+                      : "r" (value)
+                      :);
+}
+static inline uint64_t csr_read_write_mhpmcounter13h(uint64_t new_value) {
+    uint_csr64_t prev_value;
+    __asm__ volatile ("csrrw    %0, mhpmcounter13h, %1"
+                      : "=r" (prev_value)
+                      : "r" (new_value)
+                      :);
+    return prev_value;
+}
+
+/*******************************************
+ * mhpmcounter30H - MRW - Vector Cycles High (Upper 32 bits, RV32)
+ */
+static inline uint64_t csr_read_mhpmcounter30h(void) {
+    uint_csr64_t value;
+    __asm__ volatile ("csrr    %0, mhpmcounter30h"
+                      : "=r" (value)
+                      :
+                      :);
+    return value;
+}
+static inline void csr_write_mhpmcounter30h(uint_csr64_t value) {
+    __asm__ volatile ("csrw    mhpmcounter30h, %0"
+                      :
+                      : "r" (value)
+                      :);
+}
+static inline uint64_t csr_read_write_mhpmcounter30h(uint64_t new_value) {
+    uint_csr64_t prev_value;
+    __asm__ volatile ("csrrw    %0, mhpmcounter30h, %1"
+                      : "=r" (prev_value)
+                      : "r" (new_value)
+                      :);
+    return prev_value;
+}
+
+
+/*******************************************
  * Utils
  */
 
 static void read_hpms(uint32_t *hpm_values) {
   hpm_values[ 0] = csr_read_mcycle();
-  //hpm_values[ 1] = ();
   hpm_values[ 2] = csr_read_minstret();
   hpm_values[ 3] = csr_read_mhpmcounter3();
   hpm_values[ 4] = csr_read_mhpmcounter4();
@@ -823,97 +927,206 @@ static void read_hpms(uint32_t *hpm_values) {
   hpm_values[30] = csr_read_mhpmcounter30();
   hpm_values[31] = csr_read_mhpmcounter31();
 
-  hpm_values[35] = csr_read_mhpmcounter3h();
-  hpm_values[56] = csr_read_mhpmcounter24h();
-  hpm_values[57] = csr_read_mhpmcounter25h();
-  hpm_values[61] = csr_read_mhpmcounter29h();
+  /* Upper 32-bit registers for 64-bit counters (stored at 32 + index) */
+  hpm_values[39] = csr_read_mhpmcounter7h();   /* Stall High: 32 + 7  = 39 */
+  hpm_values[41] = csr_read_mhpmcounter9h();   /* Add/Sub High: 32 + 9  = 41 */
+  hpm_values[45] = csr_read_mhpmcounter13h();  /* Load High: 32 + 13 = 45 */
+  hpm_values[62] = csr_read_mhpmcounter30h();  /* Vector Cycles High: 32 + 30 = 62 */
 }
 
-static void evaluate_hpms(uint32_t *hpm_values_0, uint32_t *hpm_values_1) {
+/* Hardware Enable Bitmask Enum (mapped 1:1 to RS5 CSRBank.sv parameters) */
+typedef enum {
+    HPMCOUNTEREnable   = (1 << 0), /* Base RV32I, Pipeline & Overview Counters */
+    AMOEXT             = (1 << 1), /* Atomic Instructions (AMO, LR, SC) */
+    COMPRESSED         = (1 << 2), /* RVC Compressed Instructions & Misaligned Jumps */
+    MULEXT             = (1 << 3), /* Multiplication & Division/Remainder */
+    ZKNEnable          = (1 << 4), /* AES & SHA2 Cryptographic Extensions */
+    XKYBEREnable       = (1 << 5), /* Kyber ML-KEM Post-Quantum Cryptography Accelerator */
+    VEnable            = (1 << 6), /* Vector Extension Units (Add/Sub, Mul, Div, Mem, Cycles) */
+    HPM_ALL            = (HPMCOUNTEREnable | AMOEXT | COMPRESSED | MULEXT | ZKNEnable | XKYBEREnable | VEnable)
+} hpm_enable_e;
+
+/* Convenience aliases with HPM_ prefix */
+#define HPM_HPMCOUNTEREnable   HPMCOUNTEREnable
+#define HPM_AMOEXT             AMOEXT
+#define HPM_COMPRESSED         COMPRESSED
+#define HPM_MULEXT             MULEXT
+#define HPM_ZKNEnable          ZKNEnable
+#define HPM_XKYBEREnable       XKYBEREnable
+#define HPM_VEnable            VEnable
+#define HPM_ENABLE_ALL         HPM_ALL
+
+/* Individual HPM counter index definitions */
+typedef enum {
+    HPM_CYCLES          = 0,  /* Clock Cycles */
+    HPM_TIME            = 1,  /* Timer */
+    HPM_INSTRET         = 2,  /* Instructions Retired */
+    HPM_FETCH_STALL     = 3,  /* Fetch Stalls */
+    HPM_FETCH_MISALIGN  = 4,  /* Fetch Misaligned */
+    HPM_INTERRUPTS      = 5,  /* Interrupt Count */
+    HPM_HAZARDS         = 6,  /* Hazard Count */
+    HPM_STALLS          = 7,  /* Pipeline Stalls */
+    HPM_LOGIC           = 8,  /* Logic Instructions (AND, OR, XOR) */
+    HPM_ADD_SUB         = 9,  /* Add / Sub Instructions */
+    HPM_SHIFT_ROTATE    = 10, /* Shift / Rotate Instructions */
+    HPM_BRANCHES        = 11, /* Conditional Branches */
+    HPM_JUMPS           = 12, /* Jumps (JAL, JALR) */
+    HPM_LOADS           = 13, /* Memory Loads */
+    HPM_STORES          = 14, /* Memory Stores */
+    HPM_AMO             = 15, /* Atomic Instructions (AMO) */
+    HPM_SYSTEM          = 16, /* System Instructions */
+    HPM_CSR             = 17, /* CSR Instructions */
+    HPM_OTHER           = 18, /* LUI, AUIPC, SLT */
+    HPM_COMPRESSED_INST = 19, /* Compressed Instructions (RVC) */
+    HPM_MISALIGNED_JUMP = 20, /* Misaligned Jumps */
+    HPM_MUL             = 21, /* Multiplication Instructions */
+    HPM_DIV_REM         = 22, /* Division / Remainder */
+    HPM_AES_SHA2        = 23, /* AES & SHA-2 Cryptographic Instructions */
+    HPM_KYBER           = 24, /* Kyber Post-Quantum Instructions */
+    HPM_VADD_SUB        = 25, /* Vector Add / Sub */
+    HPM_VMUL            = 26, /* Vector Mul / MAC */
+    HPM_VDIV_REM        = 27, /* Vector Div / Rem */
+    HPM_VOTHERS         = 28, /* Vector Others */
+    HPM_VMEM            = 29, /* Vector Memory (Load / Store) */
+    HPM_VCYCLES         = 30  /* Vector Active Cycles */
+} hpm_idx_e;
+
+static inline void evaluate_hpm_single(uint32_t *hpm_values_0, uint32_t *hpm_values_1, int idx) {
+    if (idx < 0 || idx >= 32) return;
+    uint32_t val = hpm_values_1[idx] - hpm_values_0[idx];
+    const char *name = "Counter";
+    switch (idx) {
+        case 0:  name = "Clock Cycles"; break;
+        case 1:  name = "Timer"; break;
+        case 2:  name = "Inst Retired"; break;
+        case 3:  name = "Inst Killed"; break;
+        case 4:  name = "Exceptions"; break;
+        case 5:  name = "Interrupts"; break;
+        case 6:  name = "Hazards"; break;
+        case 7:  name = "Stalls"; break;
+        case 8:  name = "Logic"; break;
+        case 9:  name = "Add/Sub"; break;
+        case 10: name = "Shift/Rotate"; break;
+        case 11: name = "Branches"; break;
+        case 12: name = "Jumps"; break;
+        case 13: name = "Loads"; break;
+        case 14: name = "Stores"; break;
+        case 15: name = "Atomic (AMO)"; break;
+        case 16: name = "System"; break;
+        case 17: name = "CSR"; break;
+        case 18: name = "LUI/AUIPC/SLT"; break;
+        case 19: name = "Compressed"; break;
+        case 20: name = "Misaligned Jump"; break;
+        case 21: name = "Mul"; break;
+        case 22: name = "Div/Rem"; break;
+        case 23: name = "AES + SHA2"; break;
+        case 24: name = "Kyber"; break;
+        case 25: name = "Vector Add/Sub"; break;
+        case 26: name = "Vector Mul/MAC"; break;
+        case 27: name = "Vector Div/Rem"; break;
+        case 28: name = "Vector Others"; break;
+        case 29: name = "Vector Mem LS"; break;
+        case 30: name = "Vector Cycl"; break;
+        default: name = "Unknown"; break;
+    }
+    printf("\n================ HPM Counters ================\n");
+    printf("Cycles[%2d] - %-16s %0u\n", idx, name, (unsigned int)val);
+    printf("==============================================\n\n");
+}
+
+
+static void evaluate_hpms_filtered(uint32_t *hpm_values_0, uint32_t *hpm_values_1, uint32_t enable_mask) {
   int hpms [64];
 
-  hpms[ 0] = (int)(hpm_values_1[ 0] - hpm_values_0[ 0]);
-  hpms[ 1] = (int)(hpm_values_1[ 1] - hpm_values_0[ 1]);
-  hpms[ 2] = (int)(hpm_values_1[ 2] - hpm_values_0[ 2]);
-  hpms[ 3] = (int)(hpm_values_1[ 3] - hpm_values_0[ 3]);
-  hpms[ 4] = (int)(hpm_values_1[ 4] - hpm_values_0[ 4]);
-  hpms[ 5] = (int)(hpm_values_1[ 5] - hpm_values_0[ 5]);
-  hpms[ 6] = (int)(hpm_values_1[ 6] - hpm_values_0[ 6]);
-  hpms[ 7] = (int)(hpm_values_1[ 7] - hpm_values_0[ 7]);
-  hpms[ 8] = (int)(hpm_values_1[ 8] - hpm_values_0[ 8]);
-  hpms[ 9] = (int)(hpm_values_1[ 9] - hpm_values_0[ 9]);
-  hpms[10] = (int)(hpm_values_1[10] - hpm_values_0[10]);
-  hpms[11] = (int)(hpm_values_1[11] - hpm_values_0[11]);
-  hpms[12] = (int)(hpm_values_1[12] - hpm_values_0[12]);
-  hpms[13] = (int)(hpm_values_1[13] - hpm_values_0[13]);
-  hpms[14] = (int)(hpm_values_1[14] - hpm_values_0[14]);
-  hpms[15] = (int)(hpm_values_1[15] - hpm_values_0[15]);
-  hpms[16] = (int)(hpm_values_1[16] - hpm_values_0[16]);
-  hpms[17] = (int)(hpm_values_1[17] - hpm_values_0[17]);
-  hpms[18] = (int)(hpm_values_1[18] - hpm_values_0[18]);
-  hpms[19] = (int)(hpm_values_1[19] - hpm_values_0[19]);
-  hpms[20] = (int)(hpm_values_1[20] - hpm_values_0[20]);
-  hpms[21] = (int)(hpm_values_1[21] - hpm_values_0[21]);
-  hpms[22] = (int)(hpm_values_1[22] - hpm_values_0[22]);
-  hpms[23] = (int)(hpm_values_1[23] - hpm_values_0[23]);
-  hpms[24] = (int)(hpm_values_1[24] - hpm_values_0[24]);
-  hpms[25] = (int)(hpm_values_1[25] - hpm_values_0[25]);
-  hpms[26] = (int)(hpm_values_1[26] - hpm_values_0[26]);
-  hpms[27] = (int)(hpm_values_1[27] - hpm_values_0[27]);
-  hpms[28] = (int)(hpm_values_1[28] - hpm_values_0[28]);
-  hpms[29] = (int)(hpm_values_1[29] - hpm_values_0[29]);
-  hpms[30] = (int)(hpm_values_1[30] - hpm_values_0[30]);
-  hpms[31] = (int)(hpm_values_1[31] - hpm_values_0[31]);
+  for (int i = 0; i < 32; i++) {
+    hpms[i] = (int)(hpm_values_1[i] - hpm_values_0[i]);
+  }
 
-  hpms[35] = (int)(hpm_values_1[35] - hpm_values_0[35]);
-  hpms[56] = (int)(hpm_values_1[56] - hpm_values_0[56]);
-  hpms[57] = (int)(hpm_values_1[57] - hpm_values_0[57]);
-  hpms[61] = (int)(hpm_values_1[61] - hpm_values_0[61]);
+  hpms[39] = (int)(hpm_values_1[39] - hpm_values_0[39]);
+  hpms[41] = (int)(hpm_values_1[41] - hpm_values_0[41]);
+  hpms[45] = (int)(hpm_values_1[45] - hpm_values_0[45]);
+  hpms[62] = (int)(hpm_values_1[62] - hpm_values_0[62]);
 
-  printf("HPM Counters - Cycles Measured:\n");
-  printf("Cycles[ 0] - Cycles:       %0d\n", hpms[ 0]);
-//printf("Cycles[ 1] - Time:         %0d\n", hpms[ 1]);
-  printf("Cycles[ 2] - Inst Retired: %0d\n", hpms[ 2]);
-  printf("Cycles[ 3] - Inst Killed:  %0d\n", hpms[ 3]);
-  printf("Cycles[ 4] - Cntxt Switch: %0d\n", hpms[ 4]);
-  printf("Cycles[ 5] - Exceptions:   %0d\n", hpms[ 5]);
-  printf("Cycles[ 6] - Interrupts:   %0d\n", hpms[ 6]);
-  printf("Cycles[ 7] - Hazards:      %0d\n", hpms[ 7]);
-  printf("Cycles[ 8] - Stalls:       %0d\n", hpms[ 8]);
-  printf("Cycles[ 9] - NOPS:         %0d\n", hpms[ 9]);
-  printf("Cycles[10] - Logics:       %0d\n", hpms[10]);
-  printf("Cycles[11] - Add-Subs:     %0d\n", hpms[11]);
-  printf("Cycles[12] - Shifts:       %0d\n", hpms[12]);
-  printf("Cycles[13] - Branches:     %0d\n", hpms[13]);
-  printf("Cycles[14] - Jumps:        %0d\n", hpms[14]);
-  printf("Cycles[15] - Loads:        %0d\n", hpms[15]);
-  printf("Cycles[16] - Stores:       %0d\n", hpms[16]);
-  printf("Cycles[17] - Sys:          %0d\n", hpms[17]);
-  printf("Cycles[18] - CSR:          %0d\n", hpms[18]);
-  printf("Cycles[19] - Lui/SLT:      %0d\n", hpms[19]);
-  printf("Cycles[20] - Compressed:   %0d\n", hpms[20]);
-  printf("Cycles[21] - Misaligned:   %0d\n", hpms[21]);
-  printf("Cycles[22] - Mults:        %0d\n", hpms[22]);
-  printf("Cycles[23] - Divs:         %0d\n", hpms[23]);
-  printf("Cycles[24] - V-Add-Subs:   %0d\n", hpms[24]);
-  printf("Cycles[25] - V-Mults:      %0d\n", hpms[25]);
-  printf("Cycles[26] - V-Divs:       %0d\n", hpms[26]);
-  printf("Cycles[27] - V-Macs:       %0d\n", hpms[27]);
-  printf("Cycles[28] - V-Reductions: %0d\n", hpms[28]);
-  printf("Cycles[29] - V-Load-Store: %0d\n", hpms[29]);
-  printf("Cycles[30] - V-Others:     %0d\n", hpms[30]);
-//printf("Cycles[31] -  :            %0d\n", hpms[31]);
+  printf("\n================ HPM Counters ================\n");
+  if (enable_mask & HPMCOUNTEREnable) {
+    printf("Cycles[ 0] - Clock Cycles:     %0u\n", (unsigned int)hpms[ 0]);
+    printf("Cycles[ 2] - Inst Retired:     %0u\n", (unsigned int)hpms[ 2]);
 
-  printf("Cycles[35] - CyclesScalar: %0d\n", hpms[35]);
-  printf("Cycles[56] - V-Inst:       %0d\n", hpms[56]);
-  printf("V-Cycles-Tot:              %0d\n", hpms[57] + hpms[61]);
-  printf("Cycles[57] - V-Cycles:     %0d\n", hpms[57]);
-  printf("Cycles[61] - V-Cycles-LS:  %0d\n", hpms[61]);
+    printf("\n-- Pipeline & Telemetria --\n");
+    printf("Cycles[ 3] - Inst Killed:      %0u\n", (unsigned int)hpms[ 3]);
+    printf("Cycles[ 4] - Exceptions:       %0u\n", (unsigned int)hpms[ 4]);
+    printf("Cycles[ 5] - Interrupts:       %0u\n", (unsigned int)hpms[ 5]);
+    printf("Cycles[ 6] - Hazards:          %0u\n", (unsigned int)hpms[ 6]);
+    if (hpms[39])
+      printf("Cycles[ 7] - Stalls (64b):     0x%x%08x\n", (unsigned int)hpms[39], (unsigned int)hpms[ 7]);
+    else
+      printf("Cycles[ 7] - Stalls:           %0u\n", (unsigned int)hpms[ 7]);
 
-  printf("Scalar LOAD-STORES  = %0d\n", hpms[15] + hpms[16]);
-  printf("Vector LOAD-STORES  = %0d\n", hpms[29]);
-  printf("\n");
+    printf("\n-- Base RV32I --\n");
+    printf("Cycles[ 8] - Logic:            %0u\n", (unsigned int)hpms[ 8]);
+    if (hpms[41])
+      printf("Cycles[ 9] - Add/Sub (64b):    0x%x%08x\n", (unsigned int)hpms[41], (unsigned int)hpms[ 9]);
+    else
+      printf("Cycles[ 9] - Add/Sub:          %0u\n", (unsigned int)hpms[ 9]);
+    printf("Cycles[10] - Shift/Rotate:     %0u\n", (unsigned int)hpms[10]);
+    printf("Cycles[11] - Branches:         %0u\n", (unsigned int)hpms[11]);
+    printf("Cycles[12] - Jumps:            %0u\n", (unsigned int)hpms[12]);
+    if (hpms[45])
+      printf("Cycles[13] - Loads (64b):      0x%x%08x\n", (unsigned int)hpms[45], (unsigned int)hpms[13]);
+    else
+      printf("Cycles[13] - Loads:            %0u\n", (unsigned int)hpms[13]);
+    printf("Cycles[14] - Stores:           %0u\n", (unsigned int)hpms[14]);
+    printf("Cycles[16] - System:           %0u\n", (unsigned int)hpms[16]);
+    printf("Cycles[17] - CSR:              %0u\n", (unsigned int)hpms[17]);
+    printf("Cycles[18] - LUI/AUIPC/SLT:    %0u\n", (unsigned int)hpms[18]);
+  }
 
+  if (enable_mask & AMOEXT) {
+    printf("\n-- AMOEXT --\n");
+    printf("Cycles[15] - Atomic (AMO):     %0u\n", (unsigned int)hpms[15]);
+  }
+
+  if (enable_mask & COMPRESSED) {
+    printf("\n-- COMPRESSED --\n");
+    printf("Cycles[19] - Compressed:       %0u\n", (unsigned int)hpms[19]);
+    printf("Cycles[20] - Misaligned Jump:  %0u\n", (unsigned int)hpms[20]);
+  }
+
+  if (enable_mask & MULEXT) {
+    printf("\n-- MULEXT --\n");
+    printf("Cycles[21] - Mul:              %0u\n", (unsigned int)hpms[21]);
+    printf("Cycles[22] - Div/Rem:          %0u\n", (unsigned int)hpms[22]);
+  }
+
+  if (enable_mask & ZKNEnable) {
+    printf("\n-- Crypto (ZKNEnable) --\n");
+    printf("Cycles[23] - AES + SHA2:       %0u\n", (unsigned int)hpms[23]);
+  }
+
+  if (enable_mask & XKYBEREnable) {
+    printf("\n-- Crypto (XKYBEREnable) --\n");
+    printf("Cycles[24] - Kyber:            %0u\n", (unsigned int)hpms[24]);
+  }
+
+  if (enable_mask & VEnable) {
+    printf("\n-- VEnable (Extensao Vetorial) --\n");
+    printf("Cycles[25] - Vector Add/Sub:   %0u\n", (unsigned int)hpms[25]);
+    printf("Cycles[26] - Vector Mul/MAC:   %0u\n", (unsigned int)hpms[26]);
+    printf("Cycles[27] - Vector Div/Rem:   %0u\n", (unsigned int)hpms[27]);
+    printf("Cycles[28] - Vector Others:    %0u\n", (unsigned int)hpms[28]);
+    printf("Cycles[29] - Vector Mem LS:    %0u\n", (unsigned int)hpms[29]);
+    if (hpms[62])
+      printf("Cycles[30] - Vector Cycl (64b):0x%x%08x\n", (unsigned int)hpms[62], (unsigned int)hpms[30]);
+    else
+      printf("Cycles[30] - Vector Cycl:      %0u\n", (unsigned int)hpms[30]);
+  }
+
+  printf("==============================================\n\n");
+}
+
+/* Backward-compatible evaluate_hpms() that evaluates all enabled counters */
+static inline void evaluate_hpms(uint32_t *hpm_values_0, uint32_t *hpm_values_1) {
+  evaluate_hpms_filtered(hpm_values_0, hpm_values_1, HPM_ALL);
 }
 
 #endif // #define RISCV_CSR_HPM_H
