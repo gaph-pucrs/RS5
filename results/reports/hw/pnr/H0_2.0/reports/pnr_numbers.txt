@@ -1,0 +1,14 @@
+die_w_um 135.1
+die_h_um 133.5
+die_area_um2 18035.85
+core_w_um 123.06
+core_h_um 121.5
+core_area_um2 14951.79
+std_cells 9200
+std_cell_area_um2 10259.928
+phys_cells 9601
+phys_cell_area_um2 4691.862
+clock_buf_inv_cells 527
+clock_buf_inv_area_um2 189.63
+clock_gates 64
+std_util_core 0.686200648886

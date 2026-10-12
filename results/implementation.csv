@@ -1,0 +1,6 @@
+ID,label,std_cell_area_um2,kGE_0p378,cells,core_area_um2,setup_wns_ss_ps,hold_wns_ff_ps,leak_tt_mW,source
+H0,RS5,10259.928,27.14,9200,14951.79,2,15,0.04918495,hw/pnr/H0_2.0/reports/pnr_numbers.txt
+H1,+Zbkb,10588.41,28.01,9747,15397.704,8,7,0.05047168,hw/pnr/H1_2.0/reports/pnr_numbers.txt
+H4,+XKyber (Ser.),11141.172,29.47,10511,16309.188,5,20,0.05315626,hw/pnr/H4_2.0/reports/pnr_numbers.txt
+H3,+Zbkb+XKyber (Ser.),11269.314,29.81,10719,16389.072,2,9,0.05377818,hw/pnr/H3_2.0/reports/pnr_numbers.txt
+H2,+Zbkb+XKyber (Comb.),11041.002,29.21,10698,16087.68,1,1,0.05246854,hw/pnr/H2_2.0/reports/pnr_numbers.txt

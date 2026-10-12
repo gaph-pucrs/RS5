@@ -1,0 +1,22 @@
+op,class,cycles,fraction
+KeyGen,1 keccak_permutation,722034,0.6880
+KeyGen,2 keccak_sponge_glue,83270,0.0793
+KeyGen,3 poly_arith_ntt,121851,0.1161
+KeyGen,4 sampling,23679,0.0226
+KeyGen,5 compress_pack,7212,0.0069
+KeyGen,6 mem_verify_cmov,69230,0.0660
+KeyGen,7 other,22242,0.0212
+Encaps,1 keccak_permutation,695292,0.6365
+Encaps,2 keccak_sponge_glue,85015,0.0778
+Encaps,3 poly_arith_ntt,181613,0.1663
+Encaps,4 sampling,26619,0.0244
+Encaps,5 compress_pack,23930,0.0219
+Encaps,6 mem_verify_cmov,68182,0.0624
+Encaps,7 other,11730,0.0107
+Decaps,1 keccak_permutation,695292,0.5792
+Decaps,2 keccak_sponge_glue,85183,0.0710
+Decaps,3 poly_arith_ntt,265997,0.2216
+Decaps,4 sampling,26619,0.0222
+Decaps,5 compress_pack,48195,0.0401
+Decaps,6 mem_verify_cmov,78911,0.0657
+Decaps,7 other,288,0.0002

@@ -1,0 +1,6 @@
+# site-local standard-cell library settings (library under NDA): see scripts/config/pdk.env.example
+scripts/config/pdk.env
+# default output directory of the flow ($WORK)
+work/
+__pycache__/
+*.pyc

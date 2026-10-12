@@ -1,0 +1,6 @@
+cb173caf98b5a82ac25c5bae4ff77562  base/app.bin
+5844ae46488842b07e0adcb34a2b6487  zbkb/app.bin
+501059edb1fc4344502c3f62579126ea  xkyber/app.bin
+5ea6eda1f604a86d31796cd1b6d0d65b  both/app.bin
+12ef3268452edbbf45ea46c527caa12e  multest/app.bin
+fe2e1aaf98221056b516f0a97f3f976d  coremark/app.bin

@@ -1,0 +1,9 @@
+op,start_cycle,end_cycle,cycles,calls_in_op
+polyvec_ntt_first,3304439,3406033,101594,2
+polyvec_pointwise_acc_montgomery_first,3406041,3466938,60897,4
+sha3_f1600_rvb32_first,3569119,3588694,19575,26
+sha3_f1600_rvb32_mid,3902897,3922472,19575,26
+cbd_eta1_first,3945755,3950178,4423,2
+polyvec_invntt_tomont_first,4369441,4525227,155786,1
+polyvec_compress_first,4636772,4666954,30182,1
+sha3_f1600_rvb32_last,4808474,4828049,19575,26

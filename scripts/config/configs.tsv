@@ -1,0 +1,7 @@
+# ID	tree	genus_params (appended to the lean-core list below)	verilator_defines (+ common)	sw_build	description
+# lean core (all IDs), Genus: {COMPRESSED 0} {ZKNEEnable 0} {ZKNHEnable 0} {ZICONDEnable 0} {ZCBEnable 0} {HPMCOUNTEREnable 0} {AMOEXT 0} ; Verilator: +define+V_COMPRESSED=0 +define+V_ZKNE=0 +define+V_ZKNH=0
+H0	base	{MUL_TYPE 1} {ZBKBEnable 0} {XKYBEREnable 0}	+define+V_ZBKB=0 +define+V_XKYBER=0 +define+V_MUL_TYPE=MUL_DEFAULT	base	RV32IM baseline (RS5 serial multiplier)
+H1	base	{MUL_TYPE 1} {ZBKBEnable 1} {XKYBEREnable 0}	+define+V_ZBKB=1 +define+V_XKYBER=0 +define+V_MUL_TYPE=MUL_DEFAULT	zbkb	+Zbkb
+H2	comb	{MUL_TYPE 0} {ZBKBEnable 1} {XKYBEREnable 1}	+define+V_ZBKB=1 +define+V_XKYBER=1 +define+V_MUL_TYPE=MUL_FAST	both	+Zbkb +XKyber, combinational realization (ibex_multdiv_fast)
+H3	ser	{MUL_TYPE 1} {ZBKBEnable 1} {XKYBEREnable 1}	+define+V_ZBKB=1 +define+V_XKYBER=1 +define+V_MUL_TYPE=MUL_DEFAULT	both	+Zbkb +XKyber, serialized realization
+H4	ser	{MUL_TYPE 1} {ZBKBEnable 0} {XKYBEREnable 1}	+define+V_ZBKB=0 +define+V_XKYBER=1 +define+V_MUL_TYPE=MUL_DEFAULT	xkyber	+XKyber only (serialized; unused Zbkb execute logic remains)

@@ -1,0 +1,60 @@
+00000000 T _entry
+00000000 T _text
+00000020 t .clr_bss
+00000030 t .clr_bss_done
+00000038 T halt
+00000044 00000054 T cmp_idx
+00000098 00000130 T calc_func
+000001c8 00000048 T cmp_complex
+00000210 000001c4 T core_list_mergesort
+000003d4 00000300 T core_bench_list
+000006d4 0000015c T core_list_init
+00000830 00000124 T core_init_matrix
+00000954 00000058 T matrix_mul_vect
+000009ac 000000a0 T matrix_mul_matrix
+00000a4c 000000b4 T matrix_mul_matrix_bitextract
+00000b00 000003e8 T matrix_test
+00000ee8 0000003c T core_bench_matrix
+00000f24 00000014 T start_time
+00000f38 00000014 T stop_time
+00000f4c 00000018 T get_time
+00000f64 00000014 T time_in_secs
+00000f78 00000014 T portable_init
+00000f8c 0000001c T portable_fini
+00000fa8 0000017c T core_init_state
+00001124 000002cc T core_state_transition
+000013f0 000001a0 T core_bench_state
+00001590 00000064 T get_seed_32
+000015f4 00000228 T crcu16
+0000181c 00000420 T crcu32
+00001c3c 0000022c T crc16
+00001e68 00000008 T check_data_types
+00001e70 000002e0 t number
+00002150 00000874 T ee_printf
+000029c4 00000088 T iterate
+00002a4c 00000750 T main
+0000319c T _etext
+0000319c D _rodata
+00003874 00000010 d errpat
+00003884 00000010 d scipat
+00003894 00000010 d floatpat
+000038a4 00000010 d intpat
+00003ad0 0000000a d state_known_crc
+00003adc 0000000a d matrix_known_crc
+00003ae8 0000000a d list_known_crc
+00003af2 D _data
+00003af2 D _erodata
+00003af4 00000004 D default_num_contexts
+00003af8 00000004 D seed4_volatile
+00003afc 00000004 D seed3_volatile
+00003b00 D _bss_start
+00003b00 D _edata
+00003b00 00000004 d stop_time_val
+00003b04 00000004 d start_time_val
+00003b08 00000004 D seed5_volatile
+00003b0c 00000004 D seed2_volatile
+00003b10 00000004 D seed1_volatile
+00003b14 D _bss_end
+000042f2 D _gp
+00007b14 D _end
+00007b14 D _stack
