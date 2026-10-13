@@ -4,7 +4,7 @@ This branch reproduces the implementation and energy results of
 
 > V. B. Zanini, I. I. Weber, and F. G. Moraes, "Energy of Lattice and Keccak Instruction Set
 > Extensions for ML-KEM on an Embedded RISC-V," in *Proc. IEEE International Symposium on Circuits
-> and Systems (ISCAS)*, 2027.
+> and Systems (ISCAS)*, 2027 - SUBMITED.
 
 The paper adds the standard Zbkb extension (Keccak) and XKyber, six custom instructions for
 modular arithmetic, centered binomial sampling and coefficient compression, to the RS5 RISC-V core
