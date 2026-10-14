@@ -479,7 +479,9 @@ module RS5
         .XOSVMEnable     (XOSVMEnable     ),
         .XKYBEREnable    (XKYBEREnable    ),
         .COMPRESSED      (COMPRESSED      ),
+        .ZKNEnable       (ZKNEEnable || ZKNHEnable),
         .MULEXT          (MULEXT          ),
+        .AMOEXT          (AMOEXT          ),
         .VEnable         (VEnable         ),
         .VLEN            (VLEN            )
     ) CSRBank1 (
