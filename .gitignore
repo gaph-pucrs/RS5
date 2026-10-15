@@ -10,6 +10,7 @@ proto/**/*.cache/**
 proto/**/*.gen/**
 proto/**/*.ip_user_files/**
 synthesis/work/
+synthesis/results/
 *.d
 *.o
 Vtb_wrapper*
