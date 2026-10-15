@@ -1,10 +1,16 @@
-set OUT_FILES ./results
-
 #genus -f run_logical_synthesis.tcl -execute "set TOP_MODULE vectorUnit" -execute "set VLEN 256" -execute "set LLEN 32" -execute "set BUS_WIDTH 32"
 
 ###############################################################################
 # Setup
 ###############################################################################
+# SYNTH_DIR: directory holding this script and scripts/ (defaults to the cwd)
+# OUT_FILES: where reports/netlists are written (defaults to SYNTH_DIR/results)
+if {![info exists SYNTH_DIR]} {set SYNTH_DIR [pwd]}
+set SYNTH_DIR [file normalize ${SYNTH_DIR}]
+set ROOT_DIR  [file dirname ${SYNTH_DIR}]
+if {![info exists OUT_FILES]} {set OUT_FILES ${SYNTH_DIR}/results}
+file mkdir ${OUT_FILES}/reports ${OUT_FILES}/gate_level ${OUT_FILES}/physical_synthesis/work
+
 if {![info exists TOP_MODULE]} {set TOP_MODULE RS5}
 
 if {![info exists VLEN]} {set VLEN 64}
@@ -35,7 +41,7 @@ puts "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 
 	# Multi-Mode Multi-Corner (MMMC)
 
-	read_mmmc "scripts/mmmc_tsmc_28_bv.tcl"
+	read_mmmc "${SYNTH_DIR}/scripts/mmmc_tsmc_28_bv.tcl"
 
 }
 
@@ -94,36 +100,36 @@ puts "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 					 ${TECH_PATH}/lef/tcbn28hpcplusbwp30p140_110a/lef/tcbn28hpcplusbwp30p140.lef \
 					/home/williannunes/RS5/synthesis/gen_regblock/ts6n28hpcphvta32x64m2fwbso_200b/LEF/ts6n28hpcphvta32x64m2fwbso_200b.lef"
 
-	read_hdl -define SYNTH -sv "../rtl/RS5_pkg.sv						\
-								../rtl/aes/riscv_crypto_sbox_aes_out.sv \
-								../rtl/aes/riscv_crypto_sbox_aes_top.sv \
-								../rtl/aes/riscv_crypto_sbox_inv_mid.sv \
-								../rtl/aes/riscv_crypto_aes_fwd_sbox.sv \
-								../rtl/aes_unit.sv 						\
-								../RingBuffer/rtl/RingBuffer.sv 		\
-								../rtl/amo.sv 							\
-								../rtl/CSRBank.sv 						\
-								../rtl/decode.sv 						\
-								../rtl/decompresser.sv 					\
-								../rtl/div.sv 							\
-								../rtl/mul.sv 							\
-								../rtl/mulNbits.sv						\
-								../rtl/vector/vectorRegbank.sv  		\
-								../rtl/vector/vectorCSRs.sv				\
-								../rtl/vector/vectorLane.sv				\
-								../rtl/vector/vectorSlide.sv			\
-								../rtl/vector/vectorReductionTree.sv 	\
-								../rtl/vector/vectorReductions.sv		\
-								../rtl/vector/vectorALU.sv				\
-								../rtl/vector/vectorLSU.sv				\
-								../rtl/vectorUnit.sv					\
-								../rtl/execute.sv 						\
-								../rtl/fetch.sv 						\
-								../rtl/lrsc.sv 							\
-								../rtl/mmu.sv 							\
-								../rtl/regbank.sv 						\
-								../rtl/retire.sv 						\
-								../rtl/RS5.sv"
+	read_hdl -define SYNTH -sv "${ROOT_DIR}/rtl/RS5_pkg.sv						\
+								${ROOT_DIR}/rtl/aes/riscv_crypto_sbox_aes_out.sv \
+								${ROOT_DIR}/rtl/aes/riscv_crypto_sbox_aes_top.sv \
+								${ROOT_DIR}/rtl/aes/riscv_crypto_sbox_inv_mid.sv \
+								${ROOT_DIR}/rtl/aes/riscv_crypto_aes_fwd_sbox.sv \
+								${ROOT_DIR}/rtl/aes_unit.sv 						\
+								${ROOT_DIR}/RingBuffer/rtl/RingBuffer.sv 		\
+								${ROOT_DIR}/rtl/amo.sv 							\
+								${ROOT_DIR}/rtl/CSRBank.sv 						\
+								${ROOT_DIR}/rtl/decode.sv 						\
+								${ROOT_DIR}/rtl/decompresser.sv 					\
+								${ROOT_DIR}/rtl/div.sv 							\
+								${ROOT_DIR}/rtl/mul.sv 							\
+								${ROOT_DIR}/rtl/mulNbits.sv						\
+								${ROOT_DIR}/rtl/vector/vectorRegbank.sv  		\
+								${ROOT_DIR}/rtl/vector/vectorCSRs.sv				\
+								${ROOT_DIR}/rtl/vector/vectorLane.sv				\
+								${ROOT_DIR}/rtl/vector/vectorSlide.sv			\
+								${ROOT_DIR}/rtl/vector/vectorReductionTree.sv 	\
+								${ROOT_DIR}/rtl/vector/vectorReductions.sv		\
+								${ROOT_DIR}/rtl/vector/vectorALU.sv				\
+								${ROOT_DIR}/rtl/vector/vectorLSU.sv				\
+								${ROOT_DIR}/rtl/vectorUnit.sv					\
+								${ROOT_DIR}/rtl/execute.sv 						\
+								${ROOT_DIR}/rtl/fetch.sv 						\
+								${ROOT_DIR}/rtl/lrsc.sv 							\
+								${ROOT_DIR}/rtl/mmu.sv 							\
+								${ROOT_DIR}/rtl/regbank.sv 						\
+								${ROOT_DIR}/rtl/retire.sv 						\
+								${ROOT_DIR}/rtl/RS5.sv"
 }
 
 

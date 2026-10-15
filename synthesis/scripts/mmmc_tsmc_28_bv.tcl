@@ -4,7 +4,7 @@
 
 set LIB_PATH /pdk/tsmc/PDK28/PDK_TSMC28_bv/tcbn28hpcplusbwp30p140_190a/TSMCHOME/digital/Front_End
 set TECH_PATH /pdk/tsmc/PDK28/PDK_TSMC28_bv/tcbn28hpcplusbwp30p140_190a/TSMCHOME/digital/Back_End
-set CONSTRAINTS_PATH ./scripts
+if {[info exists SYNTH_DIR]} {set CONSTRAINTS_PATH ${SYNTH_DIR}/scripts} else {set CONSTRAINTS_PATH ./scripts}
 
 #################################################################
 ## library_sets (lib from library)
