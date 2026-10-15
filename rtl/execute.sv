@@ -478,6 +478,7 @@ module execute
         div div1 (
             .clk              (clk),
             .reset_n          (reset_n),
+            .stall            (stall),
             .first_operand_i  (rs1_data_i),
             .second_operand_i (rs2_data_i),
             .enable_i         (enable_div),
@@ -559,6 +560,7 @@ module execute
         ) vector (
             .clk                    (clk),
             .reset_n                (reset_n),
+            .stall                  (stall),
             .instruction_i          (instruction_i),
             .enable_i               (ctrl_i.is_vector),
             .vector_operation_i     (ctrl_i.vector_op),

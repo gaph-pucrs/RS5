@@ -21,6 +21,7 @@ module div
 ) (
     input   logic         clk,
     input   logic         reset_n,
+    input   logic         stall,
 
     input   logic [N-1:0] first_operand_i,
     input   logic [N-1:0] second_operand_i,
@@ -96,6 +97,7 @@ module div
             b_unsig     <= '0;
             counter     <= '0;
         end
+        else if (stall) begin end
         else if (!enable_i) begin
             valid_result   <= 1'b0;
         end
