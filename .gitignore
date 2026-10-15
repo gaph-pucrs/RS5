@@ -9,7 +9,7 @@ proto/**/*.runs/**
 proto/**/*.cache/**
 proto/**/*.gen/**
 proto/**/*.ip_user_files/**
-synthesis/**
+synthesis/work/
 *.d
 *.o
 Vtb_wrapper*
@@ -46,3 +46,6 @@ riscof/**/__pycache__
 riscof/riscv-arch-test
 .arch_stamp
 .mem_size_stamp
+CLAUDE*
+.claude/*
+.claude
