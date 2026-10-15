@@ -26,6 +26,7 @@ module vectorReductions
     input  logic                       clk,
     /* verilator lint_off UNUSEDSIGNAL */
     input  logic                       reset_n,
+    input  logic                       stall,
     input  logic                       enable_i,
     /* verilator lint_on UNUSEDSIGNAL  */
     input  iTypeVector_e               vector_operation_i,
@@ -71,6 +72,7 @@ module vectorReductions
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
                 cycle_counter <= '0;
+            else if (stall) begin end
             else if (enable_i && !last_cycle)
                 cycle_counter <= cycle_counter + 1;
             else
@@ -128,6 +130,7 @@ module vectorReductions
         )   reduction_tree_sum_8b (
             .clk           (clk),
             .reset_n       (reset_n),
+            .stall         (stall),
             .first_operand (first_operand_8b),
             .second_operand(second_operand[7:0]),
             .vl            (vl),
@@ -147,6 +150,7 @@ module vectorReductions
         )   reduction_tree_sum_16b (
             .clk           (clk),
             .reset_n       (reset_n),
+            .stall         (stall),
             .first_operand (first_operand_16b),
             .second_operand(second_operand[15:0]),
             .vl            (vl),
@@ -166,6 +170,7 @@ module vectorReductions
         )   reduction_tree_sum_32b (
             .clk           (clk),
             .reset_n       (reset_n),
+            .stall         (stall),
             .first_operand (first_operand_32b),
             .second_operand(second_operand[31:0]),
             .vl            (vl),
@@ -217,6 +222,7 @@ module vectorReductions
         )   reduction_tree_and_8b (
             .clk           (clk),
             .reset_n       (reset_n),
+            .stall         (stall),
             .first_operand (first_operand_8b),
             .second_operand(second_operand[7:0]),
             .vl            (vl),
@@ -236,6 +242,7 @@ module vectorReductions
         )   reduction_tree_or_8b (
             .clk           (clk),
             .reset_n       (reset_n),
+            .stall         (stall),
             .first_operand (first_operand_8b),
             .second_operand(second_operand[7:0]),
             .vl            (vl),
@@ -255,6 +262,7 @@ module vectorReductions
         )   reduction_tree_xor_8b (
             .clk           (clk),
             .reset_n       (reset_n),
+            .stall         (stall),
             .first_operand (first_operand_8b),
             .second_operand(second_operand[7:0]),
             .vl            (vl),
@@ -281,6 +289,7 @@ module vectorReductions
         )   reduction_tree_and_16b (
             .clk           (clk),
             .reset_n       (reset_n),
+            .stall         (stall),
             .first_operand (first_operand_16b),
             .second_operand(second_operand[15:0]),
             .vl            (vl),
@@ -300,6 +309,7 @@ module vectorReductions
         )   reduction_tree_or_16b (
             .clk           (clk),
             .reset_n       (reset_n),
+            .stall         (stall),
             .first_operand (first_operand_16b),
             .second_operand(second_operand[15:0]),
             .vl            (vl),
@@ -319,6 +329,7 @@ module vectorReductions
         )   reduction_tree_xor_16b (
             .clk           (clk),
             .reset_n       (reset_n),
+            .stall         (stall),
             .first_operand (first_operand_16b),
             .second_operand(second_operand[15:0]),
             .vl            (vl),
@@ -345,6 +356,7 @@ module vectorReductions
         )   reduction_tree_and_32b (
             .clk           (clk),
             .reset_n       (reset_n),
+            .stall         (stall),
             .first_operand (first_operand_32b),
             .second_operand(second_operand[31:0]),
             .vl            (vl),
@@ -364,6 +376,7 @@ module vectorReductions
         )   reduction_tree_or_32b (
             .clk           (clk),
             .reset_n       (reset_n),
+            .stall         (stall),
             .first_operand (first_operand_32b),
             .second_operand(second_operand[31:0]),
             .vl            (vl),
@@ -383,6 +396,7 @@ module vectorReductions
         )   reduction_tree_xor_32b (
             .clk           (clk),
             .reset_n       (reset_n),
+            .stall         (stall),
             .first_operand (first_operand_32b),
             .second_operand(second_operand[31:0]),
             .vl            (vl),
@@ -445,6 +459,7 @@ module vectorReductions
         )   reduction_tree_min_8b (
             .clk           (clk),
             .reset_n       (reset_n),
+            .stall         (stall),
             .first_operand (first_operand_8b),
             .second_operand(second_operand[7:0]),
             .vl            (vl),
@@ -464,6 +479,7 @@ module vectorReductions
         )   reduction_tree_minu_8b (
             .clk           (clk),
             .reset_n       (reset_n),
+            .stall         (stall),
             .first_operand (first_operand_8b),
             .second_operand(second_operand[7:0]),
             .vl            (vl),
@@ -483,6 +499,7 @@ module vectorReductions
         )   reduction_tree_max_8b (
             .clk           (clk),
             .reset_n       (reset_n),
+            .stall         (stall),
             .first_operand (first_operand_8b),
             .second_operand(second_operand[7:0]),
             .vl            (vl),
@@ -502,6 +519,7 @@ module vectorReductions
         )   reduction_tree_maxu_8b (
             .clk           (clk),
             .reset_n       (reset_n),
+            .stall         (stall),
             .first_operand (first_operand_8b),
             .second_operand(second_operand[7:0]),
             .vl            (vl),
@@ -529,6 +547,7 @@ module vectorReductions
         )   reduction_tree_min_16b (
             .clk           (clk),
             .reset_n       (reset_n),
+            .stall         (stall),
             .first_operand (first_operand_16b),
             .second_operand(second_operand[15:0]),
             .vl            (vl),
@@ -548,6 +567,7 @@ module vectorReductions
         )   reduction_tree_minu_16b (
             .clk           (clk),
             .reset_n       (reset_n),
+            .stall         (stall),
             .first_operand (first_operand_16b),
             .second_operand(second_operand[15:0]),
             .vl            (vl),
@@ -567,6 +587,7 @@ module vectorReductions
         )   reduction_tree_max_16b (
             .clk           (clk),
             .reset_n       (reset_n),
+            .stall         (stall),
             .first_operand (first_operand_16b),
             .second_operand(second_operand[15:0]),
             .vl            (vl),
@@ -586,6 +607,7 @@ module vectorReductions
         )   reduction_tree_maxu_16b (
             .clk           (clk),
             .reset_n       (reset_n),
+            .stall         (stall),
             .first_operand (first_operand_16b),
             .second_operand(second_operand[15:0]),
             .vl            (vl),
@@ -613,6 +635,7 @@ module vectorReductions
         )   reduction_tree_min_32b (
             .clk           (clk),
             .reset_n       (reset_n),
+            .stall         (stall),
             .first_operand (first_operand_32b),
             .second_operand(second_operand[31:0]),
             .vl            (vl),
@@ -632,6 +655,7 @@ module vectorReductions
         )   reduction_tree_minu_32b (
             .clk           (clk),
             .reset_n       (reset_n),
+            .stall         (stall),
             .first_operand (first_operand_32b),
             .second_operand(second_operand[31:0]),
             .vl            (vl),
@@ -651,6 +675,7 @@ module vectorReductions
         )   reduction_tree_max_32b (
             .clk           (clk),
             .reset_n       (reset_n),
+            .stall         (stall),
             .first_operand (first_operand_32b),
             .second_operand(second_operand[31:0]),
             .vl            (vl),
@@ -670,6 +695,7 @@ module vectorReductions
         )   reduction_tree_maxu_32b (
             .clk           (clk),
             .reset_n       (reset_n),
+            .stall         (stall),
             .first_operand (first_operand_32b),
             .second_operand(second_operand[31:0]),
             .vl            (vl),
@@ -720,16 +746,18 @@ module vectorReductions
     // *********************************
 
     always @(posedge clk) begin
-        unique case(vector_operation_i)
-            VREDOR:   result_o <= result_redor;
-            VREDXOR:  result_o <= result_redxor;
-            VREDSUM:  result_o <= result_redsum;
-            VREDMIN:  result_o <= result_redmin;
-            VREDMINU: result_o <= result_redminu;
-            VREDMAX:  result_o <= result_redmax;
-            VREDMAXU: result_o <= result_redmaxu;
-            default:  result_o <= result_redand;
-        endcase
+        if (!stall) begin
+            unique case(vector_operation_i)
+                VREDOR:   result_o <= result_redor;
+                VREDXOR:  result_o <= result_redxor;
+                VREDSUM:  result_o <= result_redsum;
+                VREDMIN:  result_o <= result_redmin;
+                VREDMINU: result_o <= result_redminu;
+                VREDMAX:  result_o <= result_redmax;
+                VREDMAXU: result_o <= result_redmaxu;
+                default:  result_o <= result_redand;
+            endcase
+        end
     end
 
 endmodule
