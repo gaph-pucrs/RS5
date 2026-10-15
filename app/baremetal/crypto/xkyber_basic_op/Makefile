@@ -27,6 +27,8 @@ all: $(TARGET).bin $(TARGET).lst
 $(TARGET).bin: $(TARGET).elf
 	@printf "${RED}Generating %s...${NC}\n" "$@"
 	@$(OBJCOPY) $< $@ -O binary
+	@mkdir -p ../../../bin
+	@cp $@ ../../../bin/program.bin
 
 $(TARGET).lst: $(TARGET).elf
 	@printf "${RED}Generating %s...${NC}\n" "$@"

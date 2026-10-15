@@ -83,9 +83,14 @@ You need to build the application before running the simulation:
 make -C app/baremetal/tests/riscv-tests
 ```
 
+Applications are grouped in [app/](app/) by build system, then by purpose (`tests`, `benchmarks`, `crypto`, `examples`):
+`app/newlib` holds the applications built with newlib through `app/newlib/common/common.mk`, and `app/baremetal` holds the ones without a C library.
+Building any application also copies its binary to `app/bin/program.bin`, which is the program the testbench loads by default.
+To simulate another application, build it and run the simulation again.
+
 ### Simulate with Verilator
 
-This verilates and runs the default application.
+This verilates and runs the last built application.
 Results are written to `sim/results/Output.txt` (simulation output) and `sim/results/Report.txt` (profiling).
 
 ```bash
