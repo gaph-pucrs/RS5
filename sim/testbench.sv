@@ -29,7 +29,7 @@ module testbench
 (
 );
 
-  timeunit 1ns; timeprecision 1ns;
+  timeunit 1ns; timeprecision 1ps;
 
 //////////////////////////////////////////////////////////////////////////////
 // PARAMETERS FOR CORE INSTANTIATION
