@@ -59,7 +59,7 @@ module testbench
 
 `ifndef SYNTH
     localparam bit           PROFILING       = 1'b1;
-    localparam bit           DEBUG           = 1'b1;
+    localparam bit           DEBUG           = 1'b0;
 `endif
     localparam string        PROFILING_FILE  = "./results/Report.txt";
     localparam string        OUTPUT_FILE     = "./results/Output.txt";
