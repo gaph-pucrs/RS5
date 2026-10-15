@@ -80,7 +80,7 @@ The default test application is a set of tests from the [riscv-arch-test](https:
 You need to build the application before running the simulation:
 
 ```bash
-make -C app/riscv-tests
+make -C app/baremetal/tests/riscv-tests
 ```
 
 ### Simulate with Verilator
@@ -109,19 +109,19 @@ xrun -f sim.xrun
 The testbench's `VEnable`, `VLEN` and `LLEN` are parameters, and the program comes from the `BIN_FILE_PATH` macro, so you can override them without editing the testbench:
 
 ```bash
-xrun -f sim.xrun -defparam testbench.VEnable=1 +define+BIN_FILE_PATH=\"../app/vector-tests/test.bin\"
+xrun -f sim.xrun -defparam testbench.VEnable=1 +define+BIN_FILE_PATH=\"../app/baremetal/tests/vector-tests/test.bin\"
 ```
 
 With Verilator, pass them through the Makefile:
 
 ```bash
-make -C sim VENABLE=1 VLEN=256 BIN_FILE_PATH=../app/vector-tests/test.bin
+make -C sim VENABLE=1 VLEN=256 BIN_FILE_PATH=../app/baremetal/tests/vector-tests/test.bin
 ```
 
 ### Vector regression tests
 
-[sim/vector_regression.sh](sim/vector_regression.sh) builds and simulates each test in [app/vector-tests/operations](app/vector-tests/operations) with Xcelium.
-Each log goes to `app/vector-tests/results/passed` or `app/vector-tests/results/failed`.
+[sim/vector_regression.sh](sim/vector_regression.sh) builds and simulates each test in [app/baremetal/tests/vector-tests/operations](app/baremetal/tests/vector-tests/operations) with Xcelium.
+Each log goes to `app/baremetal/tests/vector-tests/results/passed` or `app/baremetal/tests/vector-tests/results/failed`.
 
 The tests' expected results assume a specific configuration. Before running the script:
 
@@ -129,7 +129,7 @@ The tests' expected results assume a specific configuration. Before running the 
    The script enables the vector unit and selects the vector test binary on the xrun command line, so `VEnable` and the program path need no editing.
 2. Build the tests with **GCC 13**, or turn off auto-vectorization.
    Newer GCC releases auto-vectorize the test code with RVV instructions, which changes the code under test and breaks the tests.
-   If you use a newer GCC, add `-fno-tree-vectorize` to `GCC_RISCV` in [app/vector-tests/Makefile](app/vector-tests/Makefile).
+   If you use a newer GCC, add `-fno-tree-vectorize` to `GCC_RISCV` in [app/baremetal/tests/vector-tests/Makefile](app/baremetal/tests/vector-tests/Makefile).
    Check your version with `riscv64-elf-gcc --version`.
 
 Then run:
@@ -154,11 +154,11 @@ Peripherals include a UART, real-time clock, PLIC, and a mapped button interrupt
 
 ### Prototyping steps
 
-1. Compile the desired application (e.g., `make -C app/coremark`).
+1. Compile the desired application (e.g., `make -C app/baremetal/benchmarks/coremark`).
 2. Generate the BRAM initialisation file (.coe):
    ```bash
    cd proto
-   ./init_mem.py ../app/coremark
+   ./init_mem.py ../app/baremetal/benchmarks/coremark
    ```
 3. Open [proto/RS5/RS5.xpr](proto/RS5/RS5.xpr) (for Nexys A7) or [proto/RS5_SUME](proto/RS5_SUME/RS5.xpr) in Vivado. Right click on BRAM and select the option **Reset output products** in Vivado whenever the `.coe` file is regenerated.
 4. Run synthesis, implementation, and generate the bitstream.
