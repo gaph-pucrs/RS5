@@ -90,6 +90,8 @@ uint32_t hpm_1_s[64];
 uint32_t hpm_0_v[64];
 uint32_t hpm_1_v[64];
 
+void j2d_kernel_asm_v(uint32_t r, uint32_t c, DATA_TYPE *A, DATA_TYPE *B);
+
 void j2d_s(uint32_t r, uint32_t c, DATA_TYPE *A, DATA_TYPE *B,
            uint32_t tsteps) {
   for (uint32_t t = 0; t < tsteps; t++) {
