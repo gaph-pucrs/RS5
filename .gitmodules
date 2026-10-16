@@ -4,3 +4,6 @@
 [submodule "app/lmfrnet/lmfrnet-utils"]
 	path = app/lmfrnet/lmfrnet-utils
 	url = https://github.com/santosantonio1/lmfrnet-utils
+[submodule "app/alexnet-refactor/alexnet-utils"]
+	path = app/alexnet-refactor/alexnet-utils
+	url = https://github.com/santosantonio1/alexnet-utils
