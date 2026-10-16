@@ -1,0 +1,6 @@
+.env
+/params/
+/dataset/
+/tmp/
+/dump/
+/build/
