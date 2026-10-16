@@ -316,7 +316,8 @@ module vectorLSU
             end
         end
         else begin
-            elementsProcessedCycle = 1;
+            // Strided/indexed access one element per cycle in FIRST/EXEC; LAST only drains the pipeline
+            elementsProcessedCycle = (state == VLSU_LAST_CYCLE) ? '0 : 1;
         end
     end
 
