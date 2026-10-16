@@ -32,8 +32,6 @@ all : $(BIN_FILES) $(LST_FILES)
 
 %.bin : %.elf
 	$(OBJCOPY) -O binary $< $@
-	mkdir -p ../../../bin
-	cp $@ ../../../bin/program.bin
 
 %.lst : %.elf
 	$(OBJDUMP) -d $< > $@

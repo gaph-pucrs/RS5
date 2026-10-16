@@ -18,8 +18,6 @@ all: test.S
 	$(DUMP_RISCV) -h test.axf > test.sec
 	$(DUMP_RISCV) -s test.axf > test.cnt
 	$(OBJ_RISCV) -O binary test.axf test.bin
-	mkdir -p ../../../bin
-	cp test.bin ../../../bin/program.bin
 	$(SIZE_RISCV) test.axf
 	hexdump -v -e '4/1 "%02x" "\n"' test.bin > test.hex
 

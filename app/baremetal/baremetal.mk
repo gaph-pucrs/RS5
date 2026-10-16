@@ -1,7 +1,6 @@
 RED  =\033[0;31m
 NC   =\033[0m # No Color
 
-BAREMETAL_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 TARGET   ?= $(notdir $(CURDIR))
 MEM_SIZE ?= 65536
 ARCH     ?= rv32im_zicsr
@@ -28,8 +27,6 @@ all: $(TARGET).bin $(TARGET).lst
 $(TARGET).bin: $(TARGET).elf
 	@printf "${RED}Generating %s...${NC}\n" "$@"
 	@$(OBJCOPY) $< $@ -O binary
-	@mkdir -p $(BAREMETAL_DIR)../bin
-	@cp $@ $(BAREMETAL_DIR)../bin/program.bin
 
 $(TARGET).lst: $(TARGET).elf
 	@printf "${RED}Generating %s...${NC}\n" "$@"
