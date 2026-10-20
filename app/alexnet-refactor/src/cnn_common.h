@@ -24,6 +24,8 @@
 
     #ifndef VECTOR
         #include "cnn_common_scalar.h"
+    #elif defined(VECTOR_OPT)
+        #include "cnn_common_vector_opt.h"
     #else
         #include "cnn_common_vector.h"
     #endif
