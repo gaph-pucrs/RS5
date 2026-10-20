@@ -53,8 +53,8 @@ module testbench
     localparam int           RAM_DELAY_CYCLES= 0;
 
     /* Overridable from the simulator command line, e.g. Verilator -GVEnable=1 -GVLEN=256 */
-    parameter  bit           VEnable         = 1'b0;
-    parameter  int           VLEN            = 512;
+    parameter  bit           VEnable         = 1'b1;
+    parameter  int           VLEN            = 256;
     parameter  int           LLEN            = 32;
 
 `ifndef SYNTH
@@ -68,7 +68,7 @@ module testbench
     localparam int           MEM_ADDR_BITS   = 28;
     /* Program to load: override with -DBIN_FILE_PATH=\"path\" (Verilator) or +define+BIN_FILE_PATH=\"path\" (Xcelium) */
 `ifndef BIN_FILE_PATH
-    `define BIN_FILE_PATH "../app/baremetal/tests/riscv-tests/test.bin"
+    `define BIN_FILE_PATH "../app/newlib/crypto/keccak-vector/keccak-vector.bin"
 `endif
     parameter  string        BIN_FILE        = `BIN_FILE_PATH;
 
