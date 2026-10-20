@@ -9,3 +9,21 @@ else
 endif
 
 include ../common/common.mk
+
+# Host build (-DNO_RISCV): scalar kernels, prints the checksums to compare RTL runs against
+HOST_CC ?= gcc
+
+native: build/lmfrnet_native
+
+build/lmfrnet_native: src/lmfrnet.c $(wildcard src/*.h)
+	@mkdir -p build
+	@printf "${RED}Compiling %s (host)...${NC}\n" "$<"
+	@$(HOST_CC) -O2 -Wall -DNO_RISCV -I$(COMMON_DIR)/include $< -o $@
+
+run-native: build/lmfrnet_native
+	@./build/lmfrnet_native
+
+clean-native:
+	@rm -rf build
+
+.PHONY: native run-native clean-native
