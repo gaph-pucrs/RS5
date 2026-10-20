@@ -7,6 +7,8 @@
     // Host build: runs the scalar kernels natively and dumps every layer
     // output to DUMP_DIR/<layer>.bin (raw int32) for alexnet-utils/validate.py
     static inline uint64_t read_cycle64(void) { return 0; }
+    static inline uint32_t read_mul(void) { return 0; }
+    static inline uint32_t read_vmac(void) { return 0; }
     #ifndef DUMP_DIR
         #define DUMP_DIR "dump"
     #endif
@@ -22,6 +24,20 @@
             hi2 = csr_read_mcycleh();
         } while (hi != hi2);
         return ((uint64_t)hi << 32) | (uint64_t)lo;
+    }
+
+    // retired scalar mul and vector multiply-add (vmacc, vnmsac, vmadd, vnmsub)
+    // instructions: 32-bit counters, mhpmcounter22h/27h are always 0
+    static inline uint32_t read_mul(void) {
+        uint32_t v;
+        __asm__ volatile("csrr %0, mhpmcounter22" : "=r"(v));
+        return v;
+    }
+
+    static inline uint32_t read_vmac(void) {
+        uint32_t v;
+        __asm__ volatile("csrr %0, mhpmcounter27" : "=r"(v));
+        return v;
     }
 #endif
 
@@ -76,21 +92,28 @@ static const struct {
 
 static timing layer_time[N_LAYERS];
 static timing total_cycles;
+static uint32_t layer_mul[N_LAYERS];
+static uint32_t layer_vmac[N_LAYERS];
 
 #define RUN_LAYER(L, CALL)                                              \
     do {                                                                \
+        uint32_t _mul  = read_mul();                                    \
+        uint32_t _vmac = read_vmac();                                   \
         layer_time[L].to = read_cycle64();                              \
             CALL;                                                       \
         layer_time[L].tf = read_cycle64();                              \
+        layer_mul[L]  = read_mul()  - _mul;                             \
+        layer_vmac[L] = read_vmac() - _vmac;                            \
         layer_time[L].lapsed = layer_time[L].tf - layer_time[L].to;     \
     } while (0)
 
 #define PRINT_DATA()                                                    \
     do {                                                                \
         printf("--- PIPELINE STATS ----\n");                            \
-        printf("task,cycles\n");                                        \
+        printf("task,cycles,mul,vmac\n");                               \
         for (int i = 0; i < N_LAYERS; i++)                              \
-            printf("%s,%s\n", layers[i].name, u64_str(layer_time[i].lapsed)); \
+            printf("%s,%s,%" PRIu32 ",%" PRIu32 "\n", layers[i].name,   \
+                   u64_str(layer_time[i].lapsed), layer_mul[i], layer_vmac[i]); \
     } while(0)
 
 // wrapping sum of a layer's outputs, to compare RTL runs against the native one
