@@ -136,3 +136,69 @@ void split_keccak_f(keccak_istate st, keccak_mode_e mode){
     }
 }
 
+// XOR one rate-sized block into the state: build each 64-bit lane from
+// 8 message bytes, then split it, since XOR commutes with the interleaving.
+static void split_xor_block(keccak_istate st, uint8_t* block, size_t rate){
+    for (size_t i = 0; i < rate / 8; i++){
+        uint64_t lane = 0;
+        for (int b = 0; b < 8; b++){
+            lane |= (uint64_t)block[8 * i + b] << (8 * b);
+        }
+        uint32_t even, odd;
+        split_lane(lane, &even, &odd);
+        st[i][0] ^= even;
+        st[i][1] ^= odd;
+    }
+}
+
+// Same as absorb, but the last block (possibly empty) is padded in a byte
+// buffer first, so every block goes through split_xor_block.
+void split_absorb(keccak_istate st, keccak_mode_e mode, uint8_t* msg, size_t len){
+
+    size_t rate = PARAMS[mode].rate;
+    while (len >= rate){
+        split_xor_block(st, msg, rate);
+        split_keccak_f(st, mode);
+        msg += rate;
+        len -= rate;
+    }
+    uint8_t block[200] = {0};
+    memcpy(block, msg, len);
+    block[len] ^= PARAMS[mode].domain;
+    block[rate - 1] ^= 0x80;
+    split_xor_block(st, block, rate);
+    memset(block, 0, sizeof(block));
+}
+
+// Same as squeeze, joining each lane back to 64 bits once, at its first byte.
+void split_squeeze(keccak_istate st, keccak_mode_e mode, uint8_t* out, size_t outlen){
+
+    size_t rate = PARAMS[mode].rate;
+    uint64_t lane = 0;
+    for (size_t i = 0; i < outlen; i++){
+        if (i > 0 && i % rate == 0){
+            split_keccak_f(st, mode);
+        }
+        size_t j = i % rate;
+        if (j % 8 == 0){
+            lane = join_lane(st[j/8][0], st[j/8][1]);
+        }
+        out[i] = (uint8_t)(lane >> (8 * (j % 8)));
+    }
+}
+
+// Same contract as hash, on the interleaved state.
+size_t split_hash(keccak_istate st, keccak_mode_e mode, uint8_t* msg, size_t len, uint8_t* out, size_t outlen){
+
+    int is_shake = (mode == SHAKE128) || (mode == SHAKE256);
+    if (!is_shake){
+        outlen = (200 - PARAMS[mode].rate) / 2;
+    }
+    split_absorb(st, mode, msg, len);
+    split_keccak_f(st, mode);
+    split_squeeze(st, mode, out, outlen);
+    if (!is_shake){
+        memset(st, 0, sizeof(keccak_istate));
+    }
+    return outlen;
+}

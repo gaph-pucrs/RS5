@@ -73,5 +73,8 @@ void split_pi(keccak_istate st);
 void split_chi(keccak_istate st);
 void split_iota(keccak_istate st, size_t round);
 void split_keccak_f(keccak_istate st, keccak_mode_e mode);
+void split_absorb(keccak_istate st, keccak_mode_e mode, uint8_t* msg, size_t len);
+void split_squeeze(keccak_istate st, keccak_mode_e mode, uint8_t* out, size_t outlen);
+size_t split_hash(keccak_istate st, keccak_mode_e mode, uint8_t* msg, size_t len, uint8_t* out, size_t outlen);
 
 #endif

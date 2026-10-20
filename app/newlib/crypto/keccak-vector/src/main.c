@@ -48,5 +48,36 @@ int main (){
     printf("zero-state lane 0: %08lx%08lx (expect f1258f7940e1dde7)\n",
            (unsigned long)(lane0 >> 32), (unsigned long)lane0);
 
+    // split_hash must match hash for every mode, around the block boundaries,
+    // with SHAKE squeezing more than one rate block
+    uint8_t msg[400];
+    for (int i = 0; i < 400; i++){
+        msg[i] = (uint8_t)(i * 7 + 3);
+    }
+    int hash_fails = 0, cases = 0;
+    for (int m = 0; m < KECCAK_MODE_COUNT; m++){
+        size_t rate = PARAMS[m].rate;
+        size_t lens[] = {0, 1, rate - 1, rate, rate + 1, 2 * rate + 5};
+        for (int k = 0; k < 6; k++){
+            keccak_state st = {0};
+            keccak_istate ist = {0};
+            uint8_t want[200], got[200];
+            size_t n  = hash(st, m, msg, lens[k], want, sizeof(want));
+            size_t n2 = split_hash(ist, m, msg, lens[k], got, sizeof(got));
+            cases++;
+            if (n != n2 || memcmp(want, got, n) != 0){
+                printf("FAIL mode %d len %d\n", m, (int)lens[k]);
+                hash_fails++;
+            }
+        }
+    }
+    printf("split_hash test: %d failures in %d cases\n", hash_fails, cases);
+
+    uint8_t out[64];
+    keccak_istate hst = {0};
+    size_t n = split_hash(hst, SHA3_256, (uint8_t*)"abc", 3, out, sizeof(out));
+    printf("split SHA3-256(\"abc\"): ");
+    print_bytes(out, n);
+    printf("expect                3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532\n");
     return 0;
 }
