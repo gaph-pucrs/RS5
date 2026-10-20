@@ -1,47 +1,24 @@
-#include <stdio.h>
-#include <stdint.h>
-#include <string.h>
-#define LANE(x,y) ((x) + 5 * (y))
-#define ROTL64(a, n) (((a) << (n)) | ((a) >> ((64 - (n)) % 64)))
+#include "keccak.h"
 
 
-typedef enum {
-    SHA3_224,
-    SHA3_256,
-    SHA3_384,
-    SHA3_512,
-    SHAKE128,
-    SHAKE256,
-    KECCAK_MODE_COUNT
-} keccak_mode_e;    
-
-typedef struct {
-    size_t rate;
-    uint8_t domain;
-    uint8_t rounds;
-} keccak_params;
-
-static const keccak_params PARAMS[KECCAK_MODE_COUNT] = {
-    [SHA3_224] = {144, 0x06, 24},    // designated initializers: index by enum name
-    [SHA3_256] = {136, 0x06, 24},
-    [SHA3_384] = {104, 0x06, 24},
-    [SHA3_512] = { 72, 0x06, 24},
-    [SHAKE128] = {168, 0x1F, 24},
-    [SHAKE256] = {136, 0x1F, 24},
-};
-
-
-typedef uint64_t keccak_state[25];
-
+// XOR every full rate block into the state and permute; the last block
+// (possibly empty) gets the padding. The final permutation is left to the caller.
 void absorb(keccak_state st,  keccak_mode_e mode, uint8_t* msg, size_t len){
-    
-    size_t absorb_limit = PARAMS[mode].rate;
-    size_t i;
-    for (i = 0; (i < len) && (i < absorb_limit); i++){
-        st[i/8]^= ((uint64_t)msg[i] << ((i*8) % 64));
+
+    size_t rate = PARAMS[mode].rate;
+    while (len >= rate){
+        for (size_t i = 0; i < rate; i++){
+            st[i/8] ^= ((uint64_t)msg[i] << ((i*8) % 64));
+        }
+        keccak_f(st, mode);
+        msg += rate;
+        len -= rate;
     }
-    st[i / 8] ^= (uint64_t)PARAMS[mode].domain << (8 * (i % 8));
-    st[(absorb_limit - 1) / 8] ^= (uint64_t)0x80 << (8 * ((absorb_limit - 1) % 8));
+    for (size_t i = 0; i < len; i++){
+        st[i/8] ^= ((uint64_t)msg[i] << ((i*8) % 64));
+    }
+    st[len / 8] ^= (uint64_t)PARAMS[mode].domain << (8 * (len % 8));
+    st[(rate - 1) / 8] ^= (uint64_t)0x80 << (8 * ((rate - 1) % 8));
 
 }
 
@@ -67,15 +44,6 @@ void theta(keccak_state st){
     }
 }
 
-
-//amount of each rotate
-static const uint8_t RHO[25] = {0,  1,  62, 28, 27, 
-                                36, 44,  6, 55, 20,
-                                3,  10, 43, 25, 39,
-                                41, 45, 15, 21,  8,
-                                18,  2, 61, 56, 14};
-
-
 void rho(keccak_state st){
     for(int i = 0; i < 25; i ++){
         st[i] = ROTL64(st[i], RHO[i]);
@@ -93,7 +61,6 @@ void pi(keccak_state st){
     }
     memset(temp, 0, sizeof(keccak_state));
 }
-
 
 void chi(keccak_state st){
     uint64_t old_row[5];
@@ -130,18 +97,41 @@ void keccak_f(keccak_state st, keccak_mode_e mode){
     }
 }
 
+// Copy outlen bytes of output from the rate into out, permuting before
+// each extra rate block (SHAKE outputs longer than the rate).
+void squeeze(keccak_state st, keccak_mode_e mode, uint8_t* out, size_t outlen){
 
-int main (){
+    size_t rate = PARAMS[mode].rate;
+    for (size_t i = 0; i < outlen; i++){
+        if (i > 0 && i % rate == 0){
+            keccak_f(st, mode);
+        }
+        size_t j = i % rate;
+        out[i] = (uint8_t)(st[j/8] >> (8 * (j % 8)));
+    }
+}
 
-    keccak_state state = {0};    
+// SHA3: writes the (200 - rate) / 2 byte digest (outlen is ignored) and
+// clears the state. SHAKE: writes outlen bytes and keeps the state, so more
+// output can be squeezed (keccak_f then squeeze, after whole rate blocks).
+// Returns the number of bytes written to out.
+size_t hash(keccak_state st, keccak_mode_e mode, uint8_t* msg, size_t len, uint8_t* out, size_t outlen){
 
-    char msg[] = {"mensagemginhainicial\n"};
+    int is_shake = (mode == SHAKE128) || (mode == SHAKE256);
+    if (!is_shake){
+        outlen = (200 - PARAMS[mode].rate) / 2;
+    }
+    absorb(st, mode, msg, len);
+    keccak_f(st, mode);
+    squeeze(st, mode, out, outlen);
+    if (!is_shake){
+        memset(st, 0, sizeof(keccak_state));
+    }
+    return outlen;
+}
 
-    absorb(state, SHA3_512, msg, sizeof(msg));
-    print(state);
-    printf("==============\n");
-    keccak_f(state, SHA3_512);
-    print(state);
-    printf("==============\n");
-    return 0;
+void print_bytes(uint8_t* b, size_t len){
+    for (size_t i = 0; i < len; i++)
+        printf("%02x", b[i]);
+    printf("\n");
 }
