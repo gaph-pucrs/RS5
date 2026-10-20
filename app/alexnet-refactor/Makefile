@@ -5,6 +5,10 @@ OPT      = -O2
 ifeq ($(VEn), 1)
 	DEFS += -DVECTOR
 	ARCH  = rv32imc_zicsr_zve32x_zvl$(VLEN)b
+	# optimized kernels (cnn_common_vector_opt.h)
+	ifeq ($(VOPT), 1)
+		DEFS += -DVECTOR_OPT
+	endif
 else
 	ARCH  = rv32imc_zicsr
 endif
