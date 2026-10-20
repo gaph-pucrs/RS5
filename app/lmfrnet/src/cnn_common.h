@@ -31,6 +31,10 @@
         TensorShape b33c;
     } MFBlockShapes;
 
+    // keeps GCC from vectorizing (or turning into memset/memcpy) a function's
+    // loops, so the vector build only has the hand-written RVV code
+    #define KERNEL __attribute__((optimize("no-tree-vectorize","no-tree-slp-vectorize","no-tree-loop-distribute-patterns")))
+
     #ifndef VECTOR
         #include "cnn_common_scalar.h"
     #else

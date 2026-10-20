@@ -39,4 +39,12 @@ cd ..
 
 ```
 
+## Running natively (NO_RISCV)
+
+```sh
+make run-native
+```
+
+Builds **src/lmfrnet.c** with the host gcc and the scalar kernels, runs image1, and prints the predicted class and a checksum per layer. An RS5 run prints the same checksums, plus the cycles and the `mul`/`vmac` instruction counts per layer: the checksums and the predicted class must match the native run.
+
 ##
