@@ -2,4 +2,4 @@
 -f ../../../rtl/rtl.f
 -f ../../common/rtl/fpga_common.f
 
-../../RS5_NEXYS/RS5_FPGA_Platform_NEXYS.sv
+../RS5_FPGA_Platform_NEXYS.sv

@@ -15,14 +15,14 @@ if { [string first $scripts_vivado_version $current_vivado_version] == -1 } {
 ##################################################################
 
 # To test this script, run the following commands from Vivado Tcl console:
-# source FIFO_BUFFER_UART.tcl
+# source DRAM_RegBank.tcl
 # If there is no project opened, this script will create a
 # project, but make sure you do not have an existing project
 # in the current working folder.
 
 set list_projs [get_projects -quiet]
 if { $list_projs eq "" } {
-  create_project RS5 RS5_NEXYS -part xc7a100tcsg324-1
+  create_project RS5 Nexys_A7 -part xc7a100tcsg324-1
   set_property target_language Verilog [current_project]
   set_property simulator_language Mixed [current_project]
 }
@@ -34,7 +34,7 @@ if { $list_projs eq "" } {
 set bCheckIPs 1
 set bCheckIPsPassed 1
 if { $bCheckIPs == 1 } {
-  set list_check_ips { xilinx.com:ip:fifo_generator:13.2 }
+  set list_check_ips { xilinx.com:ip:dist_mem_gen:8.0 }
   set list_ips_missing ""
   common::send_msg_id "IPS_TCL-1001" "INFO" "Checking if the following IPs exist in the project's IP catalog: $list_check_ips ."
 
@@ -57,30 +57,22 @@ if { $bCheckIPsPassed != 1 } {
 }
 
 ##################################################################
-# CREATE IP FIFO_BUFFER_UART
+# CREATE IP DRAM_RegBank
 ##################################################################
 
-set FIFO_BUFFER_UART [create_ip -name fifo_generator -vendor xilinx.com -library ip -version 13.2 -module_name FIFO_BUFFER_UART]
+set DRAM_RegBank [create_ip -name dist_mem_gen -vendor xilinx.com -library ip -version 8.0 -module_name DRAM_RegBank]
 
 # User Parameters
 set_property -dict [list \
-  CONFIG.Data_Count {false} \
-  CONFIG.Fifo_Implementation {Common_Clock_Distributed_RAM} \
-  CONFIG.INTERFACE_TYPE {Native} \
-  CONFIG.Input_Data_Width {8} \
-  CONFIG.Input_Depth {64} \
-  CONFIG.Programmable_Empty_Type {No_Programmable_Empty_Threshold} \
-  CONFIG.Programmable_Full_Type {No_Programmable_Full_Threshold} \
-  CONFIG.Reset_Pin {true} \
-  CONFIG.Reset_Type {Synchronous_Reset} \
-  CONFIG.Use_Dout_Reset {false} \
-  CONFIG.Write_Acknowledge_Flag {false} \
-] [get_ips FIFO_BUFFER_UART]
+  CONFIG.data_width {32} \
+  CONFIG.depth {32} \
+  CONFIG.memory_type {simple_dual_port_ram} \
+] [get_ips DRAM_RegBank]
 
 # Runtime Parameters
 set_property -dict { 
   GENERATE_SYNTH_CHECKPOINT {0}
-} $FIFO_BUFFER_UART
+} $DRAM_RegBank
 
 ##################################################################
 

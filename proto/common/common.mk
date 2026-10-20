@@ -1,56 +1,31 @@
 SHELL := /bin/bash
 
-# ---------------------------------------------------------------------
-# User configuration
-# ---------------------------------------------------------------------
-
+# Shared FPGA flow; platform-specific values are defined by the including Makefile.
 APP       ?= coremark
-
 VIVADO    ?= vivado
 PYTHON    ?= python3
 GIT       ?= git
 TIO       ?= tio
-
 HW_SERVER ?= localhost:3121
-
+HW_TARGET ?=
 SERIAL    ?= /dev/ttyUSB1
 BAUD      ?= 115200
 
-
-# ---------------------------------------------------------------------
-# Directories
-# ---------------------------------------------------------------------
-
-PLATFORM_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
-PROTO_DIR    := $(abspath $(PLATFORM_DIR)/..)
+# This file is included by proto/<platform>/Makefile.
+PLATFORM_DIR := $(abspath $(dir $(firstword $(MAKEFILE_LIST))))
+COMMON_DIR   := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
+PROTO_DIR    := $(abspath $(COMMON_DIR)/..)
 ROOT_DIR     := $(abspath $(PROTO_DIR)/..)
-COMMON_DIR   := $(PROTO_DIR)/common
 
-PROJECT_XPR := $(PLATFORM_DIR)/RS5.xpr
-
-RTL_FILELIST      := $(PLATFORM_DIR)/filelists/nexys.f
-CONSTRAINT_FILELIST   := $(PLATFORM_DIR)/filelists/constraints.f
-IP_MANIFEST   := $(PLATFORM_DIR)/filelists/ips.f
-IP_DIR        := $(PLATFORM_DIR)/ips
-
-APP_DIR   := $(ROOT_DIR)/app/$(APP)
-
-MEM_INPUT := $(APP_DIR)/$(APP).bin
-MEM_COE   := $(PLATFORM_DIR)/memimage.coe
-
-
-REPORT_DIR := $(PLATFORM_DIR)/reports
-
-
-# ---------------------------------------------------------------------
-# Nexys A7 configuration
-# ---------------------------------------------------------------------
-
-EXPECTED_PART := xc7a100tcsg324-1
-HW_TARGET ?=
-EXPECTED_TOP  := RS5_FPGA_Platform
-EXPECTED_DEVICE := xc7a100t
-
+PROJECT_XPR         := $(PLATFORM_DIR)/RS5.xpr
+RTL_FILELIST        := $(PLATFORM_DIR)/filelists/$(RTL_FILELIST_NAME)
+CONSTRAINT_FILELIST := $(PLATFORM_DIR)/filelists/constraints.f
+IP_MANIFEST         := $(PLATFORM_DIR)/filelists/ips.f
+IP_DIR              := $(PLATFORM_DIR)/ips
+APP_DIR             := $(ROOT_DIR)/app/$(APP)
+MEM_INPUT           := $(APP_DIR)/$(APP).bin
+MEM_COE             := $(PLATFORM_DIR)/memimage.coe
+REPORT_DIR          := $(PLATFORM_DIR)/reports
 
 export HW_TARGET
 
@@ -112,7 +87,7 @@ RTL_SOURCES += \
 	$(COMMON_DIR)/rtl/UART_RX_CTRL.sv \
 	$(COMMON_DIR)/rtl/UART_TX_CTRL.vhd \
 	$(COMMON_DIR)/rtl/Debouncer.vhd \
-	$(PLATFORM_DIR)/RS5_FPGA_Platform_NEXYS.sv
+	$(PLATFORM_DIR)/$(PLATFORM_TOP)
 
 
 XDC_SOURCES := $(shell find "$(PLATFORM_DIR)" \
@@ -147,7 +122,7 @@ all: bit
 
 
 help:
-	@echo "RS5 Nexys A7 FPGA Automation"
+	@echo "RS5 $(PLATFORM_NAME) FPGA Automation"
 	@echo ""
 	@echo "Usage:"
 	@echo "  make [target] APP=<application>"
@@ -158,7 +133,8 @@ help:
 	@echo "  mem       Generate memimage.coe"
 	@echo "  prepare   Prepare Vivado project/IPs"
 	@echo "  synth     Run synthesis"
-	@echo "  impl      Run implementation"
+	@echo "  impl      Run implementation and reports"
+	@echo "  reports   Generate timing, utilization and power reports"
 	@echo "  bit       Generate bitstream"
 	@echo "  flash     Program FPGA"
 	@echo "  monitor   Open UART monitor"
@@ -167,6 +143,7 @@ help:
 	@echo "Examples:"
 	@echo "  make"
 	@echo "  make bit APP=hello"
+	@echo "  make reports APP=coremark"
 	@echo "  make flash APP=coremark"
 
 

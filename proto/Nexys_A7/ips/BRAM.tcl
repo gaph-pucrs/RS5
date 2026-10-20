@@ -22,7 +22,7 @@ if { [string first $scripts_vivado_version $current_vivado_version] == -1 } {
 
 set list_projs [get_projects -quiet]
 if { $list_projs eq "" } {
-  create_project RS5 RS5 -part xc7a100tcsg324-1
+  create_project RS5 Nexys_A7 -part xc7a100tcsg324-1
   set_property target_language Verilog [current_project]
   set_property simulator_language Mixed [current_project]
 }

@@ -30,6 +30,9 @@ report_timing_summary \
 report_utilization \
     -file [file join $report_dir utilization.rpt]
 
+report_utilization -hierarchical -hierarchical_min_primitive_count 0 \
+    -append -file [file join $report_dir utilization.rpt]
+
 report_power \
     -file [file join $report_dir power.rpt]
 
