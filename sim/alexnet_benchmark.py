@@ -15,7 +15,7 @@ print()
 # Paths
 # *********************************
 script_dir  = os.path.dirname(os.path.abspath(__file__))
-cnn_dir     = os.path.join(script_dir, "../app/alexnet_layers")
+cnn_dir     = os.path.join(script_dir, "../app/newlib/benchmarks/alexnet_layers")
 results_dir = os.path.join(cnn_dir, "results")
 
 layers = ["conv1", "conv2", "conv3", "conv4", "conv5", "fc"]
@@ -58,7 +58,7 @@ for layer in layers:
             print(f"    ❌ Compilation failed (see {make_log})")
             continue
 
-        bin_path    = f"../app/alexnet_layers/{layer}/{layer}.bin"
+        bin_path    = f"../app/newlib/benchmarks/alexnet_layers/{layer}/{layer}.bin"
         vlen_tag    = "scalar" if vlen == 0 else f"vlen{vlen}"
         result_path = os.path.join(layer_results, f"{vlen_tag}.txt")
 

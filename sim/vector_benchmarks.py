@@ -21,7 +21,7 @@ print()
 # Benchmarks
 # *********************************
 script_dir = os.path.dirname(os.path.abspath(__file__))
-benchmarks_dir = os.path.join(script_dir, "../app/vector-benchmarks/")
+benchmarks_dir = os.path.join(script_dir, "../app/newlib/benchmarks/vector-benchmarks/")
 
 exclude_substrings = []
 include_substrings = []
