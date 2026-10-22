@@ -152,7 +152,9 @@ module CSRBank
         else if (sys_reset)
             mstatus_mpie <= 1'b0;
         else begin 
-            if (raise_exception_i || interrupt_ack_i)
+            if (machine_return_i)
+                mstatus_mpie <= 1'b1;
+            else if (raise_exception_i || interrupt_ack_i)
                 mstatus_mpie <= mstatus_mie;
             else if (write_enable_i && address_i == MSTATUS)
                 mstatus_mpie <= wr_data[7];
@@ -181,9 +183,12 @@ module CSRBank
         else if (sys_reset)
             mstatus_mpp <= 2'b11;
         else begin 
-            if (raise_exception_i || interrupt_ack_i)
+            if (machine_return_i)
+                mstatus_mpp <= USER;                /* least privileged supported mode */
+            else if (raise_exception_i || interrupt_ack_i)
                 mstatus_mpp <= privilege;
-            else if (write_enable_i && address_i == MSTATUS)
+            /* MPP is WARL and only M and U are implemented */
+            else if (write_enable_i && address_i == MSTATUS && wr_data[12:11] inside {USER, MACHINE})
                 mstatus_mpp <= wr_data[12:11];
         end
     end
