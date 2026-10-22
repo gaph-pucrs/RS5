@@ -71,12 +71,13 @@ for benchmark in benchmarks_list:
     ###############
     # Compile Code
     ###############
+    bin_path = os.path.join(benchmarks_dir, 'benchmark.bin')
     command = ['make', '-C', benchmark_path, 'clean', 'all']
     result_path = os.path.join(results_dir, "make_result.txt")
     try:
         with open(result_path, "w") as result_file:
             result = subprocess.run(command, check=True, stdout=result_file, stderr=subprocess.STDOUT, universal_newlines=True)
-            shutil.move(os.path.join(benchmark_path, f'{benchmark}.bin'), os.path.join(benchmarks_dir, f'benchmark.bin'))
+            shutil.move(os.path.join(benchmark_path, f'{benchmark}.bin'), bin_path)
             print(f"✅ Succesful Compilation for {benchmark} !!!\n")
     except subprocess.CalledProcessError as e:
         print(f"❌ Failed Compilation for {benchmark}:\n", e.stderr)
@@ -96,13 +97,14 @@ for benchmark in benchmarks_list:
                 print(f'Executing: BUS_WIDTH ={bus_width:3d}, VLEN ={vlen:3d}, LANES ={vlen//llen:2d}.')
 
                 xcelium = ['xrun', '-f', 'sim.xrun']
-                defines = [f"-defparam testbench.BUS_WIDTH={bus_width}", f"-defparam testbench.VLEN={vlen}", f"-defparam testbench.LLEN={llen}"]
+                params = {'VEnable': 1, 'BIN_FILE': f'"{bin_path}"', 'BUS_WIDTH': bus_width, 'VLEN': vlen, 'LLEN': llen}
+                defines = [arg for k, v in params.items() for arg in ('-defparam', f'testbench.{k}={v}')]
                 command = xcelium + defines
 
                 result_path = os.path.join(results_dir, f"bus{bus_width}_vlen{vlen}_lanes{vlen//llen}.txt")
                 with open(result_path, "w") as result_file:
                     try:
-                        result = subprocess.run(command, check=True, stdout=result_file, stderr=result_file, universal_newlines=True)
+                        result = subprocess.run(command, cwd=script_dir, check=True, stdout=result_file, stderr=result_file, universal_newlines=True)
                     except subprocess.CalledProcessError as e:
                         print(f"❌ Failed Execution for {benchmark} - bus={bus_width} vlen={vlen} llen={llen}:\n", e.stderr)
                         continue

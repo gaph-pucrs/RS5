@@ -69,7 +69,7 @@ for layer in layers:
             'make', '-C', script_dir,
             f'VENABLE={venable}',
             f'VLEN={vlen}',
-            f'BIN_FILE_PATH={bin_path}',
+            f'BIN_FILE={bin_path}',
         ]
 
         with open(result_path, "w") as f:

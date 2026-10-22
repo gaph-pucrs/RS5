@@ -13,8 +13,8 @@ endif
 ifeq ($(origin VLEN),command line)
 VERILATOR_FLAGS += -GVLEN=$(VLEN)
 endif
-ifeq ($(origin BIN_FILE_PATH),command line)
-VERILATOR_FLAGS += -DBIN_FILE_PATH=\"$(BIN_FILE_PATH)\"
+ifeq ($(origin BIN_FILE),command line)
+VERILATOR_FLAGS += -GBIN_FILE=\"$(BIN_FILE)\"
 endif
 # Make waveforms
 #VERILATOR_FLAGS += --trace

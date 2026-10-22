@@ -62,11 +62,7 @@ module testbench
 
     parameter  int           BUS_WIDTH       = 32;
     localparam int           MEM_ADDR_BITS   = 28;
-    /* Program to load: override with -DBIN_FILE_PATH=\"path\" (Verilator) or +define+BIN_FILE_PATH=\"path\" (Xcelium) */
-`ifndef BIN_FILE_PATH
-    `define BIN_FILE_PATH "../app/baremetal/tests/riscv-tests/test.bin"
-`endif
-    parameter  string        BIN_FILE        = `BIN_FILE_PATH;
+    parameter  string        BIN_FILE        = "../app/baremetal/tests/riscv-tests/test.bin";
 
     localparam int           i_cnt = 1;
 

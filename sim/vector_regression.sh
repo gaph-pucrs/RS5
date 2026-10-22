@@ -33,7 +33,7 @@ for file in "$source_folder"/*; do
 
     # Run the command and capture the output
     output_file="${destination_folder}/${filename_without_extension}.txt"
-    xrun -f sim.xrun -defparam testbench.VEnable=1 +define+BIN_FILE_PATH=\"../app/baremetal/tests/vector-tests/test.bin\" | tee "$output_file"
+    xrun -f sim.xrun -defparam testbench.VEnable=1 -defparam testbench.BIN_FILE=\"../app/baremetal/tests/vector-tests/test.bin\" | tee "$output_file"
 
     # Check the output file for the PASSED string
     if grep -q "PASSED: test/${filename}!" "$output_file"; then

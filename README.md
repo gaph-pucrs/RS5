@@ -102,6 +102,12 @@ cd sim
 vsim -c -do sim.do
 ```
 
+To load another program, set `BIN_FILE` before running `sim.do`:
+
+```bash
+vsim -c -do "set BIN_FILE ../app/baremetal/tests/vector-tests/test.bin; do sim.do"
+```
+
 ### Simulate with Xcelium
 
 ```bash
@@ -109,16 +115,16 @@ cd sim
 xrun -f sim.xrun
 ```
 
-The testbench's `VEnable`, `VLEN` and `LLEN` are parameters, and the program comes from the `BIN_FILE_PATH` macro, so you can override them without editing the testbench:
+The testbench's `VEnable`, `VLEN`, `LLEN` and `BIN_FILE` (the program to load) are parameters, so you can override them without editing the testbench:
 
 ```bash
-xrun -f sim.xrun -defparam testbench.VEnable=1 +define+BIN_FILE_PATH=\"../app/baremetal/tests/vector-tests/test.bin\"
+xrun -f sim.xrun -defparam testbench.VEnable=1 -defparam testbench.BIN_FILE=\"../app/baremetal/tests/vector-tests/test.bin\"
 ```
 
 With Verilator, pass them through the Makefile:
 
 ```bash
-make -C sim VENABLE=1 VLEN=256 BIN_FILE_PATH=../app/baremetal/tests/vector-tests/test.bin
+make -C sim VENABLE=1 VLEN=256 BIN_FILE=../app/baremetal/tests/vector-tests/test.bin
 ```
 
 ### Vector regression tests
