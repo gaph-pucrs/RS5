@@ -25,12 +25,6 @@
 module RS5
     import RS5_pkg::*;
 #(
-`ifndef SYNTH
-    parameter bit           DEBUG          = 1'b0,
-    parameter string        DBG_REG_FILE   = "./debug/regBank.txt",
-    parameter bit           PROFILING      = 1'b0,
-    parameter string        PROFILING_FILE = "./debug/Report.txt",
-`endif
     parameter environment_e Environment      = ASIC,
     parameter mul_e         MULEXT           = MUL_M,
     parameter atomic_e      AMOEXT           = AMO_A,
@@ -270,12 +264,7 @@ module RS5
         );
     end
     else begin : RegFileFF_blk
-        regbank #(
-        `ifndef SYNTH
-            .DEBUG      (DEBUG       ),
-            .DBG_FILE   (DBG_REG_FILE)
-        `endif
-        ) regbankff (
+        regbank regbankff (
             .clk        (clk                   ),
             .reset_n    (reset_n               ),
             .rs1        (rs1                   ),
@@ -471,10 +460,6 @@ module RS5
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     CSRBank #(
-    `ifndef SYNTH
-        .PROFILING     (PROFILING     ),
-        .PROFILING_FILE(PROFILING_FILE),
-    `endif
         .HPMCOUNTEREnable(HPMCOUNTEREnable),
         .XOSVMEnable     (XOSVMEnable     ),
         .XKYBEREnable    (XKYBEREnable    ),

@@ -25,12 +25,6 @@
 
 module regbank
     import RS5_pkg::*;
-#(
-`ifndef SYNTH
-    parameter bit    DEBUG    = 1'b0,
-    parameter string DBG_FILE = "./debug/regBank.txt"
-`endif
-)
 (
     input   logic         clk,
     input   logic         reset_n,
@@ -66,28 +60,5 @@ module regbank
             regfile[rd] <= data_i;
         end
     end
-
-//////////////////////////////////////////////////////////////////////////////
-// DEBUG
-//////////////////////////////////////////////////////////////////////////////
-`ifndef SYNTH
-    if (DEBUG) begin : gen_reg_dbg
-        int fd;
-
-    initial begin
-        fd = $fopen (DBG_FILE, "w");
-        if (fd == 0) begin
-            $display("Error opening file %s", DBG_FILE);
-        end
-    end
-
-        always_ff @(posedge clk) begin
-            $fwrite(fd,"[%0d] %02d - %8h \t %02d - %8h\n", $time(), rs1, data1_o, rs2, data2_o);
-            if (rd != '0 && enable == 1'b1) begin
-                $fwrite(fd,"[%0d] --------------------------------- %02d - %8h\n", $time, rd, data_i);
-            end
-        end
-    end
-`endif
 
 endmodule

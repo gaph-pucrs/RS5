@@ -30,10 +30,6 @@
 module CSRBank
     import RS5_pkg::*;
 #(
-`ifndef SYNTH
-    parameter bit       PROFILING      = 1'b0,
-    parameter string    PROFILING_FILE = "./debug/Report.txt",
-`endif
     parameter bit       HPMCOUNTEREnable = 1'b0,
     parameter bit       XOSVMEnable      = 1'b0,
     parameter bit       XKYBEREnable     = 1'b0,
@@ -1629,73 +1625,5 @@ module CSRBank
             end
         end
     end
-
-////////////////////////////////////////////////////////////////////////////////
-// Profiling
-////////////////////////////////////////////////////////////////////////////////
-
-`ifndef SYNTH
-    if (PROFILING) begin : gen_profiling
-        int fd;
-
-        initial begin
-            fd = $fopen(PROFILING_FILE, "w");
-            if (fd == 0) begin
-                $display("Error\ opening profiling file");
-            end
-        end
-
-        final begin
-            $fwrite(fd,"Clock Cycles:            %0d\n", mcycle);
-            $fwrite(fd,"Instructions Retired:    %0d\n", minstret);
-            if (COMPRESSED == 1'b1) begin
-                $fwrite(fd,"Instructions Compressed: %0d\n", cntr_compressed);
-            end
-            $fwrite(fd,"Instructions Killed:     %0d\n", cntr_killed);
-            $fwrite(fd,"Context Switches:        %0d\n", cntr_context);
-            $fwrite(fd,"Exceptions Raised:       %0d\n", cntr_exception);
-            $fwrite(fd,"Interrupts Acked:        %0d\n", cntr_irq);
-            if (COMPRESSED == 1'b1) begin
-                $fwrite(fd,"Misaligned Jumps:        %0d\n", cntr_misaligned);
-            end
-
-            $fwrite(fd,"Cycles Scalar Instruct:  %0d\n", cntr_scalar);
-
-            $fwrite(fd,"\nCYCLES WITH::\n");
-            $fwrite(fd,"HAZARDS:                 %0d\n", cntr_hazard);
-            $fwrite(fd,"STALL:                   %0d\n", cntr_stall);
-            $fwrite(fd,"BUBBLES (INC. HAZARDS):  %0d\n", cntr_nop);
-
-            $fwrite(fd,"\nINSTRUCTION COUNTERS:\n");
-            $fwrite(fd,"LUI_SLT:                 %0d\n", cntr_luislt);
-            $fwrite(fd,"LOGIC:                   %0d\n", cntr_logic);
-            $fwrite(fd,"ADDSUB:                  %0d\n", cntr_addsub);
-            $fwrite(fd,"SHIFT:                   %0d\n", cntr_shift);
-            $fwrite(fd,"BRANCH:                  %0d\n", cntr_branch);
-            $fwrite(fd,"JUMP:                    %0d\n", cntr_jump);
-            $fwrite(fd,"LOAD:                    %0d\n", cntr_load);
-            $fwrite(fd,"STORE:                   %0d\n", cntr_store);
-            $fwrite(fd,"SYS:                     %0d\n", cntr_sys);
-            $fwrite(fd,"CSR:                     %0d\n", cntr_csr);
-            $fwrite(fd,"MUL:                     %0d\n", cntr_mul);
-            $fwrite(fd,"DIV:                     %0d\n", cntr_div);
-
-            if(VEnable) begin
-                $fwrite(fd, "\nVECTOR EXTENSION:\n");
-                $fwrite(fd, "Vector Instructions:     %0d\n", cntr_vinst);
-                $fwrite(fd, "Vector Cycles Total:     %0d\n", cntr_vcycles + cntr_vlscycles);
-                $fwrite(fd, "Vector Cycles Arith/Cfg: %0d\n", cntr_vcycles);
-                $fwrite(fd, "Vector Cycles Load/Stor: %0d\n", cntr_vlscycles);
-                $fwrite(fd, "VADDSUB:                 %0d\n", cntr_vaddsub);
-                $fwrite(fd, "VMUL:                    %0d\n", cntr_vmul);
-                $fwrite(fd, "VDIV:                    %0d\n", cntr_vdiv);
-                $fwrite(fd, "VMAC:                    %0d\n", cntr_vmac);
-                $fwrite(fd, "VRED:                    %0d\n", cntr_vred);
-                $fwrite(fd, "VLOAD/VSTORE:            %0d\n", cntr_vloadstore);
-                $fwrite(fd, "VOTHERS:                 %0d\n", cntr_vothers);
-            end
-        end
-    end
-`endif
 
 endmodule

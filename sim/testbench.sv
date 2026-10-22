@@ -57,12 +57,8 @@ module testbench
     parameter  int           VLEN            = 512;
     parameter  int           LLEN            = 32;
 
-`ifndef SYNTH
     localparam bit           PROFILING       = 1'b1;
     localparam bit           DEBUG           = 1'b1;
-`endif
-    localparam string        PROFILING_FILE  = "./results/Report.txt";
-    localparam string        OUTPUT_FILE     = "./results/Output.txt";
 
     parameter  int           BUS_WIDTH       = 32;
     localparam int           MEM_ADDR_BITS   = 28;
@@ -158,11 +154,6 @@ module testbench
     logic stall;
 
     RS5 #(
-    `ifndef SYNTH
-	    .DEBUG          (DEBUG          ),
-	    .PROFILING      (PROFILING      ),
-        .PROFILING_FILE (PROFILING_FILE ),
-    `endif
         .Environment     (ASIC          ),
         .MULEXT          (MULEXT        ),
         .AMOEXT          (AMOEXT        ),
@@ -224,10 +215,6 @@ module testbench
     /* verilator lint_on UNUSEDSIGNAL */
 
     RAM_mem #(
-    `ifndef SYNTH
-        .DEBUG     (DEBUG     ),
-        .DEBUG_PATH("./debug/"),
-    `endif
         .BUS_WIDTH(BUS_WIDTH  ),
         .MEM_WIDTH(MEM_WIDTH  ),
         .BIN_FILE (BIN_FILE   )
@@ -348,8 +335,10 @@ module testbench
 // Memory Mapped regs
 //////////////////////////////////////////////////////////////////////////////
     int fd;
+    string file_name;
     initial begin
-        fd = $fopen(OUTPUT_FILE,"w");
+        file_name = $sformatf("./results/%m.output.txt");
+        fd = $fopen(file_name,"w");
     end
 
     always_ff @(posedge clk) begin
@@ -376,6 +365,19 @@ module testbench
         else begin
             data_tb <= '0;
         end
+    end
+
+//////////////////////////////////////////////////////////////////////////////
+// Debugging and profiling modules
+//////////////////////////////////////////////////////////////////////////////
+
+    if (DEBUG) begin : debug_blk
+        bind regbank RegbankDebug debug();
+        bind RAM_mem MemDebug #(.BUS_WIDTH(BUS_WIDTH)) debug();
+    end
+
+    if (PROFILING) begin : profiling_blk
+        bind CSRBank HPMProfiler report();
     end
 
 endmodule
