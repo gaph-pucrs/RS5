@@ -92,7 +92,9 @@ class sail_cSim(pluginTemplate):
             execute += self.objdump_cmd.format(elf, self.xlen, 'ref.disass')
             sig_file = os.path.join(test_dir, self.name[:-1] + ".signature")
 
-            execute += self.sail_exe[self.xlen] + self.args + ' --test-signature={} {} > {}.log 2>&1;'.format(sig_file, elf, test_name)
+            # the trace goes to its own file so that {}.log holds nothing but the
+            # trace, and can be diffed against the DUT one by lockstep.py
+            execute += self.sail_exe[self.xlen] + self.args + ' --test-signature={} --trace-output={}.log {} > sail.log 2>&1;'.format(sig_file, test_name, elf)
 
             cov_str = ' '
             for label in testentry['coverage_labels']:

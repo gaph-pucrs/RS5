@@ -32,6 +32,12 @@ arch-test-update: riscv-arch-test
 riscv-arch-test:
 	@riscof arch-test --clone --get-version 3.9.1
 
+lockstep-baseline:
+	@./lockstep.py $(WORK_DIR)/baseline_work/rv32i_m/*/src/*.S
+
+lockstep-extensions:
+	@./lockstep.py $(WORK_DIR)/extensions_work/rv32i_m/*/src/*.S
+
 report-baseline: $(WORK_DIR)/baseline_work/report.html
 	@xdg-open $^
 
@@ -48,4 +54,4 @@ clean:
 	@echo "Cleaning..."
 	@rm -rf $(WORK_DIR)/baseline_work $(WORK_DIR)/extensions_work riscv-arch-test
 
-.PHONY: all default baseline extensions arch-test-update clean
+.PHONY: all default baseline extensions arch-test-update lockstep-baseline lockstep-extensions clean

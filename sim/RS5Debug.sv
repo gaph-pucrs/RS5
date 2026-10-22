@@ -26,7 +26,7 @@ module RS5Debug
     int fd;
 
     initial begin
-        file_name = $sformatf("./debug/%m.txt");
+        file_name = $sformatf("%m.log");
         fd = $fopen(file_name, "w");
     end
 
@@ -41,6 +41,7 @@ module RS5Debug
         case (bits)
             8:       s = $sformatf("%02h", data[7:0]);
             16:      s = $sformatf("%04h", data[15:0]);
+            64:      s = $sformatf("%016h", data);
             default: s = $sformatf("%08h", data);
         endcase
         return {"0x", s.toupper()};
@@ -63,6 +64,11 @@ module RS5Debug
         if (csr == VLENBYTES)
             return "vlenb";
         return csr.name().tolower();
+    endfunction
+
+    /* Sail keeps mstatus in a 64 bit bitfield, so even RV32 prints it 64 bits wide */
+    function automatic int csr_bits(input logic [11:0] addr);
+        return (CSRs'(addr) == MSTATUS) ? 64 : 32;
     endfunction
 
     function automatic string exc_str(input exceptionCode_e code);
@@ -137,8 +143,16 @@ module RS5Debug
     assign stepped     = started && !RS5.stall && !RS5.hold && (RS5.exec_valid || RS5.ctrl_execute.exc_ilegal_inst);
     assign fetch_fault = RS5.RAISE_EXCEPTION && RS5.ctrl_execute.exc_inst_access_fault;
 
+    /* An AMO is held in execute while it loads, modifies and stores: amo_operand
+     * carries the loaded value one cycle before it carries the value stored back */
+    logic [31:0] amo_loaded;
+    always_ff @(posedge RS5.clk) begin
+        if (!RS5.stall)
+            amo_loaded <= RS5.execute1.amo_operand;
+    end
+
     /* Execute: everything known when the instruction is committed */
-    /* AMO, LR/SC and vector memory/register effects are not traced */
+    /* LR/SC and vector memory/register effects are not traced */
     always_comb begin
         entry.valid     = stepped || fetch_fault;
         entry.log       = "";
@@ -164,12 +178,17 @@ module RS5Debug
             if (!RS5.RAISE_EXCEPTION) begin
                 /* printed value is pre-WARL, read CSRBank back if legalization diverges */
                 if (RS5.csr_write_enable)
-                    entry.log = {entry.log, $sformatf("CSR %s <- %s (input: %s)\n", csr_str(RS5.csr_addr), hex_str(RS5.CSRBank1.wr_data, 32), hex_str(RS5.CSRBank1.wr_data, 32))};
+                    entry.log = {entry.log, $sformatf("CSR %s <- %s (input: %s)\n", csr_str(RS5.csr_addr), hex_str(RS5.CSRBank1.wr_data, csr_bits(RS5.csr_addr)), hex_str(RS5.CSRBank1.wr_data, 32))};
                 else if (RS5.ctrl_execute.is_csr)
                     entry.log = {entry.log, $sformatf("CSR %s -> %s\n", csr_str(RS5.csr_addr), hex_str(RS5.csr_data_read, 32))};
 
                 if (RS5.ctrl_execute.is_store)
                     entry.log = {entry.log, $sformatf("mem[%s] <- %s\n", paddr_str(RS5.mem_address_exec), data_str(RS5.rs2_data_execute, RS5.ctrl_execute.is_byte, RS5.ctrl_execute.is_half))};
+
+                if (RS5.ctrl_execute.is_amo) begin
+                    entry.log = {entry.log, $sformatf("mem[RW,%s] -> %s\n", paddr_str(RS5.mem_address_exec), hex_str(amo_loaded, 32))};
+                    entry.log = {entry.log, $sformatf("mem[%s] <- %s\n",    paddr_str(RS5.mem_address_exec), hex_str(RS5.execute1.amo_operand, 32))};
+                end
 
                 entry.load = RS5.ctrl_execute.is_load;
             end
@@ -233,11 +252,11 @@ module RS5Debug
             if (entry_ret.exception != NE) begin
                 $fwrite(fd, "trapping from %s to M to handle %s\n", priv_str(entry_ret.priv), exc_str(entry_ret.exception));
                 $fwrite(fd, "handling exc#%s at priv M with tval %s\n", hex_str(32'(entry_ret.exception), 8), hex_str(RS5.CSRBank1.mtval, 32));
-                $fwrite(fd, "CSR mstatus <- %s\n", hex_str(RS5.CSRBank1.mstatus, 32));
+                $fwrite(fd, "CSR mstatus <- %s\n", hex_str(RS5.CSRBank1.mstatus, 64));
             end
 
             if (entry_ret.mret) begin
-                $fwrite(fd, "CSR mstatus <- %s\n", hex_str(RS5.CSRBank1.mstatus, 32));
+                $fwrite(fd, "CSR mstatus <- %s\n", hex_str(RS5.CSRBank1.mstatus, 64));
                 $fwrite(fd, "ret-ing from M to %s\n", priv_str(RS5.CSRBank1.privilege));
             end
 
@@ -245,7 +264,7 @@ module RS5Debug
             if (entry_ret.irq) begin
                 $fwrite(fd, "Handling interrupt: %s\n", hex_str(32'(RS5.CSRBank1.mcause_exception_code), 8));
                 $fwrite(fd, "handling int#%s at priv M with tval 0x00000000\n", hex_str(32'(RS5.CSRBank1.mcause_exception_code), 8));
-                $fwrite(fd, "CSR mstatus <- %s\n", hex_str(RS5.CSRBank1.mstatus, 32));
+                $fwrite(fd, "CSR mstatus <- %s\n", hex_str(RS5.CSRBank1.mstatus, 64));
             end
         end
     end
