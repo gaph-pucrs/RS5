@@ -16,6 +16,19 @@ endif
 ifeq ($(origin BIN_FILE),command line)
 VERILATOR_FLAGS += -GBIN_FILE=\"$(BIN_FILE)\"
 endif
+# Bound monitors, enabled with e.g. make DEBUG=1 LOCKSTEP=0
+DEBUG     ?= 0
+LOCKSTEP  ?= 0
+PROFILING ?= 1
+ifeq ($(DEBUG),1)
+VERILATOR_FLAGS += +define+DEBUG
+endif
+ifeq ($(LOCKSTEP),1)
+VERILATOR_FLAGS += +define+LOCKSTEP
+endif
+ifeq ($(PROFILING),1)
+VERILATOR_FLAGS += +define+PROFILING
+endif
 # Make waveforms
 #VERILATOR_FLAGS += --trace
 # Check SystemVerilog assertions

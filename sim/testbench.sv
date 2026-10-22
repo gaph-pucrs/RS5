@@ -57,9 +57,6 @@ module testbench
     parameter  int           VLEN            = 512;
     parameter  int           LLEN            = 32;
 
-    localparam bit           PROFILING       = 1'b1;
-    localparam bit           DEBUG           = 1'b1;
-
     parameter  int           BUS_WIDTH       = 32;
     localparam int           MEM_ADDR_BITS   = 28;
     parameter  string        BIN_FILE        = "../app/baremetal/tests/riscv-tests/test.bin";
@@ -367,13 +364,18 @@ module testbench
 // Debugging and profiling modules
 //////////////////////////////////////////////////////////////////////////////
 
-    if (DEBUG) begin : debug_blk
-        bind regbank RegbankDebug debug();
-        bind RAM_mem MemDebug #(.BUS_WIDTH(BUS_WIDTH)) debug();
-    end
+    /* Macros, not parameters: Verilator applies a bind even inside a false generate if */
+`ifdef DEBUG
+    bind regbank RegbankDebug debug();
+    bind RAM_mem MemDebug #(.BUS_WIDTH(BUS_WIDTH)) debug();
+`endif
 
-    if (PROFILING) begin : profiling_blk
-        bind CSRBank HPMProfiler report();
-    end
+`ifdef LOCKSTEP
+    bind RS5 RS5Debug #(.COMPRESSED(COMPRESSED)) debug();
+`endif
+
+`ifdef PROFILING
+    bind CSRBank HPMProfiler report();
+`endif
 
 endmodule

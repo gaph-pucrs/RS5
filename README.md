@@ -115,6 +115,22 @@ cd sim
 xrun -f sim.xrun
 ```
 
+### Simulation monitors
+
+The testbench binds optional monitors, selected at compile time:
+
+| Flag        | Output                                         | Default |
+|-------------|------------------------------------------------|---------|
+| `DEBUG`     | Register bank and memory access logs (`debug/`) | off     |
+| `LOCKSTEP`  | sail-riscv 0.7 instruction trace (`debug/`)     | off     |
+| `PROFILING` | HPM counters report (`results/`)                | on      |
+
+```bash
+make -C sim LOCKSTEP=1 DEBUG=1                         # Verilator
+vsim -c -do "set LOCKSTEP 1; set PROFILING 0; do sim.do" # Questa
+xrun -f sim.xrun +define+LOCKSTEP                      # Xcelium (PROFILING is on in sim.xrun)
+```
+
 The testbench's `VEnable`, `VLEN`, `LLEN` and `BIN_FILE` (the program to load) are parameters, so you can override them without editing the testbench:
 
 ```bash
