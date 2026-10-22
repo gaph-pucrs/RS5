@@ -52,8 +52,6 @@ module riscof_tb
     localparam int      i_cnt     = 1;
     localparam bit      USE_XOSVM = 1'b0;
     localparam bit      VEnable   = 1'b0;
-    localparam bit      PROFILING = 1'b0;
-    localparam bit      DEBUG     = 1'b0;
     localparam mul_e    MULEXT    = MEnable ? MUL_M : MUL_OFF;
     localparam atomic_e AMOEXT    = AEnable ? AMO_A : AMO_OFF;
 
@@ -138,10 +136,6 @@ module riscof_tb
     logic instruction_enable;
 
     RS5 #(
-    `ifndef SYNTH
-	    .DEBUG      (DEBUG          ),
-	    .PROFILING  (PROFILING      ),
-    `endif
         .Environment     (ASIC            ),
         .MULEXT          (MULEXT          ),
         .AMOEXT          (AMOEXT          ),
@@ -198,10 +192,6 @@ module riscof_tb
     /* verilator lint_on UNUSEDSIGNAL */
 
     RAM_mem #(
-    `ifndef SYNTH
-        .DEBUG     (DEBUG     ),
-        .DEBUG_PATH("./debug/"),
-    `endif
         .MEM_WIDTH(MEM_WIDTH  ),
         .BIN_FILE (BIN_FILE   )
     ) RAM_MEM (
