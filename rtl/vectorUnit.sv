@@ -100,6 +100,11 @@ module vectorUnit
     logic [4:0]       permute_vs1_addr, permute_vs2_addr, permute_vd_addr;
     logic [VLENB-1:0] permute_write_enable;
     logic [VLEN-1:0]  permute_result;
+
+    /* Register bank ports, shared by the pipeline and the permutation engine */
+    logic [4:0]       rb_vs1_addr, rb_vs2_addr, rb_vd_addr;
+    logic [VLENB-1:0] rb_write_enable;
+    logic [VLEN-1:0]  rb_result;
     logic [VLEN-1:0]  result_alu, result_alu_mask, result_lsu, result;
     logic [VLENB-1:0] write_enable;
 
@@ -567,10 +572,6 @@ module vectorUnit
     end
 
     /* The permutation engine drives the register bank while it runs */
-    logic [4:0]       rb_vs1_addr, rb_vs2_addr, rb_vd_addr;
-    logic [VLENB-1:0] rb_write_enable;
-    logic [VLEN-1:0]  rb_result;
-
     assign rb_vs1_addr     = (state == V_PERM) ? permute_vs1_addr : vs1_addr;
     assign rb_vs2_addr     = (state == V_PERM) ? permute_vs2_addr : vs2_addr;
     assign rb_write_enable = write_enable | permute_write_enable;
