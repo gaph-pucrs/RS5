@@ -20,7 +20,7 @@ These encodings used to execute as another instruction, with no trap. Each one i
 | `vcpop.m`, `vfirst.m` | ran as `vmv.x.s` (vs1 not checked) | implemented |
 | `vsmul.vv` / `vsmul.vx` | ran as `vmv<nr>r.v` (funct3 not checked) | illegal (`vmv<nr>r` is OPIVI only, nr = 1/2/4/8) |
 | `vlseg`/`vsseg` and other segment forms | ran as the single-field load/store (nf not checked) | illegal |
-| `vle<eew>ff.v` | ran as `vle<eew>.v` | unchanged, which is correct while no load can fault |
+| `vle<eew>ff.v` | ran as `vle<eew>.v` | unchanged: same result unless an element after the first faults, since `vl` is never trimmed |
 | Reserved forms (`vrsub.vv`, `vmsgt.vv`, `vminu.vi`, reductions in OPMVX, `vmv.v.*` with vs2 ≠ 0, …) | executed | illegal: each funct6 is valid only in the forms the spec defines |
 | `vle64`/`vse64`, `mew = 1`, scalar FP loads/stores (`flw`, …) on LOAD-FP/STORE-FP | ran as vector loads/stores | illegal |
 | `vmerge.vvm/.vxm/.vim` | wrote only the mask-active elements, so inactive elements kept the old `vd` | writes every body element, with `v0` selecting the source |
@@ -66,7 +66,7 @@ Zve32x requires every RVV 1.0 integer instruction for SEW 8, 16 and 32, plus all
 - **No `vstart`.** It reads as 0 and vector instructions are never interrupted midway, so it is never needed. A write to it is ignored instead of resuming from that element.
 - **`vxsat` is never set by hardware.** The CSR exists and can be read and written, but no implemented instruction saturates.
 - **Register-group alignment is not checked.** A `vd`/`vs` that is not a multiple of LMUL, or an illegal overlap, is a reserved encoding. RS5 runs it instead of trapping. The spec allows that, but traps would make such bugs visible.
-- **Fault-only-first loads never trim `vl`.** That is correct while no vector load can fault, and will need work with an MMU that can fault on vector accesses.
+- **Fault-only-first loads never trim `vl`.** They run as plain unit-stride loads, so a fault on an element after the first is not turned into a shorter `vl`.
 - **Tail and mask-off elements are always left undisturbed.** That is allowed for both the agnostic and undisturbed policies.
 
 ## What to implement
