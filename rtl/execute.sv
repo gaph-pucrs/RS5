@@ -89,6 +89,9 @@ module execute
     output  logic [31:0]            csr_data_o,
     input   logic [31:0]            mtvec_i,
     input   logic [31:0]            mepc_i,
+    /* verilator lint_off UNUSEDSIGNAL */
+    input   logic [ 1:0]            vxrm_i,
+    /* verilator lint_on UNUSEDSIGNAL */
     output  logic [31:0]            vtype_o,
     output  logic [31:0]            vlen_o,
     output  logic [31:0]            pc_irq_o,
@@ -549,6 +552,7 @@ module execute
             .vector_operation_i     (ctrl_i.vector_op),
             .op1_scalar_i           (rs1_data_i),
             .op2_scalar_i           (rs2_data_i),
+            .vxrm_i                 (vxrm_i),
             .hold_o                 (hold_vector),
             .vtype_o                (vtype_o),
             .vlen_o                 (vlen_o),

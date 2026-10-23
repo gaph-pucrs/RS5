@@ -43,6 +43,7 @@ module vectorLane
     input  logic               hold_widening,
     input  logic [ 1:0]        mult_signed_mode,
     input  logic               div_enable,
+    input  logic [ 1:0]        vxrm,
 
     output logic               hold_o,
     output logic [LLEN/8-1:0]  result_mask_o,
@@ -176,6 +177,55 @@ module vectorLane
                 result_sll =         first_operand  <<  second_operand[4:0];
                 result_srl =         first_operand  >>  second_operand[4:0];
                 result_sra = $signed(first_operand) >>> second_operand[4:0];
+            end
+        endcase
+    end
+
+//////////////////////////////////////////////////////////////////////////////
+// Scaling shifts (vssrl, vssra): shift right, then round by vxrm
+//////////////////////////////////////////////////////////////////////////////
+
+    /* v is the element extended to 32 bits (sign or zero), d the shift amount */
+    function automatic logic [31:0] scaling_shift(
+        input logic [31:0] v,
+        input logic [ 4:0] d,
+        input logic [ 1:0] rm,
+        input logic        arith
+    );
+        logic [31:0] shifted;
+        logic        half;   /* v[d-1]: the most significant bit shifted out */
+        logic        rest;   /* v[d-2:0] != 0 */
+        logic        r;
+        shifted = arith ? 32'($signed(v) >>> d) : (v >> d);
+        half    = (d != '0) ? v[d - 5'd1] : 1'b0;
+        rest    = (d > 5'd1) ? ((v & ((32'd1 << (d - 5'd1)) - 32'd1)) != '0) : 1'b0;
+        unique case (rm)
+            2'b00:   r = half;                              /* rnu: round to nearest, ties up   */
+            2'b01:   r = half & (rest | shifted[0]);        /* rne: round to nearest, ties even */
+            2'b10:   r = 1'b0;                              /* rdn: truncate                     */
+            default: r = !shifted[0] & (half | rest);       /* rod: round to odd                 */
+        endcase
+        return shifted + 32'(r);
+    endfunction
+
+    logic [31:0] result_ssrl;
+    logic [31:0] result_ssra;
+
+    always_comb begin
+        unique case (vsew)
+            EW8:
+                for (int i = 0; i < 4; i++) begin
+                    result_ssrl[(8*i)+:8] = 8'(scaling_shift({24'b0, first_operand[(8*i)+:8]}, {2'b0, second_op_8b[i][2:0]}, vxrm, 1'b0));
+                    result_ssra[(8*i)+:8] = 8'(scaling_shift({{24{first_operand[(8*i)+7]}}, first_operand[(8*i)+:8]}, {2'b0, second_op_8b[i][2:0]}, vxrm, 1'b1));
+                end
+            EW16:
+                for (int i = 0; i < 2; i++) begin
+                    result_ssrl[(16*i)+:16] = 16'(scaling_shift({16'b0, first_operand[(16*i)+:16]}, {1'b0, second_op_16b[i][3:0]}, vxrm, 1'b0));
+                    result_ssra[(16*i)+:16] = 16'(scaling_shift({{16{first_operand[(16*i)+15]}}, first_operand[(16*i)+:16]}, {1'b0, second_op_16b[i][3:0]}, vxrm, 1'b1));
+                end
+            default: begin
+                result_ssrl = scaling_shift(first_operand, second_operand[4:0], vxrm, 1'b0);
+                result_ssra = scaling_shift(first_operand, second_operand[4:0], vxrm, 1'b1);
             end
         endcase
     end
@@ -742,6 +792,8 @@ module vectorLane
                 VSLL:              result_o[(32*cycle)+:32] <= result_sll;
                 VSRL:              result_o[(32*cycle)+:32] <= result_srl;
                 VSRA:              result_o[(32*cycle)+:32] <= result_sra;
+                VSSRL:             result_o[(32*cycle)+:32] <= result_ssrl;
+                VSSRA:             result_o[(32*cycle)+:32] <= result_ssra;
                 VMIN:              result_o[(32*cycle)+:32] <= result_min;
                 VMINU:             result_o[(32*cycle)+:32] <= result_minu;
                 VMAX:              result_o[(32*cycle)+:32] <= result_max;

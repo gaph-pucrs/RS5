@@ -303,6 +303,7 @@ module RS5
     logic                  RAISE_EXCEPTION, MACHINE_RETURN;
     logic           [31:0] csr_data_to_write, csr_data_read;
     logic           [31:0] mepc, mtvec, vtype, vlen, pc_irq, pc_exc;
+    logic           [ 1:0] vxrm;
 
     logic                   mem_enable;
     logic            [31:0] mem_address_exec;
@@ -362,6 +363,7 @@ module RS5
         .csr_data_o              (csr_data_to_write            ),
         .mtvec_i                 (mtvec                        ),
         .mepc_i                  (mepc                         ),
+        .vxrm_i                  (vxrm                         ),
         .vtype_o                 (vtype                        ),
         .vlen_o                  (vlen                         ),
         .pc_irq_o                (pc_irq                       ),
@@ -497,6 +499,7 @@ module RS5
         .hold                       (hold),
         .vtype_i                    (vtype),
         .vlen_i                     (vlen),
+        .vxrm_o                     (vxrm),
         .raise_exception_i          (RAISE_EXCEPTION),
         .machine_return_i           (MACHINE_RETURN),
         .exception_code_i           (Exception_Code),

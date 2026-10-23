@@ -64,6 +64,7 @@ module CSRBank
 
     input   logic [31:0]        vtype_i,
     input   logic [31:0]        vlen_i,
+    output  logic [ 1:0]        vxrm_o,
 
     input   logic               raise_exception_i,
     input   logic               machine_return_i,
@@ -1100,6 +1101,36 @@ module CSRBank
     end
 
 ////////////////////////////////////////////////////////////////////////////////
+// Vector fixed-point CSRs: vxrm, vxsat and vcsr = {vxrm, vxsat}
+////////////////////////////////////////////////////////////////////////////////
+
+    logic [1:0] vxrm;
+    logic       vxsat;
+
+    if (VEnable) begin : gen_vxcsr_on
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n) begin
+                vxrm  <= '0;
+                vxsat <= '0;
+            end
+            else if (write_enable_i) begin
+                unique case (address_i)
+                    VXRM:    vxrm          <= wr_data[1:0];
+                    VXSAT:   vxsat         <= wr_data[0];
+                    VCSR:    {vxrm, vxsat} <= wr_data[2:0];
+                    default: ;
+                endcase
+            end
+        end
+    end
+    else begin : gen_vxcsr_off
+        assign vxrm  = '0;
+        assign vxsat = '0;
+    end
+
+    assign vxrm_o = vxrm;
+
+////////////////////////////////////////////////////////////////////////////////
 // mscratch
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1499,6 +1530,9 @@ module CSRBank
 
             /* V CSRs */
             VSTART:         current_val = '0;
+            VXSAT:          current_val = {31'b0, vxsat};
+            VXRM:           current_val = {30'b0, vxrm};
+            VCSR:           current_val = {29'b0, vxrm, vxsat};
             VLENBYTES:      current_val = VEnable ? VLEN/8 : '0;
             VTYPE:          current_val = vtype_i;
             VL:             current_val = vlen_i;

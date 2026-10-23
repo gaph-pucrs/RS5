@@ -48,6 +48,7 @@ module vectorALU
 
     input  iTypeVector_e                vector_operation_i,
     input  vew_e                        vsew,
+    input  logic [1:0]                  vxrm,
 
     input  logic                        accumulate_instruction,
     input  logic                        mask_instruction,
@@ -260,6 +261,7 @@ module vectorALU
                 .hold_widening     (hold_widening_r),
                 .mult_signed_mode  (mult_signed_mode),
                 .div_enable        (div_enable),
+                .vxrm              (vxrm),
                 .hold_o            (hold_lanes[i_lane]),
                 .result_mask_o     (result_lanes_mask[i_lane]),
                 .result_mult_o     (result_lanes_mult[(2*LLEN*i_lane)+:2*LLEN]),

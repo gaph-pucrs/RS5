@@ -31,6 +31,7 @@ module vectorUnit
 
     input   logic [31:0]           op1_scalar_i,
     input   logic [31:0]           op2_scalar_i,
+    input   logic [ 1:0]           vxrm_i,
 
     output  logic                  hold_o,
 
@@ -521,7 +522,7 @@ module vectorUnit
 
     always_comb begin
         // unsigned
-        if (vector_operation_i inside {VSRL, VSLL, VSRA}) begin
+        if (vector_operation_i inside {VSRL, VSLL, VSRA, VSSRL, VSSRA, VNSRL, VNSRA}) begin
             unique case (vsew)
                 EW8:     imm_replicated = {(VLENB  ){ 3'h0, rs1}};
                 EW16:    imm_replicated = {(VLENB/2){11'h0, rs1}};
@@ -658,6 +659,7 @@ module vectorUnit
         .widening_instruction  (widening_instruction_r),
         .current_state         (state),
         .vsew                  (vsew),
+        .vxrm                  (vxrm_i),
         .hold_o                (hold_alu),
         .hold_widening_o       (hold_widening),
         .result_mask_o         (result_alu_mask),
