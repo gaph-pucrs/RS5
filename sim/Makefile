@@ -49,8 +49,9 @@ run:
 	@echo
 	@echo "-- DONE --------------------"
 
+# The RTL has no timescale while the testbench does: TIMESCALEMOD is not a design issue
 lint:
-	@$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_INPUT) --lint-only -I../rtl -I../rtl/aes --timing
+	@$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_INPUT) --lint-only -Wno-TIMESCALEMOD -I../rtl -I../rtl/aes -I../rtl/vector -I../RingBuffer/rtl --timing
 
 clean:
 	@echo
