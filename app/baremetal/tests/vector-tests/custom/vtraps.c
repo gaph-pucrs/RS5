@@ -161,6 +161,16 @@ void TEST_CASE7(void) {
   EXPECT_NO_TRAP(28, "vnsrl.wi v16, v8, 0");
 }
 
+// vrgatherei16 needs EMUL = 16/SEW * LMUL <= 8, and vcompress is unmasked
+void TEST_CASE8(void) {
+  VSET(4, e8, m8);
+  EXPECT_TRAP(29, "vrgatherei16.vv v24, v8, v16");
+  VSET(4, e8, m4);
+  EXPECT_NO_TRAP(30, "vrgatherei16.vv v24, v8, v16");
+  VSET(4, e32, m1);
+  EXPECT_TRAP(31, ".word 0x5c862257");  // vcompress.vm v4, v8, v12 with vm = 0
+}
+
 int main(void) {
   INIT_CHECK();
   enable_vec();
@@ -174,6 +184,7 @@ int main(void) {
   TEST_CASE5();
   TEST_CASE6();
   TEST_CASE7();
+  TEST_CASE8();
 
   EXIT_CHECK();
 }

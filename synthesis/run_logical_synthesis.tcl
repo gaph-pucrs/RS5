@@ -118,6 +118,7 @@ puts "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 								${ROOT_DIR}/rtl/vector/vectorCSRs.sv				\
 								${ROOT_DIR}/rtl/vector/vectorLane.sv				\
 								${ROOT_DIR}/rtl/vector/vectorSlide.sv			\
+								${ROOT_DIR}/rtl/vector/vectorPermute.sv		\
 								${ROOT_DIR}/rtl/vector/vectorReductionTree.sv 	\
 								${ROOT_DIR}/rtl/vector/vectorReductions.sv		\
 								${ROOT_DIR}/rtl/vector/vectorALU.sv				\

@@ -11,6 +11,7 @@
 ./vector/vectorReductionTree.sv
 ./vector/vectorReductions.sv
 ./vector/vectorSlide.sv
+./vector/vectorPermute.sv
 ./vector/vectorLane.sv
 ./vector/vectorCSRs.sv
 ./vector/vectorALU.sv

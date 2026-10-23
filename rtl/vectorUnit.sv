@@ -95,6 +95,11 @@ module vectorUnit
     logic [VLEN-1:0]  first_operand, second_operand, third_operand;
 
     logic [4:0]       vd_addr, vd_addr_r;
+
+    logic             permute_busy;
+    logic [4:0]       permute_vs1_addr, permute_vs2_addr, permute_vd_addr;
+    logic [VLENB-1:0] permute_write_enable;
+    logic [VLEN-1:0]  permute_result;
     logic [VLEN-1:0]  result_alu, result_alu_mask, result_lsu, result;
     logic [VLENB-1:0] write_enable;
 
@@ -126,6 +131,10 @@ module vectorUnit
                       && !((vector_operation_i inside {VLD, VST})
                            && instruction_i[24:20] == 5'b01000 && instruction_i[27:26] == 2'b00);
 
+    /* vrgather, vrgatherei16, vslideup, vslidedown and vcompress run in vectorPermute */
+    logic       permute_instruction;
+    assign permute_instruction = vector_operation_i inside {VRGATHER, VRGATHEREI16, VSLIDEUP, VSLIDEDOWN, VCOMPRESS};
+
     /* vnsrl/vnsra: the source group has 2*SEW elements and EMUL = 2*LMUL */
     logic       narrowing_instruction;
     assign narrowing_instruction = vector_operation_i inside {VNSRL, VNSRA};
@@ -141,6 +150,9 @@ module vectorUnit
         illegal_vtype = 1'b0;
         /* Widening needs 2*SEW <= ELEN and 2*LMUL <= 8 */
         if (widening_instruction && (vsew == EW32 || vlmul == LMUL_8))
+            illegal_vtype = 1'b1;
+        /* vrgatherei16 index group: EMUL = 16/SEW * LMUL must be <= 8 */
+        if (vector_operation_i == VRGATHEREI16 && vsew == EW8 && vlmul == LMUL_8)
             illegal_vtype = 1'b1;
         /* Narrowing needs a 2*SEW <= ELEN source and 2*LMUL <= 8 */
         if (narrowing_instruction && (vsew == EW32 || vlmul == LMUL_8))
@@ -241,9 +253,9 @@ module vectorUnit
 // FSM
 //////////////////////////////////////////////////////////////////////////////
 
-    assign hazard_detected = (state == V_IDLE && |write_enable == 1'b1 && (vs1_addr == vd_addr_r || vs2_addr == vd_addr_r));
+    assign hazard_detected = (state == V_IDLE && |rb_write_enable == 1'b1 && (vs1_addr == rb_vd_addr || vs2_addr == rb_vd_addr));
 
-    assign hold_o = enable && (next_state == V_EXEC || hazard_detected == 1'b1);
+    assign hold_o = enable && (next_state inside {V_EXEC, V_PERM} || hazard_detected == 1'b1);
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
@@ -257,7 +269,9 @@ module vectorUnit
     always_comb begin
         unique case (state)
             V_IDLE:
-                if ((
+                if (op_vector && permute_instruction && !hazard_detected)
+                    next_state = V_PERM;
+                else if ((
                     (op_vector && !(vector_operation_i inside {VNOP, VSETVL, VSETVLI, VSETIVLI}))
                 ||  (op_vload || op_vstore)
                 ) && !hazard_detected)
@@ -279,6 +293,10 @@ module vectorUnit
                     next_state = V_IDLE;
                 else
                     next_state = V_EXEC;
+
+            /* The permutation engine holds the pipeline until it drains */
+            V_PERM:
+                next_state = permute_busy ? V_PERM : V_IDLE;
 
             default:
                 next_state = V_IDLE;
@@ -544,6 +562,17 @@ module vectorUnit
         end
     end
 
+    /* The permutation engine drives the register bank while it runs */
+    logic [4:0]       rb_vs1_addr, rb_vs2_addr, rb_vd_addr;
+    logic [VLENB-1:0] rb_write_enable;
+    logic [VLEN-1:0]  rb_result;
+
+    assign rb_vs1_addr     = (state == V_PERM) ? permute_vs1_addr : vs1_addr;
+    assign rb_vs2_addr     = (state == V_PERM) ? permute_vs2_addr : vs2_addr;
+    assign rb_write_enable = write_enable | permute_write_enable;
+    assign rb_vd_addr      = (|permute_write_enable) ? permute_vd_addr : vd_addr_r;
+    assign rb_result       = (|permute_write_enable) ? permute_result  : result;
+
     vectorRegbank #(
         .Environment (Environment),
         .VLEN        (VLEN),
@@ -551,11 +580,11 @@ module vectorUnit
     ) vectorRegbank1 (
         .clk      (clk),
         .reset_n  (reset_n),
-        .vs1_addr (vs1_addr),
-        .vs2_addr (vs2_addr),
-        .enable   (write_enable),
-        .vd_addr  (vd_addr_r),
-        .result   (result),
+        .vs1_addr (rb_vs1_addr),
+        .vs2_addr (rb_vs2_addr),
+        .enable   (rb_write_enable),
+        .vd_addr  (rb_vd_addr),
+        .result   (rb_result),
         .v0_mask  (v0_mask),
         .vs1_data (vs1_data),
         .vs2_data (vs2_data)
@@ -672,6 +701,38 @@ module vectorUnit
         .mem_write_data_o       (mem_write_data_o),
         .mem_read_data_i        (mem_read_data_i),
         .read_data_o            (result_lsu)
+    );
+
+//////////////////////////////////////////////////////////////////////////////
+// Permutation engine
+//////////////////////////////////////////////////////////////////////////////
+
+    vectorPermute #(
+        .VLEN   (VLEN),
+        .VLENB  (VLENB)
+    ) vectorPermute1 (
+        .clk                (clk),
+        .reset_n            (reset_n),
+        .start_i            (state == V_IDLE && next_state == V_PERM && !hold),
+        .vector_operation_i (vector_operation_i),
+        .opCat_i            (opCat),
+        .vsew               (vsew),
+        .vlmul              (vlmul),
+        .vl                 (vl),
+        .vm                 (vm),
+        .vd_i               (rd),
+        .vs1_i              (rs1),
+        .vs2_i              (rs2),
+        .scalar_i           (op1_scalar_i),
+        .vs1_addr_o         (permute_vs1_addr),
+        .vs2_addr_o         (permute_vs2_addr),
+        .vs1_data_i         (vs1_data),
+        .vs2_data_i         (vs2_data),
+        .v0_mask_i          (v0_mask),
+        .busy_o             (permute_busy),
+        .we_o               (permute_write_enable),
+        .vd_addr_o          (permute_vd_addr),
+        .wdata_o            (permute_result)
     );
 
 //////////////////////////////////////////////////////////////////////////////

@@ -386,6 +386,10 @@ module decode
                 6'b001001:                           decode_vector_opi = VAND;
                 6'b001010:                           decode_vector_opi = VOR;
                 6'b001011:                           decode_vector_opi = VXOR;
+                6'b001100:                           decode_vector_opi = VRGATHER;
+                /* funct6 001110 is vrgatherei16 in OPIVV and vslideup in OPIVX/OPIVI */
+                6'b001110:                           decode_vector_opi = (opCat == OPIVV) ? VRGATHEREI16 : VSLIDEUP;
+                6'b001111: if (opCat != OPIVV)       decode_vector_opi = VSLIDEDOWN;
                 /* vmerge needs vm = 0, vmv.v.* needs vm = 1 and vs2 = 0 */
                 6'b010111: if (!vm)                  decode_vector_opi = VMERGE;
                            else if (vs2_field == '0) decode_vector_opi = VMV;
@@ -425,6 +429,8 @@ module decode
                 6'b000111: if (opCat == OPMVV)       decode_vector_opm = VREDMAX;
                 6'b001110: if (opCat == OPMVX)       decode_vector_opm = VSLIDE1UP;
                 6'b001111: if (opCat == OPMVX)       decode_vector_opm = VSLIDE1DOWN;
+                /* vcompress is unmasked */
+                6'b010111: if (opCat == OPMVV && vm) decode_vector_opm = VCOMPRESS;
                 /* VWXUNARY0 (OPMVV, selected by vs1) and VRXUNARY0 (OPMVX, vs2 = 0) */
                 6'b010000: if (opCat == OPMVV && vm && vs1_field == 5'b00000)
                                                      decode_vector_opm = VMVXS;

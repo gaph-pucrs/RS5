@@ -271,10 +271,10 @@ module vectorALU
                     for (int k = 0; k < VLEN/16; k++) begin
                         logic [15:0] s;
                         logic [ 3:0] sh;
-                        logic [15:0] r;
+                        logic [ 7:0] r;
                         s  = first_operand[(16*k)+:16];
                         sh = second_operand[(8*((narrow_half ? VLEN/16 : 0) + k))+:4];
-                        r  = narrow_arith ? 16'($signed(s) >>> sh) : (s >> sh);
+                        r  = 8'(narrow_arith ? 16'($signed(s) >>> sh) : (s >> sh));
                         result_narrow[(8*k)+:8]          <= r[7:0];
                         result_narrow[(VLEN/2+8*k)+:8]   <= r[7:0];
                     end
@@ -282,10 +282,10 @@ module vectorALU
                     for (int k = 0; k < VLEN/32; k++) begin
                         logic [31:0] s;
                         logic [ 4:0] sh;
-                        logic [31:0] r;
+                        logic [15:0] r;
                         s  = first_operand[(32*k)+:32];
                         sh = second_operand[(16*((narrow_half ? VLEN/32 : 0) + k))+:5];
-                        r  = narrow_arith ? 32'($signed(s) >>> sh) : (s >> sh);
+                        r  = 16'(narrow_arith ? 32'($signed(s) >>> sh) : (s >> sh));
                         result_narrow[(16*k)+:16]        <= r[15:0];
                         result_narrow[(VLEN/2+16*k)+:16] <= r[15:0];
                     end
