@@ -126,6 +126,10 @@ module vectorUnit
                       && !((vector_operation_i inside {VLD, VST})
                            && instruction_i[24:20] == 5'b01000 && instruction_i[27:26] == 2'b00);
 
+    /* vnsrl/vnsra: the source group has 2*SEW elements and EMUL = 2*LMUL */
+    logic       narrowing_instruction;
+    assign narrowing_instruction = vector_operation_i inside {VNSRL, VNSRA};
+
     /* vzext/vsext: log2 of the extension factor (vf2 = 1, vf4 = 2) */
     logic       extension_instruction;
     logic [1:0] ext_log2;
@@ -137,6 +141,9 @@ module vectorUnit
         illegal_vtype = 1'b0;
         /* Widening needs 2*SEW <= ELEN and 2*LMUL <= 8 */
         if (widening_instruction && (vsew == EW32 || vlmul == LMUL_8))
+            illegal_vtype = 1'b1;
+        /* Narrowing needs a 2*SEW <= ELEN source and 2*LMUL <= 8 */
+        if (narrowing_instruction && (vsew == EW32 || vlmul == LMUL_8))
             illegal_vtype = 1'b1;
         /* Extensions need EEW = SEW/f >= 8 and EMUL = LMUL/f >= 1/8 */
         if (extension_instruction) begin
@@ -323,7 +330,8 @@ module vectorUnit
         else if (mask_load_store) begin
             vlmul_effective = LMUL_1;
         end
-        else if (widening_instruction) begin
+        else if (widening_instruction || narrowing_instruction) begin
+            /* Twice the registers: destination (widening) or source (narrowing) */
             unique case (vlmul)
                 LMUL_1:
                     vlmul_effective = LMUL_2;
@@ -400,7 +408,9 @@ module vectorUnit
         else if (next_state == V_IDLE)
             total_elements_processed <= 0;
         else if (!hold)
-            total_elements_processed <= total_elements_processed + elements_per_reg;
+            /* A narrowing source register holds half a destination register */
+            total_elements_processed <= total_elements_processed
+                                      + (narrowing_instruction ? (elements_per_reg >> 1) : elements_per_reg);
 
     assign vector_process_done = (total_elements_processed >= vl && !whole_reg_load_store && op_vector);
 
@@ -417,6 +427,10 @@ module vectorUnit
         // VS1 Address
         if (op_vstore) begin
             vs1_addr = rd_addr;
+        end
+        else if (narrowing_instruction) begin
+            /* Source register j uses the shift amounts of destination register j/2 */
+            vs1_addr = rs1 + (cycle_count >> 1);
         end
         else if (vector_operation_i inside {VSLIDE1UP, VSLIDE1DOWN}) begin
             vs1_addr = rs2_addr + 1;
@@ -457,6 +471,8 @@ module vectorUnit
         else if (!hold || hold_widening) begin
             vd_addr   <= (reduction_instruction || mask_instruction)
                         ? rd
+                        : narrowing_instruction
+                        ? rd + (cycle_count_vd >> 1)
                         : rd + cycle_count_vd;
             vd_addr_r <= vd_addr;
         end
@@ -477,6 +493,26 @@ module vectorUnit
             end
             else if (whole_reg_load_store || mask_instruction) begin
                 write_enable <= '1;
+            end
+            else if (narrowing_instruction) begin
+                /* Source register j writes half (j & 1) of destination register j/2:  */
+                /* its element k is destination element g = j * (elements/2) + k        */
+                unique case (vsew)
+                    EW8:
+                        for (int i = 0; i < VLENB; i++) begin
+                            int k, g;
+                            k = i - (cycle_count_r[0] ? VLENB/2 : 0);
+                            g = int'(cycle_count_r) * (VLENB/2) + k;
+                            write_enable[i] <= (k >= 0) && (k < VLENB/2) && (g < int'(vl)) && (vm || v0_mask[g]);
+                        end
+                    default:
+                        for (int i = 0; i < VLENB/2; i++) begin
+                            int k, g;
+                            k = i - (cycle_count_r[0] ? VLENB/4 : 0);
+                            g = int'(cycle_count_r) * (VLENB/4) + k;
+                            write_enable[(i*2)+:2] <= {2{(k >= 0) && (k < VLENB/4) && (g < int'(vl)) && (vm || v0_mask[g])}};
+                        end
+                endcase
             end
             else begin
                 unique case (vsew_effective)

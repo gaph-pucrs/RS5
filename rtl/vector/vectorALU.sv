@@ -249,6 +249,51 @@ module vectorALU
     end
 
 //////////////////////////////////////////////////////////////////////////////
+// vnsrl/vnsra: shift each 2*SEW element of source register j right and keep
+// SEW bits. The shift amount is element (j & 1) * (elements/2) + k of the
+// second operand. The result is placed in both halves; the write enable
+// selects the half of the destination register that source register j fills.
+//////////////////////////////////////////////////////////////////////////////
+    logic [VLEN-1:0] result_narrow;
+    logic            narrow_arith;
+    logic            narrow_half;
+
+    assign narrow_arith = (vector_operation_i == VNSRA);
+    assign narrow_half  = cycle_count_r[0];
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            result_narrow <= '0;
+        end
+        else begin
+            unique case (vsew)
+                EW8:
+                    for (int k = 0; k < VLEN/16; k++) begin
+                        logic [15:0] s;
+                        logic [ 3:0] sh;
+                        logic [15:0] r;
+                        s  = first_operand[(16*k)+:16];
+                        sh = second_operand[(8*((narrow_half ? VLEN/16 : 0) + k))+:4];
+                        r  = narrow_arith ? 16'($signed(s) >>> sh) : (s >> sh);
+                        result_narrow[(8*k)+:8]          <= r[7:0];
+                        result_narrow[(VLEN/2+8*k)+:8]   <= r[7:0];
+                    end
+                default:
+                    for (int k = 0; k < VLEN/32; k++) begin
+                        logic [31:0] s;
+                        logic [ 4:0] sh;
+                        logic [31:0] r;
+                        s  = first_operand[(32*k)+:32];
+                        sh = second_operand[(16*((narrow_half ? VLEN/32 : 0) + k))+:5];
+                        r  = narrow_arith ? 32'($signed(s) >>> sh) : (s >> sh);
+                        result_narrow[(16*k)+:16]        <= r[15:0];
+                        result_narrow[(VLEN/2+16*k)+:16] <= r[15:0];
+                    end
+            endcase
+        end
+    end
+
+//////////////////////////////////////////////////////////////////////////////
 // Multiplication_common
 //////////////////////////////////////////////////////////////////////////////
 
@@ -305,7 +350,7 @@ module vectorALU
 
     /* Operations computed outside the lanes don't start them */
     logic alu_side_instruction;
-    assign alu_side_instruction = vector_operation_i inside {VID, VZEXT, VSEXT};
+    assign alu_side_instruction = vector_operation_i inside {VID, VZEXT, VSEXT, VNSRL, VNSRA};
 
     assign enable_lane = current_state == V_EXEC && vector_operation_i != VNOP && !hold_widening_r && !hold_accumulation_r && !reduction_instruction && !slide_instruction && !alu_side_instruction;
 
@@ -444,6 +489,7 @@ module vectorALU
             VSLIDE1DOWN:       result_o = result_slide;
             VID:               result_o = result_vid;
             VZEXT, VSEXT:      result_o = result_ext;
+            VNSRL, VNSRA:      result_o = result_narrow;
             default:           result_o = result_lanes;
         endcase
     end

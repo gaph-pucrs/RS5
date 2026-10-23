@@ -151,6 +151,16 @@ void TEST_CASE6(void) {
   EXPECT_NO_TRAP(25, "vzext.vf2 v4, v8");
 }
 
+// Narrowing needs a 2*SEW <= ELEN source and 2*LMUL <= 8
+void TEST_CASE7(void) {
+  VSET(4, e32, m1);
+  EXPECT_TRAP(26, "vnsrl.wi v4, v8, 0");
+  VSET(4, e16, m8);
+  EXPECT_TRAP(27, "vnsra.wi v16, v0, 0");
+  VSET(4, e16, m4);
+  EXPECT_NO_TRAP(28, "vnsrl.wi v16, v8, 0");
+}
+
 int main(void) {
   INIT_CHECK();
   enable_vec();
@@ -163,6 +173,7 @@ int main(void) {
   TEST_CASE4();
   TEST_CASE5();
   TEST_CASE6();
+  TEST_CASE7();
 
   EXIT_CHECK();
 }

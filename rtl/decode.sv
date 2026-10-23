@@ -405,6 +405,8 @@ module decode
                 6'b101001:                           decode_vector_opi = VSRA;
                 6'b101010:                           decode_vector_opi = VSSRL;
                 6'b101011:                           decode_vector_opi = VSSRA;
+                6'b101100:                           decode_vector_opi = VNSRL;
+                6'b101101:                           decode_vector_opi = VNSRA;
                 default:                             decode_vector_opi = VNOP;
             endcase
         end
