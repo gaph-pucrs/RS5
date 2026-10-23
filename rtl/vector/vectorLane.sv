@@ -24,7 +24,6 @@ module vectorLane
 ) (
     input  logic              clk,
     input  logic              reset_n,
-    input  logic              stall,
 
     input  logic [LLEN-1:0]    first_operand_i,
     input  logic [LLEN-1:0]    second_operand_i,
@@ -77,7 +76,6 @@ module vectorLane
             if (!reset_n) begin
                 cycle <= '0;
             end
-            else if (stall) begin end
             else if (!enable_i) begin
                 cycle <= '0;
             end
@@ -90,7 +88,6 @@ module vectorLane
             if (!reset_n) begin
                 cycle_r <= '0;
             end
-            else if (stall) begin end
             else begin
                 cycle_r <= cycle;
             end
@@ -287,7 +284,6 @@ module vectorLane
         if (!reset_n) begin
             result_mask_o <= '0;
         end
-        else if (stall) begin end
         else begin
             unique case (vsew)
                 EW8:     result_mask_o[(4*cycle)+:4] <=        result_comparison_8b  & ({4{vm}} | mask_sew8);
@@ -376,12 +372,10 @@ module vectorLane
 
     assign mult_low = (vector_operation_i inside {VMUL, VMACC, VNMSAC, VMADD, VNMSUB} || widening_instruction);
 
-    mul #(
-        .FREEZE_ON_STALL(1'b1)
-    ) mul32b (
+    mul mul32b (
         .clk             (clk),
         .reset_n         (reset_n),
-        .stall           (stall),
+        .stall           (1'b0),
         .first_operand_i (mult_op_a_32b),
         .second_operand_i(mult_op_b_32b),
         .signed_mode_i   (mult_signed_mode),
@@ -480,7 +474,6 @@ module vectorLane
             result_mult_r   <= '0;
             third_operand_r <= '0;
         end
-        else if (stall) begin end
         else if (!hold_mult) begin
             result_mult_r   <= result_mult[31:0];
             third_operand_r <= third_operand;
@@ -533,7 +526,6 @@ module vectorLane
                 ) div8b (
                     .clk              (clk),
                     .reset_n          (reset_n),
-                    .stall            (stall),
                     .first_operand_i  (first_operand [(8*i_div8b)+:8]),
                     .second_operand_i (second_operand[(8*i_div8b)+:8]),
                     .enable_i         (div_enable_8b),
@@ -566,7 +558,6 @@ module vectorLane
                 ) div16b (
                     .clk              (clk),
                     .reset_n          (reset_n),
-                    .stall            (stall),
                     .first_operand_i  (first_operand [(16*i_div16b)+:16]),
                     .second_operand_i (second_operand[(16*i_div16b)+:16]),
                     .enable_i         (div_enable_16b),
@@ -597,7 +588,6 @@ module vectorLane
         ) div32b (
             .clk              (clk),
             .reset_n          (reset_n),
-            .stall            (stall),
             .first_operand_i  (first_operand),
             .second_operand_i (second_operand),
             .enable_i         (div_enable_32b),
@@ -744,7 +734,6 @@ module vectorLane
         if (!reset_n) begin
             result_o <= '0;
         end
-        else if (stall) begin end
         else begin
             unique case(vector_operation_i)
                 VAND:              result_o[(32*cycle)+:32] <= result_and;
@@ -771,7 +760,6 @@ module vectorLane
         if (!reset_n) begin
             result_mult_o <= '0;
         end
-        else if (stall) begin end
         else if (!hold_widening) begin
             result_mult_o[(64*cycle)+:64] <= result_mult;
         end

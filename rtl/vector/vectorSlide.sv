@@ -136,8 +136,7 @@ module vectorSlide
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             last_operand_r <= '0;
-        else if (stall) begin end
-        else
+        else if (!stall)
             last_operand_r <= first_operand[VLEN-1-:32];
     end
 
@@ -206,7 +205,6 @@ module vectorSlide
         always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             result_o <= '0;
-        else if (stall) begin end
         else if (vector_operation_i == VSLIDE1DOWN)
             result_o <= result_slide1down;
         else
