@@ -44,7 +44,10 @@ module vectorUnit
     input  logic [BUS_WIDTH-1:0]   mem_read_data_i,
 
     output  logic [31:0]           res_scalar_o,
-    output  logic                  wr_en_scalar_o
+    output  logic                  wr_en_scalar_o,
+
+    /* The instruction is illegal for the current vtype: raise an exception, don't execute */
+    output  logic                  illegal_o
 );
 
     localparam VLENB = VLEN/8;
@@ -108,9 +111,34 @@ module vectorUnit
     assign zimm     = {instruction_i[30:20]};
     assign opCat    = opCat_e'(instruction_i[14:12]);
 
-    assign op_vload  = enable_i && (vector_operation_i == VLD);
-    assign op_vstore = enable_i && (vector_operation_i == VST);
-    assign op_vector = enable_i && !(vector_operation_i == VLD) && !(vector_operation_i == VST);
+//////////////////////////////////////////////////////////////////////////////
+// Illegal instructions for the current vtype
+//////////////////////////////////////////////////////////////////////////////
+
+    logic enable;
+    logic vill;
+    logic needs_vtype;
+    logic illegal_vtype;
+
+    /* vset*, whole-register loads/stores and vmv<nr>r do not depend on vtype */
+    assign needs_vtype = !(vector_operation_i inside {VNOP, VSETVL, VSETVLI, VSETIVLI, VMVR})
+                      && !((vector_operation_i inside {VLD, VST})
+                           && instruction_i[24:20] == 5'b01000 && instruction_i[27:26] == 2'b00);
+
+    /* Reserved instruction/vtype combinations RS5 cannot execute */
+    always_comb begin
+        illegal_vtype = 1'b0;
+        /* Widening needs 2*SEW <= ELEN and 2*LMUL <= 8 */
+        if (widening_instruction && (vsew == EW32 || vlmul == LMUL_8))
+            illegal_vtype = 1'b1;
+    end
+
+    assign illegal_o = enable_i && needs_vtype && (vill || illegal_vtype);
+    assign enable    = enable_i && !illegal_o;
+
+    assign op_vload  = enable && (vector_operation_i == VLD);
+    assign op_vstore = enable && (vector_operation_i == VST);
+    assign op_vector = enable && !(vector_operation_i == VLD) && !(vector_operation_i == VST);
 
     assign accumulate_instruction = (vector_operation_i inside {VMACC, VNMSAC, VMADD, VNMSUB});
     assign multiply_instruction   = (vector_operation_i inside {VMUL, VMULH, VMULHSU, VMULHU} | accumulate_instruction | widening_instruction);
@@ -156,7 +184,7 @@ module vectorUnit
     ) vectorCSRs1 (
         .clk                    (clk),
         .reset_n                (reset_n),
-        .is_vector_op_i         (enable_i),
+        .is_vector_op_i         (enable),
         .vector_operation_i     (vector_operation_i),
         .op1_scalar_i           (op1_scalar_i),
         .op2_scalar_i           (op2_scalar_i),
@@ -168,7 +196,8 @@ module vectorUnit
         .vsew                   (vsew),
         .vlmul                  (vlmul),
         .vl                     (vl),
-        .vl_next                (vl_next)
+        .vl_next                (vl_next),
+        .vill_o                 (vill)
     );
 
 //////////////////////////////////////////////////////////////////////////////
@@ -193,7 +222,7 @@ module vectorUnit
 
     assign hazard_detected = (state == V_IDLE && |write_enable == 1'b1 && (vs1_addr == vd_addr_r || vs2_addr == vd_addr_r));
 
-    assign hold_o = enable_i && (next_state == V_EXEC || hazard_detected == 1'b1);
+    assign hold_o = enable && (next_state == V_EXEC || hazard_detected == 1'b1);
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin

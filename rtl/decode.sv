@@ -342,86 +342,134 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     iTypeVector_e vector_operation;
+    logic         vector_invalid;
 
     if (VEnable) begin : v_enable_decode_gen_on
         iTypeVector_e decode_vector_opcfg;
         iTypeVector_e decode_vector_opi;
         iTypeVector_e decode_vector_opm;
+        logic         vector_mem_valid;
 
-        opCat_e opCat;
+        opCat_e     opCat;
+        logic [5:0] funct6;
+        logic       vm;
+        logic [4:0] vs1_field;
+        logic [4:0] vs2_field;
 
-        assign opCat = opCat_e'(funct3);
+        assign opCat     = opCat_e'(funct3);
+        assign funct6    = funct7[6:1];
+        assign vm        = instruction_i[25];
+        assign vs1_field = instruction_i[19:15];
+        assign vs2_field = instruction_i[24:20];
 
         always_comb begin
             unique case (instruction_i[31:30]) inside
                 2'b0?:      decode_vector_opcfg = VSETVLI;
                 2'b11:      decode_vector_opcfg = VSETIVLI;
-                2'b10:      decode_vector_opcfg = VSETVL;
+                /* vsetvl: bits [30:25] must be zero */
+                2'b10:      decode_vector_opcfg = (instruction_i[30:25] == '0) ? VSETVL : VNOP;
                 default:    decode_vector_opcfg = VNOP;
             endcase
         end
 
+        /* OPIVV/OPIVX/OPIVI: each funct6 is only valid in some of the three forms */
         always_comb begin
-            unique case (funct7[6:1]) inside
-                6'b000000:     decode_vector_opi = VADD;
-                6'b000010:     decode_vector_opi = VSUB;
-                6'b000011:     decode_vector_opi = VRSUB;
-                6'b000100:     decode_vector_opi = VMINU;
-                6'b000101:     decode_vector_opi = VMIN;
-                6'b000110:     decode_vector_opi = VMAXU;
-                6'b000111:     decode_vector_opi = VMAX;
-                6'b001001:     decode_vector_opi = VAND;
-                6'b001010:     decode_vector_opi = VOR;
-                6'b001011:     decode_vector_opi = VXOR;
-                6'b010111:     decode_vector_opi = (funct7[0]) ? VMV : VMERGE;
-                6'b011000:     decode_vector_opi = VMSEQ;
-                6'b011001:     decode_vector_opi = VMSNE;
-                6'b011010:     decode_vector_opi = VMSLTU;
-                6'b011011:     decode_vector_opi = VMSLT;
-                6'b011100:     decode_vector_opi = VMSLEU;
-                6'b011101:     decode_vector_opi = VMSLE;
-                6'b011110:     decode_vector_opi = VMSGTU;
-                6'b011111:     decode_vector_opi = VMSGT;
-                6'b100101:     decode_vector_opi = VSLL;
-                6'b100111:     decode_vector_opi = VMVR;
-                6'b101000:     decode_vector_opi = VSRL;
-                6'b101001:     decode_vector_opi = VSRA;
-                default:       decode_vector_opi = VNOP;
+            decode_vector_opi = VNOP;
+            unique case (funct6)
+                6'b000000:                           decode_vector_opi = VADD;
+                6'b000010: if (opCat != OPIVI)       decode_vector_opi = VSUB;
+                6'b000011: if (opCat != OPIVV)       decode_vector_opi = VRSUB;
+                6'b000100: if (opCat != OPIVI)       decode_vector_opi = VMINU;
+                6'b000101: if (opCat != OPIVI)       decode_vector_opi = VMIN;
+                6'b000110: if (opCat != OPIVI)       decode_vector_opi = VMAXU;
+                6'b000111: if (opCat != OPIVI)       decode_vector_opi = VMAX;
+                6'b001001:                           decode_vector_opi = VAND;
+                6'b001010:                           decode_vector_opi = VOR;
+                6'b001011:                           decode_vector_opi = VXOR;
+                /* vmerge needs vm = 0, vmv.v.* needs vm = 1 and vs2 = 0 */
+                6'b010111: if (!vm)                  decode_vector_opi = VMERGE;
+                           else if (vs2_field == '0) decode_vector_opi = VMV;
+                6'b011000:                           decode_vector_opi = VMSEQ;
+                6'b011001:                           decode_vector_opi = VMSNE;
+                6'b011010: if (opCat != OPIVI)       decode_vector_opi = VMSLTU;
+                6'b011011: if (opCat != OPIVI)       decode_vector_opi = VMSLT;
+                6'b011100:                           decode_vector_opi = VMSLEU;
+                6'b011101:                           decode_vector_opi = VMSLE;
+                6'b011110: if (opCat != OPIVV)       decode_vector_opi = VMSGTU;
+                6'b011111: if (opCat != OPIVV)       decode_vector_opi = VMSGT;
+                6'b100101:                           decode_vector_opi = VSLL;
+                /* vmv<nr>r.v is OPIVI only (OPIVV/OPIVX is vsmul), unmasked, nr = 1/2/4/8 */
+                6'b100111: if (opCat == OPIVI && vm && vs1_field inside {5'd0, 5'd1, 5'd3, 5'd7})
+                                                     decode_vector_opi = VMVR;
+                6'b101000:                           decode_vector_opi = VSRL;
+                6'b101001:                           decode_vector_opi = VSRA;
+                default:                             decode_vector_opi = VNOP;
             endcase
         end
 
+        /* OPMVV/OPMVX */
         always_comb begin
-            unique case (funct7[6:1]) inside
-                6'b000000:     decode_vector_opm = VREDSUM;
-                6'b000001:     decode_vector_opm = VREDAND;
-                6'b000010:     decode_vector_opm = VREDOR;
-                6'b000011:     decode_vector_opm = VREDXOR;
-                6'b000100:     decode_vector_opm = VREDMINU;
-                6'b000101:     decode_vector_opm = VREDMIN;
-                6'b000110:     decode_vector_opm = VREDMAXU;
-                6'b000111:     decode_vector_opm = VREDMAX;
-                6'b001110:     decode_vector_opm = VSLIDE1UP;
-                6'b001111:     decode_vector_opm = VSLIDE1DOWN;
-                6'b010000:     decode_vector_opm = (opCat == OPMVX)
-                                                ? VMVSX
-                                                : VMVXS;
-                6'b100000:     decode_vector_opm = VDIVU;
-                6'b100001:     decode_vector_opm = VDIV;
-                6'b100010:     decode_vector_opm = VREMU;
-                6'b100011:     decode_vector_opm = VREM;
-                6'b100100:     decode_vector_opm = VMULHU;
-                6'b100101:     decode_vector_opm = VMUL;
-                6'b100110:     decode_vector_opm = VMULHSU;
-                6'b100111:     decode_vector_opm = VMULH;
-                6'b101101:     decode_vector_opm = VMACC;
-                6'b101111:     decode_vector_opm = VNMSAC;
-                6'b101001:     decode_vector_opm = VMADD;
-                6'b101011:     decode_vector_opm = VNMSUB;
-                6'b111000:     decode_vector_opm = VWMULU;
-                6'b111010:     decode_vector_opm = VWMULSU;
-                6'b111011:     decode_vector_opm = VWMUL;
-                default:       decode_vector_opm = VNOP;
+            decode_vector_opm = VNOP;
+            unique case (funct6)
+                6'b000000: if (opCat == OPMVV)       decode_vector_opm = VREDSUM;
+                6'b000001: if (opCat == OPMVV)       decode_vector_opm = VREDAND;
+                6'b000010: if (opCat == OPMVV)       decode_vector_opm = VREDOR;
+                6'b000011: if (opCat == OPMVV)       decode_vector_opm = VREDXOR;
+                6'b000100: if (opCat == OPMVV)       decode_vector_opm = VREDMINU;
+                6'b000101: if (opCat == OPMVV)       decode_vector_opm = VREDMIN;
+                6'b000110: if (opCat == OPMVV)       decode_vector_opm = VREDMAXU;
+                6'b000111: if (opCat == OPMVV)       decode_vector_opm = VREDMAX;
+                6'b001110: if (opCat == OPMVX)       decode_vector_opm = VSLIDE1UP;
+                6'b001111: if (opCat == OPMVX)       decode_vector_opm = VSLIDE1DOWN;
+                /* VWXUNARY0 (OPMVV, selected by vs1) and VRXUNARY0 (OPMVX, vs2 = 0) */
+                6'b010000: if (opCat == OPMVV && vm && vs1_field == 5'b00000)
+                                                     decode_vector_opm = VMVXS;
+                           else if (opCat == OPMVX && vm && vs2_field == '0)
+                                                     decode_vector_opm = VMVSX;
+                6'b100000:                           decode_vector_opm = VDIVU;
+                6'b100001:                           decode_vector_opm = VDIV;
+                6'b100010:                           decode_vector_opm = VREMU;
+                6'b100011:                           decode_vector_opm = VREM;
+                6'b100100:                           decode_vector_opm = VMULHU;
+                6'b100101:                           decode_vector_opm = VMUL;
+                6'b100110:                           decode_vector_opm = VMULHSU;
+                6'b100111:                           decode_vector_opm = VMULH;
+                6'b101001:                           decode_vector_opm = VMADD;
+                6'b101011:                           decode_vector_opm = VNMSUB;
+                6'b101101:                           decode_vector_opm = VMACC;
+                6'b101111:                           decode_vector_opm = VNMSAC;
+                6'b111000:                           decode_vector_opm = VWMULU;
+                6'b111010:                           decode_vector_opm = VWMULSU;
+                6'b111011:                           decode_vector_opm = VWMUL;
+                default:                             decode_vector_opm = VNOP;
             endcase
+        end
+
+        /* Loads/stores: EEW 8/16/32 only (ELEN = 32, other widths are scalar FP),     */
+        /* mew = 0, no segments (nf = 0) except the whole-register forms               */
+        logic [2:0] nf;
+        logic [1:0] mop;
+        assign nf  = instruction_i[31:29];
+        assign mop = instruction_i[27:26];
+
+        always_comb begin
+            vector_mem_valid = (funct3 inside {3'b000, 3'b101, 3'b110}) && !instruction_i[28];
+            if (mop == 2'b00) begin
+                unique case (vs2_field) inside
+                    5'b00000: vector_mem_valid &= (nf == '0);
+                    /* whole register: unmasked, nf = 0/1/3/7, stores encode EEW = 8 */
+                    5'b01000: vector_mem_valid &= vm && (nf inside {3'd0, 3'd1, 3'd3, 3'd7})
+                                                     && (instruction_operation == VLOAD || funct3 == 3'b000);
+                    /* mask load/store: unmasked, EEW = 8 */
+                    5'b01011: vector_mem_valid &= vm && (nf == '0) && (funct3 == 3'b000);
+                    /* fault-only-first, loads only */
+                    5'b10000: vector_mem_valid &= (nf == '0) && (instruction_operation == VLOAD);
+                    default:  vector_mem_valid  = 1'b0;
+                endcase
+            end
+            else begin
+                vector_mem_valid &= (nf == '0);
+            end
         end
 
         always_comb begin
@@ -434,19 +482,23 @@ module decode
                 endcase
             end
             else if (instruction_operation == VLOAD) begin
-                vector_operation = VLD;
+                vector_operation = vector_mem_valid ? VLD : VNOP;
             end
             else if (instruction_operation == VSTORE) begin
-                vector_operation = VST;
+                vector_operation = vector_mem_valid ? VST : VNOP;
             end
             else begin
                 vector_operation = VNOP;
             end
         end
 
+        /* Any vector opcode that does not decode to an implemented operation is illegal */
+        assign vector_invalid = (instruction_operation inside {VECTOR, VLOAD, VSTORE}) && (vector_operation == VNOP);
+
     end
     else begin : v_enable_decode_gen_off
         assign vector_operation = VNOP;
+        assign vector_invalid   = 1'b0;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -668,7 +720,7 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     logic invalid_inst;
-    assign invalid_inst = ((instruction_i[1:0] != '1) || instruction_operation == INVALID || amo_invalid) && !invalid;
+    assign invalid_inst = ((instruction_i[1:0] != '1) || instruction_operation == INVALID || amo_invalid || vector_invalid) && !invalid;
 
     logic exc_inst_access_fault;
     assign exc_inst_access_fault = exc_inst_access_fault_i && !invalid;

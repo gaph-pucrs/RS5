@@ -38,12 +38,15 @@ module vectorCSRs
     output  vew_e                   vsew,
     output  vlmul_e                 vlmul,
     output  logic[$bits(VLEN)-1:0]  vl,
-    output  logic[$bits(VLEN)-1:0]  vl_next
+    output  logic[$bits(VLEN)-1:0]  vl_next,
+    output  logic                   vill_o
 );
 
     logic [$bits(VLENB)-1:0] elementsPerRegister;
     logic [$bits(VLEN)-1:0]  vl_max;
-    logic        vill, vill_next, vma, vma_next, vta, vta_next;
+    logic        vill, vma, vma_next, vta, vta_next;
+    logic        rsvd_bits;
+    logic[$bits(VLEN)-1:0] vl_new;
     vew_e        vsew_next;
     vlmul_e      vlmul_next;
     logic        cfg_error, cfg_error_r;
@@ -52,31 +55,32 @@ module vectorCSRs
 // Combinational
 //////////////////////////////////////////////////////////////////////////////
 
+    /* An unsupported vtype sets vill: SEW > ELEN (32), reserved SEW or LMUL,  */
+    /* reserved vtype bits (including vill itself in a vsetvl operand), and     */
+    /* fractional LMUL with SEW > LMUL * ELEN                                   */
     always_comb begin
         case (vlmul_next)
-            LMUL_1_8:   cfg_error = (vsew_next inside {EW16, EW32, EW64})
-                                    ? 1'b1
-                                    : 1'b0;
-            LMUL_1_4:   cfg_error = (vsew_next inside {EW32, EW64})
-                                    ? 1'b1
-                                    : 1'b0;
-            LMUL_1_2:   cfg_error = (vsew_next == EW64)
-                                    ? 1'b1
-                                    : 1'b0;
-            default:    cfg_error   = 1'b0;
+            LMUL_RSVD:  cfg_error = 1'b1;
+            LMUL_1_8:   cfg_error = (vsew_next inside {EW16, EW32});
+            LMUL_1_4:   cfg_error = (vsew_next == EW32);
+            default:    cfg_error = 1'b0;
         endcase
+
+        if (!(vsew_next inside {EW8, EW16, EW32}) || rsvd_bits)
+            cfg_error = 1'b1;
     end
 
     always_comb begin
         if (vector_operation_i == VSETVL) begin
-            vill_next  = op2_scalar_i[31];
+            rsvd_bits  = (op2_scalar_i[31:8] != '0);
             vma_next   = op2_scalar_i[7];
             vta_next   = op2_scalar_i[6];
             vsew_next  = vew_e'(op2_scalar_i[5:3]);
             vlmul_next = vlmul_e'(op2_scalar_i[2:0]);
         end
         else begin
-            vill_next  = zimm[8];
+            /* vsetvli: zimm[10:8] reserved; vsetivli: zimm[9:8] reserved (zimm[10] is opcode) */
+            rsvd_bits  = (vector_operation_i == VSETIVLI) ? (zimm[9:8] != '0) : (zimm[10:8] != '0);
             vma_next   = zimm[7];
             vta_next   = zimm[6];
             vsew_next  = vew_e'(zimm[5:3]);
@@ -99,13 +103,13 @@ module vectorCSRs
 
     always_comb begin
         if (vector_operation_i == VSETIVLI)
-            vl_next = ({'0, rs1} > vl_max) ? vl_max : {'0, rs1};
+            vl_new = ({'0, rs1} > vl_max) ? vl_max : {'0, rs1};
         else if (rd != '0 && rs1 == '0)
-            vl_next = vl_max;
+            vl_new = vl_max;
         else if (rd == '0 && rs1 == '0)
-            vl_next = vl;
+            vl_new = vl;
         else
-            vl_next = (op1_scalar_i > vl_max) ? vl_max : op1_scalar_i;
+            vl_new = (op1_scalar_i > vl_max) ? vl_max : op1_scalar_i;
             //vl_next = (vector_operation_i == VSETVL) ? op1_scalar_i : {'0, op1_scalar_i[4:0]};
     end
 
@@ -125,14 +129,12 @@ module vectorCSRs
         end
         else if (is_vector_op_i && vector_operation_i inside {VSETVL, VSETVLI, VSETIVLI}) begin
             cfg_error_r <= cfg_error;
-            vill        <= vill_next | cfg_error;
+            vill        <= cfg_error;
             vma         <= vma_next;
             vta         <= vta_next;
             vsew        <= vsew_next;
             vlmul       <= vlmul_next;
-            vl          <=  (cfg_error)
-                            ? '0
-                            : vl_next;
+            vl          <= vl_next;
 
             //$display("[%0t] Set VSEW = %s, VLMUL = %s, VL = %d\n", $time, vsew_next, vlmul_next, vl_next);
         end
@@ -141,6 +143,10 @@ module vectorCSRs
 //////////////////////////////////////////////////////////////////////////////
 // CSRs
 //////////////////////////////////////////////////////////////////////////////
+
+    /* vl (and the rd of vset*) becomes 0 when the new vtype is unsupported */
+    assign vl_next  = cfg_error ? '0 : vl_new;
+    assign vill_o   = vill;
 
     assign vlen_o   = {'0, vl};
     assign vtype_o  = (cfg_error_r)

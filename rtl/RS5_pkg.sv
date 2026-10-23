@@ -201,7 +201,7 @@ package RS5_pkg;
         ZBKBREV8  = 12'b100000000000
     } iTypeZbkb_e;
 
-    typedef enum logic [5:0] {
+    typedef enum logic [6:0] {
         VNOP,
         VSETVL,
         VSETVLI,
@@ -257,6 +257,20 @@ package RS5_pkg;
         VMERGE,
         VSLIDE1UP,
         VSLIDE1DOWN,
+        VRGATHER,
+        VRGATHEREI16,
+        VSLIDEUP,
+        VSLIDEDOWN,
+        VCOMPRESS,
+        VCPOP,
+        VFIRST,
+        VID,
+        VZEXT,
+        VSEXT,
+        VNSRL,
+        VNSRA,
+        VSSRL,
+        VSSRA,
         VLD,            // Vector load  (was iType_e VLOAD)
         VST             // Vector store (was iType_e VSTORE)
     } iTypeVector_e;
@@ -385,7 +399,8 @@ package RS5_pkg;
     typedef enum  logic[1:0] {DIRECT, VECTORED} trapMode_e;
 
     typedef enum  logic[11:0] {
-        VSTART        = 12'h008,
+        VSTART        = 12'h008, VXSAT, VXRM,
+        VCSR          = 12'h00F,
         MSTATUS       = 12'h300, MISA, 
         MIE           = 12'h304, MTVEC, MCOUNTEREN,
         MENVCFG       = 12'h30A, 

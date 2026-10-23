@@ -42,6 +42,10 @@ _entry:
 	/* running tests from riscv-tests */
 	la	sp, _stack
 
+	/* Unexpected traps print TRAP, mcause and mepc, then end the simulation */
+	la	t0, _trap
+	csrw	mtvec, t0
+
 #define TEST(n) \
 	.global n; \
 	jal zero,n; \
@@ -65,3 +69,26 @@ _entry:
 	li	s10, 0x80000000		# this will interrupt the simulation (assertion)
 	sw	zero, 0(s10)
 	jal zero, .end
+
+	.align 2
+_trap:
+	li	a0, 0x80001000
+	addi	a1, zero, 'T'
+	sw	a1, 0(a0)
+	addi	a1, zero, 'R'
+	sw	a1, 0(a0)
+	addi	a1, zero, 'A'
+	sw	a1, 0(a0)
+	addi	a1, zero, 'P'
+	sw	a1, 0(a0)
+	addi	a1, zero, ' '
+	sw	a1, 0(a0)
+	li	a0, 0x80002000		# integer print port
+	csrr	a1, mcause
+	sw	a1, 0(a0)
+	csrr	a1, mepc
+	sw	a1, 0(a0)
+	li	a0, 0x80001000
+	addi	a1, zero, '\n'
+	sw	a1, 0(a0)
+	jal	zero, .end

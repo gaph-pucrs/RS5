@@ -61,7 +61,7 @@ static inline unsigned long golden_vl(unsigned long avl, unsigned long vsew, uns
 // illegal values of vlmul and vsew which violtate: ELEN >= SEW/LMUL
 #define check_vtype_vl(casenum, vtype, golden_vtype, avl, vl, vsew, vlmul)                                                     \
   printf("Checking vtype and vl #%d...\n", casenum); \
-  if((vlmul==5 && (vsew == 1 || vsew == 2 || vsew ==3)) || (vlmul==6 && (vsew == 2 || vsew ==3)) || (vlmul==7 && vsew==3)){   \
+  if((vsew == 3) || (vlmul==5 && (vsew == 1 || vsew == 2)) || (vlmul==6 && vsew == 2)){ /* ELEN = 32 */  \
   if((vtype != 0x80000000) || (vl != 0)){    \
   printf("FAILED. Got vtype = %lx, expected vtype = 80000000. avl = %lx, vl = %lx.\n", vtype,avl, vl);     \
   return;                                                  \

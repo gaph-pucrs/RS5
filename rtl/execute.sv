@@ -533,6 +533,7 @@ module execute
     logic [31:0] vector_scalar_result;
     logic        vector_wr_en;
     logic        hold_vector;
+    logic        exc_ilegal_vector;
 
     if (VEnable) begin : v_gen_on
         vectorUnit #(
@@ -557,12 +558,14 @@ module execute
             .mem_write_data_o       (mem_write_data_vector),
             .mem_read_data_i        (mem_read_data_i),
             .res_scalar_o           (vector_scalar_result),
-            .wr_en_scalar_o         (vector_wr_en)
+            .wr_en_scalar_o         (vector_wr_en),
+            .illegal_o              (exc_ilegal_vector)
         );
     end
     else begin : v_gen_off
         assign hold_vector  = '0;
         assign vector_wr_en = '0;
+        assign exc_ilegal_vector        = '0;
         assign vector_scalar_result     = '0;
         assign mem_address_vector       = '0;
         assign mem_read_enable_vector   = '0;
@@ -872,7 +875,7 @@ module execute
 
     always_comb begin
         unique case (1'b1)
-            ctrl_i.is_vector:   write_enable = ctrl_i.rd_we && rd_i != '0 && vector_wr_en;
+            ctrl_i.is_vector:   write_enable = ctrl_i.rd_we && rd_i != '0 && vector_wr_en && !raise_exception;
             ctrl_i.is_sc:       write_enable = we_atomic;
             ctrl_i.is_amo:      write_enable = we_atomic;
             default:            write_enable = we_default;
@@ -1002,6 +1005,7 @@ module execute
         illegal_mret ||
         ctrl_i.is_ecall || ctrl_i.is_ebreak ||
         exc_ilegal_csr_inst ||
+        exc_ilegal_vector ||
         iaddr_misaligned ||
         laddr_misaligned ||
         saddr_misaligned
@@ -1026,7 +1030,7 @@ module execute
             exception_code_o  = LOAD_ACCESS_FAULT;
         else if (ctrl_i.exc_inst_access_fault)
             exception_code_o  = INSTRUCTION_ACCESS_FAULT;
-        else if (ctrl_i.exc_ilegal_inst || exc_ilegal_csr_inst || illegal_mret)
+        else if (ctrl_i.exc_ilegal_inst || exc_ilegal_csr_inst || exc_ilegal_vector || illegal_mret)
             exception_code_o  = ILLEGAL_INSTRUCTION;
         else if (iaddr_misaligned)
             exception_code_o  = INSTRUCTION_ADDRESS_MISALIGNED;
