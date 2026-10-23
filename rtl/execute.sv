@@ -462,7 +462,6 @@ module execute
         div div1 (
             .clk              (clk),
             .reset_n          (reset_n),
-            .stall            (stall),
             .first_operand_i  (rs1_data_i),
             .second_operand_i (rs2_data_i),
             .enable_i         (enable_div),

@@ -79,8 +79,7 @@ module vectorALU
         if (!reset_n) begin
             hold_widening_r <= 1'b0;
         end
-        else if (stall) begin end
-        else begin
+        else if (!stall) begin
             hold_widening_r <= hold_widening_o;
         end
     end
@@ -96,7 +95,6 @@ module vectorALU
         if (!reset_n) begin
             hold_accumulation_r <= 1'b0;
         end
-        else if (stall) begin end
         else begin
             hold_accumulation_r <= hold_accumulation;
         end
@@ -113,7 +111,6 @@ module vectorALU
         if (!reset_n) begin
             hold_mask_r <= 1'b0;
         end
-        else if (stall) begin end
         else begin
             hold_mask_r <= hold_mask;
         end
@@ -252,7 +249,6 @@ module vectorALU
             )   u_vectorLane (
                 .clk               (clk),
                 .reset_n           (reset_n),
-                .stall             (stall),
                 .first_operand_i   (first_operand [(LLEN*i_lane)+:LLEN]),
                 .second_operand_i  (second_operand[(LLEN*i_lane)+:LLEN]),
                 .third_operand_i   (third_operand [(LLEN*i_lane)+:LLEN]),
@@ -308,7 +304,6 @@ module vectorALU
         if (!reset_n) begin
             result_mask_o <= '0;
         end
-        else if (stall) begin end
         else begin
             unique case (vsew)
                 EW8:
@@ -353,7 +348,6 @@ module vectorALU
             vector_operation_r <= VNOP;
             hold_widening_2r   <= '0;
         end
-        else if (stall) begin end
         else begin
             first_operand_r    <= first_operand;
             second_operand_r   <= second_operand;
