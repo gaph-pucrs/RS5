@@ -53,14 +53,18 @@ module RAM_mem
 
     reg [7:0] RAM [0:MEM_WIDTH-1];
     int fd;
+    string bin_file;
 `ifndef SYNTH
     int fd_r_a, fd_r_b, fd_w_a, fd_w_b;
 `endif
 
     initial begin
-        fd = $fopen (BIN_FILE, "r");
+        /* +BIN=<path> on the simulator command line overrides BIN_FILE */
+        if (!$value$plusargs("BIN=%s", bin_file))
+            bin_file = BIN_FILE;
+        fd = $fopen (bin_file, "r");
         if (fd == '0) begin
-            $display("[%d] [RAM_mem] ERROR: %s not found.", $time(), BIN_FILE);
+            $display("[%d] [RAM_mem] ERROR: %s not found.", $time(), bin_file);
             $finish();
         end
 

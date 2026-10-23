@@ -2,7 +2,11 @@
 CFLAGS_STRIP = -fdata-sections -ffunction-sections
 LDFLAGS_STRIP = --gc-sections
 
-GCC_RISCV = riscv64-elf-gcc -march=rv32imv_zicsr -mabi=ilp32 -Os $(CFLAGS_STRIP) -DDEBUG_PORT -static -mcmodel=medany -fvisibility=hidden -nostdlib -nostartfiles -mno-relax -DPRINTF_DISABLE_SUPPORT_FLOAT=1
+# Keep the tests scalar outside their asm: no auto-vectorization, and no vector
+# memcpy/memset expansion (-mstringop-strategy exists from GCC 14)
+NO_VEC = -fno-tree-vectorize $(shell riscv64-elf-gcc -mstringop-strategy=scalar -E -x c /dev/null > /dev/null 2>&1 && echo -mstringop-strategy=scalar)
+
+GCC_RISCV = riscv64-elf-gcc -march=rv32imv_zicsr -mabi=ilp32 -Os $(NO_VEC) $(CFLAGS_STRIP) -DDEBUG_PORT -static -mcmodel=medany -fvisibility=hidden -nostdlib -nostartfiles -mno-relax -DPRINTF_DISABLE_SUPPORT_FLOAT=1
 AS_RISCV = riscv64-elf-as -march=rv32imv_zicsr -mabi=ilp32
 LD_RISCV = riscv64-elf-ld -melf32lriscv
 DUMP_RISCV = riscv64-elf-objdump #-Mno-aliases

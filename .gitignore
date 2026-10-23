@@ -50,3 +50,4 @@ riscof/riscv-arch-test
 CLAUDE*
 .claude/*
 .claude
+sim/obj_vreg_*/
