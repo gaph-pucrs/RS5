@@ -46,6 +46,16 @@ static int test_case;
 
 #define vtype(golden_vtype, vlmul, vsew, vta, vma) (golden_vtype = vlmul << 0 | vsew << 3 | vta << 6 | vma << 7)
 
+// Expected vl for a legal configuration: min(AVL, VLMAX), with VLMAX from vlenb.
+// (The upstream Ara tests assumed a VLEN large enough for vl == AVL.)
+static inline unsigned long golden_vl(unsigned long avl, unsigned long vsew, unsigned long vlmul) {
+  unsigned long vlenb;
+  asm volatile ("csrr %0, vlenb" : "=r" (vlenb));
+  unsigned long vlmax = (vlenb >> vsew);
+  vlmax = (vlmul < 4) ? (vlmax << vlmul) : (vlmax >> (8 - vlmul));
+  return (avl < vlmax) ? avl : vlmax;
+}
+
 // Checking vtype and vl value which is set by configuration setting instructions
 // by comparing with golden_vtype value used as a reference. Also check for
 // illegal values of vlmul and vsew which violtate: ELEN >= SEW/LMUL
@@ -56,7 +66,7 @@ static int test_case;
   printf("FAILED. Got vtype = %lx, expected vtype = 80000000. avl = %lx, vl = %lx.\n", vtype,avl, vl);     \
   return;                                                  \
   }}                                                        \
-  else if (vtype != golden_vtype || avl != vl) {                                                                        \
+  else if (vtype != golden_vtype || golden_vl(avl, vsew, vlmul) != vl) {                                                \
     printf("FAILED. Got vtype = %lx, expected vtype = %lx. avl = %lx, vl = %lx.\n", vtype, golden_vtype, avl, vl); \
     num_failed++;                                                                                                  \
     return;                                                                                                        \
