@@ -61,12 +61,31 @@ void TEST_CASE2() {
   // XCMP(7, scalar_64b, 55 << 30);
 }
 
+// vmv.x.s sign-extends SEW < XLEN elements into the full 32-bit register
+void TEST_CASE3() {
+  unsigned long r;
+  VSET(16, e8, m1);
+  VLOAD_8(v1, 0x85, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  asm volatile("vmv.x.s %0, v1" : "=r"(r));
+  XCMP(5, r, 0xffffff85);
+
+  VSET(16, e16, m1);
+  VLOAD_16(v1, 0x8001, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  asm volatile("vmv.x.s %0, v1" : "=r"(r));
+  XCMP(6, r, 0xffff8001);
+
+  VLOAD_16(v1, 0x7001, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  asm volatile("vmv.x.s %0, v1" : "=r"(r));
+  XCMP(7, r, 0x00007001);
+}
+
 int main(void) {
   INIT_CHECK();
   enable_vec();
 
   TEST_CASE1();
   TEST_CASE2();
+  TEST_CASE3();
 
   EXIT_CHECK();
 }

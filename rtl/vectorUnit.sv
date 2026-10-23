@@ -858,8 +858,9 @@ module vectorUnit
         end
         else if (vector_operation_i == VMVXS) begin
             unique case (vsew_effective)
-                EW8:     res_scalar_o = {'0, first_operand[7:0]};
-                EW16:    res_scalar_o = {'0, first_operand[15:0]};
+                /* SEW < XLEN: element 0 is sign-extended */
+                EW8:     res_scalar_o = {{24{first_operand[7]}},  first_operand[7:0]};
+                EW16:    res_scalar_o = {{16{first_operand[15]}}, first_operand[15:0]};
                 default: res_scalar_o =      first_operand[31:0];
             endcase
             wr_en_scalar_o = 1'b1;
