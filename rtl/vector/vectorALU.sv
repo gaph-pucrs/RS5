@@ -49,6 +49,7 @@ module vectorALU
     input  iTypeVector_e                vector_operation_i,
     input  vew_e                        vsew,
     input  logic [1:0]                  vxrm,
+    input  logic [1:0]                  ext_log2,
 
     input  logic                        accumulate_instruction,
     input  logic                        mask_instruction,
@@ -204,6 +205,50 @@ module vectorALU
     end
 
 //////////////////////////////////////////////////////////////////////////////
+// vzext/vsext: destination register r takes chunk (r mod f) of the source
+// register, VLEN/f bits of EEW = SEW/f elements, and extends each to SEW
+//////////////////////////////////////////////////////////////////////////////
+    logic [VLEN-1:0] result_ext;
+    logic            ext_signed;
+    logic            chunk2;
+    logic [1:0]      chunk4;
+
+    assign ext_signed = (vector_operation_i == VSEXT);
+    assign chunk2     = cycle_count_r[0];
+    assign chunk4     = cycle_count_r[1:0];
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            result_ext <= '0;
+        end
+        else begin
+            unique case (vsew)
+                EW16:   /* vf2 from 8 bits */
+                    for (int i = 0; i < VLEN/16; i++) begin
+                        logic [7:0] s8;
+                        s8 = first_operand[(VLEN/2)*chunk2 + 8*i +: 8];
+                        result_ext[(16*i)+:16] <= {{8{ext_signed & s8[7]}}, s8};
+                    end
+                default:
+                    if (ext_log2 == 2'd1) begin     /* vf2 from 16 bits */
+                        for (int i = 0; i < VLEN/32; i++) begin
+                            logic [15:0] s16;
+                            s16 = first_operand[(VLEN/2)*chunk2 + 16*i +: 16];
+                            result_ext[(32*i)+:32] <= {{16{ext_signed & s16[15]}}, s16};
+                        end
+                    end
+                    else begin                      /* vf4 from 8 bits */
+                        for (int i = 0; i < VLEN/32; i++) begin
+                            logic [7:0] s8;
+                            s8 = first_operand[(VLEN/4)*chunk4 + 8*i +: 8];
+                            result_ext[(32*i)+:32] <= {{24{ext_signed & s8[7]}}, s8};
+                        end
+                    end
+            endcase
+        end
+    end
+
+//////////////////////////////////////////////////////////////////////////////
 // Multiplication_common
 //////////////////////////////////////////////////////////////////////////////
 
@@ -260,7 +305,7 @@ module vectorALU
 
     /* Operations computed outside the lanes don't start them */
     logic alu_side_instruction;
-    assign alu_side_instruction = vector_operation_i inside {VID};
+    assign alu_side_instruction = vector_operation_i inside {VID, VZEXT, VSEXT};
 
     assign enable_lane = current_state == V_EXEC && vector_operation_i != VNOP && !hold_widening_r && !hold_accumulation_r && !reduction_instruction && !slide_instruction && !alu_side_instruction;
 
@@ -398,6 +443,7 @@ module vectorALU
             VSLIDE1UP,
             VSLIDE1DOWN:       result_o = result_slide;
             VID:               result_o = result_vid;
+            VZEXT, VSEXT:      result_o = result_ext;
             default:           result_o = result_lanes;
         endcase
     end

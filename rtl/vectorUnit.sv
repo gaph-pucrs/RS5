@@ -126,12 +126,25 @@ module vectorUnit
                       && !((vector_operation_i inside {VLD, VST})
                            && instruction_i[24:20] == 5'b01000 && instruction_i[27:26] == 2'b00);
 
+    /* vzext/vsext: log2 of the extension factor (vf2 = 1, vf4 = 2) */
+    logic       extension_instruction;
+    logic [1:0] ext_log2;
+    assign extension_instruction = vector_operation_i inside {VZEXT, VSEXT};
+    assign ext_log2              = instruction_i[16] ? 2'd1 : 2'd2;
+
     /* Reserved instruction/vtype combinations RS5 cannot execute */
     always_comb begin
         illegal_vtype = 1'b0;
         /* Widening needs 2*SEW <= ELEN and 2*LMUL <= 8 */
         if (widening_instruction && (vsew == EW32 || vlmul == LMUL_8))
             illegal_vtype = 1'b1;
+        /* Extensions need EEW = SEW/f >= 8 and EMUL = LMUL/f >= 1/8 */
+        if (extension_instruction) begin
+            if (vsew == EW8 || (ext_log2 == 2'd2 && vsew == EW16))
+                illegal_vtype = 1'b1;
+            if (vlmul == LMUL_1_8 || (ext_log2 == 2'd2 && vlmul == LMUL_1_4))
+                illegal_vtype = 1'b1;
+        end
     end
 
     assign illegal_o = enable_i && needs_vtype && (vill || illegal_vtype);
@@ -413,7 +426,11 @@ module vectorUnit
         end
 
         // VS2 Address
-        if (accumulate_instruction) begin
+        if (extension_instruction) begin
+            /* f destination registers read the same source register */
+            vs2_addr = rs2 + (cycle_count >> ext_log2);
+        end
+        else if (accumulate_instruction) begin
             if (!hold) begin
                 unique case (vector_operation_i)
                     VMADD, VNMSUB: vs2_addr = rd_addr;
@@ -660,6 +677,7 @@ module vectorUnit
         .current_state         (state),
         .vsew                  (vsew),
         .vxrm                  (vxrm_i),
+        .ext_log2              (ext_log2),
         .hold_o                (hold_alu),
         .hold_widening_o       (hold_widening),
         .result_mask_o         (result_alu_mask),

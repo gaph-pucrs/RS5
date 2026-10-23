@@ -142,6 +142,15 @@ void TEST_CASE5(void) {
   EXPECT_NO_TRAP(22, "vwmul.vv v4, v8, v12");
 }
 
+// Extensions need EEW = SEW/f >= 8
+void TEST_CASE6(void) {
+  VSET(4, e8, m1);
+  EXPECT_TRAP(23, "vsext.vf2 v4, v8");
+  VSET(4, e16, m1);
+  EXPECT_TRAP(24, "vzext.vf4 v4, v8");
+  EXPECT_NO_TRAP(25, "vzext.vf2 v4, v8");
+}
+
 int main(void) {
   INIT_CHECK();
   enable_vec();
@@ -153,6 +162,7 @@ int main(void) {
   TEST_CASE3();
   TEST_CASE4();
   TEST_CASE5();
+  TEST_CASE6();
 
   EXIT_CHECK();
 }

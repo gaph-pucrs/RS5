@@ -432,6 +432,9 @@ module decode
                                                      decode_vector_opm = VFIRST;
                            else if (opCat == OPMVX && vm && vs2_field == '0)
                                                      decode_vector_opm = VMVSX;
+                /* VXUNARY0: vzext/vsext vf4 (vs1 = 0010x) and vf2 (0011x); vf8 needs SEW = 64 */
+                6'b010010: if (opCat == OPMVV && vs1_field[4:2] == 3'b001)
+                                                     decode_vector_opm = vs1_field[0] ? VSEXT : VZEXT;
                 /* VMUNARY0: only vid.v (vs1 = 10001, vs2 = 0) */
                 6'b010100: if (opCat == OPMVV && vs1_field == 5'b10001 && vs2_field == '0)
                                                      decode_vector_opm = VID;
