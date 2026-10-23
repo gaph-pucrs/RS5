@@ -6,11 +6,34 @@ ELEN stays 32. Zvkb is out of scope.
 
 Work happens on the local branch `pqc-rvv`, created from `vkeccak`. Each step ends with a one-line commit once its tests pass.
 
+- [Status](#status)
 - [What the PQC code needs](#what-the-pqc-code-needs)
 - [Design decisions](#design-decisions)
 - [Steps](#steps)
 - [Test strategy](#test-strategy)
 - [Not in scope](#not-in-scope)
+
+## Status
+
+Steps 0–8 are done (2026-10-23). All vector tests pass in Verilator at VLEN 512 (81 tests), `riscv-tests` pass, and PQRV's ML-KEM and ML-DSA kernels match the reference at VLEN 128.
+
+| Kernel (VLEN 128) | Reference | RVV on RS5 |
+| --- | --- | --- |
+| ML-KEM NTT | 53,467 cycles | 3,701 cycles |
+| ML-KEM rejection sampling (504 bytes) | 5,631 cycles | 2,530 cycles |
+| ML-DSA NTT | 57,433 cycles | 9,839 cycles |
+
+Changes from the plan:
+
+- **Two RS5 bugs outside the plan were fixed.** `vmerge` wrote only the mask-active elements, which broke the ML-KEM CBD sampler and would have broken the NTTs. `vmv.x.s` zero-extended SEW 8/16 elements instead of sign-extending them. Each has its own commit and test.
+- **Step 7 became two apps,** `pqc-rvv-kyber` and `pqc-rvv-dilithium`, because PQRV's Kyber and Dilithium kernels define the same symbols. Besides the NTT product, they check rejection sampling, CBD, reduction and the order conversions.
+- **Several unit tests are generated** from a Python model of the spec instead of being ported from Ara (`vssra`/`vssrl` cases 7+, `vext`, `vnarrow`, `vpermute`, `vmerge`). They cover every rounding mode, LMUL up to 8 and the allowed register overlaps, which Ara's tests don't.
+- **Test fixes:**
+  - The `vsetvl` tests used 64-bit variables with 32-bit asm operands, and assumed `vl` = AVL at any VLEN.
+  - The whole-register tests set e64 just to shrink `vl`.
+  - The vector test harness now prints unexpected traps instead of restarting the program.
+- **`make -C sim lint` was broken** (missing include paths and a fatal timescale warning) and now passes.
+- **Not done:** the optional Genus area comparison.
 
 ## What the PQC code needs
 
