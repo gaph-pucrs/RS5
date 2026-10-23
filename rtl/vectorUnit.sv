@@ -288,7 +288,7 @@ module vectorUnit
     end
 
     always_comb begin
-        if (vector_operation_i inside {VMVXS, VMVSX}) begin
+        if (vector_operation_i inside {VMVXS, VMVSX, VCPOP, VFIRST}) begin
             vlmul_effective = LMUL_1;
         end
         else if (vector_operation_i == VMVR) begin
@@ -450,7 +450,7 @@ module vectorUnit
         if (!reset_n) begin
             write_enable <= '0;
         end
-        else if ((state == V_EXEC) && (!hold || hold_widening) && !op_vstore && vector_operation_i != VMVXS) begin
+        else if ((state == V_EXEC) && (!hold || hold_widening) && !op_vstore && !(vector_operation_i inside {VMVXS, VCPOP, VFIRST})) begin
             if (reduction_instruction || vector_operation_i == VMVSX) begin
                 unique case (vsew_effective)
                     EW8:     write_enable <= {'0, 1'b1};
@@ -694,12 +694,47 @@ module vectorUnit
     end
 
 //////////////////////////////////////////////////////////////////////////////
+// vcpop.m and vfirst.m: the vs2 mask register (first_operand), limited to the
+// first vl bits and, when masked, to the active bits of v0
+//////////////////////////////////////////////////////////////////////////////
+
+    logic [VLEN-1:0] mask_bits;
+    logic [31:0]     mask_popcount;
+    logic [31:0]     mask_first;
+
+    always_comb begin
+        for (int i = 0; i < VLEN; i++)
+            mask_bits[i] = first_operand[i] && (vm || v0_mask[i]) && (i < vl);
+    end
+
+    always_comb begin
+        mask_popcount = '0;
+        for (int i = 0; i < VLEN; i++)
+            mask_popcount = mask_popcount + 32'(mask_bits[i]);
+    end
+
+    always_comb begin
+        mask_first = '1;    /* -1 when no bit is set */
+        for (int i = VLEN-1; i >= 0; i--)
+            if (mask_bits[i])
+                mask_first = 32'(i);
+    end
+
+//////////////////////////////////////////////////////////////////////////////
 // Scalar Result
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
         if (vector_operation_i inside {VSETVL, VSETVLI, VSETIVLI}) begin
             res_scalar_o   = vl_next;
+            wr_en_scalar_o = 1'b1;
+        end
+        else if (vector_operation_i == VCPOP) begin
+            res_scalar_o   = mask_popcount;
+            wr_en_scalar_o = 1'b1;
+        end
+        else if (vector_operation_i == VFIRST) begin
+            res_scalar_o   = mask_first;
             wr_en_scalar_o = 1'b1;
         end
         else if (vector_operation_i == VMVXS) begin

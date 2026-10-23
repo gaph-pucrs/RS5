@@ -426,8 +426,15 @@ module decode
                 /* VWXUNARY0 (OPMVV, selected by vs1) and VRXUNARY0 (OPMVX, vs2 = 0) */
                 6'b010000: if (opCat == OPMVV && vm && vs1_field == 5'b00000)
                                                      decode_vector_opm = VMVXS;
+                           else if (opCat == OPMVV && vs1_field == 5'b10000)
+                                                     decode_vector_opm = VCPOP;
+                           else if (opCat == OPMVV && vs1_field == 5'b10001)
+                                                     decode_vector_opm = VFIRST;
                            else if (opCat == OPMVX && vm && vs2_field == '0)
                                                      decode_vector_opm = VMVSX;
+                /* VMUNARY0: only vid.v (vs1 = 10001, vs2 = 0) */
+                6'b010100: if (opCat == OPMVV && vs1_field == 5'b10001 && vs2_field == '0)
+                                                     decode_vector_opm = VID;
                 6'b100000:                           decode_vector_opm = VDIVU;
                 6'b100001:                           decode_vector_opm = VDIV;
                 6'b100010:                           decode_vector_opm = VREMU;

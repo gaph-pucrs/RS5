@@ -180,6 +180,30 @@ module vectorALU
         );
 
 //////////////////////////////////////////////////////////////////////////////
+// vid.v: element index = register in the group * elements per register + i
+//////////////////////////////////////////////////////////////////////////////
+    logic [VLEN-1:0] result_vid;
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            result_vid <= '0;
+        end
+        else begin
+            unique case (vsew)
+                EW8:
+                    for (int i = 0; i < VLEN/8; i++)
+                        result_vid[(8*i)+:8]   <= 8'((int'(cycle_count_r) * (VLEN/8)) + i);
+                EW16:
+                    for (int i = 0; i < VLEN/16; i++)
+                        result_vid[(16*i)+:16] <= 16'((int'(cycle_count_r) * (VLEN/16)) + i);
+                default:
+                    for (int i = 0; i < VLEN/32; i++)
+                        result_vid[(32*i)+:32] <= 32'((int'(cycle_count_r) * (VLEN/32)) + i);
+            endcase
+        end
+    end
+
+//////////////////////////////////////////////////////////////////////////////
 // Multiplication_common
 //////////////////////////////////////////////////////////////////////////////
 
@@ -234,7 +258,11 @@ module vectorALU
     logic [   VLEN -1:0]    result_lanes;
     logic [   VLEN -1:0]    result_mult_low;
 
-    assign enable_lane = current_state == V_EXEC && vector_operation_i != VNOP && !hold_widening_r && !hold_accumulation_r && !reduction_instruction && !slide_instruction;
+    /* Operations computed outside the lanes don't start them */
+    logic alu_side_instruction;
+    assign alu_side_instruction = vector_operation_i inside {VID};
+
+    assign enable_lane = current_state == V_EXEC && vector_operation_i != VNOP && !hold_widening_r && !hold_accumulation_r && !reduction_instruction && !slide_instruction && !alu_side_instruction;
 
     generate
         for (genvar i_lane = 0; i_lane < LANES; i_lane++) begin : LANE_LOOP
@@ -369,6 +397,7 @@ module vectorALU
             VWMULSU:           result_o = (hold_widening_2r == 1'b1) ? result_lanes_mult[(2*VLEN)-1:VLEN] : result_lanes_mult[VLEN-1:0];
             VSLIDE1UP,
             VSLIDE1DOWN:       result_o = result_slide;
+            VID:               result_o = result_vid;
             default:           result_o = result_lanes;
         endcase
     end
