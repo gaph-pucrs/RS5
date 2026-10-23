@@ -497,6 +497,10 @@ module vectorUnit
     end
 
     // WRITE ENABLE GENERATION
+    /* vmerge is encoded with vm = 0 but writes every body element: v0 selects the source */
+    logic vm_write;
+    assign vm_write = vm || (vector_operation_i == VMERGE);
+
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             write_enable <= '0;
@@ -536,21 +540,21 @@ module vectorUnit
                 unique case (vsew_effective)
                     EW8:
                         for (int i = 0; i < VLENB; i++)
-                            if ((vm || mask_sew8[cycle_count_r][i]) && (i < vl_curr_reg))
+                            if ((vm_write || mask_sew8[cycle_count_r][i]) && (i < vl_curr_reg))
                                 write_enable[i] <= 1'b1;
                             else
                                 write_enable[i] <= 1'b0;
 
                     EW16:
                         for (int i = 0; i < VLENB/2; i++)
-                            if ((vm || mask_sew16[cycle_count_r][i]) && (i < vl_curr_reg))
+                            if ((vm_write || mask_sew16[cycle_count_r][i]) && (i < vl_curr_reg))
                                 write_enable[(i*2)+:2] <= 2'b11;
                             else
                                 write_enable[(i*2)+:2] <= 2'b00;
 
                     default:
                         for (int i = 0; i < VLENB/4; i++)
-                            if ((vm || mask_sew32[cycle_count_r][i]) && (i < vl_curr_reg))
+                            if ((vm_write || mask_sew32[cycle_count_r][i]) && (i < vl_curr_reg))
                                 write_enable[(i*4)+:4] <= 4'b1111;
                             else
                                 write_enable[(i*4)+:4] <= 4'b0000;
