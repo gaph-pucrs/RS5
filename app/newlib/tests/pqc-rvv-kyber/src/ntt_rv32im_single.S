@@ -1,0 +1,17 @@
+/*
+ * PQRV's single-issue RV32IM NTT (pqrv/ntt_singleissue_plant_rv32im.S), with its symbols
+ * renamed so both the single- and dual-issue versions can be linked.
+ */
+#define ntt_rv32im ntt_single_rv32im
+#define intt_rv32im intt_single_rv32im
+#define poly_basemul_acc_rv32im poly_basemul_acc_single_rv32im
+#define poly_basemul_acc_end_rv32im poly_basemul_acc_end_single_rv32im
+#define poly_basemul_cache_init_rv32im poly_basemul_cache_init_single_rv32im
+#define poly_basemul_acc_cache_init_rv32im poly_basemul_acc_cache_init_single_rv32im
+#define poly_basemul_acc_cache_init_end_rv32im poly_basemul_acc_cache_init_end_single_rv32im
+#define poly_basemul_acc_cached_rv32im poly_basemul_acc_cached_single_rv32im
+#define poly_basemul_acc_cache_end_rv32im poly_basemul_acc_cache_end_single_rv32im
+#define poly_plantard_rdc_rv32im poly_plantard_rdc_single_rv32im
+#define poly_toplant_rv32im poly_toplant_single_rv32im
+
+#include "pqrv/ntt_singleissue_plant_rv32im.S"

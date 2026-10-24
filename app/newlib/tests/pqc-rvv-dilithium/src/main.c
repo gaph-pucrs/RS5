@@ -9,7 +9,9 @@
  * Checks: polynomial product (NTT, pointwise Montgomery product, inverse NTT),
  * the RVV NTT against the reference NTT after reordering, the order
  * conversions, and reduction. Prints NTT cycle counts next to the reference
- * built at -Os (the common.mk default) and at -O2 (ref_O2.c).
+ * built at -Os (the common.mk default) and at -O2 (ref_O2.c), and next to
+ * PQRV's hand-written RV32IM NTTs for single- and dual-issue cores
+ * (ntt_rv32im_single.S, ntt_rv32im_dual.S).
  */
 
 #include <stdint.h>
@@ -23,6 +25,11 @@
 
 /* The reference NTT built at -O2 (ref_O2.c) */
 void ntt_O2(int32_t a[N]);
+
+/* PQRV's RV32IM NTTs (ntt_rv32im_single.S, ntt_rv32im_dual.S) and their twiddles (zetas_rv32im.c) */
+void ntt_single_rv32im(int32_t *a, int32_t *zetas);
+void ntt_dual_rv32im(int32_t *a, int32_t *zetas);
+extern int32_t zetas_ntt_rv32im[N * 2];
 
 static int failures;
 
@@ -66,7 +73,7 @@ static int32_t vc[N] __attribute__((aligned(16)));
 
 int main(void)
 {
-    uint32_t t0, t_ref, t_ref_o2, t_rvv;
+    uint32_t t0, t_ref, t_ref_o2, t_as, t_ad, t_rvv;
 
     for (int i = 0; i < N; i++) {
         a[i] = rnd() % Q;
@@ -100,8 +107,23 @@ int main(void)
     ntt_O2(vc);
     t_ref_o2 = cycles() - t0;
     check("ML-DSA NTT reference -O2", vc, ref_a, N);
-    printf("  NTT cycles: reference -Os %lu, reference -O2 %lu, RVV %lu\n", (unsigned long)t_ref,
-           (unsigned long)t_ref_o2, (unsigned long)t_rvv);
+
+    memcpy(vc, a, sizeof(a));
+    t0 = cycles();
+    ntt_single_rv32im(vc, zetas_ntt_rv32im);
+    t_as = cycles() - t0;
+    check("ML-DSA NTT RV32IM asm single", vc, ref_a, N);
+
+    memcpy(vc, a, sizeof(a));
+    t0 = cycles();
+    ntt_dual_rv32im(vc, zetas_ntt_rv32im);
+    t_ad = cycles() - t0;
+    check("ML-DSA NTT RV32IM asm dual", vc, ref_a, N);
+
+    printf("  NTT cycles: reference -Os %lu, reference -O2 %lu, RV32IM asm single %lu,\n"
+           "              RV32IM asm dual %lu, RVV %lu\n",
+           (unsigned long)t_ref, (unsigned long)t_ref_o2, (unsigned long)t_as,
+           (unsigned long)t_ad, (unsigned long)t_rvv);
 
     /* The RVV NTT keeps its own coefficient order: back to the reference order */
     memcpy(va, a, sizeof(a));

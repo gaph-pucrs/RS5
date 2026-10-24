@@ -2,9 +2,11 @@
  * ML-KEM (Kyber) kernels written with RVV, run on RS5 and checked against the
  * scalar reference implementation (common/kyber_round3_ref).
  *
- * The vector code is PQRV's ntt_rvv_vlen128.S (https://github.com/Ji-Peng/PQRV,
- * commit 005d55d, MIT, see LICENSE-PQRV). It assumes VLEN = 128 and uses
- * vrgather, vmerge, vcompress, vcpop, vsext and vssra.
+ * The vector code is PQRV's ntt_rvv_vlen128.S and ntt_rvv_vlen256.S
+ * (https://github.com/Ji-Peng/PQRV, commit 005d55d, MIT, see LICENSE-PQRV).
+ * Each one assumes its VLEN, so main picks one from vlenb: the same binary runs
+ * at VLEN 128 and 256. They use vrgather, vmerge, vcompress, vcpop, vsext and
+ * vssra.
  *
  * Checks: polynomial product (NTT, basemul, inverse NTT), rejection sampling,
  * centered binomial sampling (eta = 2 and 3), Barrett reduction and conversion
@@ -13,6 +15,8 @@
  * Prints cycle counts next to scalar baselines built from the same reference
  * code: -Os (the common.mk default), -O2 (ref_O2.c), and the Xkyber NTT
  * (ntt_xkyber.c, ntt_xkyber_O2.c), which needs the core simulated with XKYBER=1.
+ * Also next to PQRV's hand-written RV32IM NTTs for single- and dual-issue cores
+ * (ntt_rv32im_single.S, ntt_rv32im_dual.S).
  */
 
 #include <stdint.h>
@@ -23,6 +27,7 @@
 #include "cbd.h"
 #include "ntt.h"
 #include "ntt_rvv_vlen128.h"
+#include "ntt_rvv_vlen256.h"
 #include "params.h"
 #include "poly.h"
 #include "reduce.h"
@@ -35,6 +40,19 @@ void kyber_ref_O2_ntt(int16_t r[KYBER_N]);
 void kyber_xkyber_ntt(int16_t r[KYBER_N]);
 void kyber_xkyber_O2_ntt(int16_t r[KYBER_N]);
 unsigned int rej_uniform_ref_O2(int16_t *r, unsigned int len, const uint8_t *buf, unsigned int buflen);
+
+/* PQRV's RV32IM NTTs (ntt_rv32im_single.S, ntt_rv32im_dual.S) and their twiddles (zetas_rv32im.c) */
+void ntt_single_rv32im(int16_t *r, uint32_t *zetas);
+void ntt_dual_rv32im(int16_t *r, uint32_t *zetas);
+extern uint32_t zetas_ntt_rv32im[128];
+
+static void ntt_asm_single(int16_t *r) { ntt_single_rv32im(r, zetas_ntt_rv32im); }
+static void ntt_asm_dual(int16_t *r) { ntt_dual_rv32im(r, zetas_ntt_rv32im); }
+
+/* PQRV's RVV kernels for the VLEN of the core, chosen in main */
+static int vlen256;
+#define RVV(f) (vlen256 ? f##_rvv_vlen256 : f##_rvv_vlen128)
+#define QDATA  (vlen256 ? qdata_vlen256 : qdata_vlen128)
 
 static int failures;
 
@@ -87,7 +105,7 @@ static void check(const char *name, const int16_t *got, const int16_t *exp, int 
 static unsigned int rej_uniform_rvv(int16_t *r, const uint8_t *buf)
 {
     uint32_t ctr, pos;
-    rej_uniform_rvv_vlen128(r, buf, qdata_vlen128, &ctr, &pos);
+    RVV(rej_uniform)(r, buf, QDATA, &ctr, &pos);
     while (ctr < KYBER_N && pos <= REJ_BUFLEN - 3) {
         uint16_t val0 = ((buf[pos + 0] >> 0) | ((uint16_t)buf[pos + 1] << 8)) & 0xFFF;
         uint16_t val1 = ((buf[pos + 1] >> 4) | ((uint16_t)buf[pos + 2] << 4));
@@ -124,6 +142,15 @@ int main(void)
 
     __asm__ volatile("csrw mtvec, %0" : : "r"(trap_handler));
 
+    uint32_t vlenb;
+    __asm__ volatile("csrr %0, vlenb" : "=r"(vlenb));
+    if (vlenb != 16 && vlenb != 32) {
+        printf("PQRV's RVV kernels need VLEN 128 or 256, not %lu\n", (unsigned long)vlenb * 8);
+        return 1;
+    }
+    vlen256 = vlenb == 32;
+    printf("VLEN %lu\n", (unsigned long)vlenb * 8);
+
     /* Polynomial product: ref (ntt, basemul, invntt) against the RVV kernels */
     for (int i = 0; i < KYBER_N; i++) {
         a.coeffs[i] = rnd() % KYBER_Q;
@@ -139,10 +166,10 @@ int main(void)
     poly_basemul_montgomery(&ref_r, &ref_a, &ref_b);
     poly_invntt_tomont(&ref_r);
 
-    ntt_rvv_vlen128(va, qdata_vlen128);
-    ntt_rvv_vlen128(vb, qdata_vlen128);
-    poly_basemul_rvv_vlen128(vr, va, vb, qdata_vlen128);
-    intt_rvv_vlen128(vr, qdata_vlen128);
+    RVV(ntt)(va, QDATA);
+    RVV(ntt)(vb, QDATA);
+    RVV(poly_basemul)(vr, va, vb, QDATA);
+    RVV(intt)(vr, QDATA);
 
     check("ML-KEM polynomial product", vr, ref_r.coeffs, KYBER_N, 0);
 
@@ -151,13 +178,16 @@ int main(void)
     uint32_t t_o2  = scalar_ntt("ML-KEM NTT reference -O2", kyber_ref_O2_ntt, &a, ref_a.coeffs);
     uint32_t t_xos = scalar_ntt("ML-KEM NTT Xkyber -Os", kyber_xkyber_ntt, &a, ref_a.coeffs);
     uint32_t t_xo2 = scalar_ntt("ML-KEM NTT Xkyber -O2", kyber_xkyber_O2_ntt, &a, ref_a.coeffs);
+    uint32_t t_as  = scalar_ntt("ML-KEM NTT RV32IM asm single", ntt_asm_single, &a, ref_a.coeffs);
+    uint32_t t_ad  = scalar_ntt("ML-KEM NTT RV32IM asm dual", ntt_asm_dual, &a, ref_a.coeffs);
     memcpy(va, a.coeffs, sizeof(va));
     t0 = cycles();
-    ntt_rvv_vlen128(va, qdata_vlen128);
+    RVV(ntt)(va, QDATA);
     t_rvv = cycles() - t0;
-    printf("  NTT cycles: reference -Os %lu, reference -O2 %lu, Xkyber -Os %lu, Xkyber -O2 %lu, RVV %lu\n",
+    printf("  NTT cycles: reference -Os %lu, reference -O2 %lu, Xkyber -Os %lu, Xkyber -O2 %lu,\n"
+           "              RV32IM asm single %lu, RV32IM asm dual %lu, RVV %lu\n",
            (unsigned long)t_os, (unsigned long)t_o2, (unsigned long)t_xos, (unsigned long)t_xo2,
-           (unsigned long)t_rvv);
+           (unsigned long)t_as, (unsigned long)t_ad, (unsigned long)t_rvv);
 
     /* Rejection sampling (vmsltu, vcpop, vcompress) */
     for (int i = 0; i < REJ_BUFLEN; i++)
@@ -188,10 +218,10 @@ int main(void)
     for (int i = 0; i < REJ_BUFLEN; i++)
         buf[i] = rnd();
     cbd_eta2(&ref_cbd, buf);
-    cbd2_rvv_vlen128(vr, buf, qdata_vlen128);
+    RVV(cbd2)(vr, buf, QDATA);
     check("ML-KEM CBD eta = 2", vr, ref_cbd.coeffs, KYBER_N, 1);
     cbd_eta1(&ref_cbd, buf);
-    cbd3_rvv_vlen128(vr, buf, qdata_vlen128);
+    RVV(cbd3)(vr, buf, QDATA);
     check("ML-KEM CBD eta = 3", vr, ref_cbd.coeffs, KYBER_N, 1);
 
     /* Barrett reduction (vssra with vxrm = rnu) and Montgomery conversion */
@@ -200,14 +230,14 @@ int main(void)
         ref_red.coeffs[i] = (int16_t)rnd();
     memcpy(vr, ref_red.coeffs, KYBER_N * sizeof(int16_t));
     poly_reduce(&ref_red);
-    poly_reduce_rvv_vlen128(vr);
+    RVV(poly_reduce)(vr);
     check("ML-KEM Barrett reduction", vr, ref_red.coeffs, KYBER_N, 0);
 
     for (int i = 0; i < KYBER_N; i++)
         ref_red.coeffs[i] = (int16_t)rnd();
     memcpy(vr, ref_red.coeffs, KYBER_N * sizeof(int16_t));
     poly_tomont(&ref_red);
-    poly_tomont_rvv_vlen128(vr);
+    RVV(poly_tomont)(vr);
     check("ML-KEM to Montgomery", vr, ref_red.coeffs, KYBER_N, 0);
 
     if (failures)
