@@ -40,6 +40,24 @@ Changes from the plan:
 
     The new design meets the 2 ns clock in the slow corner, with 0.6 ps of slack. Most of the growth is in the lanes (scaling shifts) and the ALU-side blocks (`vid`, extensions, narrowing).
 
+- **Area of the whole core (Genus 21.1, TSMC 28 nm, `TOP_MODULE RS5`, `VEnable` 1, 2026-10-24):**
+
+    | | VLEN 128 `vkeccak` | VLEN 128 `pqc-rvv` | VLEN 256 `vkeccak` | VLEN 256 `pqc-rvv` |
+    | --- | --- | --- | --- | --- |
+    | Core | 96,381 µm² | 109,983 µm² (+14.1%) | 164,491 µm² | 183,475 µm² (+11.5%) |
+    | Vector unit | 80,724 µm² | 93,819 µm² (+16.2%) | 149,745 µm² | 168,839 µm² (+12.8%) |
+    | ALU (lanes) | 53,509 µm² | 61,875 µm² | 99,656 µm² | 112,101 µm² |
+    | Register bank | 17,672 µm² | 18,012 µm² | 35,887 µm² | 37,035 µm² |
+    | LSU | 3,988 µm² | 4,183 µm² | 5,919 µm² | 5,870 µm² |
+    | Permutation engine | — | 1,898 µm² | — | 2,351 µm² |
+    | Rest of the core | 15,657 µm² | 16,165 µm² | 14,746 µm² | 14,636 µm² |
+
+    - **Timing:** all four runs meet the 2 ns clock in the slow corner with no violating paths.
+    - **Where the area goes:** almost all of the growth is in the vector unit, and the ALU accounts for about two thirds of it. The rest of the core changes by less than 600 µm².
+    - **Cell and net area:** these totals include Genus's net-area estimate. Counting cells alone, the core grows 10.7% at VLEN 128 and 10.3% at VLEN 256.
+    - **Why the vector unit is bigger here:** it comes out about 9,000 µm² larger than in the `vectorUnit`-alone run above, mostly in net area. The relative growth is the same, 16%.
+    - **Where the reports are:** `synthesis/results/full_core/<branch>_vlen<N>/reports/`, which is git-ignored. `launch.sh` in that folder reruns the four syntheses.
+
 ## Cycle counts
 
 Each app runs every version of a kernel in one binary, on one simulation, and reads `mcycle` around a single call (`pqc-rvv-kyber/src/main.c`, `pqc-rvv-dilithium/src/main.c`). Each scalar version is checked against the reference result before its count is used.
