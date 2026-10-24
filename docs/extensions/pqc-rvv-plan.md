@@ -33,7 +33,15 @@ Changes from the plan:
   - The whole-register tests set e64 just to shrink `vl`.
   - The vector test harness now prints unexpected traps instead of restarting the program.
 - **`make -C sim lint` was broken** (missing include paths and a fatal timescale warning) and now passes.
-- **Not done:** the optional Genus area comparison.
+- **Area (Genus 21.1, TSMC 28 nm, `vectorUnit` at VLEN 128):**
+
+    | | Before (`vkeccak`) | After (`pqc-rvv`) |
+    | --- | --- | --- |
+    | Total area | 71,680 µm² | 83,416 µm² (+16%) |
+    | ALU | 46,580 µm² | 53,832 µm² |
+    | Permutation engine | — | 1,668 µm² |
+
+    The new design meets the 2 ns clock in the slow corner, with 0.6 ps of slack. Most of the growth is in the lanes (scaling shifts) and the ALU-side blocks (`vid`, extensions, narrowing).
 
 ## What the PQC code needs
 
