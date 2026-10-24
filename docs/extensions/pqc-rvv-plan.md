@@ -18,7 +18,7 @@ Work happens on the local branch `pqc-rvv`, created from `vkeccak`. Each step en
 
 Steps 0–8 are done (2026-10-23). All vector tests pass in Verilator at VLEN 512 (81 tests), `riscv-tests` pass, and PQRV's ML-KEM and ML-DSA kernels match the reference at VLEN 128.
 
-The RVV kernels run 6.4× (ML-KEM NTT, against Xkyber) to 12× (against the reference C at -Os) faster than the scalar code. See [Cycle counts](#cycle-counts).
+Against PQRV's hand-written RV32IM assembly, the fastest scalar code, the RVV NTTs are 3.6× faster for ML-KEM (4.9× at VLEN 256) and 2.0× faster for ML-DSA. See [Cycle counts](#cycle-counts).
 
 Changes from the plan:
 
@@ -46,21 +46,28 @@ Each app runs every version of a kernel in one binary, on one simulation, and re
 
 Setup:
 
-- **Core:** RS5 in Verilator, VLEN 128, `LLEN` 32, the testbench's `MUL_M` multiplier, and a RAM with no wait states.
+- **Core:** RS5 in Verilator, `LLEN` 32, the testbench's `MUL_M` multiplier, and a RAM with no wait states.
+- **VLEN:** 128 for everything. The ML-KEM app also runs at 256: it reads `vlenb` and picks PQRV's VLEN 128 or 256 kernels, so the same binary runs at both. The scalar counts don't depend on VLEN.
 - **ML-KEM simulation:** `XKYBER=1`, so the Xkyber baseline can run.
-- **Compiler:** GCC 16.1.0-gaph with `-fno-tree-vectorize`, so the scalar code has no vector instructions.
+- **Compiler:** GCC 16.1.0-gaph with `-fno-tree-vectorize`, so the scalar C has no vector instructions.
 
-| Kernel | Reference -Os | Reference -O2 | Xkyber -Os | Xkyber -O2 | RVV (PQRV) |
+Scalar versions:
+
+| Kernel | Reference -Os | Reference -O2 | Xkyber -Os | Xkyber -O2 | RV32IM asm, single-issue | RV32IM asm, dual-issue |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| ML-KEM NTT | 45,908 | 31,973 | 24,001 | 23,276 | 13,321 | 13,325 |
+| ML-KEM rejection sampling (504 bytes) | 5,209 | 4,930 | — | — | — | — |
+| ML-DSA NTT | 58,458 | 56,966 | — | — | 19,981 | 20,396 |
+
+RVV (PQRV), and its speedup over the fastest scalar version:
+
+| Kernel | VLEN 128 | VLEN 256 | Over RV32IM asm | Over Xkyber -O2 | Over reference -Os |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| ML-KEM NTT | 45,253 | 31,072 | 23,796 | 23,715 | 3,700 |
-| ML-KEM rejection sampling (504 bytes) | 5,596 | 5,084 | — | — | 2,535 |
-| ML-DSA NTT | 58,458 | 56,966 | — | — | 9,840 |
+| ML-KEM NTT | 3,715 | 2,714 | 3.6× / 4.9× | 6.3× / 8.6× | 12.4× / 16.9× |
+| ML-KEM rejection sampling | 2,542 | 2,143 | — | — | 2.0× / 2.4× (over -O2: 1.9× / 2.3×) |
+| ML-DSA NTT | 9,839 | — | 2.0× | — | 5.9× |
 
-| RVV speedup over | Reference -Os | Reference -O2 | Xkyber (-O2) |
-| --- | ---: | ---: | ---: |
-| ML-KEM NTT | 12.2× | 8.4× | 6.4× |
-| ML-KEM rejection sampling | 2.2× | 2.0× | — |
-| ML-DSA NTT | 5.9× | 5.8× | — |
+Speedups are given as VLEN 128 / VLEN 256. Doubling VLEN makes the ML-KEM NTT only 1.37× faster, and rejection sampling 1.19×.
 
 Where each version comes from:
 
@@ -74,12 +81,17 @@ Where each version comes from:
   - `kyberadd`/`kybersub` process two packed coefficients each.
   - The loop is mostly inline assembly, so -O2 changes almost nothing.
   - There is no Xkyber for ML-DSA, whose modulus is 23 bits.
-- **RVV:** PQRV's `ntt_rvv_vlen128.S` and `rej_uniform_rvv_vlen128`, as in the correctness checks.
+- **RV32IM asm:** PQRV's hand-written scalar NTTs (`src/pqrv/`), with the twiddle tables from PQRV's `Kyber/RV32` and `Dilithium/RV32` builds (`src/zetas_rv32im.c`).
+  - ML-KEM uses Plantard multiplication and merges layers 4+3; ML-DSA uses Montgomery and merges 3+3+2. Merging cuts loads and stores.
+  - PQRV tuned one version for single-issue cores and one for dual-issue cores. `src/ntt_rv32im_single.S` and `src/ntt_rv32im_dual.S` rename their symbols so both can be linked.
+  - On RS5, a single-issue core, the two run within 2% of each other.
+- **RVV:** PQRV's `ntt_rvv_vlen128.S`/`ntt_rvv_vlen256.S` and their rejection samplers, as in the correctness checks.
 
 What these numbers don't cover:
 
-- **No hand-written scalar assembly baseline.** An optimized RV32IM NTT, with lazy reduction and scheduled code, would likely beat the -O2 column. We have not measured one.
-- **Changed reference numbers.** The first version of this table (2026-10-23) had 53,467 cycles for the ML-KEM reference, which was `poly_ntt` including the Barrett pass. ML-DSA moved from 57,433 to 58,458 cycles although its reference code did not change; only the binary layout did. Treat differences of about 2% as noise.
+- **ML-DSA has no VLEN 256 kernel.** PQRV only has a header for it, with no assembly or constants.
+- **Rejection sampling has no assembly baseline.** PQRV has none for RV32IM, so its best scalar version is the reference at -O2.
+- **Numbers move by about 2% when the binary changes.** The reference code is the same, but adding code moves it to other addresses. For example, the ML-KEM -Os NTT went from 45,253 to 45,908 cycles when the VLEN 256 and assembly kernels were added. The first version of this table (2026-10-23) had 53,467 cycles for the ML-KEM reference, which was `poly_ntt` including the Barrett pass.
 
 ## What the PQC code needs
 
