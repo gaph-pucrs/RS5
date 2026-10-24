@@ -8,7 +8,8 @@
  *
  * Checks: polynomial product (NTT, pointwise Montgomery product, inverse NTT),
  * the RVV NTT against the reference NTT after reordering, the order
- * conversions, and reduction. Prints cycle counts next to the reference.
+ * conversions, and reduction. Prints NTT cycle counts next to the reference
+ * built at -Os (the common.mk default) and at -O2 (ref_O2.c).
  */
 
 #include <stdint.h>
@@ -19,6 +20,9 @@
 #include "ntt_rvv_vlen128.h"
 #include "params.h"
 #include "reduce.h"
+
+/* The reference NTT built at -O2 (ref_O2.c) */
+void ntt_O2(int32_t a[N]);
 
 static int failures;
 
@@ -62,7 +66,7 @@ static int32_t vc[N] __attribute__((aligned(16)));
 
 int main(void)
 {
-    uint32_t t0, t_ref, t_rvv;
+    uint32_t t0, t_ref, t_ref_o2, t_rvv;
 
     for (int i = 0; i < N; i++) {
         a[i] = rnd() % Q;
@@ -90,7 +94,14 @@ int main(void)
     intt_rvv_vlen128(vc, qdata_vlen128);
 
     check("ML-DSA polynomial product", vc, ref_c, N);
-    printf("  NTT cycles: reference %lu, RVV %lu\n", (unsigned long)t_ref, (unsigned long)t_rvv);
+
+    memcpy(vc, a, sizeof(a));
+    t0 = cycles();
+    ntt_O2(vc);
+    t_ref_o2 = cycles() - t0;
+    check("ML-DSA NTT reference -O2", vc, ref_a, N);
+    printf("  NTT cycles: reference -Os %lu, reference -O2 %lu, RVV %lu\n", (unsigned long)t_ref,
+           (unsigned long)t_ref_o2, (unsigned long)t_rvv);
 
     /* The RVV NTT keeps its own coefficient order: back to the reference order */
     memcpy(va, a, sizeof(a));

@@ -44,7 +44,6 @@ module testbench
     localparam bit           USE_ZCB         = 1'b0;
     localparam bit           USE_ZBKB        = 1'b1;
     localparam bit           USE_ZKNH        = 1'b0;
-    localparam bit           USE_XKYBER      = 1'b0;
     localparam bit           USE_HPMCOUNTER  = 1'b1;
     localparam bit           BRANCHPRED      = 1'b1;
     localparam bit           FORWARDING      = 1'b1;
@@ -53,6 +52,7 @@ module testbench
     localparam int           RAM_DELAY_CYCLES= 0;
 
     /* Overridable from the simulator command line, e.g. Verilator -GVEnable=1 -GVLEN=256 */
+    parameter  bit           USE_XKYBER      = 1'b0;
     parameter  bit           VEnable         = 1'b1;
     parameter  int           VLEN            = 256;
     parameter  int           LLEN            = 32;

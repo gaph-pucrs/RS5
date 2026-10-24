@@ -13,6 +13,9 @@ endif
 ifeq ($(origin VLEN),command line)
 VERILATOR_FLAGS += -GVLEN=$(VLEN)
 endif
+ifeq ($(origin XKYBER),command line)
+VERILATOR_FLAGS += -GUSE_XKYBER=$(XKYBER)
+endif
 ifeq ($(origin BIN_FILE_PATH),command line)
 VERILATOR_FLAGS += -DBIN_FILE_PATH=\"$(BIN_FILE_PATH)\"
 endif
