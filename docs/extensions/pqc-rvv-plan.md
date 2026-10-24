@@ -7,6 +7,7 @@ ELEN stays 32. Zvkb is out of scope.
 Work happens on the local branch `pqc-rvv`, created from `vkeccak`. Each step ends with a one-line commit once its tests pass.
 
 - [Status](#status)
+- [Cycle counts](#cycle-counts)
 - [What the PQC code needs](#what-the-pqc-code-needs)
 - [Design decisions](#design-decisions)
 - [Steps](#steps)
@@ -17,11 +18,7 @@ Work happens on the local branch `pqc-rvv`, created from `vkeccak`. Each step en
 
 Steps 0–8 are done (2026-10-23). All vector tests pass in Verilator at VLEN 512 (81 tests), `riscv-tests` pass, and PQRV's ML-KEM and ML-DSA kernels match the reference at VLEN 128.
 
-| Kernel (VLEN 128) | Reference | RVV on RS5 |
-| --- | --- | --- |
-| ML-KEM NTT | 53,467 cycles | 3,701 cycles |
-| ML-KEM rejection sampling (504 bytes) | 5,631 cycles | 2,530 cycles |
-| ML-DSA NTT | 57,433 cycles | 9,839 cycles |
+The RVV kernels run 6.4× (ML-KEM NTT, against Xkyber) to 12× (against the reference C at -Os) faster than the scalar code. See [Cycle counts](#cycle-counts).
 
 Changes from the plan:
 
@@ -42,6 +39,47 @@ Changes from the plan:
     | Permutation engine | — | 1,668 µm² |
 
     The new design meets the 2 ns clock in the slow corner, with 0.6 ps of slack. Most of the growth is in the lanes (scaling shifts) and the ALU-side blocks (`vid`, extensions, narrowing).
+
+## Cycle counts
+
+Each app runs every version of a kernel in one binary, on one simulation, and reads `mcycle` around a single call (`pqc-rvv-kyber/src/main.c`, `pqc-rvv-dilithium/src/main.c`). Each scalar version is checked against the reference result before its count is used.
+
+Setup:
+
+- **Core:** RS5 in Verilator, VLEN 128, `LLEN` 32, the testbench's `MUL_M` multiplier, and a RAM with no wait states.
+- **ML-KEM simulation:** `XKYBER=1`, so the Xkyber baseline can run.
+- **Compiler:** GCC 16.1.0-gaph with `-fno-tree-vectorize`, so the scalar code has no vector instructions.
+
+| Kernel | Reference -Os | Reference -O2 | Xkyber -Os | Xkyber -O2 | RVV (PQRV) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| ML-KEM NTT | 45,253 | 31,072 | 23,796 | 23,715 | 3,700 |
+| ML-KEM rejection sampling (504 bytes) | 5,596 | 5,084 | — | — | 2,535 |
+| ML-DSA NTT | 58,458 | 56,966 | — | — | 9,840 |
+
+| RVV speedup over | Reference -Os | Reference -O2 | Xkyber (-O2) |
+| --- | ---: | ---: | ---: |
+| ML-KEM NTT | 12.2× | 8.4× | 6.4× |
+| ML-KEM rejection sampling | 2.2× | 2.0× | — |
+| ML-DSA NTT | 5.9× | 5.8× | — |
+
+Where each version comes from:
+
+- **Reference -Os:** the pq-crystals reference C, the way `common.mk` builds every app.
+  - For ML-KEM, that is `app/newlib/common/kyber_round3_ref` (`ntt()` alone, without the Barrett pass that `poly_ntt` adds).
+  - For ML-DSA, it is `ntt.c`/`reduce.c` in the app's `src/`.
+- **Reference -O2:** the same files built again at -O2 under other names (`src/ref_O2.c`).
+  - `ntt.c` and `reduce.c` share one translation unit, so `montgomery_reduce` is inlined, as LTO would do.
+  - In ML-DSA the 64-bit Montgomery multiply dominates, so -O2 barely helps.
+- **Xkyber:** the `KYBER_ISE` path of the same `ntt.c` (`kybermul`, `kyberadd`, `kybersub`), built under other names in `src/ntt_xkyber.c` and `src/ntt_xkyber_O2.c`.
+  - `kyberadd`/`kybersub` process two packed coefficients each.
+  - The loop is mostly inline assembly, so -O2 changes almost nothing.
+  - There is no Xkyber for ML-DSA, whose modulus is 23 bits.
+- **RVV:** PQRV's `ntt_rvv_vlen128.S` and `rej_uniform_rvv_vlen128`, as in the correctness checks.
+
+What these numbers don't cover:
+
+- **No hand-written scalar assembly baseline.** An optimized RV32IM NTT, with lazy reduction and scheduled code, would likely beat the -O2 column. We have not measured one.
+- **Changed reference numbers.** The first version of this table (2026-10-23) had 53,467 cycles for the ML-KEM reference, which was `poly_ntt` including the Barrett pass. ML-DSA moved from 57,433 to 58,458 cycles although its reference code did not change; only the binary layout did. Treat differences of about 2% as noise.
 
 ## What the PQC code needs
 
