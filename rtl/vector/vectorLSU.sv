@@ -510,6 +510,7 @@ module vectorLSU
     logic [1:0]              address_2r;
     vector_lsu_states_e      state_r;
     vector_lsu_states_e      state_2r;
+    logic                    capture_2r;
     logic [$bits(VLENB)-1:0] elementsProcessedCycle_r;
     logic [$bits(VLENB)-1:0] elementsProcessedCycle_2r;
     logic [$bits(VLENB)-1:0] elementsProcessedRegister_r;
@@ -560,6 +561,16 @@ module vectorLSU
             elementsProcessedCycle_2r    <= elementsProcessedCycle_r;
             elementsProcessedRegister_2r <= elementsProcessedRegister_r;
         end
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            capture_2r <= 1'b0;
+        else if (!stall)
+            capture_2r <= (state_r != VLSU_IDLE);
+        else
+            /* read data was already captured on the first stalled cycle: don't capture the next request's data */
+            capture_2r <= 1'b0;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -632,8 +643,8 @@ module vectorLSU
     end
 
     always @(posedge clk) begin
-        if (!stall) begin
-            if (state_2r != VLSU_IDLE) begin
+        if (state_2r != VLSU_IDLE) begin
+            if (capture_2r) begin
                 unique case (width)
                     EW8: begin
                         for (int i = 0; i < ELEMENTS_PER_ACCESS_EW8;  i++) begin
@@ -658,9 +669,9 @@ module vectorLSU
                     end
                 endcase
             end
-            else begin
-                read_data_o <= '0;
-            end
+        end
+        else if (!stall) begin
+            read_data_o <= '0;
         end
     end
 
