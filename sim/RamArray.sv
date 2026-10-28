@@ -17,7 +17,10 @@
 
 module RamArray
 #(
+    /* 64 bits to reach 2**32; callers may pass 32-bit values */
+    /* verilator lint_off WIDTHEXPAND */
     parameter longint unsigned MEM_WIDTH = 65536,
+    /* verilator lint_on WIDTHEXPAND */
     parameter int              BUS_WIDTH = 32,
     parameter string           BIN_FILE  = "../app/baremetal/tests/riscv-tests/test.bin"
 )
