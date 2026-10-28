@@ -190,7 +190,7 @@ module testbench
 // RAM
 //////////////////////////////////////////////////////////////////////////////
 
-    localparam int MEM_WIDTH = 1 << MEM_ADDR_BITS;
+    localparam longint unsigned MEM_WIDTH = 1 << MEM_ADDR_BITS;
 
 
     logic                             enA;
@@ -207,7 +207,7 @@ module testbench
     logic [BUS_WIDTH-1:0]             dataBo;
     /* verilator lint_on UNUSEDSIGNAL */
 
-    RAM_mem #(
+    RamArray #(
         .BUS_WIDTH(BUS_WIDTH  ),
         .MEM_WIDTH(MEM_WIDTH  ),
         .BIN_FILE (BIN_FILE   )
