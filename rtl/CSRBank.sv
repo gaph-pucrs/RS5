@@ -34,7 +34,8 @@ module CSRBank
     parameter bit       XOSVMEnable      = 1'b1,
     parameter bit       XKYBEREnable     = 1'b1,
     parameter bit       COMPRESSED       = 1'b1,
-    parameter bit       ZKNEnable        = 1'b1,
+    parameter bit       ZKNEEnable       = 1'b1,
+    parameter bit       ZKNHEnable       = 1'b1,
     parameter bit       VEnable          = 1'b1,
     parameter mul_e     MULEXT           = MUL_M,
     parameter atomic_e  AMOEXT           = AMO_A,
@@ -435,8 +436,6 @@ module CSRBank
 // Performance counters
 ////////////////////////////////////////////////////////////////////////////////
 
-    /* @todo Add (A)tomic, Zkne, and Zicond */
-
     logic [31:0] cntr_killed;           // mhpmcounter3
     logic [31:0] cntr_exception;        // mhpmcounter4
     logic [31:0] cntr_irq;              // mhpmcounter5
@@ -691,6 +690,7 @@ module CSRBank
                     cntr_lui_slt <= wr_data;
             end
         end
+
         if (AMOEXT != AMO_OFF) begin : gen_amocounter_on
             always_ff @(posedge clk or negedge reset_n) begin
                 if (!reset_n)
@@ -782,7 +782,7 @@ module CSRBank
             assign cntr_div_rem = '0;
         end
 
-        if (ZKNEnable) begin : gen_zkncounter_on
+        if (ZKNEEnable || ZKNHEnable) begin : gen_zkncounter_on
             always_ff @(posedge clk or negedge reset_n) begin
                 if (!reset_n)
                     cntr_aes_sha <= '0;
@@ -962,13 +962,13 @@ module CSRBank
         {32'h0,          cntr_exception           }, // mhpmcounter4
         {32'h0,          cntr_irq                 }, // mhpmcounter5
         {32'h0,          cntr_hazard              }, // mhpmcounter6
-        {cntr_stall[63:32],     cntr_stall[31:0]  }, // mhpmcounter7
+        {cntr_stall                               }, // mhpmcounter7
         {32'h0,          cntr_logic               }, // mhpmcounter8
-        {cntr_add_sub[63:32],   cntr_add_sub[31:0]}, // mhpmcounter9
+        {cntr_add_sub                             }, // mhpmcounter9
         {32'h0,          cntr_shift_rotate        }, // mhpmcounter10
         {32'h0,          cntr_branch              }, // mhpmcounter11
         {32'h0,          cntr_jump                }, // mhpmcounter12
-        {cntr_load[63:32],      cntr_load[31:0]   }, // mhpmcounter13
+        {cntr_load                                }, // mhpmcounter13
         {32'h0,          cntr_store               }, // mhpmcounter14
         {32'h0,          cntr_atomic              }, // mhpmcounter15
         {32'h0,          cntr_sys                 }, // mhpmcounter16
@@ -985,7 +985,7 @@ module CSRBank
         {32'h0,          cntr_vdiv_rem            }, // mhpmcounter27
         {32'h0,          cntr_vothers             }, // mhpmcounter28
         {32'h0,          cntr_vload_store         }, // mhpmcounter29
-        {cntr_vcycles[63:32],   cntr_vcycles[31:0]}, // mhpmcounter30
+        {cntr_vcycles                             }, // mhpmcounter30
         {64'h0                                    }  // mhpmcounter31
     };
 

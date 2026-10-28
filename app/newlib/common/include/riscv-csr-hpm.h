@@ -1052,7 +1052,7 @@ static void evaluate_hpms_filtered(uint32_t *hpm_values_0, uint32_t *hpm_values_
     printf("Cycles[ 0] - Clock Cycles:     %0u\n", (unsigned int)hpms[ 0]);
     printf("Cycles[ 2] - Inst Retired:     %0u\n", (unsigned int)hpms[ 2]);
 
-    printf("\n-- Pipeline & Telemetria --\n");
+    printf("\n-- Pipeline & Telemetry --\n");
     printf("Cycles[ 3] - Inst Killed:      %0u\n", (unsigned int)hpms[ 3]);
     printf("Cycles[ 4] - Exceptions:       %0u\n", (unsigned int)hpms[ 4]);
     printf("Cycles[ 5] - Interrupts:       %0u\n", (unsigned int)hpms[ 5]);
@@ -1109,7 +1109,7 @@ static void evaluate_hpms_filtered(uint32_t *hpm_values_0, uint32_t *hpm_values_
   }
 
   if (enable_mask & VEnable) {
-    printf("\n-- VEnable (Extensao Vetorial) --\n");
+    printf("\n-- VEnable (Vector Extension) --\n");
     printf("Cycles[25] - Vector Add/Sub:   %0u\n", (unsigned int)hpms[25]);
     printf("Cycles[26] - Vector Mul/MAC:   %0u\n", (unsigned int)hpms[26]);
     printf("Cycles[27] - Vector Div/Rem:   %0u\n", (unsigned int)hpms[27]);
