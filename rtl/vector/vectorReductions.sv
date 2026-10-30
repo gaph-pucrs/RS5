@@ -28,6 +28,7 @@ module vectorReductions
     input  logic                       reset_n,
     input  logic                       enable_i,
     /* verilator lint_on UNUSEDSIGNAL  */
+    input  logic                       stall,
     input  iTypeVector_e               vector_operation_i,
 
     input  logic [VLEN-1:0]            first_operand,
@@ -720,16 +721,18 @@ module vectorReductions
     // *********************************
 
     always @(posedge clk) begin
-        unique case(vector_operation_i)
-            VREDOR:   result_o <= result_redor;
-            VREDXOR:  result_o <= result_redxor;
-            VREDSUM:  result_o <= result_redsum;
-            VREDMIN:  result_o <= result_redmin;
-            VREDMINU: result_o <= result_redminu;
-            VREDMAX:  result_o <= result_redmax;
-            VREDMAXU: result_o <= result_redmaxu;
-            default:  result_o <= result_redand;
-        endcase
+        if (!stall) begin
+            unique case(vector_operation_i)
+                VREDOR:   result_o <= result_redor;
+                VREDXOR:  result_o <= result_redxor;
+                VREDSUM:  result_o <= result_redsum;
+                VREDMIN:  result_o <= result_redmin;
+                VREDMINU: result_o <= result_redminu;
+                VREDMAX:  result_o <= result_redmax;
+                VREDMAXU: result_o <= result_redmaxu;
+                default:  result_o <= result_redand;
+            endcase
+        end
     end
 
 endmodule

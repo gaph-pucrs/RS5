@@ -543,6 +543,7 @@ module execute
         ) vector (
             .clk                    (clk),
             .reset_n                (reset_n),
+            .stall                  (stall),
             .instruction_i          (instruction_i),
             .enable_i               (ctrl_i.is_vector),
             .vector_operation_i     (ctrl_i.vector_op),
