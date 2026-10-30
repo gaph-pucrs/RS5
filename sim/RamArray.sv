@@ -65,7 +65,7 @@ module RamArray
     end
     else begin : banked
         localparam int SEL_BITS  = MEM_ADDR_BITS - BANK_ADDR_BITS;
-        localparam int NUM_BANKS = (MEM_WIDTH + (1 << BANK_ADDR_BITS) - 1) >> BANK_ADDR_BITS;
+        localparam int NUM_BANKS = int'((MEM_WIDTH + (1 << BANK_ADDR_BITS) - 1) >> BANK_ADDR_BITS);
 
         logic [SEL_BITS-1:0]  selA, selB;
         logic [SEL_BITS-1:0]  selA_r, selB_r;
