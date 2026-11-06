@@ -1,0 +1,122 @@
+#ifndef __CNN_STD_H__
+#define __CNN_STD_H__
+
+#define IMAGE_HEIGHT   32
+#define IMAGE_WIDTH    32
+#define IMAGE_CHANNELS  3
+
+#define STAGE_1_HEIGHT     32
+#define STAGE_1_WIDTH      32
+#define STAGE_1_CHANNELS   32
+#define STAGE_1_KERNEL      3
+#define STAGE_1_STRIDE      1
+
+#define STAGE_2_HEIGHT       16
+#define STAGE_2_WIDTH        16
+#define STAGE_2_CHANNELS    104
+#define MMCBlock1_mmLayer1_branch11_CHANNELS     12
+#define MMCBlock1_mmLayer1_branch33a_CHANNELS    12
+#define MMCBlock1_mmLayer1_branch33b_CHANNELS     6
+#define MMCBlock1_mmLayer1_branch33c_CHANNELS     6
+#define MMCBlock1_mmLayer1_CHANNELS              56
+#define MMCBlock1_mmLayer2_branch11_CHANNELS     12
+#define MMCBlock1_mmLayer2_branch33a_CHANNELS    12
+#define MMCBlock1_mmLayer2_branch33b_CHANNELS     6
+#define MMCBlock1_mmLayer2_branch33c_CHANNELS     6
+#define MMCBlock1_mmLayer2_CHANNELS              80
+#define MMCBlock1_mmLayer3_branch11_CHANNELS     12
+#define MMCBlock1_mmLayer3_branch33a_CHANNELS    12
+#define MMCBlock1_mmLayer3_branch33b_CHANNELS     6
+#define MMCBlock1_mmLayer3_branch33c_CHANNELS     6
+#define MMCBlock1_mmLayer3_CHANNELS             104
+
+#define STAGE_3_HEIGHT       8
+#define STAGE_3_WIDTH        8
+#define STAGE_3_CHANNELS   200
+#define MMCBlock2_mmLayer1_branch11_CHANNELS    12
+#define MMCBlock2_mmLayer1_branch33a_CHANNELS   12
+#define MMCBlock2_mmLayer1_branch33b_CHANNELS    6
+#define MMCBlock2_mmLayer1_branch33c_CHANNELS    6
+#define MMCBlock2_mmLayer1_CHANNELS            128
+#define MMCBlock2_mmLayer2_branch11_CHANNELS    12
+#define MMCBlock2_mmLayer2_branch33a_CHANNELS   12
+#define MMCBlock2_mmLayer2_branch33b_CHANNELS    6
+#define MMCBlock2_mmLayer2_branch33c_CHANNELS    6
+#define MMCBlock2_mmLayer2_CHANNELS            152
+#define MMCBlock2_mmLayer3_branch11_CHANNELS    12
+#define MMCBlock2_mmLayer3_branch33a_CHANNELS   12
+#define MMCBlock2_mmLayer3_branch33b_CHANNELS    6
+#define MMCBlock2_mmLayer3_branch33c_CHANNELS    6
+#define MMCBlock2_mmLayer3_CHANNELS            176
+#define MMCBlock2_mmLayer4_branch11_CHANNELS    12
+#define MMCBlock2_mmLayer4_branch33a_CHANNELS   12
+#define MMCBlock2_mmLayer4_branch33b_CHANNELS    6
+#define MMCBlock2_mmLayer4_branch33c_CHANNELS    6
+#define MMCBlock2_mmLayer4_CHANNELS            200
+
+#define STAGE_4_HEIGHT       4
+#define STAGE_4_WIDTH        4
+#define STAGE_4_CHANNELS   392
+#define MMCBlock3_mmLayer1_branch11_CHANNELS    12
+#define MMCBlock3_mmLayer1_branch33a_CHANNELS   12
+#define MMCBlock3_mmLayer1_branch33b_CHANNELS    6
+#define MMCBlock3_mmLayer1_branch33c_CHANNELS    6
+#define MMCBlock3_mmLayer1_CHANNELS            224
+#define MMCBlock3_mmLayer2_branch11_CHANNELS    12
+#define MMCBlock3_mmLayer2_branch33a_CHANNELS   12
+#define MMCBlock3_mmLayer2_branch33b_CHANNELS    6
+#define MMCBlock3_mmLayer2_branch33c_CHANNELS    6
+#define MMCBlock3_mmLayer2_CHANNELS            248
+#define MMCBlock3_mmLayer3_branch11_CHANNELS    12
+#define MMCBlock3_mmLayer3_branch33a_CHANNELS   12
+#define MMCBlock3_mmLayer3_branch33b_CHANNELS    6
+#define MMCBlock3_mmLayer3_branch33c_CHANNELS    6
+#define MMCBlock3_mmLayer3_CHANNELS            272 
+#define MMCBlock3_mmLayer4_branch11_CHANNELS    12
+#define MMCBlock3_mmLayer4_branch33a_CHANNELS   12
+#define MMCBlock3_mmLayer4_branch33b_CHANNELS    6
+#define MMCBlock3_mmLayer4_branch33c_CHANNELS    6
+#define MMCBlock3_mmLayer4_CHANNELS            296
+#define MMCBlock3_mmLayer5_branch11_CHANNELS    12
+#define MMCBlock3_mmLayer5_branch33a_CHANNELS   12
+#define MMCBlock3_mmLayer5_branch33b_CHANNELS    6
+#define MMCBlock3_mmLayer5_branch33c_CHANNELS    6
+#define MMCBlock3_mmLayer5_CHANNELS            320
+#define MMCBlock3_mmLayer6_branch11_CHANNELS    12
+#define MMCBlock3_mmLayer6_branch33a_CHANNELS   12
+#define MMCBlock3_mmLayer6_branch33b_CHANNELS    6
+#define MMCBlock3_mmLayer6_branch33c_CHANNELS    6
+#define MMCBlock3_mmLayer6_CHANNELS            344
+#define MMCBlock3_mmLayer7_branch11_CHANNELS    12
+#define MMCBlock3_mmLayer7_branch33a_CHANNELS   12
+#define MMCBlock3_mmLayer7_branch33b_CHANNELS    6
+#define MMCBlock3_mmLayer7_branch33c_CHANNELS    6
+#define MMCBlock3_mmLayer7_CHANNELS            368
+#define MMCBlock3_mmLayer8_branch11_CHANNELS    12
+#define MMCBlock3_mmLayer8_branch33a_CHANNELS   12
+#define MMCBlock3_mmLayer8_branch33b_CHANNELS    6
+#define MMCBlock3_mmLayer8_branch33c_CHANNELS    6
+#define MMCBlock3_mmLayer8_CHANNELS            392
+
+#define STAGE_5_HEIGHT       4
+#define STAGE_5_WIDTH        4
+#define STAGE_5_CHANNELS   464
+#define MMCBlock4_mmLayer1_branch11_CHANNELS    12
+#define MMCBlock4_mmLayer1_branch33a_CHANNELS   12
+#define MMCBlock4_mmLayer1_branch33b_CHANNELS    6
+#define MMCBlock4_mmLayer1_branch33c_CHANNELS    6
+#define MMCBlock4_mmLayer1_CHANNELS            416
+#define MMCBlock4_mmLayer2_branch11_CHANNELS    12
+#define MMCBlock4_mmLayer2_branch33a_CHANNELS   12
+#define MMCBlock4_mmLayer2_branch33b_CHANNELS    6
+#define MMCBlock4_mmLayer2_branch33c_CHANNELS    6
+#define MMCBlock4_mmLayer2_CHANNELS            440
+#define MMCBlock4_mmLayer3_branch11_CHANNELS    12
+#define MMCBlock4_mmLayer3_branch33a_CHANNELS   12
+#define MMCBlock4_mmLayer3_branch33b_CHANNELS    6
+#define MMCBlock4_mmLayer3_branch33c_CHANNELS    6
+#define MMCBlock4_mmLayer3_CHANNELS            464
+
+#define STAGE_6_CLASSES     10
+
+#endif
