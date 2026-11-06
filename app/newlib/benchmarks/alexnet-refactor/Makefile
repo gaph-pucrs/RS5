@@ -13,7 +13,7 @@ else
 	ARCH  = rv32imc_zicsr
 endif
 
-include ../common/common.mk
+include ../../common/common.mk
 
 # Host build (-DNO_RISCV): scalar kernels, every layer output dumped to dump/
 HOST_CC ?= gcc

@@ -15,7 +15,7 @@ else
 	ARCH  = rv32imc_zicsr
 endif
 
-include ../common/common.mk
+include ../../common/common.mk
 
 # Host build (-DNO_RISCV): scalar kernels, prints the checksums to compare RTL runs against
 HOST_CC ?= gcc

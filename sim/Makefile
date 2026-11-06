@@ -74,15 +74,18 @@ VERILATOR_SIM_FLAGS  = -I../rtl -I../rtl/aes -I../rtl/vector -I../RingBuffer/rtl
 # -GVEnable=1 passes a 32-bit literal to a bit parameter; suppress the benign width warning
 VERILATOR_CONV_FLAGS = $(VERILATOR_FLAGS) -Wno-WIDTHTRUNC
 
+# Directory under ../app holding the apps built/run by compile-% and run-%
+APP_DIR ?= newlib/benchmarks
+
 compile-%:
 	@echo "-- COMPILE $* ---"
-	@$(MAKE) -C ../app/$* clean all VLEN=$(VLEN) VEn=$(VEn)
+	@$(MAKE) -C ../app/$(APP_DIR)/$* clean all VLEN=$(VLEN) VEn=$(VEn)
 
 run-%:
 	@echo
 	@echo "-- VERILATE $* (VLEN=$(VLEN)) --"
 	@$(VERILATOR) $(VERILATOR_FLAGS) $(VERILATOR_INPUT) --binary -j 0 $(VERILATOR_SIM_FLAGS) \
-		-Wno-WIDTHTRUNC -GVEnable=$(VEn) -GVLEN=$(VLEN) -GBIN_FILE='"../app/$*/$*.bin"'
+		-Wno-WIDTHTRUNC -GVEnable=$(VEn) -GVLEN=$(VLEN) -GBIN_FILE='"../app/$(APP_DIR)/$*/$*.bin"'
 	@echo
 	@echo "-- RUN $* (VLEN=$(VLEN)) -------"
 	@rm -rf debug results
