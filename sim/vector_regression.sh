@@ -2,7 +2,8 @@
 
 # Vector regression tests. Run from the sim/ folder.
 # Requirements (see "Vector regression tests" in README.md):
-#   - testbench.sv: VLEN = 512 (VEnable and the program are set below on the xrun command line)
+#   - VEnable = 1, VLEN = 512 (the tests' expected results assume it) and the program
+#     are set below on the xrun command line, so testbench.sv needs no editing
 #   - Compile with GCC 13, or add -fno-tree-vectorize to GCC_RISCV in
 #     app/baremetal/tests/vector-tests/Makefile. Newer GCC auto-vectorizes the tests and breaks them.
 
@@ -33,7 +34,7 @@ for file in "$source_folder"/*; do
 
     # Run the command and capture the output
     output_file="${destination_folder}/${filename_without_extension}.txt"
-    xrun -f sim.xrun -defparam testbench.VEnable=1 -defparam testbench.BIN_FILE=\"../app/baremetal/tests/vector-tests/test.bin\" | tee "$output_file"
+    xrun -f sim.xrun -defparam testbench.VEnable=1 -defparam testbench.VLEN=512 -gpg 'testbench.BIN_FILE => "../app/baremetal/tests/vector-tests/test.bin"' | tee "$output_file"
 
     # Check the output file for the PASSED string
     if grep -q "PASSED: test/${filename}!" "$output_file"; then
