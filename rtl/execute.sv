@@ -314,6 +314,15 @@ module execute
 
     logic raise_exception;
 
+    /* SC and AMO report store access faults even during their read phase */
+    logic mem_store_access;
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mem_store_access <= 1'b0;
+        else if (!stall)
+            mem_store_access <= ctrl_i.is_amo || ctrl_i.is_sc || (pmem_write_enable != '0);
+    end
+
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
             mem_enable_o <= '0;
@@ -1023,7 +1032,7 @@ module execute
 
     always_comb begin
         if (exc_load_access_fault_i)    /* Highest priority because it happened last cycle */
-            exception_code_o  = LOAD_ACCESS_FAULT;
+            exception_code_o  = mem_store_access ? STORE_AMO_ACCESS_FAULT : LOAD_ACCESS_FAULT;
         else if (ctrl_i.exc_inst_access_fault)
             exception_code_o  = INSTRUCTION_ACCESS_FAULT;
         else if (ctrl_i.exc_ilegal_inst || exc_ilegal_csr_inst || illegal_mret)

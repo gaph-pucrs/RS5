@@ -279,6 +279,7 @@ package RS5_pkg;
         logic        bp_taken;
         logic        exc_ilegal_inst;
         logic        exc_inst_access_fault;
+        logic        exc_inst_fault_upper;
         // Result select
         logic        is_nop;
         logic        is_add;
@@ -354,6 +355,8 @@ package RS5_pkg;
         logic        compressed;
         logic        jumping;
         logic        jump_misaligned;
+        logic        inst_fault;
+        logic        inst_fault_upper;
     } decode_ctrl_t;
 
     typedef struct packed {

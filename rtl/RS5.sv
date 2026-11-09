@@ -86,6 +86,7 @@ module RS5
     logic         [31:0] bp_target;
 
     logic         [31:0] instruction_address;
+    logic                mmu_inst_fault;
 
     decode_ctrl_t        decode_ctrl;
     logic         [31:0] instruction_decode, pc_decode;
@@ -120,6 +121,7 @@ module RS5
         .busy_i               (busy_i                 ),
         .instruction_address_o(instruction_address    ),
         .instruction_data_i   (instruction_i          ),
+        .inst_fault_i         (mmu_inst_fault         ),
 
         .ctrl_o               (decode_ctrl            ),
         .instruction_o        (instruction_decode     ),
@@ -135,7 +137,6 @@ module RS5
     logic     [31:0] mvmio, mvmis, mvmim;
     /* verilator lint_on UNUSEDSIGNAL */
 
-    logic            mmu_inst_fault;
 
     if (XOSVMEnable == 1'b1) begin : gen_xosvm_mmu_on
         assign mmu_en = privilege != privilegeLevel_e'(2'b11) && mvmctl == 1'b1;
@@ -208,7 +209,6 @@ module RS5
         .should_jump_i              (should_jump                  ),
         .jump_rollback_i            (jump_rollback                ),
         
-        .exc_inst_access_fault_i    (mmu_inst_fault               ),
 
         .rs1_o                      (rs1                          ),
         .rs2_o                      (rs2                          ),

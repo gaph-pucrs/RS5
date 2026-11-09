@@ -59,7 +59,6 @@ module decode
     /* verilator lint_on UNUSEDSIGNAL */
 
     /* Combinational inputs from mem_access */
-    input   logic           exc_inst_access_fault_i,
 
     /* Combinational regbank access */
     output  logic  [4:0]    rs1_o,
@@ -671,7 +670,7 @@ module decode
     assign invalid_inst = ((instruction_i[1:0] != '1) || instruction_operation == INVALID || amo_invalid) && !invalid;
 
     logic exc_inst_access_fault;
-    assign exc_inst_access_fault = exc_inst_access_fault_i && !invalid;
+    assign exc_inst_access_fault = ctrl_i.inst_fault && !invalid;
 
     assign exception = exc_inst_access_fault || invalid_inst;
 
@@ -912,6 +911,7 @@ module decode
         ctrl.bp_taken              = bp_take_o;
         ctrl.exc_ilegal_inst       = invalid_inst;
         ctrl.exc_inst_access_fault = exc_inst_access_fault;
+        ctrl.exc_inst_fault_upper  = ctrl_i.inst_fault_upper;
         ctrl.hazard                = hazard;
         ctrl.killed                = killed;
     end
@@ -932,6 +932,7 @@ module decode
                 /* but its exception must still reach execute             */
                 ctrl_o.exc_ilegal_inst       <= invalid_inst;
                 ctrl_o.exc_inst_access_fault <= exc_inst_access_fault;
+                ctrl_o.exc_inst_fault_upper  <= ctrl_i.inst_fault_upper;
             end
             else
                 ctrl_o <= ctrl;

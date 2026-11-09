@@ -1094,14 +1094,14 @@ module CSRBank
                 unique case (exception_code_i)
                     LOAD_PAGE_FAULT,
                     STORE_AMO_PAGE_FAULT,
-                    STORE_AMO_ACCESS_FAULT,
                     LOAD_ADDRESS_MISALIGNED,
                     STORE_AMO_ADDRESS_MISALIGNED:   mtval <= mem_address_exec_i;
+                    STORE_AMO_ACCESS_FAULT,
                     LOAD_ACCESS_FAULT:              mtval <= mem_address_i;
                     INSTRUCTION_ADDRESS_MISALIGNED: mtval <= jump_target_i;
                     BREAKPOINT,
-                    INSTRUCTION_PAGE_FAULT,
-                    INSTRUCTION_ACCESS_FAULT:       mtval <= pc_i;
+                    INSTRUCTION_PAGE_FAULT:         mtval <= pc_i;
+                    INSTRUCTION_ACCESS_FAULT:       mtval <= pc_i + (ctrl_i.exc_inst_fault_upper ? 32'd2 : 32'd0);
                     ILLEGAL_INSTRUCTION:            mtval <= instruction_i;
                     default:                        mtval <= '0;
                 endcase
