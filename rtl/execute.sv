@@ -37,6 +37,7 @@ module execute
     parameter bit           XKYBEREnable = 1'b0,
     parameter bit           ZICONDEnable = 1'b0,
     parameter bit           VEnable      = 1'b0,
+    parameter bit           XOSVMEnable  = 1'b0,
     parameter int           VLEN         = 64,
     parameter int           LLEN         = 32,
     parameter int           BUS_WIDTH    = 32,
@@ -314,13 +315,19 @@ module execute
 
     logic raise_exception;
 
+    /* Only Xosvm can fault a data access */
     /* SC and AMO report store access faults even during their read phase */
     logic mem_store_access;
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            mem_store_access <= 1'b0;
-        else if (!stall)
-            mem_store_access <= ctrl_i.is_amo || ctrl_i.is_sc || (pmem_write_enable != '0);
+    if (XOSVMEnable) begin : gen_store_access_on
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                mem_store_access <= 1'b0;
+            else if (!stall)
+                mem_store_access <= ctrl_i.is_amo || ctrl_i.is_sc || (pmem_write_enable != '0);
+        end
+    end
+    else begin : gen_store_access_off
+        assign mem_store_access = 1'b0;
     end
 
     always_ff @(posedge clk or negedge reset_n) begin

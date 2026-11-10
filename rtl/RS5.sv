@@ -99,7 +99,8 @@ module RS5
         .MULEXT       (MULEXT     ),
         .ZCBEnable    (ZCBEnable  ),
         .COMPRESSED   (COMPRESSED ),
-        .BRANCHPRED   (BRANCHPRED )
+        .BRANCHPRED   (BRANCHPRED ),
+        .XOSVMEnable  (XOSVMEnable)
     ) fetch1 (
         .clk                  (clk                    ),
         .reset_n              (reset_n                ),
@@ -313,6 +314,7 @@ module RS5
         .XKYBEREnable (XKYBEREnable),
         .ZICONDEnable (ZICONDEnable),
         .VEnable      (VEnable     ),
+        .XOSVMEnable  (XOSVMEnable ),
         .VLEN         (VLEN        ),
         .LLEN         (LLEN        ),
         .BUS_WIDTH    (BUS_WIDTH   ),

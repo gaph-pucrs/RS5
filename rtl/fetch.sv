@@ -28,7 +28,8 @@ module fetch
     parameter bit   BRANCHPRED    = 1'b1, 
     parameter bit   COMPRESSED    = 1'b0,
     parameter mul_e MULEXT        = MUL_M,
-    parameter bit   ZCBEnable     = 1'b0
+    parameter bit   ZCBEnable     = 1'b0,
+    parameter bit   XOSVMEnable   = 1'b0
 )
 (
     input   logic           clk,
@@ -56,7 +57,10 @@ module fetch
     input   logic           busy_i,
     output  logic [31:0]    instruction_address_o,
     input   logic [31:0]    instruction_data_i,
+    /* Only Xosvm can fault a fetch */
+    /* verilator lint_off UNUSEDSIGNAL */
     input   logic           inst_fault_i,
+    /* verilator lint_on UNUSEDSIGNAL */
 
     /* Fetched output */
     output  decode_ctrl_t   ctrl_o,
@@ -131,19 +135,39 @@ module fetch
     logic buffer_tx;
     logic empty_buffer;
     logic [31:0] inst_buffered;
+    /* Unused without Xosvm */
+    /* verilator lint_off UNUSEDSIGNAL */
     logic        fault_buffered;
+    /* verilator lint_on UNUSEDSIGNAL */
 
-    /* Data arrives one cycle after its request */
-    logic inst_fault_r;
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            inst_fault_r <= 1'b0;
-        else
-            inst_fault_r <= inst_fault_i;
+    /* With Xosvm, the fault of each fetch travels along with its word */
+    localparam int IBUF_SIZE = XOSVMEnable ? 33 : 32;
+
+    logic [(IBUF_SIZE - 1):0] ibuf_in;
+    logic [(IBUF_SIZE - 1):0] ibuf_out;
+
+    if (XOSVMEnable) begin : gen_fetch_fault_on
+        /* Data arrives one cycle after its request */
+        logic fetch_fault_r;
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                fetch_fault_r <= 1'b0;
+            else
+                fetch_fault_r <= inst_fault_i;
+        end
+
+        assign ibuf_in        = {fetch_fault_r, instruction_data_i};
+        assign fault_buffered = ibuf_out[32];
+    end
+    else begin : gen_fetch_fault_off
+        assign ibuf_in        = instruction_data_i;
+        assign fault_buffered = 1'b0;
     end
 
+    assign inst_buffered = ibuf_out[31:0];
+
     RingBuffer #(
-        .DATA_SIZE              (33         ),
+        .DATA_SIZE              (IBUF_SIZE  ),
         .BUFFER_SIZE            (IQUEUE_SIZE),
         .FIRST_WORD_FALL_THROUGH(1          ),
         .ALMOST_FULL_THRESHOLD  (1          ),
@@ -154,10 +178,10 @@ module fetch
         .buf_rst_i     (empty_buffer),
         .rx_i          (valid_fetch),
         .rx_ack_o      (buffer_not_full),
-        .data_i        ({inst_fault_r, instruction_data_i}),
+        .data_i        (ibuf_in),
         .tx_o          (buffer_tx),
         .tx_ack_i      (pop),
-        .data_o        ({fault_buffered, inst_buffered}),
+        .data_o        (ibuf_out),
         .almost_full_o (almost_full),
         .almost_empty_o(almost_empty)
     );
@@ -334,16 +358,26 @@ module fetch
     end
 
     /* The instruction being built came from a faulting fetch */
+    /* Unused without Xosvm */
+    /* verilator lint_off UNUSEDSIGNAL */
     logic inst_fault;
+    /* verilator lint_on UNUSEDSIGNAL */
 
-    logic inst_fault_o;
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            inst_fault_o <= 1'b0;
-        else if (sys_reset)
-            inst_fault_o <= 1'b0;
-        else if (enable_i || is_jumping)
-            inst_fault_o <= inst_fault;
+    if (XOSVMEnable) begin : gen_inst_fault_on
+        logic inst_fault_r;
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                inst_fault_r <= 1'b0;
+            else if (sys_reset)
+                inst_fault_r <= 1'b0;
+            else if (enable_i || is_jumping)
+                inst_fault_r <= inst_fault;
+        end
+
+        assign ctrl_o.inst_fault = inst_fault_r;
+    end
+    else begin : gen_inst_fault_off
+        assign ctrl_o.inst_fault = 1'b0;
     end
 
     logic [31:0] pc_jumped;
@@ -409,69 +443,84 @@ module fetch
                 instruction_r <= inst_buffered;
         end
 
-        logic fault_r;
-        always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n)
-                fault_r <= 1'b0;
-            else if (sys_reset)
-                fault_r <= 1'b0;
-            else if (pop && (valid_fetch || valid_buffer))
-                fault_r <= fault_buffered;
-        end
-        
         /* Alignment control */
         logic [31:0] instruction_built;
-        logic        fault_built_lower;
-        logic        fault_built_upper;
         always_comb begin
-            if (jump_confirmed_r) begin
+            if (jump_confirmed_r)
                 /* On jump, last valid instruction is the next one */
                 instruction_built = inst_buffered;
-                fault_built_lower = fault_buffered;
-                fault_built_upper = fault_buffered;
-            end
-            else if (jump_misaligned_r || (unaligned ^ compressed)) begin
+            else if (jump_misaligned_r || (unaligned ^ compressed))
                 /* When next instruction is unaligned we also need two fetches */
                 /* Shift the last instruction msbs and join with the next lsbs */
                 instruction_built = {inst_buffered[15:0], instruction_r[31:16]};
-                fault_built_lower = fault_r;
-                fault_built_upper = fault_buffered;
-            end
-            else if (!(unaligned || compressed)) begin
+            else if (!(unaligned || compressed))
                 /* Normal flow of 4-byte aligned instructions */
                 instruction_built = inst_buffered;
-                fault_built_lower = fault_buffered;
-                fault_built_upper = fault_buffered;
-            end
-            else begin  // unaligned &&  compressed
+            else   // unaligned &&  compressed
                 /* After an unaligned compressed, the instruction we want was */
                 /* already removed from the buffer/memory                     */
                 instruction_built = instruction_r;
-                fault_built_lower = fault_r;
-                fault_built_upper = fault_r;
-            end
         end
 
         logic next_compressed;        
         assign next_compressed = (instruction_built[1:0] != 2'b11);
 
-        /* A compressed instruction does not use the upper halfword */
-        logic fault_upper;
-        assign fault_upper = fault_built_upper && !next_compressed;
-        assign inst_fault  = fault_built_lower || fault_upper;
+        if (XOSVMEnable) begin : gen_fault_on
+            /* Fault of the last word removed from buffer/memory */
+            logic fault_r;
+            always_ff @(posedge clk or negedge reset_n) begin
+                if (!reset_n)
+                    fault_r <= 1'b0;
+                else if (sys_reset)
+                    fault_r <= 1'b0;
+                else if (pop && (valid_fetch || valid_buffer))
+                    fault_r <= fault_buffered;
+            end
 
-        /* When only the upper halfword faulted, mtval must point to it */
-        logic inst_fault_upper_o;
-        always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n)
-                inst_fault_upper_o <= 1'b0;
-            else if (sys_reset)
-                inst_fault_upper_o <= 1'b0;
-            else if (enable_i || is_jumping)
-                inst_fault_upper_o <= fault_upper && !fault_built_lower;
+            /* Faults of each halfword, following the alignment control */
+            logic fault_built_lower;
+            logic fault_built_upper;
+            always_comb begin
+                if (jump_confirmed_r) begin
+                    fault_built_lower = fault_buffered;
+                    fault_built_upper = fault_buffered;
+                end
+                else if (jump_misaligned_r || (unaligned ^ compressed)) begin
+                    fault_built_lower = fault_r;
+                    fault_built_upper = fault_buffered;
+                end
+                else if (!(unaligned || compressed)) begin
+                    fault_built_lower = fault_buffered;
+                    fault_built_upper = fault_buffered;
+                end
+                else begin  // unaligned &&  compressed
+                    fault_built_lower = fault_r;
+                    fault_built_upper = fault_r;
+                end
+            end
+
+            /* A compressed instruction does not use the upper halfword */
+            logic fault_upper;
+            assign fault_upper = fault_built_upper && !next_compressed;
+            assign inst_fault  = fault_built_lower || fault_upper;
+
+            /* When only the upper halfword faulted, mtval must point to it */
+            logic inst_fault_upper_r;
+            always_ff @(posedge clk or negedge reset_n) begin
+                if (!reset_n)
+                    inst_fault_upper_r <= 1'b0;
+                else if (sys_reset)
+                    inst_fault_upper_r <= 1'b0;
+                else if (enable_i || is_jumping)
+                    inst_fault_upper_r <= fault_upper && !fault_built_lower;
+            end
+
+            assign ctrl_o.inst_fault_upper = inst_fault_upper_r;
         end
-
-        assign ctrl_o.inst_fault_upper = inst_fault_upper_o;
+        else begin : gen_fault_off
+            assign inst_fault              = 1'b0;
+            assign ctrl_o.inst_fault_upper = 1'b0;
+        end
 
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
@@ -531,6 +580,5 @@ module fetch
     assign ctrl_o.compressed      = compressed;
     assign ctrl_o.jumping         = jumping_r;
     assign ctrl_o.jump_misaligned = jump_misaligned_r;
-    assign ctrl_o.inst_fault      = inst_fault_o;
 
 endmodule
