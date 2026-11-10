@@ -99,6 +99,7 @@ module execute
     output  logic [31:0]            mem_address_exec_o,
     output  logic [31:0]            mem_address_o,
     output  logic                   mem_enable_o,
+    output  logic                   mem_store_access_o,
     output  logic [BUS_WIDTH/8-1:0] mem_write_enable_o,
     output  logic [BUS_WIDTH-1:0]   mem_write_data_o,
     /* Not used if VEnable or AMO is 0 */
@@ -317,17 +318,16 @@ module execute
 
     /* Only Xosvm can fault a data access */
     /* SC and AMO report store access faults even during their read phase */
-    logic mem_store_access;
     if (XOSVMEnable) begin : gen_store_access_on
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
-                mem_store_access <= 1'b0;
+                mem_store_access_o <= 1'b0;
             else if (!stall)
-                mem_store_access <= ctrl_i.is_amo || ctrl_i.is_sc || (pmem_write_enable != '0);
+                mem_store_access_o <= ctrl_i.is_amo || ctrl_i.is_sc || (pmem_write_enable != '0);
         end
     end
     else begin : gen_store_access_off
-        assign mem_store_access = 1'b0;
+        assign mem_store_access_o = 1'b0;
     end
 
     always_ff @(posedge clk or negedge reset_n) begin
@@ -1040,7 +1040,7 @@ module execute
 
     always_comb begin
         if (exc_load_access_fault_i)    /* Highest priority because it happened last cycle */
-            exception_code_o  = mem_store_access ? STORE_AMO_ACCESS_FAULT : LOAD_ACCESS_FAULT;
+            exception_code_o  = mem_store_access_o ? STORE_AMO_ACCESS_FAULT : LOAD_ACCESS_FAULT;
         else if (ctrl_i.exc_inst_access_fault)
             exception_code_o  = INSTRUCTION_ACCESS_FAULT;
         else if (ctrl_i.exc_ilegal_inst || exc_ilegal_csr_inst || illegal_mret)

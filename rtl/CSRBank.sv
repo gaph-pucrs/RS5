@@ -93,12 +93,10 @@ module CSRBank
     output  logic [31:0]        mtvec_o,
 
     output  logic               mvmctl_o,
-    output  logic [31:0]        mvmdo_o,
-    output  logic [31:0]        mvmio_o,
-    output  logic [31:0]        mvmds_o,
-    output  logic [31:0]        mvmis_o,
-    output  logic [31:0]        mvmim_o,
-    output  logic [31:0]        mvmdm_o
+    output  logic [31:0]        mvmo_o,
+    output  logic [31:0]        mvms_o,
+    output  logic [31:0]        mvmx_o,
+    output  logic [31:0]        mvmw_o
 );
 
     privilegeLevel_e privilege;
@@ -1137,12 +1135,10 @@ module CSRBank
 // Xosvm Extension
 ////////////////////////////////////////////////////////////////////////////////
 
-    logic [31:0] mvmio;
-    logic [31:0] mvmis;
-    logic [31:0] mvmim;
-    logic [31:0] mvmdo;
-    logic [31:0] mvmds;
-    logic [31:0] mvmdm;
+    logic [31:0] mvmo;
+    logic [31:0] mvms;
+    logic [31:0] mvmx;
+    logic [31:0] mvmw;
 
     logic mvmctl_en;
 
@@ -1156,85 +1152,52 @@ module CSRBank
 
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
-                mvmio <= '0;
-            else begin
-                if (write_enable_i && address_i == MVMIO)
-                    mvmio <= wr_data;
-            end
+                mvmo <= '0;
+            else if (write_enable_i && address_i == MVMO)
+                mvmo <= wr_data;
         end
 
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
-                mvmis <= '0;
-            else begin
-                if (write_enable_i && address_i == MVMIS)
-                    mvmis <= wr_data;
-            end
+                mvms <= '0;
+            else if (write_enable_i && address_i == MVMS)
+                mvms <= wr_data;
         end
 
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
-                mvmim <= '0;
-            else begin
-                if (write_enable_i && address_i == MVMIM)
-                    mvmim <= wr_data;
-            end
+                mvmx <= '0;
+            else if (write_enable_i && address_i == MVMX)
+                mvmx <= wr_data;
         end
 
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
-                mvmdo <= '0;
-            else begin
-                if (write_enable_i && address_i == MVMDO)
-                    mvmdo <= wr_data;
-            end
-        end
-
-        always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n)
-                mvmds <= '0;
-            else begin
-                if (write_enable_i && address_i == MVMDS)
-                    mvmds <= wr_data;
-            end
-        end
-
-        always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n)
-                mvmdm <= '0;
-            else begin
-                if (write_enable_i && address_i == MVMDM)
-                    mvmdm <= wr_data;
-            end
+                mvmw <= '0;
+            else if (write_enable_i && address_i == MVMW)
+                mvmw <= wr_data;
         end
 
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
                 mvmctl_en <= 1'b0;
-            else begin
-                if (write_enable_i && address_i == MVMCTL)
-                    mvmctl_en <= wr_data[0];
-            end
+            else if (write_enable_i && address_i == MVMCTL)
+                mvmctl_en <= wr_data[0];
         end
-
     end
     else begin : gen_xosvm_off
-        assign mvmio     = '0;
-        assign mvmis     = '0;
-        assign mvmim     = '0;
-        assign mvmdo     = '0;
-        assign mvmds     = '0;
-        assign mvmdm     = '0;
+        assign mvmo     = '0;
+        assign mvms     = '0;
+        assign mvmx     = '0;
+        assign mvmw     = '0;
         assign mvmctl_en = 1'b0;
     end
 
     assign mvmctl_o = mvmctl_en;
-    assign mvmdo_o  = mvmdo;
-    assign mvmds_o  = mvmds;
-    assign mvmdm_o  = mvmdm;
-    assign mvmio_o  = mvmio;
-    assign mvmis_o  = mvmis;
-    assign mvmim_o  = mvmim;
+    assign mvmo_o   = mvmo;
+    assign mvms_o   = mvms;
+    assign mvmx_o   = mvmx;
+    assign mvmw_o   = mvmw;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Privilege control
@@ -1479,12 +1442,10 @@ module CSRBank
 
             /* Xosvm */
             MVMCTL:         current_val = mvmctl;
-            MVMDO:          current_val = mvmdo;
-            MVMDS:          current_val = mvmds;
-            MVMDM:          current_val = mvmdm;
-            MVMIO:          current_val = mvmio;
-            MVMIS:          current_val = mvmis;
-            MVMIM:          current_val = mvmim;
+            MVMO:           current_val = mvmo;
+            MVMS:           current_val = mvms;
+            MVMX:           current_val = mvmx;
+            MVMW:           current_val = mvmw;
 
             default:        current_val = '0;
         endcase
