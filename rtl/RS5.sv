@@ -155,7 +155,7 @@ module RS5
     /* verilator lint_off UNUSEDSIGNAL */
     logic            mmu_en;
     logic            mvmctl;
-    logic     [31:0] mvmio, mvmis, mvmim;
+    logic     [31:0] mvmo, mvms, mvmx, mvmw;
     /* verilator lint_on UNUSEDSIGNAL */
 
 
@@ -167,11 +167,15 @@ module RS5
     end
 
     if (XOSVMEnable == 1'b1) begin : gen_xosvm_i_mmu_on
-        mmu i_mmu (
+        mmu #(
+            .EXEC           (1'b1                 )
+        ) i_mmu (
             .en_i           (mmu_en               ),
-            .mask_i         (mvmim                ),
-            .offset_i       (mvmio                ),
-            .size_i         (mvmis                ),
+            .offset_i       (mvmo                 ),
+            .size_i         (mvms                 ),
+            .exec_limit_i   (mvmx                 ),
+            .write_base_i   (mvmw                 ),
+            .write_i        (1'b0                 ),
             .address_i      (instruction_address  ),
             .exception_o    (mmu_inst_fault       ),
             .address_o      (instruction_paddr    )
@@ -413,10 +417,6 @@ module RS5
 /////////////////////////////////////////////////////////// MEMORY ACCESS ///////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    /* Unused without MMU */
-    /* verilator lint_off UNUSEDSIGNAL */
-    logic     [31:0] mvmdo, mvmds, mvmdm;
-    /* verilator lint_on UNUSEDSIGNAL */
 
     if (XOSVMEnable) begin : gen_d_mmu_on
         logic mmu_en_r;
@@ -429,14 +429,18 @@ module RS5
                 mmu_en_r <= mmu_en;
         end
 
-        mmu d_mmu (
-            .en_i       (mmu_en_r                       ),
-            .mask_i     (mvmdm                          ),
-            .offset_i   (mvmdo                          ),
-            .size_i     (mvmds                          ),
-            .address_i  ({mem_address[31:2], 2'b00}     ),
-            .exception_o(mmu_data_fault                 ),
-            .address_o  (lsu_addr                       )
+        mmu #(
+            .EXEC        (1'b0                          )
+        ) d_mmu (
+            .en_i        (mmu_en_r                      ),
+            .offset_i    (mvmo                          ),
+            .size_i      (mvms                          ),
+            .exec_limit_i(mvmx                          ),
+            .write_base_i(mvmw                          ),
+            .write_i     (lsu_we                        ),
+            .address_i   ({mem_address[31:2], 2'b00}    ),
+            .exception_o (mmu_data_fault                ),
+            .address_o   (lsu_addr                      )
         );
 
         assign load_access_fault    = mem_enable && mmu_data_fault;
@@ -557,12 +561,10 @@ module RS5
         .mtvec_o                    (mtvec),
     // XOSVM Signals
         .mvmctl_o                   (mvmctl),
-        .mvmdo_o                    (mvmdo),
-        .mvmds_o                    (mvmds),
-        .mvmdm_o                    (mvmdm),
-        .mvmio_o                    (mvmio),
-        .mvmis_o                    (mvmis),
-        .mvmim_o                    (mvmim)
+        .mvmo_o                     (mvmo),
+        .mvms_o                     (mvms),
+        .mvmx_o                     (mvmx),
+        .mvmw_o                     (mvmw)
     );
 
 endmodule

@@ -21,32 +21,40 @@
 
 module mmu
     import RS5_pkg::*;
+#(
+    parameter bit EXEC = 1'b0   /* 1: instruction fetch MMU, 0: data MMU */
+)
 (
     input  logic        en_i,
 
-    input  logic [31:0] mask_i,
-    input  logic [31:0] offset_i,
-    input  logic [31:0] size_i,
+    /* Page configuration */
+    input  logic [31:0] offset_i,       /* Physical base address           */
+    input  logic [31:0] size_i,         /* Page size in bytes              */
+
+    /* Only one of the regions applies, depending on EXEC */
+    /* verilator lint_off UNUSEDSIGNAL */
+    input  logic [31:0] exec_limit_i,   /* First non-executable address    */
+    input  logic [31:0] write_base_i,   /* First writable address          */
+    input  logic        write_i,        /* Store, store-conditional or AMO */
+    /* verilator lint_on UNUSEDSIGNAL */
+
     input  logic [31:0] address_i,
 
     output logic        exception_o,
     output logic [31:0] address_o
 );
 
-    always_comb begin
-        if (en_i == 1'b1) begin
-            address_o = (address_i | offset_i);
-            if (((address_i & ~mask_i) & ~size_i) != '0) begin
-                exception_o = 1'b1;
-            end
-            else begin
-                exception_o = 1'b0;
-            end
-        end
-        else begin
-            address_o   = address_i;
-            exception_o = 1'b0;
-        end
+    logic deny;
+    if (EXEC) begin : gen_exec
+        /* Fetching past the executable region */
+        assign deny = address_i >= exec_limit_i;
     end
+    else begin : gen_data
+        /* Writing below the writable region */
+        assign deny = write_i && (address_i < write_base_i);
+    end
+
+    assign address_o   = en_i ? (address_i + offset_i) : address_i;
+    assign exception_o = en_i && ((address_i >= size_i) || deny);
 
 endmodule
