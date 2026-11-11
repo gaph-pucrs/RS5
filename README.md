@@ -150,8 +150,8 @@ Each log goes to `app/baremetal/tests/vector-tests/results/passed` or `app/barem
 
 The tests' expected results assume a specific configuration. Before running the script:
 
-1. Keep `VLEN = 512` in [sim/testbench.sv](sim/testbench.sv) (the default). Any other VLEN makes the tests report false failures.
-   The script enables the vector unit and selects the vector test binary on the xrun command line, so `VEnable` and the program path need no editing.
+1. The tests' expected results assume `VLEN = 512`; any other VLEN makes them report false failures.
+   The script sets `VEnable = 1`, `VLEN = 512` and the vector test binary on the xrun command line, so [sim/testbench.sv](sim/testbench.sv) needs no editing.
 2. Build the tests with **GCC 13**, or turn off auto-vectorization.
    Newer GCC releases auto-vectorize the test code with RVV instructions, which changes the code under test and breaks the tests.
    If you use a newer GCC, add `-fno-tree-vectorize` to `GCC_RISCV` in [app/baremetal/tests/vector-tests/Makefile](app/baremetal/tests/vector-tests/Makefile).
