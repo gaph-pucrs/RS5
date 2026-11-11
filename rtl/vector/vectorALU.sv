@@ -30,6 +30,7 @@ module vectorALU
 ) (
     input  logic                        clk,
     input  logic                        reset_n,
+    input  logic                        stall,
 
     input  logic [VLEN-1:0]             first_operand,
     input  logic [VLEN-1:0]             second_operand,
@@ -78,7 +79,7 @@ module vectorALU
         if (!reset_n) begin
             hold_widening_r <= 1'b0;
         end
-        else begin
+        else if (!stall) begin
             hold_widening_r <= hold_widening_o;
         end
     end
@@ -138,6 +139,7 @@ module vectorALU
     )   u_vector_reductions (
             .clk               (clk),
             .reset_n           (reset_n),
+            .stall             (stall),
             .enable_i          (reduction_instruction),
             .vector_operation_i(vector_operation_i),
             .first_operand     (first_operand),
@@ -166,6 +168,7 @@ module vectorALU
     )   u_vector_slides (
             .clk               (clk),
             .reset_n           (reset_n),
+            .stall             (stall),
             .vector_operation_i(vector_operation_i),
             .first_operand     (first_operand),
             .second_operand    (second_operand[31:0]),

@@ -24,6 +24,7 @@ module vectorUnit
 (
     input   logic                  clk,
     input   logic                  reset_n,
+    input   logic                  stall,
 
     input   logic [31:0]           instruction_i,
     input   logic                  enable_i,
@@ -87,6 +88,7 @@ module vectorUnit
     logic [3:0]       cycle_count, cycle_count_r, cycle_count_vd;
     logic             hazard_detected;
     logic             hold, hold_widening, hold_alu, hold_lsu;
+    logic             should_stall;
 
     logic [VLEN-1:0]  first_operand, second_operand, third_operand;
 
@@ -130,19 +132,21 @@ module vectorUnit
             reduction_instruction_r  <= 1'b0;
             widening_instruction_r   <= 1'b0;
         end
-        else if (next_state == V_EXEC) begin
-            accumulate_instruction_r <= accumulate_instruction;
-            mask_instruction_nr      <= mask_instruction;
-            multiply_instruction_r   <= multiply_instruction;
-            reduction_instruction_r  <= reduction_instruction;
-            widening_instruction_r   <= widening_instruction;
-        end
-        else begin
-            accumulate_instruction_r <= 1'b0;
-            mask_instruction_nr      <= 1'b0;
-            multiply_instruction_r   <= 1'b0;
-            reduction_instruction_r  <= 1'b0;
-            widening_instruction_r   <= 1'b0;
+        else if (!should_stall) begin
+            if (next_state == V_EXEC) begin
+                accumulate_instruction_r <= accumulate_instruction;
+                mask_instruction_nr      <= mask_instruction;
+                multiply_instruction_r   <= multiply_instruction;
+                reduction_instruction_r  <= reduction_instruction;
+                widening_instruction_r   <= widening_instruction;
+            end
+            else begin
+                accumulate_instruction_r <= 1'b0;
+                mask_instruction_nr      <= 1'b0;
+                multiply_instruction_r   <= 1'b0;
+                reduction_instruction_r  <= 1'b0;
+                widening_instruction_r   <= 1'b0;
+            end
         end
     end
 
@@ -195,11 +199,17 @@ module vectorUnit
 
     assign hold_o = enable_i && (next_state == V_EXEC || hazard_detected == 1'b1);
 
+    /* The instruction stays in execute while the bus is stalled: hold its last
+     * cycle so it is not restarted; earlier cycles keep computing. Loads and
+     * stores hold every cycle: they wait for the bus, and this FSM sequences
+     * the LSU (register count, store data). */
+    assign should_stall = stall && (op_vload || op_vstore || (state == V_EXEC && next_state == V_IDLE));
+
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             state <= V_IDLE;
         end
-        else if (!hold) begin
+        else if (!should_stall && !hold) begin
             state <= next_state;
         end
     end
@@ -308,26 +318,32 @@ module vectorUnit
     always_ff @(posedge clk or negedge reset_n)
         if (!reset_n)
             cycle_count <= 0;
-        else if (next_state == V_IDLE)
-            cycle_count <= 0;
-        else if (next_state == V_EXEC && !hold)
-            cycle_count <= cycle_count + 1;
+        else if (!should_stall) begin
+            if (next_state == V_IDLE)
+                cycle_count <= 0;
+            else if (next_state == V_EXEC && !hold)
+                cycle_count <= cycle_count + 1;
+        end
 
     always_ff @(posedge clk or negedge reset_n)
         if (!reset_n)
             cycle_count_vd <= 0;
-        else if (next_state == V_IDLE)
-            cycle_count_vd <= 0;
-        else if (next_state == V_EXEC && (!hold || hold_widening))
-            cycle_count_vd <= cycle_count_vd + 1;
+        else if (!should_stall) begin
+            if (next_state == V_IDLE)
+                cycle_count_vd <= 0;
+            else if (next_state == V_EXEC && (!hold || hold_widening))
+                cycle_count_vd <= cycle_count_vd + 1;
+        end
 
     always_ff @(posedge clk or negedge reset_n)
         if (!reset_n)
             cycle_count_r <= 0;
-        else if (widening_instruction && (!hold || hold_widening))
-            cycle_count_r <= cycle_count_vd;
-        else if (!hold)
-            cycle_count_r <= cycle_count;
+        else if (!should_stall) begin
+            if (widening_instruction && (!hold || hold_widening))
+                cycle_count_r <= cycle_count_vd;
+            else if (!hold)
+                cycle_count_r <= cycle_count;
+        end
 
 //////////////////////////////////////////////////////////////////////////////
 // Vector Length Control
@@ -340,24 +356,28 @@ module vectorUnit
     always_ff @(posedge clk or negedge reset_n)
         if (!reset_n)
             vl_curr_reg <= '0;
-        else if (next_state == V_IDLE)
-            vl_curr_reg <= 0;
-        else if (whole_reg_load_store)
-            vl_curr_reg <= '1;
-        else if (mask_load_store)
-            vl_curr_reg <= (vl >> 3) + ((vl[2:0] & 3'h7) != 3'h0 ? 1 : 0);
-        else if (state == V_IDLE && next_state == V_EXEC)
-            vl_curr_reg <= vl;
-        else if (next_state == V_EXEC && !hold)
-            vl_curr_reg <= vl_next_reg;
+        else if (!should_stall) begin
+            if (next_state == V_IDLE)
+                vl_curr_reg <= 0;
+            else if (whole_reg_load_store)
+                vl_curr_reg <= '1;
+            else if (mask_load_store)
+                vl_curr_reg <= (vl >> 3) + ((vl[2:0] & 3'h7) != 3'h0 ? 1 : 0);
+            else if (state == V_IDLE && next_state == V_EXEC)
+                vl_curr_reg <= vl;
+            else if (next_state == V_EXEC && !hold)
+                vl_curr_reg <= vl_next_reg;
+        end
 
     always_ff @(posedge clk or negedge reset_n)
         if (!reset_n)
             total_elements_processed <= 0;
-        else if (next_state == V_IDLE)
-            total_elements_processed <= 0;
-        else if (!hold)
-            total_elements_processed <= total_elements_processed + elements_per_reg;
+        else if (!should_stall) begin
+            if (next_state == V_IDLE)
+                total_elements_processed <= 0;
+            else if (!hold)
+                total_elements_processed <= total_elements_processed + elements_per_reg;
+        end
 
     assign vector_process_done = (total_elements_processed >= vl && !whole_reg_load_store && op_vector);
 
@@ -407,7 +427,7 @@ module vectorUnit
             vd_addr   <= '0;
             vd_addr_r <= '0;
         end
-        else if (!hold || hold_widening) begin
+        else if (!should_stall && (!hold || hold_widening)) begin
             vd_addr   <= (reduction_instruction || mask_instruction)
                         ? rd
                         : rd + cycle_count_vd;
@@ -420,7 +440,7 @@ module vectorUnit
         if (!reset_n) begin
             write_enable <= '0;
         end
-        else if ((state == V_EXEC) && (!hold || hold_widening) && !op_vstore && vector_operation_i != VMVXS) begin
+        else if (!should_stall && (state == V_EXEC) && (!hold || hold_widening) && !op_vstore && vector_operation_i != VMVXS) begin
             if (reduction_instruction || vector_operation_i == VMVSX) begin
                 unique case (vsew_effective)
                     EW8:     write_enable <= {'0, 1'b1};
@@ -517,7 +537,7 @@ module vectorUnit
         if (!reset_n) begin
             first_operand <= '0;
         end
-        else if (!hold) begin
+        else if (!should_stall && !hold) begin
             first_operand  <= vs2_data;
         end
     end
@@ -526,7 +546,7 @@ module vectorUnit
         if (!reset_n) begin
             third_operand <= '0;
         end
-        else if (hold) begin
+        else if (!should_stall && hold) begin
             third_operand <= vs2_data;
         end
     end
@@ -535,7 +555,7 @@ module vectorUnit
         if (!reset_n) begin
             second_operand <= '0;
         end
-        else if (!hold) begin
+        else if (!should_stall && !hold) begin
             if (op_vstore) begin
                 second_operand <= vs1_data;
             end
@@ -563,6 +583,7 @@ module vectorUnit
     ) vectorLSU1 (
         .clk                    (clk),
         .reset_n                (reset_n),
+        .stall                  (stall),
         .instruction_i          (instruction_i),
         .base_address_i         (op1_scalar_i),
         .stride_i               (op2_scalar_i),
@@ -608,6 +629,7 @@ module vectorUnit
     ) vectorALU1 (
         .clk                   (clk),
         .reset_n               (reset_n),
+        .stall                 (should_stall),
         .first_operand         (first_operand),
         .second_operand        (second_operand),
         .third_operand         (third_operand),
@@ -647,7 +669,7 @@ module vectorUnit
             op_vload_r         <= 1'b0;
             mask_instruction_r <= '0;
         end
-        else begin
+        else if (!should_stall) begin
             op_vload_r         <= op_vload;
             mask_instruction_r <= mask_instruction;
         end
