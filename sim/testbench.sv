@@ -46,11 +46,18 @@ module testbench
     localparam bit           USE_ZKNH        = 1'b0;
     localparam bit           USE_XKYBER      = 1'b0;
     localparam bit           USE_HPMCOUNTER  = 1'b1;
-    localparam bit           BRANCHPRED      = 1'b1;
-    localparam bit           FORWARDING      = 1'b1;
-    localparam int           IQUEUE_SIZE     = 2;
-    localparam bit           DUALPORT_MEM    = 1'b1;
-    localparam int           RAM_DELAY_CYCLES= 0;
+
+    /* Pipeline options, overridable from the simulator command line */
+    parameter  bit           BRANCHPRED      = 1'b1;
+    parameter  bit           FORWARDING      = 1'b1;
+
+    /* Memory system, overridable from the simulator command line, e.g. Verilator -GRSP_DELAY=3 */
+    parameter  bit           DUALPORT_MEM    = 1'b1;
+    parameter  int           GNT_DELAY       = 0;      /* cycles a request waits for gnt         */
+    parameter  int           RSP_DELAY       = 0;      /* extra cycles before rvalid             */
+    parameter  bit           RANDOM_DELAY    = 1'b0;   /* draw each delay from 0 up to the above */
+    parameter  int           SEED            = 1;
+    parameter  int           IMEM_LATENCY    = 1 + RSP_DELAY;  /* the core sizes its fetch for it */
 
     /* Overridable from the simulator command line, e.g. Verilator -GVEnable=1 -GVLEN=256 */
     parameter  bit           VEnable         = 1'b0;
@@ -87,10 +94,20 @@ module testbench
 // TB SIGNALS
 //////////////////////////////////////////////////////////////////////////////
 
+    /* OBI interfaces of the core */
+    logic                   instr_req, instr_gnt, instr_rvalid;
+    logic [31:0]            instr_addr, instr_rdata;
+    logic                   data_req, data_gnt, data_we, data_rvalid;
+    logic [31:0]            data_addr;
+    logic [BUS_WIDTH/8-1:0] data_be;
+    logic [BUS_WIDTH  -1:0] data_wdata, data_rdata;
+
+    /* Targets behind the OBI delay models */
     /* Number of used bits is defined by the memory size */
     /* verilator lint_off UNUSEDSIGNAL */
     logic [31:0]            instruction_address;
     /* verilator lint_on UNUSEDSIGNAL */
+    logic                   instruction_enable;
 
     /* RTC is 64 bits but the bus is 32 bits */
     /* verilator lint_off UNUSEDSIGNAL */
@@ -103,7 +120,7 @@ module testbench
     logic [BUS_WIDTH-1:0]   instruction;
     /* verilator lint_on UNUSEDSIGNAL */
     logic                   enable_ram, enable_rtc, enable_plic, enable_tb;
-    logic                   mem_operation_enable;
+    logic                   mem_operation_enable, instruction_ready;
     logic [31:0]            mem_address;
     logic [BUS_WIDTH  -1:0] mem_data_read, mem_data_write;
     logic [BUS_WIDTH/8-1:0] mem_write_enable;
@@ -142,10 +159,6 @@ module testbench
 // CPU
 //////////////////////////////////////////////////////////////////////////////
 
-    logic busy;
-    logic enable_imem;
-    logic stall;
-
     RS5 #(
         .Environment     (ASIC          ),
         .MULEXT          (MULEXT        ),
@@ -163,27 +176,89 @@ module testbench
         .ZKNHEnable      (USE_ZKNH      ),
         .XKYBEREnable    (USE_XKYBER    ),
         .HPMCOUNTEREnable(USE_HPMCOUNTER),
-        .IQUEUE_SIZE     (IQUEUE_SIZE   ),
+        .IMEM_LATENCY    (IMEM_LATENCY  ),
         .BRANCHPRED      (BRANCHPRED    ),
         .FORWARDING      (FORWARDING    )
     ) dut (
         .clk                    (clk),
         .reset_n                (reset_n),
         .sys_reset_i            (1'b0),
-        .stall                  (stall),
-        .busy_i                 (busy),
-        .instruction_i          (instruction[31:0]),
-        .mem_data_i             (mem_data_read),
         .mtime_i                (mtime),
         .tip_i                  (mti),
         .eip_i                  (mei),
-        .imem_operation_enable_o(enable_imem),
-        .instruction_address_o  (instruction_address),
-        .dmem_operation_enable_o(mem_operation_enable),
-        .mem_write_enable_o     (mem_write_enable),
-        .mem_address_o          (mem_address),
-        .mem_data_o             (mem_data_write),
-        .interrupt_ack_o        (interrupt_ack)
+        .interrupt_ack_o        (interrupt_ack),
+        .instr_req_o            (instr_req),
+        .instr_gnt_i            (instr_gnt),
+        .instr_addr_o           (instr_addr),
+        .instr_rvalid_i         (instr_rvalid),
+        .instr_rdata_i          (instr_rdata),
+        .data_req_o             (data_req),
+        .data_gnt_i             (data_gnt),
+        .data_addr_o            (data_addr),
+        .data_we_o              (data_we),
+        .data_be_o              (data_be),
+        .data_wdata_o           (data_wdata),
+        .data_rvalid_i          (data_rvalid),
+        .data_rdata_i           (data_rdata)
+    );
+
+//////////////////////////////////////////////////////////////////////////////
+// OBI delay models
+//////////////////////////////////////////////////////////////////////////////
+
+    /* verilator lint_off UNUSEDSIGNAL */
+    logic [BUS_WIDTH/8-1:0] instruction_we;
+    logic [BUS_WIDTH  -1:0] instruction_wdata;
+    /* verilator lint_on UNUSEDSIGNAL */
+
+    OBIDelay #(
+        .BUS_WIDTH  (32          ),
+        .GNT_DELAY  (GNT_DELAY   ),
+        .RSP_DELAY  (RSP_DELAY   ),
+        .RANDOM     (RANDOM_DELAY),
+        .SEED       (SEED        )
+    ) instr_obi (
+        .clk        (clk),
+        .reset_n    (reset_n),
+        .req_i      (instr_req),
+        .gnt_o      (instr_gnt),
+        .addr_i     (instr_addr),
+        .we_i       (1'b0),
+        .be_i       (4'hF),
+        .wdata_i    ('0),
+        .rvalid_o   (instr_rvalid),
+        .rdata_o    (instr_rdata),
+        .ready_i    (instruction_ready),
+        .en_o       (instruction_enable),
+        .we_o       (instruction_we),
+        .addr_o     (instruction_address),
+        .wdata_o    (instruction_wdata),
+        .rdata_i    (instruction[31:0])
+    );
+
+    OBIDelay #(
+        .BUS_WIDTH  (BUS_WIDTH   ),
+        .GNT_DELAY  (GNT_DELAY   ),
+        .RSP_DELAY  (RSP_DELAY   ),
+        .RANDOM     (RANDOM_DELAY),
+        .SEED       (SEED * 7 + 3)
+    ) data_obi (
+        .clk        (clk),
+        .reset_n    (reset_n),
+        .req_i      (data_req),
+        .gnt_o      (data_gnt),
+        .addr_i     (data_addr),
+        .we_i       (data_we),
+        .be_i       (data_be),
+        .wdata_i    (data_wdata),
+        .rvalid_o   (data_rvalid),
+        .rdata_o    (data_rdata),
+        .ready_i    (1'b1),
+        .en_o       (mem_operation_enable),
+        .we_o       (mem_write_enable),
+        .addr_o     (mem_address),
+        .wdata_o    (mem_data_write),
+        .rdata_i    (mem_data_read)
     );
 
 //////////////////////////////////////////////////////////////////////////////
@@ -227,50 +302,26 @@ module testbench
         .dataB_o    (dataBo)
     );
 
-    logic enable_ram_delayed;
-    initial begin
-        stall = 1'b0;
-        enable_ram_delayed = 1'b0;
-
-        forever begin
-            // 1. Wait for enable_ram to go high
-            @(negedge clk iff enable_ram);
-
-            // 2. Assert stall
-            stall = 1'b1;
-
-            // 3. Wait for some cycles (to simulate delay)
-            repeat (RAM_DELAY_CYCLES) @(negedge clk);
-
-            // 4. Deassert stall, assert delayed signal
-            stall = 1'b0;
-            enable_ram_delayed = 1'b1;
-
-            // 5. Wait for enable_ram to go low to finish
-            @(negedge clk iff !enable_ram);
-            enable_ram_delayed = 1'b0;
-        end
-    end
-
+    /* The data interface has priority on a single port memory */
     if (DUALPORT_MEM) begin : dual_port
-        assign enA         = enable_imem;
+        assign enA         = instruction_enable;
         assign weA         = '0;
         assign addrA       = instruction_address[($clog2(MEM_WIDTH) - 1):0];
         assign dataAi      = '0;
         assign instruction = dataAo;
 
-        assign enB         = enable_ram_delayed;
+        assign enB         = enable_ram;
         assign weB         = mem_write_enable;
         assign addrB       = mem_address[($clog2(MEM_WIDTH) - 1):0];
         assign dataBi      = mem_data_write;
         assign data_ram    = dataBo;
 
-        assign busy        = 1'b0;
+        assign instruction_ready = 1'b1;
     end
     else begin : single_port
-        assign enA         = enable_imem || enable_ram_delayed;
-        assign weA         = enable_ram_delayed ? mem_write_enable : '0;
-        assign addrA       = enable_ram_delayed ? mem_address[($clog2(MEM_WIDTH) - 1):0] : instruction_address[($clog2(MEM_WIDTH) - 1):0];
+        assign enA         = instruction_enable || enable_ram;
+        assign weA         = enable_ram ? mem_write_enable : '0;
+        assign addrA       = enable_ram ? mem_address[($clog2(MEM_WIDTH) - 1):0] : instruction_address[($clog2(MEM_WIDTH) - 1):0];
         assign dataAi      = mem_data_write;
         assign instruction = dataAo;
         assign data_ram    = dataAo;
@@ -280,7 +331,7 @@ module testbench
         assign addrB       = '0;
         assign dataBi      = '0;
 
-        assign busy        = enable_ram;
+        assign instruction_ready = !enable_ram;
     end
 
 //////////////////////////////////////////////////////////////////////////////

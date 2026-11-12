@@ -57,6 +57,8 @@ module vectorLSU
     output logic [BUS_WIDTH/8-1:0]    mem_write_enable_o,
     output logic [BUS_WIDTH  -1:0]    mem_write_data_o,
     input  logic [BUS_WIDTH  -1:0]    mem_read_data_i,
+    /* The read data is valid, or no response is awaited */
+    input  logic                      mem_rsp_ok_i,
 
     output logic [VLEN-1:0]           read_data_o
 );
@@ -569,8 +571,8 @@ module vectorLSU
         else if (!stall)
             capture_2r <= (state_r != VLSU_IDLE);
         else
-            /* read data was already captured on the first stalled cycle: don't capture the next request's data */
-            capture_2r <= 1'b0;
+            /* once captured, don't capture the next request's data while stalled */
+            capture_2r <= capture_2r && !mem_rsp_ok_i;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -644,7 +646,7 @@ module vectorLSU
 
     always @(posedge clk) begin
         if (state_2r != VLSU_IDLE) begin
-            if (capture_2r) begin
+            if (capture_2r && mem_rsp_ok_i) begin
                 unique case (width)
                     EW8: begin
                         for (int i = 0; i < ELEMENTS_PER_ACCESS_EW8;  i++) begin

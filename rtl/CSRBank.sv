@@ -419,7 +419,7 @@ module CSRBank
         else if (sys_reset)
             minstret <= '0;
         else begin
-            if (!mcountinhibit[2] && !(hold || ctrl_i.is_nop))
+            if (!mcountinhibit[2] && !(stall || hold || ctrl_i.is_nop))
                 minstret <= minstret + 1'b1;
 
             if (write_enable_i) begin

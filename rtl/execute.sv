@@ -99,11 +99,13 @@ module execute
     output  logic [31:0]            mem_address_exec_o,
     output  logic [31:0]            mem_address_o,
     output  logic                   mem_enable_o,
-    output  logic [BUS_WIDTH/8-1:0] mem_write_enable_o,
+    output  logic                   mem_we_o,
+    output  logic [BUS_WIDTH/8-1:0] mem_be_o,
     output  logic [BUS_WIDTH-1:0]   mem_write_data_o,
     /* Not used if VEnable or AMO is 0 */
     /* verilator lint_off UNUSEDSIGNAL */
     input   logic [BUS_WIDTH-1:0]   mem_read_data_i,
+    input   logic                   mem_rsp_ok_i,
     /* verilator lint_on UNUSEDSIGNAL */
 
     /* Combinational outputs to previous stages */
@@ -288,29 +290,52 @@ module execute
         end
     end
 
+    /* Bytes accessed by scalar loads and stores */
+    logic [3:0] mem_byte_lanes;
     always_comb begin
-        mem_write_enable = '0;
-        if (ctrl_i.is_store) begin
-            unique case (1'b1)
-                ctrl_i.is_byte: mem_write_enable[sum_result[1:0]]      = 1'b1;
-                ctrl_i.is_half: mem_write_enable[sum_result[1:0]+1-:2] = 2'b11;
-                default:        mem_write_enable                       = 4'b1111;
-            endcase
-        end
+        mem_byte_lanes = '0;
+        unique case (1'b1)
+            ctrl_i.is_byte: mem_byte_lanes[sum_result[1:0]]      = 1'b1;
+            ctrl_i.is_half: mem_byte_lanes[sum_result[1:0]+1-:2] = 2'b11;
+            default:        mem_byte_lanes                       = 4'b1111;
+        endcase
     end
+
+    assign mem_write_enable = ctrl_i.is_store ? mem_byte_lanes : '0;
 
     logic [BUS_WIDTH/8-1:0] pmem_write_enable;
     assign pmem_write_enable = {{(BUS_WIDTH/8-4){1'b0}}, (mem_write_enable | {4{atomic_mem_write_enable}})}  | mem_write_enable_vector;
 
+    logic pmem_write;
+    assign pmem_write = (pmem_write_enable != '0);
+
+    /* Vector loads read the whole bus */
+    logic [BUS_WIDTH/8-1:0] pmem_byte_enable;
+    always_comb begin
+        if (pmem_write)
+            pmem_byte_enable = pmem_write_enable;
+        else if (mem_read_enable_vector_inst)
+            pmem_byte_enable = '1;
+        else
+            pmem_byte_enable = {{(BUS_WIDTH/8-4){1'b0}}, mem_byte_lanes};
+    end
+
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
-            mem_write_enable_o <= '0;
+            mem_we_o <= 1'b0;
         else if (!stall)
-            mem_write_enable_o <= pmem_write_enable;
+            mem_we_o <= pmem_write;
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mem_be_o <= '0;
+        else if (!stall)
+            mem_be_o <= pmem_byte_enable;
     end
 
     logic mem_enable;
-    assign mem_enable = pmem_read_enable || (pmem_write_enable != '0);
+    assign mem_enable = pmem_read_enable || pmem_write;
 
 
     logic raise_exception;
@@ -323,7 +348,7 @@ module execute
             if (!reset_n)
                 mem_store_access <= 1'b0;
             else if (!stall)
-                mem_store_access <= ctrl_i.is_amo || ctrl_i.is_sc || (pmem_write_enable != '0);
+                mem_store_access <= ctrl_i.is_amo || ctrl_i.is_sc || pmem_write;
         end
     end
     else begin : gen_store_access_off
@@ -573,6 +598,7 @@ module execute
             .mem_write_enable_o     (mem_write_enable_vector),
             .mem_write_data_o       (mem_write_data_vector),
             .mem_read_data_i        (mem_read_data_i),
+            .mem_rsp_ok_i           (mem_rsp_ok_i),
             .res_scalar_o           (vector_scalar_result),
             .wr_en_scalar_o         (vector_wr_en)
         );

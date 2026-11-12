@@ -52,15 +52,20 @@ module fetch
     input   logic           jump_rollback_i,
     output  logic           bp_ack_o,
 
-    /* Memory interface */
-    output  logic           mem_operation_en_o,
-    input   logic           busy_i,
+    /* Address translation: virtual address out, physical address back in */
     output  logic [31:0]    instruction_address_o,
-    input   logic [31:0]    instruction_data_i,
+    input   logic [31:0]    instruction_paddr_i,
     /* Only Xosvm can fault a fetch */
     /* verilator lint_off UNUSEDSIGNAL */
     input   logic           inst_fault_i,
     /* verilator lint_on UNUSEDSIGNAL */
+
+    /* OBI instruction interface */
+    output  logic           mem_req_o,
+    input   logic           mem_gnt_i,
+    output  logic [31:0]    mem_addr_o,
+    input   logic           mem_rvalid_i,
+    input   logic [31:0]    instruction_data_i,
 
     /* Fetched output */
     output  decode_ctrl_t   ctrl_o,
@@ -77,7 +82,6 @@ module fetch
     /* Jumped condition and fetched instruction invalidation depends on BP */
     /* Instruction address of jump target also depends on BP               */
     logic jumped;
-    logic jumped_fetch;
     logic bp_taken_r;
     logic [31:0] iaddr_jumped;
 
@@ -87,18 +91,15 @@ module fetch
     logic is_jumping;
     assign is_jumping = (jumping_r && !jump_rollback_i) || jump_misaligned_r;
 
-    logic jump_confirmed;
-    assign jump_confirmed = should_jump_i || (bp_taken_r && !jump_rollback_i);
+    /* A predicted branch is resolved in the cycle after the prediction */
+    logic bp_confirm;
+    assign bp_confirm = bp_taken_r && !jump_rollback_i;
 
-    logic jumped_r;
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            jumped_r <= 1'b1;
-        else if (sys_reset)
-            jumped_r <= 1'b1;
-        else
-            jumped_r <= jumped;
-    end
+    logic bp_rollback;
+    assign bp_rollback = bp_taken_r && jump_rollback_i;
+
+    logic jump_confirmed;
+    assign jump_confirmed = should_jump_i || bp_confirm;
 
     logic jump_confirmed_r;
     always_ff @(posedge clk or negedge reset_n) begin
@@ -117,27 +118,27 @@ module fetch
     end
 
 ////////////////////////////////////////////////////////////////////////////////
-// Memory interface and instruction queue
+// Instruction queue
 ////////////////////////////////////////////////////////////////////////////////
 
     /* The existance of prefetching only occurs with compressed enablement */
     logic instruction_prefetched;
 
-    /* verilator lint_off UNUSEDSIGNAL */
-    logic almost_empty;
-    /* verilator lint_on UNUSEDSIGNAL */
-
     /* Buffer signals */
     logic valid_fetch;
     logic pop;
-    logic almost_full;
-    logic buffer_not_full;
     logic buffer_tx;
     logic empty_buffer;
     logic [31:0] inst_buffered;
     /* Unused without Xosvm */
     /* verilator lint_off UNUSEDSIGNAL */
     logic        fault_buffered;
+    /* verilator lint_on UNUSEDSIGNAL */
+    /* Never used: requests start only with room reserved (ibuf_cnt) */
+    /* verilator lint_off UNUSEDSIGNAL */
+    logic        buffer_not_full;
+    logic        almost_full;
+    logic        almost_empty;
     /* verilator lint_on UNUSEDSIGNAL */
 
     /* With Xosvm, the fault of each fetch travels along with its word */
@@ -146,17 +147,14 @@ module fetch
     logic [(IBUF_SIZE - 1):0] ibuf_in;
     logic [(IBUF_SIZE - 1):0] ibuf_out;
 
-    if (XOSVMEnable) begin : gen_fetch_fault_on
-        /* Data arrives one cycle after its request */
-        logic fetch_fault_r;
-        always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n)
-                fetch_fault_r <= 1'b0;
-            else
-                fetch_fault_r <= inst_fault_i;
-        end
+    /* Fault of the oldest request in flight, which is the one answering */
+    /* Unused without Xosvm */
+    /* verilator lint_off UNUSEDSIGNAL */
+    logic rsp_fault;
+    /* verilator lint_on UNUSEDSIGNAL */
 
-        assign ibuf_in        = {fetch_fault_r, instruction_data_i};
+    if (XOSVMEnable) begin : gen_fetch_fault_on
+        assign ibuf_in        = {rsp_fault, instruction_data_i};
         assign fault_buffered = ibuf_out[32];
     end
     else begin : gen_fetch_fault_off
@@ -166,11 +164,14 @@ module fetch
 
     assign inst_buffered = ibuf_out[31:0];
 
+    /* Words in the buffer */
+    logic [$clog2(IQUEUE_SIZE + 1) - 1:0] ibuf_cnt;
+
     RingBuffer #(
         .DATA_SIZE              (IBUF_SIZE  ),
         .BUFFER_SIZE            (IQUEUE_SIZE),
         .FIRST_WORD_FALL_THROUGH(1          ),
-        .ALMOST_FULL_THRESHOLD  (1          ),
+        .ALMOST_FULL_THRESHOLD  (0          ),
         .ALMOST_EMPTY_THRESHOLD (0          )
     ) ibuf (
         .clk_i         (clk),
@@ -182,30 +183,10 @@ module fetch
         .tx_o          (buffer_tx),
         .tx_ack_i      (pop),
         .data_o        (ibuf_out),
+        .count_o       (ibuf_cnt),
         .almost_full_o (almost_full),
         .almost_empty_o(almost_empty)
     );
-
-    logic mem_disabled;
-    assign mem_disabled = busy_i || !mem_operation_en_o;
-
-    /* When last cycle was busy, we do not have a valid fetch */
-    logic busy_r;
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            busy_r <= 1'b1;
-        else if (sys_reset)
-            busy_r <= 1'b1;
-        else
-            busy_r <= mem_disabled;
-    end
-
-    /* A valid fetch happens only when memory answers and the requested */
-    /* address is still valid. A jump invalidates the request.          */
-    assign valid_fetch = !busy_r && !jumped_fetch;
-
-    /* Read from memory everytime we can consume an instruction */
-    assign mem_operation_en_o = !almost_full || pop || !valid_fetch;
 
     /* When a jump is confirmed we clear the buffer */
     assign empty_buffer = sys_reset || jump_confirmed;
@@ -218,24 +199,128 @@ module fetch
     /* A misaligned jump will always have to read 2 times */
     assign pop = ((enable_i && !instruction_prefetched) || is_jumping);
 
-    /* Do not update instruction address if memory can't answer       */
-    /* Do not update if the present request will make the buffer full */
-    /* Do not update if the buffer is already full                    */
-    logic iaddr_hold;
-    assign iaddr_hold = (
-        mem_disabled 
-        || (!pop && ((almost_full && valid_fetch) || !buffer_not_full))
+////////////////////////////////////////////////////////////////////////////////
+// OBI instruction interface
+////////////////////////////////////////////////////////////////////////////////
+
+    /* Requests in flight: started and not yet answered, oldest at index 0. */
+    /* A started request is committed: it is held until granted, and its    */
+    /* response is dropped when a jump made it stale. A predicted branch is */
+    /* resolved in the next cycle: a confirmation makes the requests before */
+    /* it stale, a rollback the one started on the predicted path.          */
+    /* One request in flight per word the buffer can hold */
+    localparam int INFLIGHT = IQUEUE_SIZE;
+    localparam int CNT_W    = $clog2(INFLIGHT + 1);
+    localparam int IDX_W    = $clog2(INFLIGHT);
+
+    logic [CNT_W-1:0]    inflight_cnt;
+    logic [INFLIGHT-1:0] stale;
+    /* Unused without Xosvm */
+    /* verilator lint_off UNUSEDSIGNAL */
+    logic [INFLIGHT-1:0] inflight_fault;
+    /* verilator lint_on UNUSEDSIGNAL */
+
+    /* Requests still in flight that will be written to the buffer */
+    logic [CNT_W-1:0] inflight_valid;
+    always_comb begin
+        inflight_valid = '0;
+        for (int i = 0; i < INFLIGHT; i++) begin
+            if (CNT_W'(i) < inflight_cnt && !stale[i])
+                inflight_valid = inflight_valid + 1'b1;
+        end
+    end
+
+    /* A word read now from the buffer, or straight from memory, frees room */
+    logic word_leaving;
+    assign word_leaving = pop && buffer_tx;
+
+    /* Only start a request that will find room in the buffer. Right after   */
+    /* a predicted branch, the request needs no room: a confirmation flushes */
+    /* the buffer and the requests before it, a rollback makes it stale      */
+    logic can_start;
+    assign can_start = (
+        inflight_cnt < CNT_W'(INFLIGHT)
+        && (bp_taken_r || (32'(ibuf_cnt) + 32'(inflight_valid) - 32'(word_leaving)) < IQUEUE_SIZE)
     );
 
-    logic iaddr_hold_r;
+    /* An address phase waits for gnt with stable signals */
+    logic        pending_r;
+    logic [31:0] pending_addr;
+
+    logic req_start;
+    assign req_start = !pending_r && can_start;
+
+    assign mem_req_o  = pending_r || req_start;
+    assign mem_addr_o = pending_r ? pending_addr : instruction_paddr_i;
+
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
-            iaddr_hold_r <= 1'b0;
-        else if (sys_reset)
-            iaddr_hold_r <= 1'b0;
+            pending_r <= 1'b0;
         else
-            iaddr_hold_r <= iaddr_hold;
+            pending_r <= mem_req_o && !mem_gnt_i;
     end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            pending_addr <= '0;
+        else if (req_start)
+            pending_addr <= instruction_paddr_i;
+    end
+
+    /* Any jump makes all requests up to now stale */
+    logic hard_redirect;
+    assign hard_redirect = sys_reset || should_jump_i;
+
+    /* The oldest request answers. It is dropped when stale, or when it */
+    /* followed a predicted branch that is confirmed now                */
+    assign rsp_fault   = inflight_fault[0];
+    assign valid_fetch = mem_rvalid_i && !stale[0] && !bp_confirm;
+
+    /* Position of a starting request: after the ones still in flight. */
+    /* A request only starts with room, so it never exceeds INFLIGHT-1  */
+    logic [CNT_W-1:0] start_idx;
+    assign start_idx = inflight_cnt - CNT_W'(mem_rvalid_i);
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            inflight_cnt <= '0;
+        else
+            inflight_cnt <= start_idx + CNT_W'(req_start);
+    end
+
+    logic [INFLIGHT-1:0] stale_next;
+    always_comb begin
+        stale_next = mem_rvalid_i ? (stale >> 1) : stale;
+        stale_next = stale_next | {INFLIGHT{hard_redirect || bp_confirm}};
+        /* A request started now is stale if its address is being replaced */
+        if (req_start)
+            stale_next[start_idx[IDX_W-1:0]] = hard_redirect || bp_rollback;
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            stale <= '0;
+        else
+            stale <= stale_next;
+    end
+
+    logic [INFLIGHT-1:0] fault_next;
+    always_comb begin
+        fault_next = mem_rvalid_i ? (inflight_fault >> 1) : inflight_fault;
+        if (req_start)
+            fault_next[start_idx[IDX_W-1:0]] = inst_fault_i;
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            inflight_fault <= '0;
+        else
+            inflight_fault <= fault_next;
+    end
+
+////////////////////////////////////////////////////////////////////////////////
+// Instruction address
+////////////////////////////////////////////////////////////////////////////////
 
     logic [31:0] instruction_address;
     logic [31:0] next_instruction_address;
@@ -249,9 +334,9 @@ module fetch
             instruction_address <= start_address;
         end
         else begin
-            if (jumped || (jump_rollback_i && bp_taken_r))
+            if (jumped || bp_rollback)
                 instruction_address <= iaddr_jumped;
-            else if (!iaddr_hold || (iaddr_hold_r && valid_fetch && buffer_not_full))
+            else if (req_start)
                 instruction_address <= next_instruction_address;
         end
     end
@@ -265,27 +350,17 @@ module fetch
 ////////////////////////////////////////////////////////////////////////////////
 
     if (BRANCHPRED) begin : gen_bp_on
-        logic jump_rollback_r;
-        always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n)
-                jump_rollback_r <= 1'b0;
-            else if (sys_reset)
-                jump_rollback_r <= 1'b0;
-            else 
-                jump_rollback_r <= jump_rollback_i && bp_taken_r;
-        end
-        assign jumped_fetch = (jumped_r && !jump_rollback_i) || jump_rollback_r;
-
         logic bp_taken;
         assign bp_taken = (enable_i && bp_take_i && valid);
         assign jumped   = should_jump_i || bp_taken;
 
+        /* A rollback continues after the last request started before the branch */
         logic [31:0] iaddr_rollback;
         always_ff @(posedge clk or negedge reset_n) begin
             if (!reset_n)
                 iaddr_rollback <= '0;
             else if (bp_taken)
-                iaddr_rollback <= iaddr_hold ? instruction_address : next_instruction_address;
+                iaddr_rollback <= req_start ? next_instruction_address : instruction_address;
         end
 
         always_comb begin
@@ -319,7 +394,6 @@ module fetch
     end
     else begin : gen_bp_off
         assign jumped       = should_jump_i;
-        assign jumped_fetch = jumped_r && !jump_rollback_i;
         assign bp_taken_r   = 1'b0;
         assign bp_ack_o     = 1'b0;
 

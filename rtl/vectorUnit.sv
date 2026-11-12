@@ -43,6 +43,7 @@ module vectorUnit
     output logic [BUS_WIDTH/8-1:0] mem_write_enable_o,
     output logic [BUS_WIDTH-1:0]   mem_write_data_o,
     input  logic [BUS_WIDTH-1:0]   mem_read_data_i,
+    input  logic                   mem_rsp_ok_i,
 
     output  logic [31:0]           res_scalar_o,
     output  logic                  wr_en_scalar_o
@@ -609,6 +610,7 @@ module vectorUnit
         .mem_write_enable_o     (mem_write_enable_o),
         .mem_write_data_o       (mem_write_data_o),
         .mem_read_data_i        (mem_read_data_i),
+        .mem_rsp_ok_i           (mem_rsp_ok_i),
         .read_data_o            (result_lsu)
     );
 

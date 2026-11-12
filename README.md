@@ -38,6 +38,7 @@
 | Base ISA | RV32I |
 | Privilege modes | Machine mode (M-mode) and User mode (U-mode) |
 | Interrupt controller | optional [SiFive-compliant](https://github.com/riscv/riscv-plic-spec) [PLIC](rtl/plic.sv) |
+| Memory interfaces | [OBI](https://github.com/openhwgroup/obi) instruction and data managers, see [docs](docs/README.md#obi-interfaces) |
 | Machine timer | optional [mtimer](rtl/rtc.sv) |
 
 | Extension type | Available extensions |
@@ -94,6 +95,17 @@ Results are written to `sim/results/Output.txt` (simulation output) and `sim/res
 ```bash
 make -C sim
 ```
+
+The testbench memory answers through an OBI model ([sim/OBIDelay.sv](sim/OBIDelay.sv)) that also checks the protocol.
+Its latency and the pipeline options can be set from the command line:
+
+```bash
+make -C sim GNT_DELAY=2 RSP_DELAY=3 RANDOM_DELAY=1 SEED=7 DUALPORT_MEM=0 BRANCHPRED=1 FORWARDING=1
+```
+
+`GNT_DELAY` and `RSP_DELAY` are the cycles a request waits for `gnt` and the extra cycles before `rvalid`.
+With `RANDOM_DELAY=1`, each delay is drawn from 0 up to these values, with the given `SEED`.
+The core is configured for an instruction memory latency of `1 + RSP_DELAY` (`IMEM_LATENCY`), which can also be set.
 
 ### Simulate with Modelsim/Questa
 

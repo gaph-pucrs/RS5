@@ -210,7 +210,8 @@ module RS5Debug
                 entry_ret <= entry_mem;
                 entry_mem <= entry;
             end
-            fresh <= !RS5.stall;
+            /* An instruction reaching retire is logged once its response arrived */
+            fresh <= !RS5.stall || (fresh && !RS5.rsp_ok);
         end
     end
 
@@ -218,14 +219,14 @@ module RS5Debug
     string rd_write, rd_pending;
     always_comb begin
         rd_write = "";
-        if (RS5.ctrl_retire.rd_we && RS5.rd_retire != '0)
+        if (RS5.ctrl_writeback.rd_we && RS5.rd_retire != '0)
             rd_write = $sformatf("x%0d <- %s\n", RS5.rd_retire, hex_str(RS5.regbank_data_writeback, 32));
     end
 
     always_ff @(posedge RS5.clk or negedge RS5.reset_n) begin
         if (!RS5.reset_n)
             rd_pending <= "";
-        else if (fresh && entry_ret.valid)
+        else if (fresh && RS5.rsp_ok && entry_ret.valid)
             rd_pending <= "";
         else
             rd_pending <= {rd_pending, rd_write};
@@ -233,7 +234,7 @@ module RS5Debug
 
     /* Retire: the write-back and load data of the oldest instruction */
     always_ff @(posedge RS5.clk) begin
-        if (fd != 0 && fresh && entry_ret.valid) begin
+        if (fd != 0 && fresh && RS5.rsp_ok && entry_ret.valid) begin
             $fwrite(fd, "%s", entry_ret.log);
 
             if (entry_ret.load)

@@ -15,6 +15,9 @@ module mem_access
     /* MMU interface */
     input  logic        load_access_fault_i,
 
+    /* The instruction in retire has its read data, or awaits no response */
+    input  logic        rsp_ok_i,
+
     /* Registered outputs to retire */
     output wb_ctrl_t    ctrl_o,
     output logic [31:0] result_o,
@@ -29,8 +32,8 @@ module mem_access
             ctrl_o.rd_we  <= ctrl_i.rd_we && !load_access_fault_i;
         end
         else begin
-            /* rd was already written on the first stalled cycle: don't rewrite it with stale bus data */
-            ctrl_o.rd_we  <= 1'b0;
+            /* once rd is written, don't rewrite it with stale bus data while stalled */
+            ctrl_o.rd_we  <= ctrl_o.rd_we && !rsp_ok_i;
         end
     end
 
