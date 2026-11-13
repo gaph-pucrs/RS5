@@ -69,10 +69,10 @@ void TEST_CASE2(void) {
 
 void TEST_CASE3(void) {
   VSET(32, e32, m2);
-  VLOAD_32(v1, 9, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8,
+  VLOAD_32(v6, 9, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8,
                9, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, -8);
-  VLOAD_32(v3, -1);
-  asm volatile("vredmin.vs v4, v1, v3");
+  VLOAD_32(v8, -1);
+  asm volatile("vredmin.vs v4, v6, v8");
   VCMP_U32(9, v4, -8);
 }
 

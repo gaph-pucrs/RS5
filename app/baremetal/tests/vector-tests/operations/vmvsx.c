@@ -67,10 +67,10 @@ void TEST_CASE2() {
 void TEST_CASE3() {
   scalar_32b = 55 << 16;
   VSET(32, e32, m2);
-  VLOAD_32(v1, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
-  asm volatile("vmv.s.x v1, %0" ::"r"(scalar_32b));
-  VCMP_I32(8, v1, scalar_32b);
-  VCMP_I32(9, v1, scalar_32b);
+  VLOAD_32(v2, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  asm volatile("vmv.s.x v2, %0" ::"r"(scalar_32b));
+  VCMP_I32(8, v2, scalar_32b);
+  VCMP_I32(9, v2, scalar_32b);
 }
 
 int main(void) {

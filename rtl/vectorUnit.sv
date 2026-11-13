@@ -46,6 +46,8 @@ module vectorUnit
     output  logic [31:0]           vtype_o,
     output  logic [31:0]           vlen_o,
     output  logic                  vill_o,
+    /* Reserved register group or SEW/LMUL for the instruction (traps) */
+    output  logic                  illegal_cfg_o,
 
     output logic [31:0]            mem_address_o,
     output logic                   mem_read_enable_o,
@@ -184,6 +186,113 @@ module vectorUnit
         .vl                     (vl),
         .vl_next                (vl_next)
     );
+
+//////////////////////////////////////////////////////////////////////////////
+// Illegal configurations: checks that depend on vtype (the encoding-only
+// checks are in the decoder). Does not depend on enable_i, which execute
+// gates with this output.
+//////////////////////////////////////////////////////////////////////////////
+
+    /* Registers in a group of LMUL; a fractional LMUL uses one register */
+    logic [3:0] lmul_regs;
+    logic       lmul_ge1;
+    always_comb begin
+        unique case (vlmul)
+            LMUL_2:  lmul_regs = 4'd2;
+            LMUL_4:  lmul_regs = 4'd4;
+            LMUL_8:  lmul_regs = 4'd8;
+            default: lmul_regs = 4'd1;
+        endcase
+    end
+    assign lmul_ge1 = (vlmul inside {LMUL_1, LMUL_2, LMUL_4, LMUL_8});
+
+    /* Group sizes are powers of two, so alignment is a mask of the low bits */
+    function automatic logic misaligned(logic [4:0] reg_num, logic [4:0] group_regs);
+        return (reg_num & (group_regs - 5'd1)) != '0;
+    endfunction
+
+    function automatic logic groups_overlap(logic [4:0] a, logic [4:0] a_regs, logic [4:0] b, logic [4:0] b_regs);
+        return ({1'b0, a} < {1'b0, b} + {1'b0, b_regs}) && ({1'b0, b} < {1'b0, a} + {1'b0, a_regs});
+    endfunction
+
+    /* Widening: EEW = 2*SEW and EMUL = 2*LMUL must be legal (SEW <= 16, LMUL <= 4).    */
+    /* The destination may overlap a source only in its highest-numbered half, and only */
+    /* when the source EMUL is at least 1.                                              */
+    logic [4:0] vd_regs;
+    assign vd_regs = widening_instruction ? (lmul_ge1 ? {lmul_regs, 1'b0} : 5'd1) : {1'b0, lmul_regs};
+
+    function automatic logic widening_overlap(logic [4:0] dst, logic [4:0] dst_regs, logic [4:0] src, logic [4:0] src_regs, logic src_emul_ge1);
+        return groups_overlap(dst, dst_regs, src, src_regs) && !(src_emul_ge1 && ({1'b0, src} == {1'b0, dst} + {1'b0, src_regs}));
+    endfunction
+
+    /* Compares write one mask register, which may only overlap the lowest-numbered */
+    /* register of a source group                                                   */
+    function automatic logic mask_dest_overlap(logic [4:0] dst, logic [4:0] src, logic [4:0] src_regs);
+        return (dst > src) && ({1'b0, dst} < {1'b0, src} + {1'b0, src_regs});
+    endfunction
+
+    logic arith_checked;
+    logic vs1_is_vector;
+    logic check_vd, check_vs2, check_vs1;
+    logic arith_illegal;
+
+    assign arith_checked = !(vector_operation_i inside {VNOP, VSETVL, VSETVLI, VSETIVLI, VMVR, VMVXS, VMVSX, VLD, VST});
+    assign vs1_is_vector = (opCat inside {OPIVV, OPMVV});
+    assign check_vd      = !(mask_instruction || reduction_instruction);
+    assign check_vs2     = (vector_operation_i != VMV);
+    assign check_vs1     = vs1_is_vector && !reduction_instruction;
+
+    always_comb begin
+        arith_illegal = 1'b0;
+        if (check_vd  && misaligned(rd,  vd_regs))           arith_illegal = 1'b1;
+        if (check_vs2 && misaligned(rs2, {1'b0, lmul_regs})) arith_illegal = 1'b1;
+        if (check_vs1 && misaligned(rs1, {1'b0, lmul_regs})) arith_illegal = 1'b1;
+
+        if (widening_instruction) begin
+            if (vsew != EW8 && vsew != EW16)                 arith_illegal = 1'b1;
+            if (vlmul == LMUL_8)                             arith_illegal = 1'b1;
+            if (widening_overlap(rd, vd_regs, rs2, {1'b0, lmul_regs}, lmul_ge1))
+                                                             arith_illegal = 1'b1;
+            if (vs1_is_vector && widening_overlap(rd, vd_regs, rs1, {1'b0, lmul_regs}, lmul_ge1))
+                                                             arith_illegal = 1'b1;
+        end
+
+        if (mask_instruction) begin
+            if (mask_dest_overlap(rd, rs2, {1'b0, lmul_regs}))                  arith_illegal = 1'b1;
+            if (vs1_is_vector && mask_dest_overlap(rd, rs1, {1'b0, lmul_regs})) arith_illegal = 1'b1;
+        end
+
+        /* vslide1up cannot write over its source */
+        if (vector_operation_i == VSLIDE1UP && groups_overlap(rd, {1'b0, lmul_regs}, rs2, {1'b0, lmul_regs}))
+                                                             arith_illegal = 1'b1;
+    end
+
+    /* Unit-stride and strided loads/stores: data group aligned to EMUL, checked */
+    /* only for EEW = SEW (EMUL = LMUL). Indexed: data (EEW = SEW) aligned to     */
+    /* LMUL, offsets checked only for an index EEW = SEW. The other EEW != SEW    */
+    /* cases and the destination/index overlap rules are P8.                      */
+    logic mem_illegal;
+    logic mem_eew_is_sew;
+    logic mem_checked;
+    logic mem_indexed;
+    always_comb begin
+        unique case (instruction_i[14:12])
+            3'b000:  mem_eew_is_sew = (vsew == EW8);
+            3'b101:  mem_eew_is_sew = (vsew == EW16);
+            default: mem_eew_is_sew = (vsew == EW32);
+        endcase
+    end
+    /* Whole register and mask accesses (unit-stride, lumop 01000 and 01011) */
+    /* are not checked here. Decoded from the instruction, not enable_i.     */
+    assign mem_indexed = instruction_i[26];
+    assign mem_checked = (vector_operation_i inside {VLD, VST})
+                      && !(instruction_i[27:26] == 2'b00 && instruction_i[24:20] inside {5'b01000, 5'b01011});
+    assign mem_illegal = mem_checked && (
+                            ((mem_indexed || mem_eew_is_sew) && misaligned(rd,  {1'b0, lmul_regs}))
+                        ||  ( mem_indexed && mem_eew_is_sew  && misaligned(rs2, {1'b0, lmul_regs}))
+                        );
+
+    assign illegal_cfg_o = (arith_checked && arith_illegal) || mem_illegal;
 
 //////////////////////////////////////////////////////////////////////////////
 // MASKs

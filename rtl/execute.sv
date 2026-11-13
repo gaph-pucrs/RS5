@@ -573,15 +573,18 @@ module execute
 
     if (VEnable) begin : v_gen_on
         /* Vector instructions trap when the vector state is Off, when vtype  */
-        /* is illegal (vill) and the instruction depends on it, and when     */
-        /* vstart != 0, a value the core never produces (vset* clear it).    */
+        /* is illegal (vill) and the instruction depends on it, when the     */
+        /* register groups or SEW/LMUL are reserved for the instruction, and */
+        /* when vstart != 0, a value the core never produces (vset* clear it). */
         logic is_vset;
         logic vector_vill;
+        logic vector_illegal_cfg;
         assign is_vset = ctrl_i.vector_op inside {VSETVL, VSETVLI, VSETIVLI};
 
         assign exc_ilegal_vector = ctrl_i.is_vector && (
             (mstatus_vs_i == 2'b00) ||
             (vector_vill && ctrl_i.uses_vtype) ||
+            vector_illegal_cfg ||
             (vstart_nonzero_i && !is_vset)
         );
 
@@ -614,6 +617,7 @@ module execute
             .vtype_o                (vtype_o),
             .vlen_o                 (vlen_o),
             .vill_o                 (vector_vill),
+            .illegal_cfg_o          (vector_illegal_cfg),
             .mem_address_o          (mem_address_vector),
             .mem_read_enable_o      (mem_read_enable_vector),
             .mem_write_enable_o     (mem_write_enable_vector),

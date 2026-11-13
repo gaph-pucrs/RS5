@@ -71,11 +71,58 @@ void TEST_CASE1(void) {
   EXPECT_LEGAL(56, 0x02b50087); // vlm.v v1, (a0)
 }
 
+// Reserved register groups and SEW/LMUL, rejected by the vector unit with
+// the current vtype
+void TEST_CASE2(void) {
+  VSET(16, e32, m1);
+  EXPECT_ILLEGAL(101, 0xee432157); // vwmul.vv v2, v4, v6 (widening with SEW = 32)
+  VSET(16, e8, m8);
+  EXPECT_ILLEGAL(102, 0xee042857); // vwmul.vv v16, v0, v8 (widening with LMUL = 8)
+  VSET(16, e8, m2);
+  EXPECT_ILLEGAL(103, 0x022200d7); // vadd.vv v1, v2, v4 (vd not aligned)
+  EXPECT_ILLEGAL(104, 0x02320157); // vadd.vv v2, v3, v4 (vs2 not aligned)
+  EXPECT_ILLEGAL(105, 0x02428157); // vadd.vv v2, v4, v5 (vs1 not aligned)
+  EXPECT_ILLEGAL(106, 0x0245c1d7); // vadd.vx v3, v4, a1 (vd not aligned)
+  EXPECT_LEGAL(107, 0x0245c157); // vadd.vx v2, v4, a1
+  EXPECT_ILLEGAL(108, 0xee852157); // vwmul.vv v2, v8, v10 (vd not aligned to 4)
+  EXPECT_ILLEGAL(109, 0xee442257); // vwmul.vv v4, v4, v8 (vs2 in low half of vd)
+  EXPECT_ILLEGAL(110, 0xee822257); // vwmul.vv v4, v8, v4 (vs1 in low half of vd)
+  EXPECT_LEGAL(111, 0xee642257); // vwmul.vv v4, v6, v8 (vs2 in high half of vd)
+  EXPECT_LEGAL(112, 0xee852257); // vwmul.vv v4, v8, v10
+  EXPECT_ILLEGAL(113, 0x622201d7); // vmseq.vv v3, v2, v4 (vd inside vs2 group)
+  EXPECT_ILLEGAL(114, 0x622202d7); // vmseq.vv v5, v2, v4 (vd inside vs1 group)
+  EXPECT_LEGAL(115, 0x62220157); // vmseq.vv v2, v2, v4 (vd = lowest of vs2)
+  EXPECT_LEGAL(116, 0x622200d7); // vmseq.vv v1, v2, v4
+  EXPECT_ILLEGAL(117, 0x0230a0d7); // vredsum.vs v1, v3, v1 (vs2 not aligned)
+  EXPECT_LEGAL(118, 0x0221a0d7); // vredsum.vs v1, v2, v3
+  EXPECT_ILLEGAL(119, 0x5e018157); // vmv.v.v v2, v3 (vs1 not aligned)
+  EXPECT_ILLEGAL(120, 0x5e05c1d7); // vmv.v.x v3, a1 (vd not aligned)
+  EXPECT_LEGAL(121, 0x423025d7); // vmv.x.s a1, v3 (ignores LMUL)
+  EXPECT_LEGAL(122, 0x4205e1d7); // vmv.s.x v3, a1 (ignores LMUL)
+  EXPECT_ILLEGAL(123, 0x3a25e157); // vslide1up.vx v2, v2, a1 (vd overlaps vs2)
+  EXPECT_ILLEGAL(124, 0x3a45e257); // vslide1up.vx v4, v4, a1 (vd overlaps vs2)
+  EXPECT_LEGAL(125, 0x3a45e157); // vslide1up.vx v2, v4, a1
+  EXPECT_LEGAL(126, 0x3e25e157); // vslide1down.vx v2, v2, a1
+  EXPECT_ILLEGAL(127, 0x02050087); // vle8.v v1, (a0) (vd not aligned)
+  EXPECT_LEGAL(128, 0x02050107); // vle8.v v2, (a0)
+  EXPECT_ILLEGAL(129, 0x020501a7); // vse8.v v3, (a0) (vs3 not aligned)
+  EXPECT_ILLEGAL(130, 0x0ab50187); // vlse8.v v3, (a0), a1 (vd not aligned)
+  EXPECT_ILLEGAL(131, 0x06350107); // vluxei8.v v2, (a0), v3 (index not aligned)
+  EXPECT_ILLEGAL(132, 0x06250187); // vluxei8.v v3, (a0), v2 (vd not aligned)
+  EXPECT_LEGAL(133, 0x02b50087); // vlm.v v1, (a0) (mask load)
+  EXPECT_LEGAL(134, 0x028500a7); // vs1r.v v1, (a0) (whole register)
+  EXPECT_LEGAL(135, 0x9e3030d7); // vmv1r.v v1, v3 (whole register)
+  VSET(16, e8, mf2);
+  EXPECT_ILLEGAL(136, 0xee42a257); // vwmul.vv v4, v4, v5 (overlap, source EMUL < 1)
+  EXPECT_LEGAL(137, 0xee532257); // vwmul.vv v4, v5, v6
+}
+
 int main(void) {
   INIT_CHECK();
   enable_vec();
 
   TEST_CASE1();
+  TEST_CASE2();
 
   EXIT_CHECK();
 }

@@ -224,9 +224,9 @@ void TEST_CASE5(void) {
                0x7a66, 0xdc69, 0xd88b, 0xa611, 0x5a08, 0x6836, 0x9130, 0x85be,
                0x84ef, 0xf522, 0x6224, 0x6e02, 0xeedb, 0x5a1f, 0x98d7, 0xa498,
                0x7a66, 0xdc69, 0xd88b, 0xa611, 0x5a08, 0x6836, 0x9130, 0x85be);
-  asm volatile("vwmulsu.vv v6, v2, v4");
+  asm volatile("vwmulsu.vv v8, v2, v4");
   VSET(64, e32, m4);
-  LVCMP_U32(13, v6, 64, VM2_I32);
+  LVCMP_U32(13, v8, 64, VM2_I32);
 };
 
 int main(void) {
