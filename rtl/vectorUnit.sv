@@ -314,11 +314,19 @@ module vectorUnit
     logic [7:0][(VLENB/2)-1:0] mask_sew16;
     logic [7:0][(VLENB/4)-1:0] mask_sew32;
 
+    /* A compare can write v0 while v0 is its mask, and with LMUL > 1 it    */
+    /* writes the destination once per source register. The mask then comes */
+    /* from the copy of the old destination taken before the first write.   */
+    logic [VLEN-1:0] mask_source;
+    logic            old_vd_valid;
+
+    assign mask_source = (mask_instruction && rd == '0 && old_vd_valid) ? third_operand : v0_mask;
+
     always_comb begin
         for (int i = 0; i < 8; i++) begin
-            mask_sew8 [i] = v0_mask[( VLENB   *(i+1))-1-:VLENB];
-            mask_sew16[i] = v0_mask[((VLENB/2)*(i+1))-1-:VLENB/2];
-            mask_sew32[i] = v0_mask[((VLENB/4)*(i+1))-1-:VLENB/4];
+            mask_sew8 [i] = mask_source[( VLENB   *(i+1))-1-:VLENB];
+            mask_sew16[i] = mask_source[((VLENB/2)*(i+1))-1-:VLENB/2];
+            mask_sew32[i] = mask_source[((VLENB/4)*(i+1))-1-:VLENB/4];
         end
     end
 
@@ -548,6 +556,10 @@ module vectorUnit
                 endcase
             end
         end
+        /* Compares read the old destination on their first hold cycle */
+        else if (mask_instruction && hold) begin
+            vs2_addr = rd;
+        end
         else begin
             vs2_addr = rs2_addr;
         end
@@ -678,12 +690,26 @@ module vectorUnit
         end
     end
 
+    /* For compares, third_operand keeps the old destination: it is taken */
+    /* on the first hold cycle, before the instruction writes vd.          */
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             third_operand <= '0;
         end
-        else if (!should_stall && hold) begin
+        else if (!should_stall && hold && !(mask_instruction && old_vd_valid)) begin
             third_operand <= vs2_data;
+        end
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            old_vd_valid <= 1'b0;
+        end
+        else if (!should_stall) begin
+            if (next_state == V_IDLE)
+                old_vd_valid <= 1'b0;
+            else if (mask_instruction && hold)
+                old_vd_valid <= 1'b1;
         end
     end
 
@@ -818,11 +844,38 @@ module vectorUnit
         end
     end
 
+    /* A compare writes only its active body elements: masked-off elements */
+    /* and the tail keep the old destination (undisturbed is always legal). */
+    /* The write happens one cycle after the compare computed it, when the  */
+    /* next instruction may already be in execute, so vm and the mask      */
+    /* source are registered like mask_instruction_r.                       */
+    logic            compare_vm_r;
+    logic            compare_v0_copy_r;
+    logic [VLEN-1:0] compare_body;
+    logic [VLEN-1:0] compare_active;
+    logic [VLEN-1:0] result_compare;
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            compare_vm_r      <= 1'b0;
+            compare_v0_copy_r <= 1'b0;
+        end
+        else if (!should_stall) begin
+            compare_vm_r      <= vm;
+            compare_v0_copy_r <= mask_instruction && rd == '0 && old_vd_valid;
+        end
+    end
+
+    /* Elements below vl (VLEN + 1 bits so vl = VLEN fits; truncated) */
+    assign compare_body   = ~({(VLEN+1){1'b1}} << vl);
+    assign compare_active = compare_body & (compare_vm_r ? '1 : (compare_v0_copy_r ? third_operand : v0_mask));
+    assign result_compare = (third_operand & ~compare_active) | (result_alu_mask & compare_active);
+
     always_comb begin
         if (op_vload_r)
             result = result_lsu;
         else if (mask_instruction_r)
-            result = result_alu_mask;
+            result = result_compare;
         else
             result = result_alu;
     end
