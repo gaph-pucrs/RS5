@@ -38,7 +38,7 @@ class sail_cSim(pluginTemplate):
         self.work_dir = work_dir
         self.objdump_cmd = self.triplet+'-objdump -D {0} > {2};'
         self.compile_cmd = self.triplet+'-gcc -march={0} \
-         -static -mcmodel=medany -fvisibility=hidden -nostdlib -nostartfiles\
+         -static -mcmodel=medany -fvisibility=hidden -nostdlib -nostartfiles -mno-relax\
          -T '+self.pluginpath+'/env/link.ld\
          -I '+self.pluginpath+'/env/\
          -I ' + archtest_env

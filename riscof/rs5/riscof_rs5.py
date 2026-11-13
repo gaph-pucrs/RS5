@@ -50,7 +50,7 @@ class rs5(pluginTemplate):
 
         # Note the march is not hardwired here, because it will change for each test
         self.compile_cmd = self.triplet + '-gcc -march={0} \
-            -static -mcmodel=medany -fvisibility=hidden -nostdlib -nostartfiles -g\
+            -static -mcmodel=medany -fvisibility=hidden -nostdlib -nostartfiles -mno-relax -g\
             -T '+self.pluginpath+'/env/link.ld\
             -I '+self.pluginpath+'/env/\
             -I ' + archtest_env + ' {2} -o {3} {4}'
