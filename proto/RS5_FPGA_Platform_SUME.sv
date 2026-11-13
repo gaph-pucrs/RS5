@@ -33,7 +33,7 @@ module RS5_FPGA_Platform
     parameter bit           VEnable           = 1'b0,
     parameter bit           BRANCHPRED        = 1'b1,
     parameter bit           FORWARDING        = 1'b1,
-    parameter int           IQUEUE_SIZE       = 2,
+    parameter int           IMEM_LATENCY      = 1,
     parameter int           VLEN              = 64,
     parameter int           CLKS_PER_BIT_UART = 1736
 )
@@ -59,6 +59,9 @@ module RS5_FPGA_Platform
 
     logic [31:0]            cpu_instruction_address, cpu_instruction;
     logic [31:0]            cpu_data_address, cpu_data_in, cpu_data_out;
+    logic                   cpu_instruction_enable, cpu_instruction_rvalid;
+    logic                   cpu_data_req, cpu_data_gnt, cpu_data_we, cpu_data_rvalid;
+    logic [3:0]             cpu_data_be;
     logic                   cpu_operation_enable, enable_ram, enable_peripherals, enable_rtc, enable_plic;
     logic                   enable_rtc_r, enable_plic_r, enable_peripherals_r;
     logic [63:0]            mtime;
@@ -76,45 +79,43 @@ module RS5_FPGA_Platform
 // Control
 //////////////////////////////////////////////////////////////////////////////
     
-    always_comb begin
-        if (cpu_operation_enable) begin
-            if (cpu_data_address[31:28] < 4'h2) begin
-                enable_ram          = 1'b1;
-                enable_rtc          = 1'b0;
-                enable_plic         = 1'b0;
-                enable_peripherals  = 1'b0;
-            end
-            else if (cpu_data_address[31:28] < 4'h3) begin
-                enable_ram          = 1'b0;
-                enable_rtc          = 1'b1;
-                enable_plic         = 1'b0;
-                enable_peripherals  = 1'b0;
-            end
-            else if (cpu_data_address[31:28] < 4'h8) begin
-                enable_ram          = 1'b0;
-                enable_rtc          = 1'b0;
-                enable_plic         = 1'b1;
-                enable_peripherals  = 1'b0;
-            end
-            else begin
-                enable_ram          = 1'b0;
-                enable_rtc          = 1'b0;
-                enable_plic         = 1'b0;
-                enable_peripherals  = 1'b1;
-            end
-        end
-        else begin
-            enable_ram          = 1'b0;
-            enable_rtc          = 1'b0;
-            enable_plic         = 1'b0;
-            enable_peripherals  = 1'b0;
-        end
+    /* OBI data interface: the peripherals stall a request by withholding gnt */
+    /* Every target answers in the cycle after the access                    */
+    assign cpu_data_gnt         = !stall;
+    assign cpu_operation_enable = cpu_data_req && cpu_data_gnt;
+    assign cpu_write_enable     = cpu_data_we ? cpu_data_be : 4'h0;
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            cpu_data_rvalid <= 1'b0;
+        else
+            cpu_data_rvalid <= cpu_operation_enable;
     end
 
+    /* The instruction memory is always ready */
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            cpu_instruction_rvalid <= 1'b0;
+        else
+            cpu_instruction_rvalid <= cpu_instruction_enable;
+    end
+
+    assign enable_ram         = cpu_data_req && (cpu_data_address[31:28] <  4'h2);
+    assign enable_rtc         = cpu_data_req && (cpu_data_address[31:28] == 4'h2);
+    assign enable_plic        = cpu_data_req && (cpu_data_address[31:28] >= 4'h3) && (cpu_data_address[31:28] < 4'h8);
+    assign enable_peripherals = cpu_data_req && (cpu_data_address[31:28] >= 4'h8);
+
+    /* A target is accessed once its request is granted */
+    logic access_ram, access_rtc, access_plic, access_peripherals;
+    assign access_ram         = enable_ram         && cpu_data_gnt;
+    assign access_rtc         = enable_rtc         && cpu_data_gnt;
+    assign access_plic        = enable_plic        && cpu_data_gnt;
+    assign access_peripherals = enable_peripherals && cpu_data_gnt;
+
     always_ff @(posedge clk) begin
-        enable_rtc_r            <= enable_rtc;
-        enable_plic_r           <= enable_plic;
-        enable_peripherals_r    <= enable_peripherals;
+        enable_rtc_r            <= access_rtc;
+        enable_plic_r           <= access_plic;
+        enable_peripherals_r    <= access_peripherals;
     end
 
     always_comb begin
@@ -151,27 +152,30 @@ module RS5_FPGA_Platform
         .COMPRESSED      (COMPRESSED      ),
         .VEnable         (VEnable         ),
         .VLEN            (VLEN            ),
-        .IQUEUE_SIZE     (IQUEUE_SIZE     ),
+        .IMEM_LATENCY    (IMEM_LATENCY    ),
         .BRANCHPRED      (BRANCHPRED      ),
         .FORWARDING      (FORWARDING      )
     ) dut (
         .clk                    (clk),
         .reset_n                (reset_n),
         .sys_reset_i            (1'b0),
-        .stall                  (stall),
-        .busy_i                 (1'b0),
-        .instruction_i          (cpu_instruction),
-        .mem_data_i             (cpu_data_in),
         .mtime_i                (mtime),
         .tip_i                  (mti),
         .eip_i                  (mei),
-        .imem_operation_enable_o(cpu_instruction_enable),
-        .instruction_address_o  (cpu_instruction_address),
-        .dmem_operation_enable_o(cpu_operation_enable),
-        .mem_write_enable_o     (cpu_write_enable),
-        .mem_address_o          (cpu_data_address),
-        .mem_data_o             (cpu_data_out),
-        .interrupt_ack_o        (interrupt_ack)
+        .interrupt_ack_o        (interrupt_ack),
+        .instr_req_o            (cpu_instruction_enable),
+        .instr_gnt_i            (1'b1),
+        .instr_addr_o           (cpu_instruction_address),
+        .instr_rvalid_i         (cpu_instruction_rvalid),
+        .instr_rdata_i          (cpu_instruction),
+        .data_req_o             (cpu_data_req),
+        .data_gnt_i             (cpu_data_gnt),
+        .data_addr_o            (cpu_data_address),
+        .data_we_o              (cpu_data_we),
+        .data_be_o              (cpu_data_be),
+        .data_wdata_o           (cpu_data_out),
+        .data_rvalid_i          (cpu_data_rvalid),
+        .data_rdata_i           (cpu_data_in)
     );
 
 //////////////////////////////////////////////////////////////////////////////
@@ -187,7 +191,7 @@ module RS5_FPGA_Platform
         .douta  (cpu_instruction),          // output wire [31 : 0] douta
         //////////////////////////////////////////////////////
         .clkb   (clk),                      // input wire clkb
-        .enb    (enable_ram),               // input wire enb
+        .enb    (access_ram),               // input wire enb
         .web    (cpu_write_enable),         // input wire [3 : 0] web
         .addrb  (cpu_data_address),         // input wire [31 : 0] addrb
         .dinb   (cpu_data_out),             // input wire [31 : 0] dinb
@@ -200,7 +204,7 @@ module RS5_FPGA_Platform
     rtc rtc(
         .clk        (clk),
         .reset_n    (reset_n),
-        .en_i       (enable_rtc),
+        .en_i       (access_rtc),
         .addr_i     (cpu_data_address[3:0]),
         .we_i       ({4'h0, cpu_write_enable}),
         .data_i     ({32'h0, cpu_data_out}),
@@ -218,7 +222,7 @@ module RS5_FPGA_Platform
     ) plic1 (
         .clk     (clk),
         .reset_n (reset_n),
-        .en_i    (enable_plic),
+        .en_i    (access_plic),
         .we_i    (cpu_write_enable),
         .addr_i  (cpu_data_address[23:0]),
         .data_i  (cpu_data_out),

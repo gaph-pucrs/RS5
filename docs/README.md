@@ -72,11 +72,11 @@ Both memory interfaces follow the [OpenHW OBI](https://github.com/openhwgroup/ob
 
 * Once asserted, `req` and the address phase signals hold until `gnt`. A request is never withdrawn, even when a jump makes a fetch unnecessary: its response is discarded.
 * `rvalid` may arrive any number of cycles after `gnt`, at least one. Every granted request, loads and stores alike, receives exactly one `rvalid`, in order.
-* Each interface keeps at most two requests without response. The data interface may have its next request granted while it waits for the previous response.
+* The data interface keeps at most two requests without response: its next request may be granted while it waits for the previous response. The instruction interface keeps up to the *IBUF* size (see `IMEM_LATENCY`) requests without response.
 * A memory that grants every request and answers in the next cycle (e.g., a BRAM with `gnt = 1` and `rvalid` as the registered `req && gnt`) runs the core exactly as fast as with zero wait states.
 * While the data interface waits for `gnt` or `rvalid`, the pipeline stalls. Fetch continues until *IBUF* is full.
 * With `BUS_WIDTH` > 32, the byte lanes are relative to the word in `data_addr_o`, as used by the vector unit.
-* `instr_req_o` depends combinationally on `data_gnt_i` and `data_rvalid_i` (the pipeline stall frees room in *IBUF*), and on `instr_rvalid_i`, but never on `instr_gnt_i`. When both interfaces share a subordinate, its `data_gnt` must not depend combinationally on `instr_req`, e.g., give the data interface priority.
+* `instr_req_o` and `data_req_o` are driven from registers only: they never depend combinationally on any `gnt` or `rvalid` input, of either interface. A subordinate or arbiter may therefore compute `gnt` from `req` freely.
 * There are no `err`, `atop` or `exokay` signals yet: atomics are performed by the core as a load followed by a store.
 
 ---
@@ -114,7 +114,7 @@ Non-extension parameters configure processor behaviour and target environment.
 | `Environment` | `environment_e` | `ASIC` | Target technology: `ASIC` or `FPGA` (selects LUT-RAM register bank on FPGA) |
 | `START_ADDR` | `logic [31:0]` | `0x00000000` | Reset/boot address loaded into the program counter on reset |
 | `BUS_WIDTH` | `int` | `32` | Data bus width in bits |
-| `IMEM_LATENCY` | `int` | `1` | Cycles from `instr_gnt_i` to `instr_rvalid_i` of a typical fetch (1: the next cycle). It sizes the instruction buffer and the fetch requests kept in flight to the smallest power of 2 above it: 2 for latency 1, 4 for latency 2–3, 8 for latency 4–7. A larger value never slows a faster memory, it only costs one buffer entry (32 flip-flops) per word |
+| `IMEM_LATENCY` | `int` | `1` | Cycles from `instr_gnt_i` to `instr_rvalid_i` of a typical fetch (1: the next cycle). It sizes the instruction buffer and the fetch requests kept in flight to the smallest power of 2 above `IMEM_LATENCY + 1`: 4 for latency 1–2, 8 for latency 3–6, 16 for latency 7–14. A larger value never slows a faster memory, it only costs one buffer entry (32 flip-flops) per word |
 | `BRANCHPRED` | `bit` | `1` | Enable static branch prediction (resolves immediate-target branches at decode instead of execute) |
 | `FORWARDING` | `bit` | `1` | Enable data forwarding from execute result and memory read; writeback forwarding is always active |
 | `VLEN` | `int` | `256` | Vector register length in bits (effective when `VEnable = 1`) |
