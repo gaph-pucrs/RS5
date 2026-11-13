@@ -236,7 +236,10 @@ module vectorALU
     logic [   VLEN -1:0]    result_lanes;
     logic [   VLEN -1:0]    result_mult_low;
 
-    assign enable_lane = current_state == V_EXEC && vector_operation_i != VNOP && !hold_widening_r && !hold_accumulation_r && !reduction_instruction && !slide_instruction;
+    /* The lanes stop in the extra cycle of a compare (hold_mask_r): with      */
+    /* LLEN > 32 a lane that kept running would restart its element counter, */
+    /* raise hold_llen again and re-arm hold_mask, so the compare never ends. */
+    assign enable_lane = current_state == V_EXEC && vector_operation_i != VNOP && !hold_widening_r && !hold_accumulation_r && !hold_mask_r && !reduction_instruction && !slide_instruction;
 
     generate
         for (genvar i_lane = 0; i_lane < LANES; i_lane++) begin : LANE_LOOP
