@@ -16,10 +16,18 @@
 module vectorUnit
     import RS5_pkg::*;
 #(
-    parameter environment_e Environment = ASIC,
-    parameter int           VLEN        = 64,
-    parameter int           LLEN        = 32,
-    parameter int           BUS_WIDTH   = 32
+    parameter environment_e Environment           = ASIC,
+    parameter int           VLEN                  = 64,
+    parameter int           LLEN                  = 32,
+    parameter int           BUS_WIDTH             = 32,
+    parameter bit           VLogicEnable          = 1'b1,
+    parameter bit           VMinMaxEnable         = 1'b1,
+    parameter bit           VMergeEnable          = 1'b1,
+    parameter bit           VDivEnable            = 1'b1,
+    parameter bit           VRedLogicEnable       = 1'b1,
+    parameter bit           VRedMinMaxEnable      = 1'b1,
+    parameter bit           VRedSumEnable         = 1'b1,
+    parameter bit           VMultiCycleReductions = 1'b0
 )
 (
     input   logic                  clk,
@@ -622,10 +630,17 @@ module vectorUnit
                             : vl_curr_reg;
 
     vectorALU #(
-        .VLEN   (VLEN),
-        .LLEN   (LLEN),
-        .VLENB  (VLENB),
-        .MULTI_CYCLE_REDUCTIONS(1'b0)
+        .VLEN                  (VLEN                 ),
+        .LLEN                  (LLEN                 ),
+        .VLENB                 (VLENB                ),
+        .VLogicEnable          (VLogicEnable         ),
+        .VMinMaxEnable         (VMinMaxEnable        ),
+        .VRedLogicEnable       (VRedLogicEnable      ),
+        .VRedMinMaxEnable      (VRedMinMaxEnable     ),
+        .VRedSumEnable         (VRedSumEnable        ),
+        .VMergeEnable          (VMergeEnable         ),
+        .VDivEnable            (VDivEnable           ),
+        .VMultiCycleReductions (VMultiCycleReductions)
     ) vectorALU1 (
         .clk                   (clk),
         .reset_n               (reset_n),

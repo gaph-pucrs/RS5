@@ -41,7 +41,15 @@ module execute
     parameter int           VLEN         = 64,
     parameter int           LLEN         = 32,
     parameter int           BUS_WIDTH    = 32,
-    parameter bit           BRANCHPRED   = 1'b1
+    parameter bit           BRANCHPRED   = 1'b1,
+    parameter bit           VLogicEnable          = 1'b1,
+    parameter bit           VMinMaxEnable         = 1'b1,
+    parameter bit           VMergeEnable          = 1'b1,
+    parameter bit           VDivEnable            = 1'b1,
+    parameter bit           VRedLogicEnable       = 1'b1,
+    parameter bit           VRedMinMaxEnable      = 1'b1,
+    parameter bit           VRedSumEnable         = 1'b1,
+    parameter bit           VMultiCycleReductions = 1'b0
 )
 (
     input   logic                   clk,
@@ -552,10 +560,18 @@ module execute
 
     if (VEnable) begin : v_gen_on
         vectorUnit #(
-            .Environment (Environment),
-            .VLEN        (VLEN       ),
-            .LLEN        (LLEN       ),
-            .BUS_WIDTH   (BUS_WIDTH  )
+            .Environment           (Environment          ),
+            .VLEN                  (VLEN                 ),
+            .LLEN                  (LLEN                 ),
+            .BUS_WIDTH             (BUS_WIDTH            ),
+            .VLogicEnable          (VLogicEnable         ),
+            .VMinMaxEnable         (VMinMaxEnable        ),
+            .VMergeEnable          (VMergeEnable         ),
+            .VDivEnable            (VDivEnable           ),
+            .VRedLogicEnable       (VRedLogicEnable      ),
+            .VRedMinMaxEnable      (VRedMinMaxEnable     ),
+            .VRedSumEnable         (VRedSumEnable        ),
+            .VMultiCycleReductions (VMultiCycleReductions)
         ) vector (
             .clk                    (clk),
             .reset_n                (reset_n),

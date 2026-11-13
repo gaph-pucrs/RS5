@@ -44,7 +44,17 @@ module RS5
     parameter bit           HPMCOUNTEREnable = 1'b0,
     parameter int           IQUEUE_SIZE      = 2,
     parameter bit           BRANCHPRED       = 1'b1,
-    parameter bit           FORWARDING       = 1'b1
+    parameter bit           FORWARDING       = 1'b1,
+    /* Vector instruction classes. With any of them at 0 the core is not   */
+    /* Zve32x: the decoder raises an illegal instruction for that class.   */
+    parameter bit           VLogicEnable          = 1'b1,
+    parameter bit           VMinMaxEnable         = 1'b1,
+    parameter bit           VMergeEnable          = 1'b1,
+    parameter bit           VDivEnable            = 1'b1,
+    parameter bit           VRedLogicEnable       = 1'b1,
+    parameter bit           VRedMinMaxEnable      = 1'b1,
+    parameter bit           VRedSumEnable         = 1'b1,
+    parameter bit           VMultiCycleReductions = 1'b0
 )
 (
     input  logic                    clk,
@@ -196,7 +206,14 @@ module RS5
         .ZICONDEnable (ZICONDEnable),
         .VEnable      (VEnable     ),
         .BRANCHPRED   (BRANCHPRED  ),
-        .FORWARDING   (FORWARDING  )
+        .FORWARDING   (FORWARDING  ),
+        .VLogicEnable     (VLogicEnable    ),
+        .VMinMaxEnable    (VMinMaxEnable   ),
+        .VMergeEnable     (VMergeEnable    ),
+        .VDivEnable       (VDivEnable      ),
+        .VRedLogicEnable  (VRedLogicEnable ),
+        .VRedMinMaxEnable (VRedMinMaxEnable),
+        .VRedSumEnable    (VRedSumEnable   )
     ) decoder1 (
         .clk                        (clk                          ),
         .reset_n                    (reset_n                      ),
@@ -318,7 +335,15 @@ module RS5
         .VLEN         (VLEN        ),
         .LLEN         (LLEN        ),
         .BUS_WIDTH    (BUS_WIDTH   ),
-        .BRANCHPRED   (BRANCHPRED  )
+        .BRANCHPRED   (BRANCHPRED  ),
+        .VLogicEnable          (VLogicEnable         ),
+        .VMinMaxEnable         (VMinMaxEnable        ),
+        .VMergeEnable          (VMergeEnable         ),
+        .VDivEnable            (VDivEnable           ),
+        .VRedLogicEnable       (VRedLogicEnable      ),
+        .VRedMinMaxEnable      (VRedMinMaxEnable     ),
+        .VRedSumEnable         (VRedSumEnable        ),
+        .VMultiCycleReductions (VMultiCycleReductions)
     ) execute1 (
         .clk                     (clk                          ),
         .reset_n                 (reset_n                      ),

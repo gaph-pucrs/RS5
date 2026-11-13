@@ -16,11 +16,11 @@
 module vectorReductionTree
     import RS5_pkg::*;
 #(
-    parameter int      SEW              = 8,
-    parameter int      VLEN             = 64,
-    parameter int      ELEMENTS_PER_REG = 8,
-    parameter red_op_e RED_OP           = RED_SUM,
-    parameter bit      MULTI_CYCLE      = 1'b0
+    parameter int      SEW                   = 8,
+    parameter int      VLEN                  = 64,
+    parameter int      ELEMENTS_PER_REG      = 8,
+    parameter red_op_e RED_OP                = RED_SUM,
+    parameter bit      VMultiCycleReductions = 1'b0
 ) (
     /* verilator lint_off UNUSEDSIGNAL */
     input  logic                                 clk,
@@ -47,7 +47,7 @@ module vectorReductionTree
     // *********************************
     //  SINGLE-CYCLE
     // *********************************
-    if (MULTI_CYCLE == 1'b0) begin : multi_cycle_reduction_off
+    if (VMultiCycleReductions == 1'b0) begin : multi_cycle_reduction_off
         logic [ELEMENTS_PER_REG-1:0][SEW-1:0] result [STAGES:0];
 
         assign result_o = {result[STAGES][0]};

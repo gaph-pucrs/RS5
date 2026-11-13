@@ -52,5 +52,24 @@ for file in $(for folder in "${source_folders[@]}"; do ls "$folder"/*.c; done); 
     echo
 done
 
+# Tests in class_disabled/ run with every vector class parameter set to 0
+class_off="-defparam testbench.VLogicEnable=0 -defparam testbench.VMinMaxEnable=0 -defparam testbench.VMergeEnable=0"
+class_off="$class_off -defparam testbench.VDivEnable=0 -defparam testbench.VRedLogicEnable=0"
+class_off="$class_off -defparam testbench.VRedMinMaxEnable=0 -defparam testbench.VRedSumEnable=0"
+for file in ../app/baremetal/tests/vector-tests/class_disabled/*.c; do
+    filename=$(basename "$file")
+    filename_without_extension="${filename%.*}"
+    cp "$file" "$destination_folder/$filename"
+    make -C "$makefile_path" clean all
+    output_file="${destination_folder}/${filename_without_extension}.txt"
+    xrun -f sim.xrun -defparam testbench.VEnable=1 -defparam testbench.VLEN=512 $class_off -gpg 'testbench.BIN_FILE => "../app/baremetal/tests/vector-tests/test.bin"' | tee "$output_file"
+    if grep -q "PASSED: test/${filename}!" "$output_file"; then
+        mv "$output_file" "$passed_folder/"
+    else
+        mv "$output_file" "$failed_folder/"
+    fi
+    rm "$destination_folder/$filename"
+done
+
 echo "Passed: $(ls "$passed_folder" | wc -l)  Failed: $(ls "$failed_folder" | wc -l)"
 ls "$failed_folder"

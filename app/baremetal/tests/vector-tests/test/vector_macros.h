@@ -282,10 +282,10 @@ static unsigned char illegal_buf[256] __attribute__((aligned(64)));
     MEMORY_BARRIER;                                                                               \
     const uint32_t scalar = 0;                                                                    \
     asm volatile("vsetvli t0, x0, e32, m8, ta, ma");                                              \
-    asm volatile("vand.vi v0,  v0,  0");                                                          \
-    asm volatile("vand.vi v8,  v0,  0");                                                          \
-    asm volatile("vand.vi v16,  v0,  0");                                                         \
-    asm volatile("vand.vi v24,  v0,  0");                                                         \
+    asm volatile("vmv.v.i v0,  0");                                                               \
+    asm volatile("vmv.v.i v8,  0");                                                               \
+    asm volatile("vmv.v.i v16, 0");                                                               \
+    asm volatile("vmv.v.i v24, 0");                                                               \
   } while(0)
 
 // Macro to initialize a vector with zeroes

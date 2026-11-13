@@ -38,7 +38,14 @@ module decode
     parameter bit           ZICONDEnable = 1'b0,
     parameter bit           VEnable      = 1'b0,
     parameter bit           BRANCHPRED   = 1'b1,
-    parameter bit           FORWARDING   = 1'b1
+    parameter bit           FORWARDING   = 1'b1,
+    parameter bit           VLogicEnable     = 1'b1,
+    parameter bit           VMinMaxEnable    = 1'b1,
+    parameter bit           VMergeEnable     = 1'b1,
+    parameter bit           VDivEnable       = 1'b1,
+    parameter bit           VRedLogicEnable  = 1'b1,
+    parameter bit           VRedMinMaxEnable = 1'b1,
+    parameter bit           VRedSumEnable    = 1'b1
 )
 (
     input   logic           clk,
@@ -383,7 +390,8 @@ module decode
         end
 
         ////////////////////////////////////////////////////////////////////////
-        // OPIVV, OPIVX, OPIVI: each funct6 is only legal in the forms it has
+        // OPIVV, OPIVX, OPIVI: each funct6 is only legal in the forms it has,
+        // and only when its class is enabled
         ////////////////////////////////////////////////////////////////////////
 
         /* vmv<nr>r.v: nr - 1 is in simm and must be 0, 1, 3 or 7 */
@@ -396,15 +404,16 @@ module decode
                 6'b000000:     decode_vector_opi = VADD;
                 6'b000010:     decode_vector_opi = !is_vi ? VSUB  : VNOP;
                 6'b000011:     decode_vector_opi = !is_vv ? VRSUB : VNOP;
-                6'b000100:     decode_vector_opi = !is_vi ? VMINU : VNOP;
-                6'b000101:     decode_vector_opi = !is_vi ? VMIN  : VNOP;
-                6'b000110:     decode_vector_opi = !is_vi ? VMAXU : VNOP;
-                6'b000111:     decode_vector_opi = !is_vi ? VMAX  : VNOP;
-                6'b001001:     decode_vector_opi = VAND;
-                6'b001010:     decode_vector_opi = VOR;
-                6'b001011:     decode_vector_opi = VXOR;
+                6'b000100:     decode_vector_opi = (VMinMaxEnable && !is_vi) ? VMINU : VNOP;
+                6'b000101:     decode_vector_opi = (VMinMaxEnable && !is_vi) ? VMIN  : VNOP;
+                6'b000110:     decode_vector_opi = (VMinMaxEnable && !is_vi) ? VMAXU : VNOP;
+                6'b000111:     decode_vector_opi = (VMinMaxEnable && !is_vi) ? VMAX  : VNOP;
+                6'b001001:     decode_vector_opi = VLogicEnable ? VAND : VNOP;
+                6'b001010:     decode_vector_opi = VLogicEnable ? VOR  : VNOP;
+                6'b001011:     decode_vector_opi = VLogicEnable ? VXOR : VNOP;
                 /* vmv.v.* (vm = 1) requires vs2 = 0; vmerge is the vm = 0 form */
-                6'b010111:     decode_vector_opi = !vm ? VMERGE : ((vs2 == '0) ? VMV : VNOP);
+                6'b010111:     decode_vector_opi = !vm ? (VMergeEnable ? VMERGE : VNOP)
+                                                 : ((vs2 == '0) ? VMV : VNOP);
                 6'b011000:     decode_vector_opi = VMSEQ;
                 6'b011001:     decode_vector_opi = VMSNE;
                 6'b011010:     decode_vector_opi = !is_vi ? VMSLTU : VNOP;
@@ -432,14 +441,14 @@ module decode
         always_comb begin
             unique case (funct6) inside
                 /* Reductions only exist as .vs (OPMVV) */
-                6'b000000:     decode_vector_opm = is_mvv ? VREDSUM  : VNOP;
-                6'b000001:     decode_vector_opm = is_mvv ? VREDAND  : VNOP;
-                6'b000010:     decode_vector_opm = is_mvv ? VREDOR   : VNOP;
-                6'b000011:     decode_vector_opm = is_mvv ? VREDXOR  : VNOP;
-                6'b000100:     decode_vector_opm = is_mvv ? VREDMINU : VNOP;
-                6'b000101:     decode_vector_opm = is_mvv ? VREDMIN  : VNOP;
-                6'b000110:     decode_vector_opm = is_mvv ? VREDMAXU : VNOP;
-                6'b000111:     decode_vector_opm = is_mvv ? VREDMAX  : VNOP;
+                6'b000000:     decode_vector_opm = (VRedSumEnable    && is_mvv) ? VREDSUM  : VNOP;
+                6'b000001:     decode_vector_opm = (VRedLogicEnable  && is_mvv) ? VREDAND  : VNOP;
+                6'b000010:     decode_vector_opm = (VRedLogicEnable  && is_mvv) ? VREDOR   : VNOP;
+                6'b000011:     decode_vector_opm = (VRedLogicEnable  && is_mvv) ? VREDXOR  : VNOP;
+                6'b000100:     decode_vector_opm = (VRedMinMaxEnable && is_mvv) ? VREDMINU : VNOP;
+                6'b000101:     decode_vector_opm = (VRedMinMaxEnable && is_mvv) ? VREDMIN  : VNOP;
+                6'b000110:     decode_vector_opm = (VRedMinMaxEnable && is_mvv) ? VREDMAXU : VNOP;
+                6'b000111:     decode_vector_opm = (VRedMinMaxEnable && is_mvv) ? VREDMAX  : VNOP;
                 6'b001110:     decode_vector_opm = !is_mvv ? VSLIDE1UP   : VNOP;
                 6'b001111:     decode_vector_opm = !is_mvv ? VSLIDE1DOWN : VNOP;
                 /* OPMVV (VWXUNARY0) selects by vs1: vmv.x.s is 00000,  */
@@ -449,10 +458,10 @@ module decode
                                                  : !is_mvv             ? ((vs2 == '0) ? VMVSX : VNOP)
                                                  : (vs1 == '0)         ? VMVXS
                                                  :                       VNOP;
-                6'b100000:     decode_vector_opm = VDIVU;
-                6'b100001:     decode_vector_opm = VDIV;
-                6'b100010:     decode_vector_opm = VREMU;
-                6'b100011:     decode_vector_opm = VREM;
+                6'b100000:     decode_vector_opm = VDivEnable ? VDIVU : VNOP;
+                6'b100001:     decode_vector_opm = VDivEnable ? VDIV  : VNOP;
+                6'b100010:     decode_vector_opm = VDivEnable ? VREMU : VNOP;
+                6'b100011:     decode_vector_opm = VDivEnable ? VREM  : VNOP;
                 6'b100100:     decode_vector_opm = VMULHU;
                 6'b100101:     decode_vector_opm = VMUL;
                 6'b100110:     decode_vector_opm = VMULHSU;
