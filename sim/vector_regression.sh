@@ -7,7 +7,7 @@
 #   - Compile with GCC 13, or add -fno-tree-vectorize to GCC_RISCV in
 #     app/baremetal/tests/vector-tests/Makefile. Newer GCC auto-vectorizes the tests and breaks them.
 
-source_folder="../app/baremetal/tests/vector-tests/operations"
+source_folders=("../app/baremetal/tests/vector-tests/operations" "../app/baremetal/tests/vector-tests/mem_operations")
 destination_folder="../app/baremetal/tests/vector-tests/test"
 makefile_path="../app/baremetal/tests/vector-tests/"
 results_folder="../app/baremetal/tests/vector-tests/results"
@@ -21,8 +21,8 @@ mkdir -p "$failed_folder"
 rm -f "$passed_folder"/*
 rm -f "$failed_folder"/*
 
-# Iterate over each file in the source folder
-for file in "$source_folder"/*; do
+# Iterate over each file in the source folders
+for file in $(for folder in "${source_folders[@]}"; do ls "$folder"/*.c; done); do
     # Extract the filename
     filename=$(basename "$file")
     filename_without_extension="${filename%.*}"
@@ -51,3 +51,6 @@ for file in "$source_folder"/*; do
     echo
     echo
 done
+
+echo "Passed: $(ls "$passed_folder" | wc -l)  Failed: $(ls "$failed_folder" | wc -l)"
+ls "$failed_folder"

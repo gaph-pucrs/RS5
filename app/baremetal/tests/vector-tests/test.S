@@ -1,8 +1,16 @@
 	.section .text.init
 	.global _entry
 _entry:
-    /* Globally disable interrupts */
-    csrw mstatus, zero
+    /* Globally disable interrupts. When misa.V is set, also set       */
+    /* mstatus.VS = Initial, otherwise vector instructions would trap. */
+    csrr t0, misa
+    srli t0, t0, 21
+    andi t0, t0, 1
+    slli t0, t0, 9
+    csrw mstatus, t0
+    /* Install the trap handler used by the illegal-instruction tests */
+    la   t0, trap_handler
+    csrw mtvec, t0
 	csrw mip, zero
 	csrw mie, zero
 	/* zero-initialize all registers */
@@ -65,3 +73,35 @@ _entry:
 	li	s10, 0x80000000		# this will interrupt the simulation (assertion)
 	sw	zero, 0(s10)
 	jal zero, .end
+
+/* Minimal trap handler: counts the trap, records mcause, mepc and mtval */
+/* and resumes at the next instruction. Vector instructions are always  */
+/* 32 bits wide, so mepc + 4 is the next instruction.                   */
+	.align 2
+	.global trap_handler
+trap_handler:
+	csrw mscratch, t0
+	la   t0, trap_save
+	sw   t1, 0(t0)
+	lw   t1, 4(t0)
+	addi t1, t1, 1
+	sw   t1, 4(t0)
+	csrr t1, mcause
+	sw   t1, 8(t0)
+	csrr t1, mepc
+	sw   t1, 12(t0)
+	csrr t1, mtval
+	sw   t1, 16(t0)
+	csrr t1, mepc
+	addi t1, t1, 4
+	csrw mepc, t1
+	lw   t1, 0(t0)
+	csrr t0, mscratch
+	mret
+
+/* trap_save layout: { t1 spill, count, mcause, mepc, mtval } */
+	.data
+	.align 2
+	.global trap_save
+trap_save:
+	.word 0, 0, 0, 0, 0
