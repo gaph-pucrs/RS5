@@ -100,6 +100,12 @@ module execute
     input   logic [31:0]            mepc_i,
     output  logic [31:0]            vtype_o,
     output  logic [31:0]            vlen_o,
+    /* Not used without the vector unit */
+    /* verilator lint_off UNUSEDSIGNAL */
+    input   logic [1:0]             mstatus_vs_i,
+    input   logic                   vstart_nonzero_i,
+    /* verilator lint_on UNUSEDSIGNAL */
+    output  logic                   vector_dirty_o,
     output  logic [31:0]            pc_irq_o,
     output  logic [31:0]            pc_exc_o,
 
@@ -134,6 +140,7 @@ module execute
     logic [31:0]    result;
     logic           write_enable;
     logic           exc_ilegal_csr_inst;
+    logic           exc_ilegal_vector;
 
 //////////////////////////////////////////////////////////////////////////////
 // ALU
@@ -361,9 +368,15 @@ module execute
     assign csr_data_o       = ctrl_i.csr_rd_uses_rs1 ? rs1_data_i : {27'b0, rs1_i};
     assign csr_operation_o  = ctrl_i.csr_op;
 
+    /* With mstatus.VS = Off the vector CSRs cannot be accessed */
+    logic vector_csr_off;
+    assign vector_csr_off = VEnable && (mstatus_vs_i == 2'b00)
+                         && (CSRs'(csr_address_i) inside {VSTART, VXSAT, VXRM, VCSR, VL, VTYPE, VLENBYTES});
+
     assign exc_ilegal_csr_inst = (
         (csr_write_enable && csr_address_i[11:10] == 2'b11) ||
-        ((csr_read_enable || csr_write_enable) && csr_address_i[9:8] > privilege_i)
+        ((csr_read_enable || csr_write_enable) && csr_address_i[9:8] > privilege_i) ||
+        ((csr_read_enable || csr_write_enable) && vector_csr_off)
     );
 
 /////////////////////////////////////////////////////////////////////////////
@@ -559,6 +572,19 @@ module execute
     logic        hold_vector;
 
     if (VEnable) begin : v_gen_on
+        /* Vector instructions trap when the vector state is Off, and when   */
+        /* vstart != 0, a value the core never produces (vset* clear it).    */
+        logic is_vset;
+        assign is_vset = ctrl_i.vector_op inside {VSETVL, VSETVLI, VSETIVLI};
+
+        assign exc_ilegal_vector = ctrl_i.is_vector && (
+            (mstatus_vs_i == 2'b00) ||
+            (vstart_nonzero_i && !is_vset)
+        );
+
+        /* Every vector instruction that completes makes the state Dirty */
+        assign vector_dirty_o = ctrl_i.is_vector && !exc_ilegal_vector && !hold_o && !stall;
+
         vectorUnit #(
             .Environment           (Environment          ),
             .VLEN                  (VLEN                 ),
@@ -577,7 +603,7 @@ module execute
             .reset_n                (reset_n),
             .stall                  (stall),
             .instruction_i          (instruction_i),
-            .enable_i               (ctrl_i.is_vector),
+            .enable_i               (ctrl_i.is_vector && !exc_ilegal_vector),
             .vector_operation_i     (ctrl_i.vector_op),
             .op1_scalar_i           (rs1_data_i),
             .op2_scalar_i           (rs2_data_i),
@@ -594,6 +620,8 @@ module execute
         );
     end
     else begin : v_gen_off
+        assign exc_ilegal_vector = 1'b0;
+        assign vector_dirty_o    = 1'b0;
         assign hold_vector  = '0;
         assign vector_wr_en = '0;
         assign vector_scalar_result     = '0;
@@ -905,7 +933,7 @@ module execute
 
     always_comb begin
         unique case (1'b1)
-            ctrl_i.is_vector:   write_enable = ctrl_i.rd_we && rd_i != '0 && vector_wr_en;
+            ctrl_i.is_vector:   write_enable = ctrl_i.rd_we && rd_i != '0 && vector_wr_en && !exc_ilegal_vector;
             ctrl_i.is_sc:       write_enable = we_atomic;
             ctrl_i.is_amo:      write_enable = we_atomic;
             default:            write_enable = we_default;
@@ -1035,6 +1063,7 @@ module execute
         illegal_mret ||
         ctrl_i.is_ecall || ctrl_i.is_ebreak ||
         exc_ilegal_csr_inst ||
+        exc_ilegal_vector ||
         iaddr_misaligned ||
         laddr_misaligned ||
         saddr_misaligned
@@ -1059,7 +1088,7 @@ module execute
             exception_code_o  = mem_store_access ? STORE_AMO_ACCESS_FAULT : LOAD_ACCESS_FAULT;
         else if (ctrl_i.exc_inst_access_fault)
             exception_code_o  = INSTRUCTION_ACCESS_FAULT;
-        else if (ctrl_i.exc_ilegal_inst || exc_ilegal_csr_inst || illegal_mret)
+        else if (ctrl_i.exc_ilegal_inst || exc_ilegal_csr_inst || exc_ilegal_vector || illegal_mret)
             exception_code_o  = ILLEGAL_INSTRUCTION;
         else if (iaddr_misaligned)
             exception_code_o  = INSTRUCTION_ADDRESS_MISALIGNED;

@@ -410,7 +410,8 @@ package RS5_pkg;
     typedef enum  logic[1:0] {DIRECT, VECTORED} trapMode_e;
 
     typedef enum  logic[11:0] {
-        VSTART        = 12'h008,
+        VSTART        = 12'h008, VXSAT, VXRM,
+        VCSR          = 12'h00F,
         MSTATUS       = 12'h300, MISA, 
         MIE           = 12'h304, MTVEC, MCOUNTEREN,
         MENVCFG       = 12'h30A, 
