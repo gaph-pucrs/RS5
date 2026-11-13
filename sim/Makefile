@@ -16,6 +16,32 @@ endif
 ifeq ($(origin BIN_FILE),command line)
 VERILATOR_FLAGS += -GBIN_FILE=\"$(BIN_FILE)\"
 endif
+# Memory system: grant and response delays of the OBI interfaces, e.g. make RSP_DELAY=2 RANDOM_DELAY=1
+ifeq ($(origin DUALPORT_MEM),command line)
+VERILATOR_FLAGS += -GDUALPORT_MEM=$(DUALPORT_MEM)
+endif
+ifeq ($(origin GNT_DELAY),command line)
+VERILATOR_FLAGS += -GGNT_DELAY=$(GNT_DELAY)
+endif
+ifeq ($(origin RSP_DELAY),command line)
+VERILATOR_FLAGS += -GRSP_DELAY=$(RSP_DELAY)
+endif
+ifeq ($(origin RANDOM_DELAY),command line)
+VERILATOR_FLAGS += -GRANDOM_DELAY=$(RANDOM_DELAY)
+endif
+ifeq ($(origin SEED),command line)
+VERILATOR_FLAGS += -GSEED=$(SEED)
+endif
+# Pipeline options
+ifeq ($(origin BRANCHPRED),command line)
+VERILATOR_FLAGS += -GBRANCHPRED=$(BRANCHPRED)
+endif
+ifeq ($(origin FORWARDING),command line)
+VERILATOR_FLAGS += -GFORWARDING=$(FORWARDING)
+endif
+ifeq ($(origin IMEM_LATENCY),command line)
+VERILATOR_FLAGS += -GIMEM_LATENCY=$(IMEM_LATENCY)
+endif
 # Bound monitors, enabled with e.g. make DEBUG=1 LOCKSTEP=0
 DEBUG     ?= 0
 LOCKSTEP  ?= 0
