@@ -46,14 +46,25 @@ static int test_case;
 
 #define vtype(golden_vtype, vlmul, vsew, vta, vma) (golden_vtype = vlmul << 0 | vsew << 3 | vta << 6 | vma << 7)
 
+// Computes VLMAX = LMUL * VLEN / SEW from vlenb, so the expected vl does not
+// depend on the VLEN the tests were written for (Ara assumes a larger VLEN).
+static inline unsigned long vlmax_of(unsigned long vsew, unsigned long vlmul) {
+  unsigned long vlenb;
+  asm volatile ("csrr %[BUF], vlenb" : [BUF] "=r" (vlenb));
+  unsigned long vlmax = (vlenb * 8) >> (3 + vsew);
+  return (vlmul < 4) ? (vlmax << vlmul) : (vlmax >> (8 - vlmul));
+}
+
 // Checking vtype and vl value which is set by configuration setting instructions
 // by comparing with golden_vtype value used as a reference. Also check for
 // illegal values of vlmul and vsew which violtate: ELEN >= SEW/LMUL
 #define check_vtype_vl(casenum, vtype, golden_vtype, avl, vl, vsew, vlmul)                                                     \
   printf("Checking vtype and vl #%d...\n", casenum); \
+  if (avl > vlmax_of(vsew, vlmul)) avl = vlmax_of(vsew, vlmul); \
   if((vlmul==5 && (vsew == 1 || vsew == 2 || vsew ==3)) || (vlmul==6 && (vsew == 2 || vsew ==3)) || (vlmul==7 && vsew==3)){   \
   if((vtype != 0x80000000) || (vl != 0)){    \
   printf("FAILED. Got vtype = %lx, expected vtype = 80000000. avl = %lx, vl = %lx.\n", vtype,avl, vl);     \
+  num_failed++;                                            \
   return;                                                  \
   }}                                                        \
   else if (vtype != golden_vtype || avl != vl) {                                                                        \

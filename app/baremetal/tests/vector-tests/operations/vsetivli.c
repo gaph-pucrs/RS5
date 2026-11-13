@@ -8,13 +8,13 @@
 
 //***********LMUL = 1**********//
 void TEST_CASE1(void) {
-  uint64_t avl, vtype,
+  unsigned long avl, vtype,
       vl; // Declaring avl,vtype and vl variables to pass for comparison
-  uint64_t vlmul = 0;    // Setting value of vlmul
-  uint64_t vsew = 0;     // Setting value of vsew
-  uint64_t vta = 1;      // Setting value of vta
-  uint64_t vma = 1;      // Setting value of vma
-  uint64_t golden_vtype; // Declaring variable to use as a reference value
+  unsigned long vlmul = 0;    // Setting value of vlmul
+  unsigned long vsew = 0;     // Setting value of vsew
+  unsigned long vta = 1;      // Setting value of vta
+  unsigned long vma = 1;      // Setting value of vma
+  unsigned long golden_vtype; // Declaring variable to use as a reference value
   vtype(golden_vtype, vlmul, vsew, vta,
         vma); // Setting up reference variable golden_vtype by assigning
               // different fields of configurations
@@ -28,12 +28,12 @@ void TEST_CASE1(void) {
 }
 
 void TEST_CASE2(void) {
-  uint64_t avl, vtype, vl;
-  uint64_t vlmul = 0;
-  uint64_t vsew = 1;
-  uint64_t vta = 1;
-  uint64_t vma = 1;
-  uint64_t golden_vtype;
+  unsigned long avl, vtype, vl;
+  unsigned long vlmul = 0;
+  unsigned long vsew = 1;
+  unsigned long vta = 1;
+  unsigned long vma = 1;
+  unsigned long golden_vtype;
   vtype(golden_vtype, vlmul, vsew, vta, vma);
   __asm__ volatile("vsetivli %[A], 20, e16, m1,ta,ma" : [A] "=r"(avl));
   read_vtype(vtype);
@@ -42,12 +42,12 @@ void TEST_CASE2(void) {
 }
 
 void TEST_CASE3(void) {
-  uint64_t avl, vtype, vl;
-  uint64_t vlmul = 0;
-  uint64_t vsew = 2;
-  uint64_t vta = 1;
-  uint64_t vma = 1;
-  uint64_t golden_vtype;
+  unsigned long avl, vtype, vl;
+  unsigned long vlmul = 0;
+  unsigned long vsew = 2;
+  unsigned long vta = 1;
+  unsigned long vma = 1;
+  unsigned long golden_vtype;
   vtype(golden_vtype, vlmul, vsew, vta, vma);
   __asm__ volatile("vsetivli %[A],10, e32, m1,ta,ma" : [A] "=r"(avl));
   read_vtype(vtype);
@@ -56,12 +56,12 @@ void TEST_CASE3(void) {
 }
 
 void TEST_CASE4(void) {
-  uint64_t avl, vtype, vl;
-  uint64_t vlmul = 0;
-  uint64_t vsew = 3;
-  uint64_t vta = 1;
-  uint64_t vma = 1;
-  uint64_t golden_vtype;
+  unsigned long avl, vtype, vl;
+  unsigned long vlmul = 0;
+  unsigned long vsew = 3;
+  unsigned long vta = 1;
+  unsigned long vma = 1;
+  unsigned long golden_vtype;
   vtype(golden_vtype, vlmul, vsew, vta, vma);
   __asm__ volatile("vsetivli %[A],16, e64, m1,ta,ma" : [A] "=r"(avl));
   read_vtype(vtype);
@@ -73,12 +73,12 @@ void TEST_CASE4(void) {
 
 //***********LMUL = 2**********//
 void TEST_CASE5(void) {
-  uint64_t avl, vtype, vl;
-  uint64_t vlmul = 1;
-  uint64_t vsew = 0;
-  uint64_t vta = 1;
-  uint64_t vma = 1;
-  uint64_t golden_vtype;
+  unsigned long avl, vtype, vl;
+  unsigned long vlmul = 1;
+  unsigned long vsew = 0;
+  unsigned long vta = 1;
+  unsigned long vma = 1;
+  unsigned long golden_vtype;
   vtype(golden_vtype, vlmul, vsew, vta, vma);
   __asm__ volatile("vsetivli %[A],30, e8, m2,ta,ma" : [A] "=r"(avl));
   read_vtype(vtype);
@@ -87,12 +87,12 @@ void TEST_CASE5(void) {
 }
 
 void TEST_CASE6(void) {
-  uint64_t avl, vtype, vl;
-  uint64_t vlmul = 1;
-  uint64_t vsew = 1;
-  uint64_t vta = 1;
-  uint64_t vma = 1;
-  uint64_t golden_vtype;
+  unsigned long avl, vtype, vl;
+  unsigned long vlmul = 1;
+  unsigned long vsew = 1;
+  unsigned long vta = 1;
+  unsigned long vma = 1;
+  unsigned long golden_vtype;
   vtype(golden_vtype, vlmul, vsew, vta, vma);
   __asm__ volatile("vsetivli %[A],20, e16, m2,ta,ma" : [A] "=r"(avl));
   read_vtype(vtype);
@@ -101,12 +101,12 @@ void TEST_CASE6(void) {
 }
 
 void TEST_CASE7(void) {
-  uint64_t avl, vtype, vl;
-  uint64_t vlmul = 1;
-  uint64_t vsew = 2;
-  uint64_t vta = 1;
-  uint64_t vma = 1;
-  uint64_t golden_vtype;
+  unsigned long avl, vtype, vl;
+  unsigned long vlmul = 1;
+  unsigned long vsew = 2;
+  unsigned long vta = 1;
+  unsigned long vma = 1;
+  unsigned long golden_vtype;
   vtype(golden_vtype, vlmul, vsew, vta, vma);
   __asm__ volatile("vsetivli %[A],10, e32, m2,ta,ma" : [A] "=r"(avl));
   read_vtype(vtype);
@@ -115,12 +115,12 @@ void TEST_CASE7(void) {
 }
 
 void TEST_CASE8(void) {
-  uint64_t avl, vtype, vl;
-  uint64_t vlmul = 1;
-  uint64_t vsew = 3;
-  uint64_t vta = 1;
-  uint64_t vma = 1;
-  uint64_t golden_vtype;
+  unsigned long avl, vtype, vl;
+  unsigned long vlmul = 1;
+  unsigned long vsew = 3;
+  unsigned long vta = 1;
+  unsigned long vma = 1;
+  unsigned long golden_vtype;
   vtype(golden_vtype, vlmul, vsew, vta, vma);
   __asm__ volatile("vsetivli %[A],16, e64, m2,ta,ma" : [A] "=r"(avl));
   read_vtype(vtype);
@@ -133,12 +133,12 @@ void TEST_CASE8(void) {
 //***********LMUL = 4**********//
 
 void TEST_CASE9(void) {
-  uint64_t avl, vtype, vl;
-  uint64_t vlmul = 2;
-  uint64_t vsew = 0;
-  uint64_t vta = 1;
-  uint64_t vma = 1;
-  uint64_t golden_vtype;
+  unsigned long avl, vtype, vl;
+  unsigned long vlmul = 2;
+  unsigned long vsew = 0;
+  unsigned long vta = 1;
+  unsigned long vma = 1;
+  unsigned long golden_vtype;
   vtype(golden_vtype, vlmul, vsew, vta, vma);
   __asm__ volatile("vsetivli %[A],30, e8, m4,ta,ma" : [A] "=r"(avl));
   read_vtype(vtype);
@@ -147,12 +147,12 @@ void TEST_CASE9(void) {
 }
 
 void TEST_CASE10(void) {
-  uint64_t avl, vtype, vl;
-  uint64_t vlmul = 2;
-  uint64_t vsew = 1;
-  uint64_t vta = 1;
-  uint64_t vma = 1;
-  uint64_t golden_vtype;
+  unsigned long avl, vtype, vl;
+  unsigned long vlmul = 2;
+  unsigned long vsew = 1;
+  unsigned long vta = 1;
+  unsigned long vma = 1;
+  unsigned long golden_vtype;
   vtype(golden_vtype, vlmul, vsew, vta, vma);
   __asm__ volatile("vsetivli %[A],20, e16, m4,ta,ma" : [A] "=r"(avl));
   read_vtype(vtype);
@@ -161,12 +161,12 @@ void TEST_CASE10(void) {
 }
 
 void TEST_CASE11(void) {
-  uint64_t avl, vtype, vl;
-  uint64_t vlmul = 2;
-  uint64_t vsew = 2;
-  uint64_t vta = 1;
-  uint64_t vma = 1;
-  uint64_t golden_vtype;
+  unsigned long avl, vtype, vl;
+  unsigned long vlmul = 2;
+  unsigned long vsew = 2;
+  unsigned long vta = 1;
+  unsigned long vma = 1;
+  unsigned long golden_vtype;
   vtype(golden_vtype, vlmul, vsew, vta, vma);
   __asm__ volatile("vsetivli %[A],10, e32, m4,ta,ma" : [A] "=r"(avl));
   read_vtype(vtype);
@@ -175,12 +175,12 @@ void TEST_CASE11(void) {
 }
 
 void TEST_CASE12(void) {
-  uint64_t avl, vtype, vl;
-  uint64_t vlmul = 2;
-  uint64_t vsew = 3;
-  uint64_t vta = 1;
-  uint64_t vma = 1;
-  uint64_t golden_vtype;
+  unsigned long avl, vtype, vl;
+  unsigned long vlmul = 2;
+  unsigned long vsew = 3;
+  unsigned long vta = 1;
+  unsigned long vma = 1;
+  unsigned long golden_vtype;
   vtype(golden_vtype, vlmul, vsew, vta, vma);
   __asm__ volatile("vsetivli %[A],10, e64, m4,ta,ma" : [A] "=r"(avl));
   read_vtype(vtype);
@@ -193,12 +193,12 @@ void TEST_CASE12(void) {
 //***********LMUL = 8**********//
 
 void TEST_CASE13(void) {
-  uint64_t avl, vtype, vl;
-  uint64_t vlmul = 3;
-  uint64_t vsew = 0;
-  uint64_t vta = 1;
-  uint64_t vma = 1;
-  uint64_t golden_vtype;
+  unsigned long avl, vtype, vl;
+  unsigned long vlmul = 3;
+  unsigned long vsew = 0;
+  unsigned long vta = 1;
+  unsigned long vma = 1;
+  unsigned long golden_vtype;
   vtype(golden_vtype, vlmul, vsew, vta, vma);
   __asm__ volatile("vsetivli %[A], 30, e8, m8,ta,ma" : [A] "=r"(avl));
   read_vtype(vtype);
@@ -207,12 +207,12 @@ void TEST_CASE13(void) {
 }
 
 void TEST_CASE14(void) {
-  uint64_t avl, vtype, vl;
-  uint64_t vlmul = 3;
-  uint64_t vsew = 1;
-  uint64_t vta = 1;
-  uint64_t vma = 1;
-  uint64_t golden_vtype;
+  unsigned long avl, vtype, vl;
+  unsigned long vlmul = 3;
+  unsigned long vsew = 1;
+  unsigned long vta = 1;
+  unsigned long vma = 1;
+  unsigned long golden_vtype;
   vtype(golden_vtype, vlmul, vsew, vta, vma);
   __asm__ volatile("vsetivli %[A], 20, e16, m8,ta,ma" : [A] "=r"(avl));
   read_vtype(vtype);
@@ -221,12 +221,12 @@ void TEST_CASE14(void) {
 }
 
 void TEST_CASE15(void) {
-  uint64_t avl, vtype, vl;
-  uint64_t vlmul = 3;
-  uint64_t vsew = 2;
-  uint64_t vta = 1;
-  uint64_t vma = 1;
-  uint64_t golden_vtype;
+  unsigned long avl, vtype, vl;
+  unsigned long vlmul = 3;
+  unsigned long vsew = 2;
+  unsigned long vta = 1;
+  unsigned long vma = 1;
+  unsigned long golden_vtype;
   vtype(golden_vtype, vlmul, vsew, vta, vma);
   __asm__ volatile("vsetivli %[A],10, e32, m8,ta,ma" : [A] "=r"(avl));
   read_vtype(vtype);
@@ -235,12 +235,12 @@ void TEST_CASE15(void) {
 }
 
 void TEST_CASE16(void) {
-  uint64_t avl, vtype, vl;
-  uint64_t vlmul = 3;
-  uint64_t vsew = 3;
-  uint64_t vta = 1;
-  uint64_t vma = 1;
-  uint64_t golden_vtype;
+  unsigned long avl, vtype, vl;
+  unsigned long vlmul = 3;
+  unsigned long vsew = 3;
+  unsigned long vta = 1;
+  unsigned long vma = 1;
+  unsigned long golden_vtype;
   vtype(golden_vtype, vlmul, vsew, vta, vma);
   __asm__ volatile("vsetivli %[A], 10, e64, m8,ta,ma" : [A] "=r"(avl));
   read_vtype(vtype);
@@ -253,12 +253,12 @@ void TEST_CASE16(void) {
 //***********LMUL = 1/8**********//
 
 void TEST_CASE17(void) {
-  uint64_t avl, vtype, vl;
-  uint64_t vlmul = 5;
-  uint64_t vsew = 0;
-  uint64_t vta = 1;
-  uint64_t vma = 1;
-  uint64_t golden_vtype;
+  unsigned long avl, vtype, vl;
+  unsigned long vlmul = 5;
+  unsigned long vsew = 0;
+  unsigned long vta = 1;
+  unsigned long vma = 1;
+  unsigned long golden_vtype;
   vtype(golden_vtype, vlmul, vsew, vta, vma);
   __asm__ volatile("vsetivli %[A], 10, e8, mf8,ta,ma" : [A] "=r"(avl));
   read_vtype(vtype);
@@ -267,12 +267,12 @@ void TEST_CASE17(void) {
 }
 
 void TEST_CASE18(void) {
-  uint64_t avl, vtype, vl;
-  uint64_t vlmul = 5;
-  uint64_t vsew = 1;
-  uint64_t vta = 1;
-  uint64_t vma = 1;
-  uint64_t golden_vtype;
+  unsigned long avl, vtype, vl;
+  unsigned long vlmul = 5;
+  unsigned long vsew = 1;
+  unsigned long vta = 1;
+  unsigned long vma = 1;
+  unsigned long golden_vtype;
   vtype(golden_vtype, vlmul, vsew, vta, vma);
   __asm__ volatile("vsetivli %[A], 10, e16,mf8,ta,ma" : [A] "=r"(avl));
   read_vtype(vtype);
@@ -281,12 +281,12 @@ void TEST_CASE18(void) {
 }
 
 void TEST_CASE19(void) {
-  uint64_t avl, vtype, vl;
-  uint64_t vlmul = 5;
-  uint64_t vsew = 2;
-  uint64_t vta = 1;
-  uint64_t vma = 1;
-  uint64_t golden_vtype;
+  unsigned long avl, vtype, vl;
+  unsigned long vlmul = 5;
+  unsigned long vsew = 2;
+  unsigned long vta = 1;
+  unsigned long vma = 1;
+  unsigned long golden_vtype;
   vtype(golden_vtype, vlmul, vsew, vta, vma);
   __asm__ volatile("vsetivli %[A], 5, e32, mf8,ta,ma" : [A] "=r"(avl));
   read_vtype(vtype);
@@ -295,12 +295,12 @@ void TEST_CASE19(void) {
 }
 
 void TEST_CASE20(void) {
-  uint64_t avl, vtype, vl;
-  uint64_t vlmul = 5;
-  uint64_t vsew = 3;
-  uint64_t vta = 1;
-  uint64_t vma = 1;
-  uint64_t golden_vtype;
+  unsigned long avl, vtype, vl;
+  unsigned long vlmul = 5;
+  unsigned long vsew = 3;
+  unsigned long vta = 1;
+  unsigned long vma = 1;
+  unsigned long golden_vtype;
   vtype(golden_vtype, vlmul, vsew, vta, vma);
   __asm__ volatile("vsetivli %[A],7, e64, mf8,ta,ma" : [A] "=r"(avl));
   read_vtype(vtype);
@@ -313,12 +313,12 @@ void TEST_CASE20(void) {
 //***********LMUL = 1/4**********//
 
 void TEST_CASE21(void) {
-  uint64_t avl, vtype, vl;
-  uint64_t vlmul = 6;
-  uint64_t vsew = 0;
-  uint64_t vta = 1;
-  uint64_t vma = 1;
-  uint64_t golden_vtype;
+  unsigned long avl, vtype, vl;
+  unsigned long vlmul = 6;
+  unsigned long vsew = 0;
+  unsigned long vta = 1;
+  unsigned long vma = 1;
+  unsigned long golden_vtype;
   vtype(golden_vtype, vlmul, vsew, vta, vma);
   __asm__ volatile("vsetivli %[A], 10, e8, mf4,ta,ma" : [A] "=r"(avl));
   read_vtype(vtype);
@@ -327,12 +327,12 @@ void TEST_CASE21(void) {
 }
 
 void TEST_CASE22(void) {
-  uint64_t avl, vtype, vl;
-  uint64_t vlmul = 6;
-  uint64_t vsew = 1;
-  uint64_t vta = 1;
-  uint64_t vma = 1;
-  uint64_t golden_vtype;
+  unsigned long avl, vtype, vl;
+  unsigned long vlmul = 6;
+  unsigned long vsew = 1;
+  unsigned long vta = 1;
+  unsigned long vma = 1;
+  unsigned long golden_vtype;
   vtype(golden_vtype, vlmul, vsew, vta, vma);
   __asm__ volatile("vsetivli %[A], 10, e16, mf4,ta,ma" : [A] "=r"(avl));
   read_vtype(vtype);
@@ -341,12 +341,12 @@ void TEST_CASE22(void) {
 }
 
 void TEST_CASE23(void) {
-  uint64_t avl, vtype, vl;
-  uint64_t vlmul = 6;
-  uint64_t vsew = 2;
-  uint64_t vta = 1;
-  uint64_t vma = 1;
-  uint64_t golden_vtype;
+  unsigned long avl, vtype, vl;
+  unsigned long vlmul = 6;
+  unsigned long vsew = 2;
+  unsigned long vta = 1;
+  unsigned long vma = 1;
+  unsigned long golden_vtype;
   vtype(golden_vtype, vlmul, vsew, vta, vma);
   __asm__ volatile("vsetivli %[A],5, e32, mf4,ta,ma" : [A] "=r"(avl));
   read_vtype(vtype);
@@ -355,12 +355,12 @@ void TEST_CASE23(void) {
 }
 
 void TEST_CASE24(void) {
-  uint64_t avl, vtype, vl;
-  uint64_t vlmul = 6;
-  uint64_t vsew = 3;
-  uint64_t vta = 1;
-  uint64_t vma = 1;
-  uint64_t golden_vtype;
+  unsigned long avl, vtype, vl;
+  unsigned long vlmul = 6;
+  unsigned long vsew = 3;
+  unsigned long vta = 1;
+  unsigned long vma = 1;
+  unsigned long golden_vtype;
   vtype(golden_vtype, vlmul, vsew, vta, vma);
   __asm__ volatile("vsetivli %[A],15, e64, mf4,ta,ma" : [A] "=r"(avl));
   read_vtype(vtype);
@@ -373,12 +373,12 @@ void TEST_CASE24(void) {
 //***********LMUL = 1/2**********//
 
 void TEST_CASE25(void) {
-  uint64_t avl, vtype, vl;
-  uint64_t vlmul = 7;
-  uint64_t vsew = 0;
-  uint64_t vta = 1;
-  uint64_t vma = 1;
-  uint64_t golden_vtype;
+  unsigned long avl, vtype, vl;
+  unsigned long vlmul = 7;
+  unsigned long vsew = 0;
+  unsigned long vta = 1;
+  unsigned long vma = 1;
+  unsigned long golden_vtype;
   vtype(golden_vtype, vlmul, vsew, vta, vma);
   __asm__ volatile("vsetivli %[A],20, e8, mf2,ta,ma" : [A] "=r"(avl));
   read_vtype(vtype);
@@ -387,12 +387,12 @@ void TEST_CASE25(void) {
 }
 
 void TEST_CASE26(void) {
-  uint64_t avl, vtype, vl;
-  uint64_t vlmul = 7;
-  uint64_t vsew = 1;
-  uint64_t vta = 1;
-  uint64_t vma = 1;
-  uint64_t golden_vtype;
+  unsigned long avl, vtype, vl;
+  unsigned long vlmul = 7;
+  unsigned long vsew = 1;
+  unsigned long vta = 1;
+  unsigned long vma = 1;
+  unsigned long golden_vtype;
   vtype(golden_vtype, vlmul, vsew, vta, vma);
   __asm__ volatile("vsetivli %[A], 20, e16, mf2,ta,ma" : [A] "=r"(avl));
   read_vtype(vtype);
@@ -401,12 +401,12 @@ void TEST_CASE26(void) {
 }
 
 void TEST_CASE27(void) {
-  uint64_t avl, vtype, vl;
-  uint64_t vlmul = 7;
-  uint64_t vsew = 2;
-  uint64_t vta = 1;
-  uint64_t vma = 1;
-  uint64_t golden_vtype;
+  unsigned long avl, vtype, vl;
+  unsigned long vlmul = 7;
+  unsigned long vsew = 2;
+  unsigned long vta = 1;
+  unsigned long vma = 1;
+  unsigned long golden_vtype;
   vtype(golden_vtype, vlmul, vsew, vta, vma);
   __asm__ volatile("vsetivli %[A], 20, e32, mf2,ta,ma" : [A] "=r"(avl));
   read_vtype(vtype);
@@ -415,12 +415,12 @@ void TEST_CASE27(void) {
 }
 
 void TEST_CASE28(void) {
-  uint64_t avl, vtype, vl;
-  uint64_t vlmul = 7;
-  uint64_t vsew = 3;
-  uint64_t vta = 1;
-  uint64_t vma = 1;
-  uint64_t golden_vtype;
+  unsigned long avl, vtype, vl;
+  unsigned long vlmul = 7;
+  unsigned long vsew = 3;
+  unsigned long vta = 1;
+  unsigned long vma = 1;
+  unsigned long golden_vtype;
   vtype(golden_vtype, vlmul, vsew, vta, vma);
   __asm__ volatile("vsetivli %[A], 30, e64, mf2,ta,ma" : [A] "=r"(avl));
   read_vtype(vtype);
