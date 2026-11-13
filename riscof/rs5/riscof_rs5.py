@@ -106,8 +106,12 @@ class rs5(pluginTemplate):
         self.verilatecmd += " -GBRANCHPRED=1\\'b" + os.environ["BRANCHPRED"]
         self.verilatecmd += " -GFORWARDING=1\\'b" + os.environ["FORWARDING"]
         self.verilatecmd += " -GDUALPORT_MEM=1\\'b" + os.environ["DUALPORT_MEM"]
-        self.verilatecmd += " -GIQUEUE_SIZE=" + os.environ["IQUEUE_SIZE"]
+        if os.environ.get("IMEM_LATENCY"):
+            self.verilatecmd += " -GIMEM_LATENCY=" + os.environ["IMEM_LATENCY"]
         self.verilatecmd += " -GDELAY_CYCLES=" + os.environ["DELAY_CYCLES"]
+        self.verilatecmd += " -GRSP_DELAY_CYCLES=" + os.environ.get("RSP_DELAY_CYCLES", "0")
+        self.verilatecmd += " -GRANDOM_DELAY=1\\'b" + os.environ.get("RANDOM_DELAY", "0")
+        self.verilatecmd += " -GSEED=" + os.environ.get("SEED", "1")
 
         self.compile_cmd = self.compile_cmd+' -mabi='+('lp64 ' if 64 in ispec['supported_xlen'] else 'ilp32 ')
 
