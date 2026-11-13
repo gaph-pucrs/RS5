@@ -374,6 +374,13 @@ package RS5_pkg;
         logic        csr_wr_uses_rs1;
     } exec_ctrl_t;
 
+    /* Vector control decoded once in vectorUnit. P0 only needs mask_is_data; */
+    /* the Zve32x packages add their fields here.                            */
+    typedef struct packed {
+        // v0 is an operand, not a mask (vmerge; vadc/vsbc in P1)
+        logic        mask_is_data;
+    } vector_ctrl_t;
+
     typedef struct packed {
         logic        valid;
         logic        compressed;

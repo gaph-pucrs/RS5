@@ -82,6 +82,9 @@ module vectorUnit
     logic        reduction_instruction_r;
     logic        widening_instruction_r;
 
+    /* Control decoded once from the operation (fields are added per package) */
+    vector_ctrl_t vctrl;
+
     vew_e   vsew, vsew_effective;
     vlmul_e vlmul, vlmul_effective;
     logic[$bits(VLEN )-1:0] vl, vl_curr_reg, vl_next_reg, vl_next;
@@ -137,6 +140,12 @@ module vectorUnit
     assign mask_instruction       = (vector_operation_i inside {VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT});
 
     assign elements_per_reg = VLENB >> vsew;
+
+    /* v0 is data, not a mask: every body element is written (vmerge) */
+    assign vctrl.mask_is_data = (vector_operation_i == VMERGE);
+
+    logic vm_effective;
+    assign vm_effective = vm || vctrl.mask_is_data;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
@@ -577,21 +586,21 @@ module vectorUnit
                 unique case (vsew_effective)
                     EW8:
                         for (int i = 0; i < VLENB; i++)
-                            if ((vm || mask_sew8[cycle_count_r][i]) && (i < vl_curr_reg))
+                            if ((vm_effective || mask_sew8[cycle_count_r][i]) && (i < vl_curr_reg))
                                 write_enable[i] <= 1'b1;
                             else
                                 write_enable[i] <= 1'b0;
 
                     EW16:
                         for (int i = 0; i < VLENB/2; i++)
-                            if ((vm || mask_sew16[cycle_count_r][i]) && (i < vl_curr_reg))
+                            if ((vm_effective || mask_sew16[cycle_count_r][i]) && (i < vl_curr_reg))
                                 write_enable[(i*2)+:2] <= 2'b11;
                             else
                                 write_enable[(i*2)+:2] <= 2'b00;
 
                     default:
                         for (int i = 0; i < VLENB/4; i++)
-                            if ((vm || mask_sew32[cycle_count_r][i]) && (i < vl_curr_reg))
+                            if ((vm_effective || mask_sew32[cycle_count_r][i]) && (i < vl_curr_reg))
                                 write_enable[(i*4)+:4] <= 4'b1111;
                             else
                                 write_enable[(i*4)+:4] <= 4'b0000;
