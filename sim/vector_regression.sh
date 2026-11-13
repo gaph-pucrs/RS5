@@ -2,12 +2,18 @@
 
 # Vector regression tests. Run from the sim/ folder.
 #
-# Every test is compiled once and simulated on each VLEN x LLEN configuration:
-#   VLENS="128 256 512" and LLENS="32 64 128" by default; override them from the
-#   environment, e.g. VLENS=512 LLENS=32 ./vector_regression.sh
+# Usage: ./vector_regression.sh [--fast]
+#
+# Every test is compiled once and simulated on each VLEN x LLEN x BUS_WIDTH
+# configuration:
+#   - default: VLENS="128 256 512", LLENS="32 64 128" and
+#     BUS_WIDTHS="32 64 128" (27 configurations); override them from the
+#     environment, e.g. VLENS=512 LLENS=32 BUS_WIDTHS=32 ./vector_regression.sh
+#   - --fast: only the 3 configurations in fast_configs (VLEN LLEN BUS_WIDTH)
 # The configurations of one test run in parallel, each with its own Xcelium
-# library (xcelium_vlen<V>_llen<L>.d). Results are saved per configuration in
-#   app/baremetal/tests/vector-tests/results/vlen<V>_llen<L>/{passed,failed}/<test>.txt
+# library (xcelium_vlen<V>_llen<L>_bus<B>.d). Results are saved per
+# configuration in
+#   app/baremetal/tests/vector-tests/results/vlen<V>_llen<L>_bus<B>/{passed,failed}/<test>.txt
 # A simulation that runs longer than SIM_TIMEOUT seconds (300 by default) is
 # killed and counted as failed, so a hung test does not stop the regression.
 #
@@ -19,7 +25,15 @@
 
 VLENS=${VLENS:-"128 256 512"}
 LLENS=${LLENS:-"32 64 128"}
+BUS_WIDTHS=${BUS_WIDTHS:-"32 64 128"}
 SIM_TIMEOUT=${SIM_TIMEOUT:-300}
+
+# VLEN LLEN BUS_WIDTH
+fast_configs=(
+    "256 32 32"
+    "256 32 64"
+    "256 64 32"
+)
 
 tests_folder="../app/baremetal/tests/vector-tests"
 source_folders=("$tests_folder/operations" "$tests_folder/mem_operations")
@@ -32,24 +46,45 @@ class_off="-defparam testbench.VLogicEnable=0 -defparam testbench.VMinMaxEnable=
 class_off="$class_off -defparam testbench.VDivEnable=0 -defparam testbench.VRedLogicEnable=0"
 class_off="$class_off -defparam testbench.VRedMinMaxEnable=0 -defparam testbench.VRedSumEnable=0"
 
+case "$1" in
+    "")
+        triples=()
+        for vlen in $VLENS; do
+            for llen in $LLENS; do
+                for bus in $BUS_WIDTHS; do
+                    triples+=("$vlen $llen $bus")
+                done
+            done
+        done
+        ;;
+    --fast)
+        triples=("${fast_configs[@]}")
+        ;;
+    *)
+        echo "Usage: $0 [--fast]" >&2
+        exit 1
+        ;;
+esac
+
+# configs holds the folder names, params the matching xrun arguments
 configs=()
-for vlen in $VLENS; do
-    for llen in $LLENS; do
-        configs+=("vlen${vlen}_llen${llen}")
-        rm -rf "$results_folder/vlen${vlen}_llen${llen}"
-        mkdir -p "$results_folder/vlen${vlen}_llen${llen}/passed" "$results_folder/vlen${vlen}_llen${llen}/failed"
-    done
+params=()
+for triple in "${triples[@]}"; do
+    read -r vlen llen bus <<< "$triple"
+    config="vlen${vlen}_llen${llen}_bus${bus}"
+    configs+=("$config")
+    params+=("-defparam testbench.VLEN=$vlen -defparam testbench.LLEN=$llen -defparam testbench.BUS_WIDTH=$bus")
+    rm -rf "${results_folder:?}/$config"
+    mkdir -p "$results_folder/$config/passed" "$results_folder/$config/failed"
 done
 
-# run_config <config> <test file name> <extra xrun arguments>
+# run_config <config> <configuration xrun arguments> <test file name> <extra xrun arguments>
 run_config() {
-    local config=$1 filename=$2 extra=$3
-    local vlen=${config#vlen}; vlen=${vlen%_llen*}
-    local llen=${config#*_llen}
+    local config=$1 config_params=$2 filename=$3 extra=$4
     local output_file="$results_folder/$config/${filename%.*}.txt"
 
     timeout "$SIM_TIMEOUT" xrun -f sim.xrun -xmlibdirname "xcelium_${config}.d" -l "xrun.${config}.log" \
-        -defparam testbench.VEnable=1 -defparam testbench.VLEN=$vlen -defparam testbench.LLEN=$llen $extra \
+        -defparam testbench.VEnable=1 $config_params $extra \
         -gpg "testbench.BIN_FILE => \"$bin_file\"" > "$output_file" 2>&1
 
     if grep -q "PASSED: test/${filename}!" "$output_file"; then
@@ -68,8 +103,8 @@ run_test() {
     cp "$file" "$destination_folder/$filename"
     make -C "$tests_folder" clean all > /dev/null
 
-    for config in "${configs[@]}"; do
-        run_config "$config" "$filename" "$extra" &
+    for i in "${!configs[@]}"; do
+        run_config "${configs[$i]}" "${params[$i]}" "$filename" "$extra" &
     done
     wait
 

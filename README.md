@@ -145,10 +145,11 @@ make -C sim VENABLE=1 VLEN=256 BIN_FILE=../app/baremetal/tests/vector-tests/test
 
 ### Vector regression tests
 
-[sim/vector_regression.sh](sim/vector_regression.sh) builds each test in [app/baremetal/tests/vector-tests/operations](app/baremetal/tests/vector-tests/operations) and [mem_operations](app/baremetal/tests/vector-tests/mem_operations) once and simulates it with Xcelium on every `VLEN` x `LLEN` configuration: `VLEN` 128, 256 and 512 and `LLEN` 32, 64 and 128 by default.
-The configurations of a test run in parallel, each with its own Xcelium library (`sim/xcelium_vlen<V>_llen<L>.d`).
+[sim/vector_regression.sh](sim/vector_regression.sh) builds each test in [app/baremetal/tests/vector-tests/operations](app/baremetal/tests/vector-tests/operations) and [mem_operations](app/baremetal/tests/vector-tests/mem_operations) once and simulates it with Xcelium on every `VLEN` x `LLEN` x `BUS_WIDTH` configuration: `VLEN` 128, 256 and 512, `LLEN` 32, 64 and 128 and `BUS_WIDTH` 32, 64 and 128 by default (27 configurations).
+With `--fast` it runs only three configurations (`VLEN`/`LLEN`/`BUS_WIDTH`): 256/32/32, 256/32/64 and 256/64/32.
+The configurations of a test run in parallel, each with its own Xcelium library (`sim/xcelium_vlen<V>_llen<L>_bus<B>.d`).
 The tests in [class_disabled](app/baremetal/tests/vector-tests/class_disabled) also run on every configuration, with all vector class parameters set to 0.
-Each log goes to `app/baremetal/tests/vector-tests/results/vlen<V>_llen<L>/passed` or `.../failed`, and the script ends with a pass/fail count per configuration.
+Each log goes to `app/baremetal/tests/vector-tests/results/vlen<V>_llen<L>_bus<B>/passed` or `.../failed`, and the script ends with a pass/fail count per configuration.
 A simulation that runs longer than `SIM_TIMEOUT` seconds (300 by default) is killed and counted as failed.
 
 The expected results do not depend on `VLEN`: compares stop at `vl`, and reductions, mask compares and `vslide1down` recompute the expected value from their sources and `vl` (see [test/vector_macros.h](app/baremetal/tests/vector-tests/test/vector_macros.h)).
@@ -158,14 +159,15 @@ Before running the script, build the tests with **GCC 13**, or turn off auto-vec
 Newer GCC releases auto-vectorize the test code with RVV instructions, which changes the code under test and breaks the tests.
 If you use a newer GCC, add `-fno-tree-vectorize` to `GCC_RISCV` in [app/baremetal/tests/vector-tests/Makefile](app/baremetal/tests/vector-tests/Makefile).
 Check your version with `riscv64-elf-gcc --version`.
-The script sets `VEnable`, `VLEN`, `LLEN` and the vector test binary on the xrun command line, so [sim/testbench.sv](sim/testbench.sv) needs no editing.
+The script sets `VEnable`, `VLEN`, `LLEN`, `BUS_WIDTH` and the vector test binary on the xrun command line, so [sim/testbench.sv](sim/testbench.sv) needs no editing.
 
 Then run:
 
 ```bash
 cd sim
-./vector_regression.sh                      # full matrix
-VLENS=512 LLENS=32 ./vector_regression.sh   # a single configuration
+./vector_regression.sh                                   # full matrix
+./vector_regression.sh --fast                            # 3 configurations
+VLENS=512 LLENS=32 BUS_WIDTHS=32 ./vector_regression.sh  # a single configuration
 ```
 
 ---
