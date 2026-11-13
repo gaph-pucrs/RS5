@@ -145,7 +145,7 @@ make -C sim VENABLE=1 VLEN=256 BIN_FILE=../app/baremetal/tests/vector-tests/test
 
 ### Vector regression tests
 
-[sim/vector_regression.sh](sim/vector_regression.sh) builds each test in [app/baremetal/tests/vector-tests/operations](app/baremetal/tests/vector-tests/operations) and [mem_operations](app/baremetal/tests/vector-tests/mem_operations) once and simulates it with Xcelium on every `VLEN` x `LLEN` configuration: `VLEN` 128, 256 and 512 and `LLEN` 32 and 64 by default.
+[sim/vector_regression.sh](sim/vector_regression.sh) builds each test in [app/baremetal/tests/vector-tests/operations](app/baremetal/tests/vector-tests/operations) and [mem_operations](app/baremetal/tests/vector-tests/mem_operations) once and simulates it with Xcelium on every `VLEN` x `LLEN` configuration: `VLEN` 128, 256 and 512 and `LLEN` 32, 64 and 128 by default.
 The configurations of a test run in parallel, each with its own Xcelium library (`sim/xcelium_vlen<V>_llen<L>.d`).
 The tests in [class_disabled](app/baremetal/tests/vector-tests/class_disabled) also run on every configuration, with all vector class parameters set to 0.
 Each log goes to `app/baremetal/tests/vector-tests/results/vlen<V>_llen<L>/passed` or `.../failed`, and the script ends with a pass/fail count per configuration.

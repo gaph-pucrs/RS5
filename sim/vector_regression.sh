@@ -3,7 +3,7 @@
 # Vector regression tests. Run from the sim/ folder.
 #
 # Every test is compiled once and simulated on each VLEN x LLEN configuration:
-#   VLENS="128 256 512" and LLENS="32 64" by default; override them from the
+#   VLENS="128 256 512" and LLENS="32 64 128" by default; override them from the
 #   environment, e.g. VLENS=512 LLENS=32 ./vector_regression.sh
 # The configurations of one test run in parallel, each with its own Xcelium
 # library (xcelium_vlen<V>_llen<L>.d). Results are saved per configuration in
@@ -18,7 +18,7 @@
 #     app/baremetal/tests/vector-tests/Makefile. Newer GCC auto-vectorizes the tests and breaks them.
 
 VLENS=${VLENS:-"128 256 512"}
-LLENS=${LLENS:-"32 64"}
+LLENS=${LLENS:-"32 64 128"}
 SIM_TIMEOUT=${SIM_TIMEOUT:-300}
 
 tests_folder="../app/baremetal/tests/vector-tests"
