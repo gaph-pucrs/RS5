@@ -201,7 +201,10 @@ package RS5_pkg;
         ZBKBREV8  = 12'b100000000000
     } iTypeZbkb_e;
 
-    typedef enum logic [5:0] {
+    /* Vector operation select. The entries after VSLIDE1DOWN are declared */
+    /* for the Zve32x packages P1-P7; the decoder returns VNOP (illegal)    */
+    /* for them until the package that implements the class lands.         */
+    typedef enum logic [6:0] {
         VNOP,
         VSETVL,
         VSETVLI,
@@ -257,6 +260,25 @@ package RS5_pkg;
         VMERGE,
         VSLIDE1UP,
         VSLIDE1DOWN,
+        // Integer extension (VExtendEnable)
+        VEXT,
+        // Widening add/sub, multiply-add and reduction (VWidenEnable)
+        VWADDSUB, VWMACC, VWREDSUM,
+        // Add/subtract with carry (VCarryEnable)
+        VADC, VMADC, VSBC, VMSBC,
+        // Narrowing shift (VNarrowEnable)
+        VNSRL, VNSRA,
+        // Fixed point (VFixedPointEnable)
+        VSADDU, VSADD, VSSUBU, VSSUB, VAADDU, VAADD, VASUBU, VASUB,
+        VSMUL, VSSRL, VSSRA, VNCLIPU, VNCLIP,
+        // Mask logical (VMaskLogicEnable)
+        VMAND, VMNAND, VMANDN, VMXOR, VMOR, VMNOR, VMORN, VMXNOR,
+        // Mask bits (VMaskBitsEnable)
+        VCPOP, VFIRST, VMSBF, VMSIF, VMSOF, VIOTA, VID,
+        // Slide (VSlideEnable)
+        VSLIDEUP, VSLIDEDOWN,
+        // Gather and compress (VGatherEnable)
+        VRGATHER, VRGATHEREI16, VCOMPRESS,
         VLD,            // Vector load  (was iType_e VLOAD)
         VST             // Vector store (was iType_e VSTORE)
     } iTypeVector_e;

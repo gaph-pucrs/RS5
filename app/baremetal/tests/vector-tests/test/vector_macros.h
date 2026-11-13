@@ -34,6 +34,11 @@ static int num_failed;
 // Pointer to the current test case
 static int test_case;
 
+// Filled by the trap handler in test.S: { t1 spill, count, mcause, mepc, mtval }
+extern volatile unsigned long trap_save[5];
+// Number of traps the test expected so far; any other trap fails the test
+static unsigned long traps_expected;
+
 /************
  *  Macros  *
  ************/
@@ -74,6 +79,47 @@ static inline unsigned long vlmax_of(unsigned long vsew, unsigned long vlmul) {
   }                                                                                                                \
   printf("PASSED.\n");
 
+// Buffer used as the base address (a0) of the memory instructions below
+static unsigned char illegal_buf[256] __attribute__((aligned(64)));
+
+// Executes one raw instruction word with a0 = illegal_buf. The encoding may
+// write a1. EXPECT_ILLEGAL checks that exactly one illegal-instruction trap
+// was taken and that mtval holds the instruction; EXPECT_LEGAL checks that
+// no trap was taken.
+#define EXEC_WORD(word) \
+  asm volatile("mv a0, %0\n\t.word " #word :: "r"(illegal_buf) : "a0", "a1", "memory")
+
+#define EXPECT_ILLEGAL(casenum, word)                                               \
+  do {                                                                              \
+    unsigned long traps_before = trap_save[1];                                      \
+    EXEC_WORD(word);                                                                \
+    printf("Checking illegal instruction #%d...\n", casenum);                       \
+    if (trap_save[1] != traps_before + 1 || trap_save[2] != 2 ||                    \
+        trap_save[4] != (word)) {                                                   \
+      printf("FAILED. traps = %lu, mcause = %lx, mtval = %lx.\n",                   \
+             trap_save[1] - traps_before, trap_save[2], trap_save[4]);              \
+      num_failed++;                                                                 \
+    }                                                                               \
+    else                                                                            \
+      printf("PASSED.\n");                                                          \
+    traps_expected = trap_save[1];                                                  \
+  } while (0)
+
+#define EXPECT_LEGAL(casenum, word)                                                 \
+  do {                                                                              \
+    unsigned long traps_before = trap_save[1];                                      \
+    EXEC_WORD(word);                                                                \
+    printf("Checking legal instruction #%d...\n", casenum);                         \
+    if (trap_save[1] != traps_before) {                                             \
+      printf("FAILED. Trapped with mcause = %lx, mtval = %lx.\n",                   \
+             trap_save[2], trap_save[4]);                                           \
+      num_failed++;                                                                 \
+    }                                                                               \
+    else                                                                            \
+      printf("PASSED.\n");                                                          \
+    traps_expected = trap_save[1];                                                  \
+  } while (0)
+
 #define check_vxsat(casenum, vxsat, golden_vxsat)                                                                  \
   printf("Checking vxsat #%d...\n", casenum);                                                               \
   if (vxsat != golden_vxsat) {                                                                        \
@@ -93,6 +139,7 @@ static inline unsigned long vlmax_of(unsigned long vsew, unsigned long vlmul) {
 #define INIT_CHECK()  \
   num_failed = 0;     \
   test_case  = 0;     \
+  traps_expected = trap_save[1];     \
 
 // Check at the final of the execution whether all the tests passed or not.
 // Returns the number of failed tests.
@@ -100,6 +147,11 @@ static inline unsigned long vlmax_of(unsigned long vsew, unsigned long vlmul) {
   do {                                                              \
     MEMORY_BARRIER;                                                 \
     VCLEAR_BANK();                                                    \
+    if (trap_save[1] != traps_expected) {                           \
+      printf("FAILED. %lu unexpected trap(s), last mcause = %lx, mepc = %lx.\n", \
+             trap_save[1] - traps_expected, trap_save[2], trap_save[3]); \
+      num_failed++;                                                 \
+    }                                                               \
     if (num_failed > 0) {                                           \
       printf("ERROR: %s failed %d tests!\n", __FILE__, num_failed); \
       return num_failed;                                            \
