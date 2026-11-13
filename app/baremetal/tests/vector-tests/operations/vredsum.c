@@ -175,6 +175,36 @@ void TEST_CASE5(void) {
   VCMP_U32(21, v4, 145);
 }
 
+// RS5: with vl = 0 a reduction does not write the destination
+void TEST_CASE6(void) {
+  VSET(16, e8, m1);
+  VLOAD_8(v1, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  VLOAD_8(v2, 1);
+  VLOAD_8(v3, 0x55);
+  VSET_ZERO(e8, m1);
+  asm volatile("vredsum.vs v3, v1, v2");
+  VSET(16, e8, m1);
+  VCMP_U8(22, v3, 0x55);
+
+  VSET(16, e16, m1);
+  VLOAD_16(v1, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  VLOAD_16(v2, 1);
+  VLOAD_16(v3, 0x5555);
+  VSET_ZERO(e16, m1);
+  asm volatile("vredsum.vs v3, v1, v2");
+  VSET(16, e16, m1);
+  VCMP_U16(23, v3, 0x5555);
+
+  VSET(16, e32, m1);
+  VLOAD_32(v1, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  VLOAD_32(v2, 1);
+  VLOAD_32(v3, 0x55555555);
+  VSET_ZERO(e32, m1);
+  asm volatile("vredsum.vs v3, v1, v2");
+  VSET(16, e32, m1);
+  VCMP_U32(24, v3, 0x55555555);
+}
+
 int main(void) {
   INIT_CHECK();
   enable_vec();
@@ -184,6 +214,7 @@ int main(void) {
   TEST_CASE3();
   TEST_CASE4();
   TEST_CASE5();
+  TEST_CASE6();
 
   EXIT_CHECK();
 }

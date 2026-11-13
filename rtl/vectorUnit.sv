@@ -573,11 +573,16 @@ module vectorUnit
         end
         else if (!should_stall && (state == V_EXEC) && (!hold || hold_widening) && !op_vstore && vector_operation_i != VMVXS) begin
             if (reduction_instruction || vector_operation_i == VMVSX) begin
-                unique case (vsew_effective)
-                    EW8:     write_enable <= {'0, 1'b1};
-                    EW16:    write_enable <= {'0, 2'b11};
-                    default: write_enable <= {'0, 4'b1111};
-                endcase
+                /* With vl = 0 they do not write the destination */
+                if (vl == '0)
+                    write_enable <= '0;
+                else begin
+                    unique case (vsew_effective)
+                        EW8:     write_enable <= {'0, 1'b1};
+                        EW16:    write_enable <= {'0, 2'b11};
+                        default: write_enable <= {'0, 4'b1111};
+                    endcase
+                end
             end
             else if (whole_reg_instruction || mask_instruction) begin
                 write_enable <= '1;

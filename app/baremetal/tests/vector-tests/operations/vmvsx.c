@@ -73,6 +73,32 @@ void TEST_CASE3() {
   VCMP_I32(9, v2, scalar_32b);
 }
 
+// RS5: with vl = 0, vmv.s.x does not write the destination
+void TEST_CASE4() {
+  uint32_t scalar = 0xdeadbeef;
+
+  VSET(16, e8, m1);
+  VLOAD_8(v1, 0x55, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  VSET_ZERO(e8, m1);
+  asm volatile("vmv.s.x v1, %0" ::"r"(scalar));
+  VSET(16, e8, m1);
+  VCMP_U8(10, v1, 0x55, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+
+  VSET(16, e16, m1);
+  VLOAD_16(v1, 0x5555, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  VSET_ZERO(e16, m1);
+  asm volatile("vmv.s.x v1, %0" ::"r"(scalar));
+  VSET(16, e16, m1);
+  VCMP_U16(11, v1, 0x5555, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+
+  VSET(16, e32, m1);
+  VLOAD_32(v1, 0x55555555, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  VSET_ZERO(e32, m1);
+  asm volatile("vmv.s.x v1, %0" ::"r"(scalar));
+  VSET(16, e32, m1);
+  VCMP_U32(12, v1, 0x55555555, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+}
+
 int main(void) {
   INIT_CHECK();
   enable_vec();
@@ -80,6 +106,7 @@ int main(void) {
   TEST_CASE1();
   TEST_CASE2();
   TEST_CASE3();
+  TEST_CASE4();
 
   EXIT_CHECK();
 }
