@@ -76,8 +76,9 @@ module RS5
 );
 
     /* Cycles from instr_gnt_i to instr_rvalid_i of a typical fetch. The fetch */
-    /* queue, and the requests kept in flight, cover that round trip.          */
-    localparam int IQUEUE_SIZE = 2 ** $clog2(IMEM_LATENCY + 1);
+    /* queue, and the requests kept in flight, cover that round trip plus the  */
+    /* cycle a word takes to free its room (instr_req_o is registered-only).   */
+    localparam int IQUEUE_SIZE = 2 ** $clog2(IMEM_LATENCY + 2);
 
     /* The pipeline stalls while the data interface is busy */
     logic                stall;

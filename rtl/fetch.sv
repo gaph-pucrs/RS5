@@ -230,17 +230,16 @@ module fetch
         end
     end
 
-    /* A word read now from the buffer, or straight from memory, frees room */
-    logic word_leaving;
-    assign word_leaving = pop && buffer_tx;
-
     /* Only start a request that will find room in the buffer. Right after   */
     /* a predicted branch, the request needs no room: a confirmation flushes */
-    /* the buffer and the requests before it, a rollback makes it stale      */
+    /* the buffer and the requests before it, a rollback makes it stale.     */
+    /* OBI: req only depends on registers, never on gnt or rvalid. A word    */
+    /* leaving the buffer frees room only in the next cycle, which the extra */
+    /* buffer entry (see RS5 IQUEUE_SIZE) hides.                             */
     logic can_start;
     assign can_start = (
         inflight_cnt < CNT_W'(INFLIGHT)
-        && (bp_taken_r || (32'(ibuf_cnt) + 32'(inflight_valid) - 32'(word_leaving)) < IQUEUE_SIZE)
+        && (bp_taken_r || (32'(ibuf_cnt) + 32'(inflight_valid)) < IQUEUE_SIZE)
     );
 
     /* An address phase waits for gnt with stable signals */
