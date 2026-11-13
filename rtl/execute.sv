@@ -572,13 +572,16 @@ module execute
     logic        hold_vector;
 
     if (VEnable) begin : v_gen_on
-        /* Vector instructions trap when the vector state is Off, and when   */
+        /* Vector instructions trap when the vector state is Off, when vtype  */
+        /* is illegal (vill) and the instruction depends on it, and when     */
         /* vstart != 0, a value the core never produces (vset* clear it).    */
         logic is_vset;
+        logic vector_vill;
         assign is_vset = ctrl_i.vector_op inside {VSETVL, VSETVLI, VSETIVLI};
 
         assign exc_ilegal_vector = ctrl_i.is_vector && (
             (mstatus_vs_i == 2'b00) ||
+            (vector_vill && ctrl_i.uses_vtype) ||
             (vstart_nonzero_i && !is_vset)
         );
 
@@ -610,6 +613,7 @@ module execute
             .hold_o                 (hold_vector),
             .vtype_o                (vtype_o),
             .vlen_o                 (vlen_o),
+            .vill_o                 (vector_vill),
             .mem_address_o          (mem_address_vector),
             .mem_read_enable_o      (mem_read_enable_vector),
             .mem_write_enable_o     (mem_write_enable_vector),

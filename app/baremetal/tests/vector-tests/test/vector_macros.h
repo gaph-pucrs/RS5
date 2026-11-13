@@ -62,11 +62,13 @@ static inline unsigned long vlmax_of(unsigned long vsew, unsigned long vlmul) {
 
 // Checking vtype and vl value which is set by configuration setting instructions
 // by comparing with golden_vtype value used as a reference. Also check for
-// illegal values of vlmul and vsew which violtate: ELEN >= SEW/LMUL
+// illegal values of vlmul and vsew. With ELEN = 32, SEW > 32 is illegal and a
+// fractional LMUL needs SEW <= LMUL * ELEN: mf8 is never legal, mf4 only with
+// e8 and mf2 with e8 and e16. LMUL = 100 is reserved.
 #define check_vtype_vl(casenum, vtype, golden_vtype, avl, vl, vsew, vlmul)                                                     \
   printf("Checking vtype and vl #%d...\n", casenum); \
   if (avl > vlmax_of(vsew, vlmul)) avl = vlmax_of(vsew, vlmul); \
-  if((vlmul==5 && (vsew == 1 || vsew == 2 || vsew ==3)) || (vlmul==6 && (vsew == 2 || vsew ==3)) || (vlmul==7 && vsew==3)){   \
+  if((vsew > 2) || vlmul==4 || vlmul==5 || (vlmul==6 && vsew > 0) || (vlmul==7 && vsew > 1)){   \
   if((vtype != 0x80000000) || (vl != 0)){    \
   printf("FAILED. Got vtype = %lx, expected vtype = 80000000. avl = %lx, vl = %lx.\n", vtype,avl, vl);     \
   num_failed++;                                            \

@@ -324,6 +324,8 @@ package RS5_pkg;
         logic        is_vector;
         // Vector loads/stores (subset of is_vector)
         logic        is_vector_mem;
+        // Vector instruction that depends on vtype (traps when vill = 1)
+        logic        uses_vtype;
         logic        is_zicond;
         logic        is_sha2;
         logic        is_zbkb;

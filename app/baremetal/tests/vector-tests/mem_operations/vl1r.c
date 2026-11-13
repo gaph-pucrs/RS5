@@ -3,6 +3,9 @@
 // SPDX-License-Identifier: SHL-0.51
 //
 // Author: Matteo Perotti
+//
+// RS5 port: e64 in the active VSETs replaced by e32 (ELEN = 32), since VCLEAR
+// depends on vtype.
 
 #include "vector_macros.h"
 #include <string.h>
@@ -45,7 +48,7 @@ void TEST_CASE1(void) {
   // Reserve space for a buffer in memory
   // INIT_MEM_ZEROES(buf_vec_8b, VLEN / 8);
   // Set vl and vtype to super short values
-  VSET(1, e64, m2);
+  VSET(1, e32, m2);
   // Initialize register + neighbours to pattern value
   VCLEAR(v16);
   // Load a buffer from memory - whole register load
@@ -66,7 +69,7 @@ void TEST_CASE1(void) {
   // Reserve space for a buffer in memory
   // INIT_MEM_ZEROES(buf_vec_16b, VLEN / 16);
   // Set vl and vtype to super short values
-  VSET(1, e64, m2);
+  VSET(1, e32, m2);
   // Initialize register + neighbours to pattern value
   VCLEAR(v16);
   // Load a buffer from memory - whole register load
@@ -87,7 +90,7 @@ void TEST_CASE1(void) {
   // Reserve space for a buffer in memory
   // INIT_MEM_ZEROES(buf_vec_32b, VLEN / 32);
   // Set vl and vtype to super short values
-  VSET(1, e64, m2);
+  VSET(1, e32, m2);
   // Initialize register + neighbours to pattern value
   VCLEAR(v16);
   // Load a buffer from memory - whole register load
@@ -136,7 +139,7 @@ void TEST_CASE2(void) {
   // Reserve space for a buffer in memory
   // INIT_MEM_ZEROES(buf_vec_8b, VLEN / 4);
   // Set vl and vtype to super short values
-  VSET(1, e64, m4);
+  VSET(1, e32, m4);
   // Initialize register + neighbours to pattern value
   VCLEAR(v16);
   // Load a buffer from memory - whole register load
@@ -157,7 +160,7 @@ void TEST_CASE2(void) {
   // Reserve space for a buffer in memory
   // INIT_MEM_ZEROES(buf_vec_16b, VLEN / 8);
   // Set vl and vtype to super short values
-  VSET(1, e64, m4);
+  VSET(1, e32, m4);
   // Initialize register + neighbours to pattern value
   VCLEAR(v16);
   // Load a buffer from memory - whole register load
@@ -178,7 +181,7 @@ void TEST_CASE2(void) {
   // Reserve space for a buffer in memory
   // INIT_MEM_ZEROES(buf_vec_32b, VLEN / 16);
   // Set vl and vtype to super short values
-  VSET(1, e64, m4);
+  VSET(1, e32, m4);
   // Initialize register + neighbours to pattern value
   VCLEAR(v16);
   // Load a buffer from memory - whole register load
@@ -227,7 +230,7 @@ void TEST_CASE3(void) {
   // Reserve space for a buffer in memory
   // INIT_MEM_ZEROES(buf_vec_8b, VLEN / 2);
   // Set vl and vtype to super short values
-  VSET(1, e64, m8);
+  VSET(1, e32, m8);
   // Initialize register + neighbours to pattern value
   VCLEAR(v16);
   // Load a buffer from memory - whole register load
@@ -248,7 +251,7 @@ void TEST_CASE3(void) {
   // Reserve space for a buffer in memory
   // INIT_MEM_ZEROES(buf_vec_16b, VLEN / 4);
   // Set vl and vtype to super short values
-  VSET(1, e64, m8);
+  VSET(1, e32, m8);
   // Initialize register + neighbours to pattern value
   VCLEAR(v16);
   // Load a buffer from memory - whole register load
@@ -269,7 +272,7 @@ void TEST_CASE3(void) {
   // Reserve space for a buffer in memory
   // INIT_MEM_ZEROES(buf_vec_32b, VLEN / 8);
   // Set vl and vtype to super short values
-  VSET(1, e64, m8);
+  VSET(1, e32, m8);
   // Initialize register + neighbours to pattern value
   VCLEAR(v16);
   // Load a buffer from memory - whole register load
@@ -318,7 +321,7 @@ void TEST_CASE4(void) {
   // Reserve space for a buffer in memory
   // INIT_MEM_ZEROES(buf_vec_8b, VLEN);
   // Set vl and vtype to super short values
-  VSET(1, e64, m8);
+  VSET(1, e32, m8);
   // Initialize register + neighbours to pattern value
   VCLEAR(v16);
   VCLEAR(v24);
@@ -340,7 +343,7 @@ void TEST_CASE4(void) {
   // Reserve space for a buffer in memory
   // INIT_MEM_ZEROES(buf_vec_16b, VLEN / 2);
   // Set vl and vtype to super short values
-  VSET(1, e64, m8);
+  VSET(1, e32, m8);
   // Initialize register + neighbours to pattern value
   VCLEAR(v16);
   VCLEAR(v24);
@@ -362,7 +365,7 @@ void TEST_CASE4(void) {
   // Reserve space for a buffer in memory
   // INIT_MEM_ZEROES(buf_vec_32b, VLEN / 4);
   // Set vl and vtype to super short values
-  VSET(1, e64, m8);
+  VSET(1, e32, m8);
   // Initialize register + neighbours to pattern value
   VCLEAR(v16);
   VCLEAR(v24);
@@ -413,7 +416,7 @@ void TEST_CASE5(void) {
   // Reserve space for a buffer in memory
   // INIT_MEM_ZEROES(buf_vec_8b, VLEN / 8);
   // Set vl and vtype to super short values
-  VSET(0, e64, m2);
+  VSET(0, e32, m2);
   // Initialize register + neighbours to pattern value
   VCLEAR(v16);
   // Load a buffer from memory - whole register load

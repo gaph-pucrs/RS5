@@ -351,6 +351,7 @@ module decode
     /* reserved or not supported, and raises an illegal instruction.     */
     iTypeVector_e vector_operation;
     logic         vector_invalid;
+    logic         vector_uses_vtype;
 
     if (VEnable) begin : v_enable_decode_gen_on
         iTypeVector_e decode_vector_opcfg;
@@ -563,10 +564,19 @@ module decode
 
         assign vector_invalid = (instruction_operation inside {VECTOR, VLOAD, VSTORE}) && (vector_operation == VNOP);
 
+        /* vset*, whole register loads/stores and vmv<nr>r do not depend on */
+        /* vtype, so they do not trap when vill is set                      */
+        logic whole_reg_mem;
+        assign whole_reg_mem = (instruction_operation inside {VLOAD, VSTORE}) && (mop == 2'b00) && (lumop == 5'b01000);
+
+        assign vector_uses_vtype = (vector_operation != VNOP) && !whole_reg_mem
+                                && !(vector_operation inside {VSETVL, VSETVLI, VSETIVLI, VMVR});
+
     end
     else begin : v_enable_decode_gen_off
-        assign vector_operation = VNOP;
-        assign vector_invalid   = 1'b0;
+        assign vector_operation  = VNOP;
+        assign vector_invalid    = 1'b0;
+        assign vector_uses_vtype = 1'b0;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -929,6 +939,7 @@ module decode
         ctrl.aes_is_mix      = ZKNEEnable   && instruction_operation == AES32ESMI;
         ctrl.is_vector       = VEnable      && instruction_operation inside {VECTOR, VLOAD, VSTORE};
         ctrl.is_vector_mem   = VEnable      && instruction_operation inside {VLOAD, VSTORE};
+        ctrl.uses_vtype      = vector_uses_vtype;
         ctrl.is_zicond       = ZICONDEnable && instruction_operation inside {CZERO_EQZ, CZERO_NEZ};
         ctrl.zicond_is_eqz   = ZICONDEnable && instruction_operation == CZERO_EQZ;
         ctrl.is_sha2         = ZKNHEnable   && instruction_operation inside {SIG0, SIG1, SUM0, SUM1, SIG0H, SIG0L,
