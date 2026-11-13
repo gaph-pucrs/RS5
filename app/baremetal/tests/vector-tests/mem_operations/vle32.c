@@ -239,6 +239,7 @@ void TEST_CASE14(void) {
   VLOAD_32(v6, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
   VSET(13, e32, m1);
   asm volatile("vle32.v v6, (%0)" ::"r"(&ALIGNED_I32[0]));
+  LIMIT_TO_REG(32); // RS5: compare only the elements of v6, which the load wrote
   VSET(32, e16, m1);
   VCMP_U32(14, v6, 0x9fe41920, 0xf9aa71f0, 0xa11a9384, 0x99991348, 0x9fa831c7,
            0x38197598, 0x18931795, 0x81937598, 0x18747547, 0x3eeeeeee,

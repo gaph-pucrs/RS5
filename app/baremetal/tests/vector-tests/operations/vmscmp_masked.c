@@ -88,7 +88,7 @@ static void check(int casenum) {
         vl_value));                                                            \
     asm volatile(insn);                                                        \
     asm volatile("vs1r.v v4, (%0)" ::"r"(got) : "memory");                     \
-    reference(vl_value, sew, masked, mask);                                    \
+    reference(current_vl(), sew, masked, mask);                                    \
     check(casenum);                                                            \
   } while (0)
 
@@ -104,7 +104,7 @@ static void check(int casenum) {
         vl_value));                                                            \
     asm volatile("vmseq.vv v0, v8, v12, v0.t");                                \
     asm volatile("vs1r.v v0, (%0)" ::"r"(got) : "memory");                     \
-    reference(vl_value, sew, 1, mask);                                         \
+    reference(current_vl(), sew, 1, mask);                                         \
     check(casenum);                                                            \
   } while (0)
 

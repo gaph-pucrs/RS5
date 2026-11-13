@@ -22,6 +22,11 @@ uint8_t gold_vec_8b[VLEN];
 uint8_t zero_vec_8b[VLEN];
 uint8_t buf_vec_8b[VLEN];
 
+// RS5: the arrays above are sized for VLEN = 512; from here on VLEN is the
+// VLEN of the core, read from vlenb
+#undef VLEN
+#define VLEN (current_vlenb() * 8)
+
 //////////
 // vs1r //
 //////////

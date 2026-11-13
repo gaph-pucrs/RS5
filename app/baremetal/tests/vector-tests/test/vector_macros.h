@@ -174,12 +174,36 @@ static unsigned char illegal_buf[256] __attribute__((aligned(64)));
   }                                                                     \
   printf("PASSED.\n");                                                  \
 
-// Check the results against a vector of golden values
+// Current vl. The golden vectors are written for VLEN = 512; with a smaller
+// VLEN, vl is capped at VLMAX and only the first vl elements are compared.
+static inline unsigned long current_vl(void) {
+  unsigned long vl;
+  asm volatile ("csrr %[VL], vl" : [VL] "=r" (vl));
+  return vl;
+}
+
+// Optional extra bound for the next compare: LIMIT_TO_VL() right after the
+// instruction under test, when the compare itself runs with another vtype
+// or LIMIT_TO_REG(sew) to bound it to the elements of one vector register.
+static unsigned long vcmp_limit = ~0ul;
+static inline unsigned long current_vlenb(void);
+#define LIMIT_TO_VL()       (vcmp_limit = current_vl())
+#define LIMIT_TO_REG(sew)   (vcmp_limit = current_vlenb() * 8 / (sew))
+
+static inline unsigned long min_vl(unsigned long n) {
+  unsigned long vl = current_vl();
+  if (vl > vcmp_limit) vl = vcmp_limit;
+  vcmp_limit = ~0ul;
+  return (n < vl) ? n : vl;
+}
+
+// Check the results against a vector of golden values, up to vl elements
 #define VCMP(T,str,casenum,vexp,act...)                                               \
   T vact[] = {act};                                                                   \
   printf("Checking the results of the test case %d:\n", casenum);                     \
   MEMORY_BARRIER;                                                                     \
-  for (unsigned int i = 0; i < sizeof(vact)/sizeof(T); i++) {                         \
+  unsigned long vcmp_n = min_vl(sizeof(vact)/sizeof(T));                             \
+  for (unsigned int i = 0; i < vcmp_n; i++) {                                         \
     if (vexp[i] != vact[i]) {                                                         \
       printf("Index %d FAILED. Got "#str", expected "#str".\n", i, vexp[i], vact[i]); \
       num_failed++;                                                                   \
@@ -188,11 +212,12 @@ static unsigned char illegal_buf[256] __attribute__((aligned(64)));
   }                                                                                   \
   printf("PASSED.\n");
 
-//Macro used to compare large number of elements
+//Macro used to compare large number of elements, up to vl elements
 #define LVCMP(T,str,casenum,elements, vexp ,vact)                                     \
   printf("Checking the results of the test case %d:\n",casenum);                      \
   MEMORY_BARRIER;                                                                     \
-  for (unsigned int i = 0; i < elements; i++) {                                       \
+  unsigned long vcmp_n = min_vl(elements);                                           \
+  for (unsigned int i = 0; i < vcmp_n; i++) {                                         \
     if (vexp[i] != vact[i]) {                                                         \
       printf("Index %d FAILED. Got "#str", expected "#str".\n", i, vexp[i], vact[i]); \
       num_failed++;                                                                   \
@@ -201,6 +226,145 @@ static unsigned char illegal_buf[256] __attribute__((aligned(64)));
   }                                                                                   \
   printf("PASSED.\n");
 
+
+/***********************************************************************
+ *  VLEN-independent checks for reductions, compares and vslide1down    *
+ ***********************************************************************/
+
+// Largest vector register group the tests use: LMUL = 8 at VLEN = 512
+#define VREG_GROUP_MAX_BYTES 512
+#define VREG_MAX_BYTES       64
+
+static uint8_t chk_src2[VREG_GROUP_MAX_BYTES] __attribute__((aligned(64)));
+static uint8_t chk_src1[VREG_MAX_BYTES] __attribute__((aligned(64)));
+static uint8_t chk_v0[VREG_MAX_BYTES] __attribute__((aligned(64)));
+static uint8_t chk_old[VREG_MAX_BYTES] __attribute__((aligned(64)));
+static uint8_t chk_got[VREG_GROUP_MAX_BYTES] __attribute__((aligned(64)));
+static unsigned long chk_vl;
+
+static inline unsigned long current_vlenb(void) {
+  unsigned long vlenb;
+  asm volatile ("csrr %[B], vlenb" : [B] "=r" (vlenb));
+  return vlenb;
+}
+
+// Element i of an SEW-bit little-endian vector in memory, zero-extended
+static inline uint32_t chk_elem(const uint8_t *buf, unsigned long i, unsigned sew) {
+  uint32_t v = 0;
+  for (unsigned b = 0; b < sew / 8; b++)
+    v |= (uint32_t)buf[i * (sew / 8) + b] << (8 * b);
+  return v;
+}
+
+static inline int32_t chk_signed(uint32_t v, unsigned sew) {
+  return (sew == 32) ? (int32_t)v : (int32_t)(v << (32 - sew)) >> (32 - sew);
+}
+
+static inline int chk_bit(const uint8_t *m, unsigned long i) { return (m[i / 8] >> (i % 8)) & 1; }
+
+typedef enum { RED_OP_SUM, RED_OP_AND, RED_OP_OR, RED_OP_XOR,
+               RED_OP_MIN, RED_OP_MINU, RED_OP_MAX, RED_OP_MAXU } red_op_t;
+
+// Reference reduction of vs1[0] and the active elements of vs2 below vl
+static inline uint32_t red_reference(red_op_t op, unsigned sew, int masked) {
+  uint32_t mask = (sew == 32) ? 0xffffffffu : ((1u << sew) - 1);
+  uint32_t acc = chk_elem(chk_src1, 0, sew);
+  for (unsigned long i = 0; i < chk_vl; i++) {
+    if (masked && !chk_bit(chk_v0, i))
+      continue;
+    uint32_t x = chk_elem(chk_src2, i, sew);
+    switch (op) {
+      case RED_OP_SUM:  acc = acc + x; break;
+      case RED_OP_AND:  acc = acc & x; break;
+      case RED_OP_OR:   acc = acc | x; break;
+      case RED_OP_XOR:  acc = acc ^ x; break;
+      case RED_OP_MIN:  acc = (chk_signed(x, sew) < chk_signed(acc, sew)) ? x : acc; break;
+      case RED_OP_MAX:  acc = (chk_signed(x, sew) > chk_signed(acc, sew)) ? x : acc; break;
+      case RED_OP_MINU: acc = (x < acc) ? x : acc; break;
+      case RED_OP_MAXU: acc = (x > acc) ? x : acc; break;
+    }
+    acc &= mask;
+  }
+  return acc;
+}
+
+// Saves the sources, v0, the old destination and vl right before a reduction
+#define RED_SAVE(sew, vd, vs2, vs1)                                                   \
+  do {                                                                                \
+    chk_vl = current_vl();                                                            \
+    asm volatile("vse" #sew ".v " #vs2 ", (%0)" ::"r"(chk_src2) : "memory");          \
+    asm volatile("vs1r.v " #vs1 ", (%0)" ::"r"(chk_src1) : "memory");                 \
+    asm volatile("vs1r.v v0, (%0)" ::"r"(chk_v0) : "memory");                         \
+    asm volatile("vs1r.v " #vd ", (%0)" ::"r"(chk_old) : "memory");                   \
+  } while (0)
+
+// Element 0 of vd must hold the reference (or stay unchanged with vl = 0);
+// the other elements keep the old destination
+#define RED_CHECK(casenum, sew, op, masked, vd)                                       \
+  do {                                                                                \
+    asm volatile("vs1r.v " #vd ", (%0)" ::"r"(chk_got) : "memory");                   \
+    uint32_t red_exp = chk_vl ? red_reference(op, sew, masked) : chk_elem(chk_old, 0, sew); \
+    printf("Checking the results of the test case %d:\n", casenum);                   \
+    if (chk_elem(chk_got, 0, sew) != red_exp) {                                       \
+      printf("Index 0 FAILED. Got %x, expected %x.\n", chk_elem(chk_got, 0, sew), red_exp); \
+      num_failed++;                                                                   \
+      return;                                                                         \
+    }                                                                                 \
+    for (unsigned long i = sew / 8; i < current_vlenb(); i++) {                       \
+      if (chk_got[i] != chk_old[i]) {                                                 \
+        printf("Byte %d FAILED. Got %x, expected %x.\n", i, chk_got[i], chk_old[i]);  \
+        num_failed++;                                                                 \
+        return;                                                                       \
+      }                                                                               \
+    }                                                                                 \
+    printf("PASSED.\n");                                                              \
+  } while (0)
+
+// Mask-producing compares: CMP_SAVE keeps the old destination before the
+// compare and CMP_VL takes its vl right after it. VMCMP_MASK then checks the
+// golden bits (written for 8 * nbytes elements) below that vl and the old
+// destination above it.
+#define CMP_SAVE(vd) asm volatile("vs1r.v " #vd ", (%0)" ::"r"(chk_old) : "memory")
+#define CMP_VL()     (chk_vl = current_vl())
+
+#define VMCMP_MASK(casenum, vd, golden...)                                            \
+  do {                                                                                \
+    uint8_t cmp_golden[] = {golden};                                                  \
+    asm volatile("vs1r.v " #vd ", (%0)" ::"r"(chk_got) : "memory");                   \
+    printf("Checking the results of the test case %d:\n", casenum);                   \
+    for (unsigned long i = 0; i < 8 * sizeof(cmp_golden); i++) {                     \
+      int exp = (i < chk_vl) ? chk_bit(cmp_golden, i) : chk_bit(chk_old, i);          \
+      if (chk_bit(chk_got, i) != exp) {                                               \
+        printf("Bit %d FAILED. Got %d, expected %d.\n", i, chk_bit(chk_got, i), exp); \
+        num_failed++;                                                                 \
+        return;                                                                       \
+      }                                                                               \
+    }                                                                                 \
+    printf("PASSED.\n");                                                              \
+  } while (0)
+
+// vslide1down: with chk_vl the vl of the slide (CMP_VL() right after it),
+// elements below vl - 1 match the golden vector, written for VLEN = 512, and
+// element vl - 1 holds the scalar when it is active. Checked up to the
+// current vl.
+#define VSLIDE1DOWN_CMP(casenum, T, sew, vd, scalar, masked, golden...)               \
+  do {                                                                                \
+    T sld_golden[] = {golden};                                                        \
+    unsigned long sld_n = (current_vl() < chk_vl) ? current_vl() : chk_vl;            \
+    asm volatile("vs1r.v v0, (%0)" ::"r"(chk_v0) : "memory");                         \
+    asm volatile("vse" #sew ".v " #vd ", (%0)" ::"r"(chk_got) : "memory");            \
+    printf("Checking the results of the test case %d:\n", casenum);                   \
+    for (unsigned long i = 0; i < sld_n; i++) {                                       \
+      int sld_last = (i == chk_vl - 1) && (!(masked) || chk_bit(chk_v0, i));          \
+      T exp = sld_last ? (T)(scalar) : sld_golden[i];                                 \
+      if (((T *)chk_got)[i] != exp) {                                                 \
+        printf("Index %d FAILED. Got %x, expected %x.\n", i, ((T *)chk_got)[i], exp); \
+        num_failed++;                                                                 \
+        return;                                                                       \
+      }                                                                               \
+    }                                                                                 \
+    printf("PASSED.\n");                                                              \
+  } while (0)
 
 // Check the results against an in-memory vector of golden values
 #define VMCMP(T,str,casenum,vexp,vgold,size)                                          \

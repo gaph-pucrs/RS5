@@ -35,6 +35,11 @@ uint16_t buf_vec_16b[VLEN / 2];
 uint32_t buf_vec_32b[VLEN / 4];
 uint64_t buf_vec_64b[VLEN / 8];
 
+// RS5: the arrays above are sized for VLEN = 512; from here on VLEN is the
+// VLEN of the core, read from vlenb
+#undef VLEN
+#define VLEN (current_vlenb() * 8)
+
 ////////////
 // vl1reX //
 ////////////

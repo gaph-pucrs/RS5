@@ -11,20 +11,23 @@ void TEST_CASE1(void) {
   VSET(16, e8, m1);
   VLOAD_8(v1, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
   VLOAD_8(v2, 1);
+  RED_SAVE(8, v3, v1, v2);
   asm volatile("vredsum.vs v3, v1, v2");
-  VCMP_U8(1, v3, 73);
+  RED_CHECK(1, 8, RED_OP_SUM, 0, v3);
 
   VSET(16, e16, m1);
   VLOAD_16(v1, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
   VLOAD_16(v2, 1);
+  RED_SAVE(16, v3, v1, v2);
   asm volatile("vredsum.vs v3, v1, v2");
-  VCMP_U16(2, v3, 73);
+  RED_CHECK(2, 16, RED_OP_SUM, 0, v3);
 
   VSET(16, e32, m1);
   VLOAD_32(v1, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
   VLOAD_32(v2, 1);
+  RED_SAVE(32, v3, v1, v2);
   asm volatile("vredsum.vs v3, v1, v2");
-  VCMP_U32(3, v3, 73);
+  RED_CHECK(3, 32, RED_OP_SUM, 0, v3);
 
   // VSET(16, e64, m1);
   // VLOAD_64(v1, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
@@ -40,24 +43,27 @@ void TEST_CASE2(void) {
   VLOAD_8(v1, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
   VLOAD_8(v2, 1);
   VLOAD_8(v3, 1);
+  RED_SAVE(8, v3, v1, v2);
   asm volatile("vredsum.vs v3, v1, v2, v0.t");
-  VCMP_U8(5, v3, 37);
+  RED_CHECK(5, 8, RED_OP_SUM, 1, v3);
 
   VSET(16, e16, m1);
   VLOAD_8(v0, 0xaa, 0x55);
   VLOAD_16(v1, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
   VLOAD_16(v2, 1);
   VLOAD_16(v3, 1);
+  RED_SAVE(16, v3, v1, v2);
   asm volatile("vredsum.vs v3, v1, v2, v0.t");
-  VCMP_U16(6, v3, 37);
+  RED_CHECK(6, 16, RED_OP_SUM, 1, v3);
 
   VSET(16, e32, m1);
   VLOAD_8(v0, 0xaa, 0x55);
   VLOAD_32(v1, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
   VLOAD_32(v2, 1);
   VLOAD_32(v3, 1);
+  RED_SAVE(32, v3, v1, v2);
   asm volatile("vredsum.vs v3, v1, v2, v0.t");
-  VCMP_U32(7, v3, 37);
+  RED_CHECK(7, 32, RED_OP_SUM, 1, v3);
 
   // VSET(16, e64, m1);
   // VLOAD_8(v0, 0xaa, 0x55);
@@ -74,22 +80,25 @@ void TEST_CASE3(void) {
   VLOAD_8(v1, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
   VLOAD_8(v2, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
   VLOAD_8(v3, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  RED_SAVE(8, v3, v1, v2);
   asm volatile("vredsum.vs v3, v1, v2");
-  VCMP_U8(9, v3, 73, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  RED_CHECK(9, 8, RED_OP_SUM, 0, v3);
 
   VSET(16, e16, m1);
   VLOAD_16(v1, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
   VLOAD_16(v2, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
   VLOAD_16(v3, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  RED_SAVE(16, v3, v1, v2);
   asm volatile("vredsum.vs v3, v1, v2");
-  VCMP_U16(10, v3, 73, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  RED_CHECK(10, 16, RED_OP_SUM, 0, v3);
 
   VSET(16, e32, m1);
   VLOAD_32(v1, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
   VLOAD_32(v2, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
   VLOAD_32(v3, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  RED_SAVE(32, v3, v1, v2);
   asm volatile("vredsum.vs v3, v1, v2");
-  VCMP_U32(11, v3, 73, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  RED_CHECK(11, 32, RED_OP_SUM, 0, v3);
 
   // VSET(16, e64, m1);
   // VLOAD_64(v1, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
@@ -106,24 +115,27 @@ void TEST_CASE4(void) {
   VLOAD_8(v1, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
   VLOAD_8(v2, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
   VLOAD_8(v3, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  RED_SAVE(8, v3, v1, v2);
   asm volatile("vredsum.vs v3, v1, v2");
-  VCMP_U8(13, v3, 65, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7);
+  RED_CHECK(13, 8, RED_OP_SUM, 0, v3);
 
   VSET(1, e16, m1);
   VLOAD_16(v1, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
   VLOAD_16(v2, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
   VLOAD_16(v3, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  RED_SAVE(16, v3, v1, v2);
   asm volatile("vredsum.vs v3, v1, v2");
   // VCMP_U16(14, v3, 2, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 0);
-  VCMP_U16(14, v3, 2);
+  RED_CHECK(14, 16, RED_OP_SUM, 0, v3);
 
   VSET(3, e32, m1);
   VLOAD_32(v1, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
   VLOAD_32(v2, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
   VLOAD_32(v3, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  RED_SAVE(32, v3, v1, v2);
   asm volatile("vredsum.vs v3, v1, v2");
   // VCMP_U32(15, v3, 7, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 0);
-  VCMP_U32(15, v3, 7, 2, 3);
+  RED_CHECK(15, 32, RED_OP_SUM, 0, v3);
 
   // VSET(7, e64, m1);
   // VLOAD_64(v1, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
@@ -147,32 +159,36 @@ void TEST_CASE5(void) {
   VLOAD_8(v1, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 0);
   VLOAD_8(v2, 100, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 0);
   VLOAD_8(v3, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 0);
+  RED_SAVE(8, v3, v1, v2);
   asm volatile("vredsum.vs v3, v1, v2, v0.t");
-  VCMP_U8(18, v3, 107, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7);
+  RED_CHECK(18, 8, RED_OP_SUM, 1, v3);
 
   VSET(1, e16, m1);
   VLOAD_8(v0, 0xaa, 0x55);
   VLOAD_16(v1, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
   VLOAD_16(v2, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
   VLOAD_16(v3, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  RED_SAVE(16, v3, v1, v2);
   asm volatile("vredsum.vs v3, v1, v2, v0.t");
   // VCMP_U16(19, v3, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
-  VCMP_U16(19, v3, 1);
+  RED_CHECK(19, 16, RED_OP_SUM, 1, v3);
 
   VSET(3, e32, m1);
   VLOAD_8(v0, 0xaa, 0x55);
   VLOAD_32(v1, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
   VLOAD_32(v2, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
   VLOAD_32(v3, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  RED_SAVE(32, v3, v1, v2);
   asm volatile("vredsum.vs v3, v1, v2, v0.t");
   // VCMP_U32(20, v3, 3, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
-  VCMP_U32(20, v3, 3, 2, 3);
+  RED_CHECK(20, 32, RED_OP_SUM, 1, v3);
 
   VSET(32, e32, m2);
   VLOAD_32(v6, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
   VLOAD_32(v8, 1);
+  RED_SAVE(32, v4, v6, v8);
   asm volatile("vredsum.vs v4, v6, v8");
-  VCMP_U32(21, v4, 145);
+  RED_CHECK(21, 32, RED_OP_SUM, 0, v4);
 }
 
 // RS5: with vl = 0 a reduction does not write the destination
@@ -182,27 +198,30 @@ void TEST_CASE6(void) {
   VLOAD_8(v2, 1);
   VLOAD_8(v3, 0x55);
   VSET_ZERO(e8, m1);
+  RED_SAVE(8, v3, v1, v2);
   asm volatile("vredsum.vs v3, v1, v2");
   VSET(16, e8, m1);
-  VCMP_U8(22, v3, 0x55);
+  RED_CHECK(22, 8, RED_OP_SUM, 0, v3);
 
   VSET(16, e16, m1);
   VLOAD_16(v1, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
   VLOAD_16(v2, 1);
   VLOAD_16(v3, 0x5555);
   VSET_ZERO(e16, m1);
+  RED_SAVE(16, v3, v1, v2);
   asm volatile("vredsum.vs v3, v1, v2");
   VSET(16, e16, m1);
-  VCMP_U16(23, v3, 0x5555);
+  RED_CHECK(23, 16, RED_OP_SUM, 0, v3);
 
   VSET(16, e32, m1);
   VLOAD_32(v1, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
   VLOAD_32(v2, 1);
   VLOAD_32(v3, 0x55555555);
   VSET_ZERO(e32, m1);
+  RED_SAVE(32, v3, v1, v2);
   asm volatile("vredsum.vs v3, v1, v2");
   VSET(16, e32, m1);
-  VCMP_U32(24, v3, 0x55555555);
+  RED_CHECK(24, 32, RED_OP_SUM, 0, v3);
 }
 
 int main(void) {
