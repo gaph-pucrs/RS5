@@ -206,60 +206,36 @@ package RS5_pkg;
     /* for them until the package that implements the class lands.         */
     typedef enum logic [6:0] {
         VNOP,
-        VSETVL,
-        VSETVLI,
-        VSETIVLI,
-        VADD,
-        VSUB,
-        VRSUB,
-        VAND,
-        VOR,
-        VXOR,
-        VSLL,
-        VSRL,
-        VSRA,
-        VMSEQ,
-        VMSNE,
-        VMSLTU,
-        VMSLT,
-        VMSLEU,
-        VMSLE,
-        VMSGTU,
-        VMSGT,
-        VMINU,
-        VMIN,
-        VMAXU,
-        VMAX,
-        VMUL,
-        VMULH,
-        VMULHU,
-        VMULHSU,
-        VWMUL,
-        VWMULU,
-        VWMULSU,
-        VDIVU,
-        VDIV,
-        VREMU,
-        VREM,
-        VMACC,
-        VNMSAC,
-        VMADD,
-        VNMSUB,
+        // Configuration
+        VSETVL, VSETVLI, VSETIVLI,
+        // Add/subtract
+        VADD, VSUB, VRSUB,
+        // Bitwise logical (VLogicEnable)
+        VAND, VOR, VXOR,
+        // Shifts
+        VSLL, VSRL, VSRA,
+        // Integer compares
+        VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT,
+        // Min/max (VMinMaxEnable)
+        VMINU, VMIN, VMAXU, VMAX,
+        // Multiply and widening multiply
+        VMUL, VMULH, VMULHU, VMULHSU, VWMUL, VWMULU, VWMULSU,
+        // Divide and remainder (VDivEnable)
+        VDIVU, VDIV, VREMU, VREM,
+        // Multiply-add
+        VMACC, VNMSAC, VMADD, VNMSUB,
+        // Sum reduction (VRedSumEnable)
         VREDSUM,
-        VREDMAXU,
-        VREDMAX,
-        VREDMINU,
-        VREDMIN,
-        VREDAND,
-        VREDOR,
-        VREDXOR,
-        VMV,
-        VMVR,
-        VMVSX,
-        VMVXS,
+        // Min/max reductions (VRedMinMaxEnable)
+        VREDMAXU, VREDMAX, VREDMINU, VREDMIN,
+        // Logical reductions (VRedLogicEnable)
+        VREDAND, VREDOR, VREDXOR,
+        // Moves
+        VMV, VMVR, VMVSX, VMVXS,
+        // Merge (VMergeEnable)
         VMERGE,
-        VSLIDE1UP,
-        VSLIDE1DOWN,
+        // Slide by one
+        VSLIDE1UP, VSLIDE1DOWN,
         // Integer extension (VExtendEnable)
         VEXT,
         // Widening add/sub, multiply-add and reduction (VWidenEnable)
@@ -279,6 +255,7 @@ package RS5_pkg;
         VSLIDEUP, VSLIDEDOWN,
         // Gather and compress (VGatherEnable)
         VRGATHER, VRGATHEREI16, VCOMPRESS,
+        // Loads and stores
         VLD,            // Vector load  (was iType_e VLOAD)
         VST             // Vector store (was iType_e VSTORE)
     } iTypeVector_e;
