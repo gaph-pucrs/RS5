@@ -73,6 +73,7 @@ module vectorUnit
     logic        reduction_instruction;
     logic        widening_instruction;
     logic        whole_reg_load_store;
+    logic        whole_reg_instruction;
     logic        mask_load_store;
 
     logic        accumulate_instruction_r;
@@ -131,6 +132,8 @@ module vectorUnit
     assign widening_instruction   = (vector_operation_i inside {VWMUL, VWMULU, VWMULSU});
     assign whole_reg_load_store   = (instruction_i[24:20] == 5'b01000 && (op_vload || op_vstore) && instruction_i[27:26] == 2'b00);
     assign mask_load_store        = (instruction_i[24:20] == 5'b01011 && (op_vload || op_vstore) && instruction_i[27:26] == 2'b00);
+    /* Whole register loads/stores and vmv<nr>r ignore vl and vtype */
+    assign whole_reg_instruction  = whole_reg_load_store || (op_vector && vector_operation_i == VMVR);
     assign mask_instruction       = (vector_operation_i inside {VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT});
 
     assign elements_per_reg = VLENB >> vsew;
@@ -478,7 +481,7 @@ module vectorUnit
         else if (!should_stall) begin
             if (next_state == V_IDLE)
                 vl_curr_reg <= 0;
-            else if (whole_reg_load_store)
+            else if (whole_reg_instruction)
                 vl_curr_reg <= '1;
             else if (mask_load_store)
                 vl_curr_reg <= (vl >> 3) + ((vl[2:0] & 3'h7) != 3'h0 ? 1 : 0);
@@ -498,7 +501,7 @@ module vectorUnit
                 total_elements_processed <= total_elements_processed + elements_per_reg;
         end
 
-    assign vector_process_done = (total_elements_processed >= vl && !whole_reg_load_store && op_vector);
+    assign vector_process_done = (total_elements_processed >= vl && !whole_reg_instruction && op_vector);
 
 //////////////////////////////////////////////////////////////////////////////
 // Register Bank
@@ -567,7 +570,7 @@ module vectorUnit
                     default: write_enable <= {'0, 4'b1111};
                 endcase
             end
-            else if (whole_reg_load_store || mask_instruction) begin
+            else if (whole_reg_instruction || mask_instruction) begin
                 write_enable <= '1;
             end
             else begin
