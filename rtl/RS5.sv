@@ -29,6 +29,7 @@ module RS5
     parameter mul_e         MULEXT           = MUL_M,
     parameter atomic_e      AMOEXT           = AMO_A,
     parameter logic [31:0]  START_ADDR       = '0,
+    parameter logic [31:0]  HART_ID          = '0,
     parameter bit           COMPRESSED       = 1'b0,
     parameter bit           VEnable          = 1'b0,
     parameter int           VLEN             = 256,
@@ -515,6 +516,7 @@ module RS5
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     CSRBank #(
+        .HART_ID         (HART_ID         ),
         .HPMCOUNTEREnable(HPMCOUNTEREnable),
         .XOSVMEnable     (XOSVMEnable     ),
         .XKYBEREnable    (XKYBEREnable    ),

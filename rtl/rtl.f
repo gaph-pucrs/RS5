@@ -35,4 +35,4 @@
 ./retire.sv
 ./RS5_pkg.sv
 ./RS5.sv
-./rtc.sv
+./mtimer.sv

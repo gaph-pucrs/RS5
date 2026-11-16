@@ -30,6 +30,7 @@
 module CSRBank
     import RS5_pkg::*;
 #(    
+    parameter logic [31:0] HART_ID       = '0,
     parameter bit       HPMCOUNTEREnable = 1'b1,
     parameter bit       XOSVMEnable      = 1'b1,
     parameter bit       XKYBEREnable     = 1'b1,
@@ -1231,7 +1232,7 @@ module CSRBank
             MVENDORID:      current_val = '0;
             MARCHID:        current_val = '0;
             MIMPID:         current_val = '0;
-            MHARTID:        current_val = '0;
+            MHARTID:        current_val = HART_ID;
             MSTATUS:        current_val = mstatus;
             MTVEC:          current_val = mtvec;
             MIP:            current_val = mip;

@@ -103,25 +103,25 @@ module riscof_tb
     /* verilator lint_on UNUSEDSIGNAL */
     logic                   instruction_ready;
 
-    logic [31:0]            data_rtc;
+    logic [31:0]            data_mtimer;
 
     logic                   interrupt_ack;
     logic [63:0]            mtime;
     logic [31:0]            instruction;
-    logic                   enable_ram, enable_rtc, enable_plic, enable_tb;
+    logic                   enable_ram, enable_mtimer, enable_plic, enable_tb;
     logic                   mem_operation_enable;
     logic [31:0]            mem_address, mem_data_read, mem_data_write;
     logic [3:0]             mem_write_enable;
     byte                    char;
     logic [31:0]            data_ram, data_plic, data_tb;
-    logic                   enable_tb_r, rtc_rvalid, plic_rvalid;
+    logic                   enable_tb_r, mtimer_rvalid, plic_rvalid;
     logic                   mti, mei;
 
 //////////////////////////////////////////////////////////////////////////////
 // Control
 //////////////////////////////////////////////////////////////////////////////
 
-    assign enable_rtc  = (mem_address[31:28] == 4'h2) && mem_operation_enable;
+    assign enable_mtimer  = (mem_address[31:28] == 4'h2) && mem_operation_enable;
     assign enable_plic = (mem_address[31:28] == 4'h4) && mem_operation_enable;
     assign enable_ram  = (mem_address[31:28] == 4'h8) && mem_operation_enable;
 
@@ -131,8 +131,8 @@ module riscof_tb
     assign mem_we = (mem_write_enable != '0);
 
     always_comb begin
-        if (rtc_rvalid) begin
-            mem_data_read = data_rtc;
+        if (mtimer_rvalid) begin
+            mem_data_read = data_mtimer;
         end
         else if (plic_rvalid) begin
             mem_data_read = data_plic;
@@ -355,7 +355,7 @@ module riscof_tb
 
     /* Always granted: the delay model grants for them */
     /* verilator lint_off UNUSEDSIGNAL */
-    logic plic_gnt, rtc_gnt;
+    logic plic_gnt, mtimer_gnt;
     /* verilator lint_on UNUSEDSIGNAL */
 
     plic #(
@@ -378,20 +378,20 @@ module riscof_tb
     );
 
 //////////////////////////////////////////////////////////////////////////////
-// RTC
+// MTIMER
 //////////////////////////////////////////////////////////////////////////////
 
-    rtc rtc(
+    mtimer mtimer(
         .clk        (clk),
         .reset_n    (reset_n),
-        .req_i      (enable_rtc),
-        .gnt_o      (rtc_gnt),
+        .req_i      (enable_mtimer),
+        .gnt_o      (mtimer_gnt),
         .addr_i     (mem_address[3:0]),
         .we_i       (mem_we),
         .be_i       (mem_write_enable),
         .wdata_i    (mem_data_write),
-        .rvalid_o   (rtc_rvalid),
-        .rdata_o    (data_rtc),
+        .rvalid_o   (mtimer_rvalid),
+        .rdata_o    (data_mtimer),
         .mti_o      (mti),
         .mtime_o    (mtime)
     );

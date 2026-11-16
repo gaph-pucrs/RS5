@@ -39,7 +39,7 @@
 | Privilege modes | Machine mode (M-mode) and User mode (U-mode) |
 | Interrupt controller | optional [SiFive-compliant](https://github.com/riscv/riscv-plic-spec) [PLIC](rtl/plic.sv) |
 | Memory interfaces | [OBI](https://github.com/openhwgroup/obi) instruction and data managers, see [docs](docs/README.md#obi-interfaces) |
-| Machine timer | optional [mtimer](rtl/rtc.sv) |
+| Machine timer | optional [mtimer](rtl/mtimer.sv) |
 
 | Extension type | Available extensions |
 |---|---|

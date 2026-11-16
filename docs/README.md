@@ -48,7 +48,7 @@ The interface contains four signal groups:
 * Global signals: `clk`, `reset_n` (asynchronous), and `sys_reset_i` (synchronous);
 * Instruction memory: OBI read-only manager, `instr_*` signals;
 * Data bus: OBI manager, `data_*` signals;
-* Peripherals: `tip_i` for timer interrupts, `eip_i` for external interrupts optionally managed through PLIC, `interrupt_ack_o`, and `mtime_i` for optional cycle counter through MTIMER/RTC.
+* Peripherals: `tip_i` for timer interrupts, `eip_i` for external interrupts optionally managed through PLIC, `interrupt_ack_o`, and `mtime_i` for optional cycle counter through MTIMER.
 
 ### OBI interfaces
 
@@ -122,6 +122,7 @@ Non-extension parameters configure processor behaviour and target environment.
 |---|---|---|---|
 | `Environment` | `environment_e` | `ASIC` | Target technology: `ASIC` or `FPGA` (selects LUT-RAM register bank on FPGA) |
 | `START_ADDR` | `logic [31:0]` | `0x00000000` | Reset/boot address loaded into the program counter on reset |
+| `HART_ID` | `logic [31:0]` | `0` | Value read from `mhartid` |
 | `BUS_WIDTH` | `int` | `32` | Data bus width in bits |
 | `IMEM_LATENCY` | `int` | `1` | Cycles from `instr_gnt_i` to `instr_rvalid_i` of a typical fetch (1: the next cycle). It sizes the instruction buffer and the fetch requests kept in flight to the smallest power of 2 above `IMEM_LATENCY + 1`: 4 for latency 1–2, 8 for latency 3–6, 16 for latency 7–14. A larger value never slows a faster memory, it only costs one buffer entry (32 flip-flops) per word |
 | `BRANCHPRED` | `bit` | `1` | Enable static branch prediction (resolves immediate-target branches at decode instead of execute) |

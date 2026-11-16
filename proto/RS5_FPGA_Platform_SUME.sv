@@ -68,11 +68,11 @@ module RS5_FPGA_Platform
     logic [31:0]            core_data_address, core_data_in, core_data_out;
     logic [3:0]             core_data_be;
     logic [5:0]             core_data_atop;
-    logic                   cpu_operation_enable, enable_ram, enable_peripherals, enable_rtc, enable_plic;
-    logic                   rtc_gnt, rtc_rvalid, plic_gnt, plic_rvalid, enable_peripherals_r;
+    logic                   cpu_operation_enable, enable_ram, enable_peripherals, enable_mtimer, enable_plic;
+    logic                   mtimer_gnt, mtimer_rvalid, plic_gnt, plic_rvalid, enable_peripherals_r;
     logic [63:0]            mtime;
     logic [31:0]            data_bram, data_plic, data_peripherals;
-    logic [31:0]            data_rtc;
+    logic [31:0]            data_mtimer;
     logic [3:0]             cpu_write_enable;
     logic                   stall;
     logic                   mei, mti;
@@ -107,14 +107,14 @@ module RS5_FPGA_Platform
     end
 
     assign enable_ram         = cpu_data_req && (cpu_data_address[31:28] <  4'h2);
-    assign enable_rtc         = cpu_data_req && (cpu_data_address[31:28] == 4'h2);
+    assign enable_mtimer         = cpu_data_req && (cpu_data_address[31:28] == 4'h2);
     assign enable_plic        = cpu_data_req && (cpu_data_address[31:28] >= 4'h3) && (cpu_data_address[31:28] < 4'h8);
     assign enable_peripherals = cpu_data_req && (cpu_data_address[31:28] >= 4'h8);
 
     /* A target is accessed once its request is granted */
-    logic access_ram, access_rtc, access_plic, access_peripherals;
+    logic access_ram, access_mtimer, access_plic, access_peripherals;
     assign access_ram         = enable_ram         && cpu_data_gnt;
-    assign access_rtc         = enable_rtc         && cpu_data_gnt;
+    assign access_mtimer         = enable_mtimer         && cpu_data_gnt;
     assign access_plic        = enable_plic        && cpu_data_gnt;
     assign access_peripherals = enable_peripherals && cpu_data_gnt;
 
@@ -123,8 +123,8 @@ module RS5_FPGA_Platform
     end
 
     always_comb begin
-        if (rtc_rvalid) begin
-            cpu_data_in = data_rtc;
+        if (mtimer_rvalid) begin
+            cpu_data_in = data_mtimer;
         end
         else if (plic_rvalid) begin
             cpu_data_in = data_plic;
@@ -231,20 +231,20 @@ module RS5_FPGA_Platform
         .doutb  (data_bram)                 // output wire [31 : 0] doutb
     );
 //////////////////////////////////////////////////////////////////////////////
-// RTC INSTANTIATION
+// MTIMER INSTANTIATION
 //////////////////////////////////////////////////////////////////////////////
 
-    rtc rtc(
+    mtimer mtimer(
         .clk        (clk),
         .reset_n    (reset_n),
-        .req_i      (access_rtc),
-        .gnt_o      (rtc_gnt),
+        .req_i      (access_mtimer),
+        .gnt_o      (mtimer_gnt),
         .addr_i     (cpu_data_address[3:0]),
         .we_i       (cpu_data_we),
         .be_i       (cpu_data_be),
         .wdata_i    (cpu_data_out),
-        .rvalid_o   (rtc_rvalid),
-        .rdata_o    (data_rtc),
+        .rvalid_o   (mtimer_rvalid),
+        .rdata_o    (data_mtimer),
         .mti_o      (mti),
         .mtime_o    (mtime)
     );

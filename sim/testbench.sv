@@ -119,14 +119,14 @@ module testbench
     /* verilator lint_on UNUSEDSIGNAL */
     logic                   instruction_enable;
 
-    logic [31:0]            data_rtc;
+    logic [31:0]            data_mtimer;
 
     logic                   interrupt_ack;
     logic [63:0]            mtime;
     /* verilator lint_off UNUSEDSIGNAL */
     logic [BUS_WIDTH-1:0]   instruction;
     /* verilator lint_on UNUSEDSIGNAL */
-    logic                   enable_ram, enable_rtc, enable_plic, enable_tb;
+    logic                   enable_ram, enable_mtimer, enable_plic, enable_tb;
     logic                   mem_operation_enable, instruction_ready;
     logic [31:0]            mem_address;
     logic [BUS_WIDTH  -1:0] mem_data_read, mem_data_write;
@@ -135,7 +135,7 @@ module testbench
     logic [BUS_WIDTH  -1:0] data_ram;
     logic [31:0]            data_plic;
     logic [BUS_WIDTH  -1:0] data_tb;
-    logic                   enable_tb_r, rtc_rvalid, plic_rvalid;
+    logic                   enable_tb_r, mtimer_rvalid, plic_rvalid;
     logic                   mti, mei;
 
 //////////////////////////////////////////////////////////////////////////////
@@ -143,7 +143,7 @@ module testbench
 //////////////////////////////////////////////////////////////////////////////
 
     assign enable_ram  = mem_operation_enable && ((mem_address[31:28] == 4'b0000) || (mem_address[31:28] == 4'b0001));
-    assign enable_rtc  = mem_operation_enable && (mem_address[31:28] == 4'b0010);
+    assign enable_mtimer  = mem_operation_enable && (mem_address[31:28] == 4'b0010);
     assign enable_plic = mem_operation_enable && (mem_address[31:28] == 4'b0100);
     assign enable_tb   = mem_operation_enable && (mem_address[31:28] == 4'b1000);
 
@@ -157,10 +157,10 @@ module testbench
     assign mem_we = (mem_write_enable != '0);
 
     always_comb begin
-        unique case ({enable_tb_r, plic_rvalid, rtc_rvalid})
+        unique case ({enable_tb_r, plic_rvalid, mtimer_rvalid})
             3'b100:  mem_data_read = data_tb;
             3'b010:  mem_data_read = {{(BUS_WIDTH-32){1'b0}}, data_plic};
-            3'b001:  mem_data_read = {{(BUS_WIDTH-32){1'b0}}, data_rtc};
+            3'b001:  mem_data_read = {{(BUS_WIDTH-32){1'b0}}, data_mtimer};
             default: mem_data_read = data_ram;
         endcase
     end
@@ -498,7 +498,7 @@ module testbench
 
     /* Always granted: the delay model grants for them */
     /* verilator lint_off UNUSEDSIGNAL */
-    logic plic_gnt, rtc_gnt;
+    logic plic_gnt, mtimer_gnt;
     /* verilator lint_on UNUSEDSIGNAL */
 
     plic #(
@@ -521,20 +521,20 @@ module testbench
     );
 
 //////////////////////////////////////////////////////////////////////////////
-// RTC
+// MTIMER
 //////////////////////////////////////////////////////////////////////////////
 
-    rtc rtc(
+    mtimer mtimer(
         .clk        (clk),
         .reset_n    (reset_n),
-        .req_i      (enable_rtc),
-        .gnt_o      (rtc_gnt),
+        .req_i      (enable_mtimer),
+        .gnt_o      (mtimer_gnt),
         .addr_i     (mem_address[3:0]),
         .we_i       (mem_we),
         .be_i       (mem_write_enable[3:0]),
         .wdata_i    (mem_data_write[31:0]),
-        .rvalid_o   (rtc_rvalid),
-        .rdata_o    (data_rtc),
+        .rvalid_o   (mtimer_rvalid),
+        .rdata_o    (data_mtimer),
         .mti_o      (mti),
         .mtime_o    (mtime)
     );
