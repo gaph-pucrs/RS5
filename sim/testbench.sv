@@ -121,7 +121,9 @@ module testbench
 
     logic [31:0]            data_mtimer;
 
+    /* verilator lint_off UNUSEDSIGNAL */
     logic                   interrupt_ack;
+    /* verilator lint_on UNUSEDSIGNAL */
     logic [63:0]            mtime;
     /* verilator lint_off UNUSEDSIGNAL */
     logic [BUS_WIDTH-1:0]   instruction;
@@ -515,7 +517,6 @@ module testbench
         .rvalid_o(plic_rvalid),
         .rdata_o (data_plic),
         .irq_i   ('0),
-        .iack_i  (interrupt_ack),
         .iack_o  (iack_periph),
         .irq_o   (mei)
     );

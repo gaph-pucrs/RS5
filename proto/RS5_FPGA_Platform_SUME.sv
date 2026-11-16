@@ -267,7 +267,6 @@ module RS5_FPGA_Platform
         .rvalid_o(plic_rvalid),
         .rdata_o (data_plic),
         .irq_i   (irq_peripherals),
-        .iack_i  (interrupt_ack),
         .irq_o   (mei),
         .iack_o  (iack_peripherals)
     );

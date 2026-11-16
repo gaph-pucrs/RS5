@@ -105,7 +105,9 @@ module riscof_tb
 
     logic [31:0]            data_mtimer;
 
+    /* verilator lint_off UNUSEDSIGNAL */
     logic                   interrupt_ack;
+    /* verilator lint_on UNUSEDSIGNAL */
     logic [63:0]            mtime;
     logic [31:0]            instruction;
     logic                   enable_ram, enable_mtimer, enable_plic, enable_tb;
@@ -372,7 +374,6 @@ module riscof_tb
         .rvalid_o(plic_rvalid),
         .rdata_o (data_plic),
         .irq_i   ('0),
-        .iack_i  (interrupt_ack),
         .iack_o  (iack_periph),
         .irq_o   (mei)
     );

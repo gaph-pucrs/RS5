@@ -9,15 +9,27 @@
  * PUCRS - Pontifical Catholic University of Rio Grande do Sul <https://pucrs.br/>
  *
  * \brief
- * Peripheral Local Interrupt Controller.
+ * Platform-Level Interrupt Controller, with one context for each hart.
+ *
+ * \detailed
+ * OBI subordinate, with the register map of the RISC-V PLIC:
+ *   0x001000:              pending sources (bit s for source s)
+ *   0x002000 + 0x80*hart:  enabled sources of the hart
+ *   0x200004 + 0x1000*hart: claim (read) and complete (write) of the hart
+ * A source is pending while it requests and is not in service. Reading claim
+ * returns the lowest pending source enabled for the hart, or 0, and puts it
+ * in service, so that another hart cannot claim it too. Writing the source to
+ * complete acknowledges the peripheral (iack_o), which takes it out of
+ * service. There are no priorities or thresholds.
  */
 
 `include "RS5_pkg.sv"
 
 module plic
-	import RS5_pkg::*;
+    import RS5_pkg::*;
 #(
-	parameter i_cnt = 1
+    parameter int i_cnt     = 1,
+    parameter int NUM_HARTS = 1
 )
 (
     input   logic                   clk,
@@ -37,48 +49,16 @@ module plic
     output  logic [31:0]            rdata_o,
 
     input   logic [i_cnt:1]         irq_i,
-    input   logic                   iack_i,
-
     output  logic [i_cnt:1]         iack_o,
-    output  logic                   irq_o
+
+    output  logic [NUM_HARTS-1:0]   irq_o
 );
     typedef logic [$clog2(i_cnt):0] intr_t;
 
-    intr_t          id_int;
-    intr_t          id_r;
-    logic [i_cnt:1] ie;
-    logic [i_cnt:1] ip;
-    logic [i_cnt:1] interrupt;
-
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            ip <= '0;
-        end
-        else begin
-            ip <= irq_i;
-        end
-    end
-
-    assign interrupt = ip & ie;
-
-	always_comb begin
-		id_int = '0;   /* 0 = NO IRQ */
-		for (int i = 1; i <= i_cnt; i++) begin
-			if (interrupt[i] == 1'b1) begin
-				id_int = intr_t'(i);           
-				break;
-			end
-		end
-	end
-
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            id_r <= '0;
-        else if (iack_i)
-            id_r <= id_int;
-    end
-
-    assign irq_o    = (|interrupt); //& ~iack_i;
+    logic [i_cnt:1]                 ip;
+    logic [i_cnt:1]                 in_service;
+    logic [NUM_HARTS-1:0][i_cnt:1]  ie;
+    intr_t [NUM_HARTS-1:0]          id;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Memory Mapped Regs
@@ -98,15 +78,21 @@ module plic
             rvalid_o <= req_i;
     end
 
+    logic [NUM_HARTS-1:0] sel_ie;
+    logic [NUM_HARTS-1:0] sel_claim;
+
     /* Register mux */
     logic [31:0] reg_val;
     always_comb begin
-        case (addr_i)
-            24'h200004: reg_val = {{31-$clog2(i_cnt){1'b0}}, id_r}; /* ID */
-            24'h001000: reg_val = {{31-i_cnt{1'b0}}, ip, 1'b0};     /* IP */
-            24'h002000: reg_val = {{31-i_cnt{1'b0}}, ie, 1'b0};     /* IE */
-            default:    reg_val = '0;
-        endcase
+        reg_val = '0;
+        if (addr_i == 24'h001000)
+            reg_val = {{31-i_cnt{1'b0}}, ip, 1'b0};
+        for (int c = 0; c < NUM_HARTS; c++) begin
+            if (sel_ie[c])
+                reg_val = {{31-i_cnt{1'b0}}, ie[c], 1'b0};
+            if (sel_claim[c])
+                reg_val = {{31-$clog2(i_cnt){1'b0}}, id[c]};
+        end
     end
 
     /* Byte access */
@@ -129,25 +115,86 @@ module plic
         end
     end
 
-    /* Write */
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            ie      <= '0;
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Contexts
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    for (genvar c = 0; c < NUM_HARTS; c++) begin : gen_context
+        assign sel_ie[c]    = (addr_i == 24'(32'h002000 + c * 32'h80));
+        assign sel_claim[c] = (addr_i == 24'(32'h200004 + c * 32'h1000));
+
+        logic write_ie;
+        assign write_ie = write && sel_ie[c];
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                ie[c] <= '0;
+            else if (write_ie)
+                ie[c] <= write_val[i_cnt:1];
         end
-        else if (write && addr_i == 24'h002000) begin
-            ie <= write_val[i_cnt:1];
-        end 
+
+        logic [i_cnt:1] interrupt;
+        assign interrupt = ip & ie[c];
+        assign irq_o[c]  = (|interrupt);
+
+        /* The lowest source has the highest priority, 0 = NO IRQ */
+        always_comb begin
+            id[c] = '0;
+            for (int i = i_cnt; i >= 1; i--) begin
+                if (interrupt[i])
+                    id[c] = intr_t'(i);
+            end
+        end
     end
 
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            iack_o <= '0;
-        end
-        else begin 
-            if (write && addr_i == 24'h200004)
-                iack_o[write_val[$clog2(i_cnt+1):0]] <= 1'b1;
-            else
-                iack_o <= '0;
+    /* One access at a time: at most one hart claims or completes in a cycle */
+    intr_t claim_id;
+    always_comb begin
+        claim_id = '0;
+        for (int c = 0; c < NUM_HARTS; c++) begin
+            if (read && sel_claim[c])
+                claim_id = id[c];
         end
     end
+
+    logic  complete;
+    intr_t complete_id;
+    assign complete    = write && (|sel_claim);
+    assign complete_id = write_val[$clog2(i_cnt):0];
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Sources
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    for (genvar s = 1; s <= i_cnt; s++) begin : gen_source
+        logic claimed;
+        logic completed;
+        assign claimed   = (claim_id == intr_t'(s));
+        assign completed = complete && (complete_id == intr_t'(s));
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                ip[s] <= 1'b0;
+            else
+                ip[s] <= irq_i[s] && !in_service[s] && !claimed;
+        end
+
+        /* The peripheral drops its request after the acknowledge */
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                in_service[s] <= 1'b0;
+            else if (claimed)
+                in_service[s] <= 1'b1;
+            else if (iack_o[s])
+                in_service[s] <= 1'b0;
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                iack_o[s] <= 1'b0;
+            else
+                iack_o[s] <= completed;
+        end
+    end
+
 endmodule
