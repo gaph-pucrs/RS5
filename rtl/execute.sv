@@ -223,13 +223,13 @@ module execute
     assign misaligned_sh = mem_address[0] && ctrl_i.is_half && ctrl_i.is_store;
 
     logic misaligned_sw;
-    assign misaligned_sw = (mem_address[1:0] != '0) && (ctrl_i.is_amo_w || (ctrl_i.is_store && !ctrl_i.is_half && !ctrl_i.is_byte));
+    assign misaligned_sw = (mem_address[1:0] != '0) && (ctrl_i.is_sc || ctrl_i.is_amo || (ctrl_i.is_store && !ctrl_i.is_half && !ctrl_i.is_byte));
 
     logic misaligned_lh;
     assign misaligned_lh = mem_address[0] && ctrl_i.is_half && ctrl_i.is_load;
 
     logic misaligned_lw;
-    assign misaligned_lw = (mem_address[1:0] != '0) && ctrl_i.is_load && !ctrl_i.is_half && !ctrl_i.is_byte;
+    assign misaligned_lw = (mem_address[1:0] != '0) && (ctrl_i.is_lr || (ctrl_i.is_load && !ctrl_i.is_half && !ctrl_i.is_byte));
 
     logic laddr_misaligned;
     assign laddr_misaligned = (misaligned_lh || misaligned_lw);
