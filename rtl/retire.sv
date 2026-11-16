@@ -26,28 +26,19 @@
 
 module retire
     import RS5_pkg::*;
-#(
-    parameter atomic_e AMOEXT = AMO_A
-)
 (
-    /* Not used without zalrsc */
+    /* Registered input from mem_access, rd_we drives the register bank */
     /* verilator lint_off UNUSEDSIGNAL */
-    input   logic           clk,
-    input   logic           reset_n,
-    /* verilator lint_on UNUSEDSIGNAL */
-
-    /* Registered input from mem_access */
     input   wb_ctrl_t       ctrl_i,
+    /* verilator lint_on UNUSEDSIGNAL */
     input   logic [31:0]    result_i,
 
     /* Memory interface */
     input   logic [31:0]    mem_data_i,
+    input   logic           mem_exokay_i,
 
     /* Regbank interface */
-    output  logic [31:0]    regbank_data_o,
-
-    /* Registered output to execute */
-    output  logic [31:0]    reservation_data_o
+    output  logic [31:0]    regbank_data_o
 );
 
     logic [31:0]    memory_data;
@@ -69,7 +60,6 @@ module retire
             default: byte_data = mem_data_i[7:0];
         endcase
         byte_sign = ctrl_i.is_unsigned ? 1'b0 : byte_data[7];
-
         half_data = result_i[1] ? mem_data_i[31:16] : mem_data_i[15:0];
         half_sign = ctrl_i.is_unsigned ? 1'b0 : half_data[15];
     end
@@ -86,28 +76,13 @@ module retire
 // Assign to Register Bank Write Back
 //////////////////////////////////////////////////////////////////////////////
 
-    assign regbank_data_o = (ctrl_i.is_load || ctrl_i.is_lr) ? memory_data : result_i;
-
-////////////////////////////////////////////////////////////////////////////////
-// LR/SC registers
-////////////////////////////////////////////////////////////////////////////////
-
-    if (AMOEXT inside {AMO_A, AMO_ZALRSC}) begin : gen_zalrsc_on
-        always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n) begin
-                reservation_data_o <= '0;
-            end
-            else if (ctrl_i.rd_we) begin    /* Avoid writing on MMU exceptions */
-                unique case (1'b1)
-                    ctrl_i.is_lr: reservation_data_o <= mem_data_i;
-                    ctrl_i.is_sc: reservation_data_o <= '0;
-                    default: ;
-                endcase
-            end
-        end
-    end
-    else begin : gen_zalrsc_off
-        assign reservation_data_o = '0;
+    /* Loads, LR and AMO write the memory data, SC writes 0 on success */
+    always_comb begin
+        unique case (1'b1)
+            ctrl_i.is_sc:   regbank_data_o = {31'b0, !mem_exokay_i};
+            ctrl_i.is_load: regbank_data_o = memory_data;
+            default:        regbank_data_o = result_i;
+        endcase
     end
 
 endmodule

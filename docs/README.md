@@ -27,7 +27,7 @@ RS5 has a 4-stage pipeline.
 | Fetch | [fetch](../rtl/fetch.sv) | Program counter logic, instruction memory access |
 | Decode | [decode](../rtl/decode.sv) | Instruction decoding, register file read, data hazard detection |
 | Execute | [execute](../rtl/execute.sv) | ALU, branch, CSR access |
-| Load/Store | [RS5 (top-level)](../rtl/RS5.sv) | Memory access |
+| Load/Store | [mem_access](../rtl/mem_access.sv) | Memory access, OBI data request and skid buffer |
 
 | Option | Module | Description |
 |---|---|---|
@@ -64,20 +64,29 @@ Both memory interfaces follow the [OpenHW OBI](https://github.com/openhwgroup/ob
 | `data_req_o` | out | 1 | Load/store request |
 | `data_gnt_i` | in | 1 | Load/store request accepted |
 | `data_addr_o` | out | 32 | Word-aligned data address |
-| `data_we_o` | out | 1 | Write enable (1: store, 0: load) |
+| `data_we_o` | out | 1 | Write enable (1: store, SC and AMO; 0: load and LR) |
 | `data_be_o` | out | `BUS_WIDTH/8` | Byte enables, for loads and stores |
-| `data_wdata_o` | out | `BUS_WIDTH` | Store data |
+| `data_wdata_o` | out | `BUS_WIDTH` | Store data, or `rs2` of SC and AMO |
+| `data_atop_o` | out | 6 | Atomic operation: `{1, funct5}` of LR.W, SC.W and AMO\*.W, 0 otherwise |
 | `data_rvalid_i` | in | 1 | Load/store response valid |
-| `data_rdata_i` | in | `BUS_WIDTH` | Load data |
+| `data_rdata_i` | in | `BUS_WIDTH` | Load data, or the original word of LR and AMO |
+| `data_exokay_i` | in | 1 | SC.W succeeded (exclusive okay) |
 
 * Once asserted, `req` and the address phase signals hold until `gnt`. A request is never withdrawn, even when a jump makes a fetch unnecessary: its response is discarded.
 * `rvalid` may arrive any number of cycles after `gnt`, at least one. Every granted request, loads and stores alike, receives exactly one `rvalid`, in order.
 * The data interface keeps at most two requests without response: its next request may be granted while it waits for the previous response. The instruction interface keeps up to the *IBUF* size (see `IMEM_LATENCY`) requests without response.
 * A memory that grants every request and answers in the next cycle (e.g., a BRAM with `gnt = 1` and `rvalid` as the registered `req && gnt`) runs the core exactly as fast as with zero wait states.
-* While the data interface waits for `gnt` or `rvalid`, the pipeline stalls. Fetch continues until *IBUF* is full.
+* A data request waiting for `gnt` is held on the bus by a one-entry skid buffer while the instruction moves on, so `gnt` never reaches the pipeline stall: the pipeline only stalls when a second request finds the buffer full, or while retire waits for `rvalid`. Fetch continues until *IBUF* is full.
 * With `BUS_WIDTH` > 32, the byte lanes are relative to the word in `data_addr_o`, as used by the vector unit.
 * `instr_req_o` and `data_req_o` are driven from registers only: they never depend combinationally on any `gnt` or `rvalid` input, of either interface. A subordinate or arbiter may therefore compute `gnt` from `req` freely.
-* There are no `err`, `atop` or `exokay` signals yet: atomics are performed by the core as a load followed by a store.
+* Atomics (`AMOEXT`) are single OBI transactions, executed at the memory: the core does not read-modify-write. An atomic transaction is never outstanding together with another one (OBI R-12).
+* There is no `err` signal yet.
+
+### Atomics
+
+The memory side must execute the transactions with `atop`. [AtomicALU](../rtl/AtomicALU.sv) does it in front of a memory that only has plain OBI: ordinary transactions pass through, LR.W reads and reserves the word for its manager (`aid_i`), SC.W writes only while that reservation holds (`exokay`), and AMO\*.W reads, writes the result and returns the original word.
+A write by another manager to a reserved word clears the reservation, so with several managers (e.g., a DMA), all of them must reach the memory through the same `AtomicALU`, each with its own `aid_i`.
+The testbenches and FPGA platforms place it in front of the data bus; `make -C sim HART1=1 BIN_FILE=../app/baremetal/tests/atomic-test/atomic-test.bin` tests it against a simulated second hart.
 
 ---
 
@@ -90,7 +99,7 @@ Extensions are enabled via parameters in [../rtl/RS5.sv](../../rtl/RS5.sv).
 | Zicsr | always enabled | Control and status register access | — |
 | M | `MULEXT = MUL_M` | Integer multiply and divide | — |
 | Zmmul | `MULEXT = MUL_ZMMUL` | Multiply-only subset of M | — |
-| A | `AMOEXT = AMO_A` | Atomic memory operations | — |
+| A | `AMOEXT = AMO_A` | Atomic memory operations, executed at the memory (see [Atomics](#atomics)) | — |
 | Zaamo | `AMOEXT = AMO_ZAAMO` | AMO subset of A | — |
 | Zalrsc | `AMOEXT = AMO_ZALRSC` | LR/SC subset of A | — |
 | C | `COMPRESSED = 1` | Compressed (16-bit) instructions | — |

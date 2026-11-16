@@ -124,7 +124,27 @@ module RS5Debug
         logic            mret;
         logic            irq;
         privilegeLevel_e priv;
+        /* AMOs execute at the memory: their old value arrives at retire */
+        logic            amo;
+        logic  [4:0]     amo_op;
+        logic [31:0]     amo_rs2;
+        logic [31:0]     amo_addr;
     } entry_t;
+
+    /* Value an AMO stores back, as computed by AtomicALU */
+    function automatic logic [31:0] amo_store(input logic [4:0] op, input logic [31:0] old, input logic [31:0] rs2);
+        unique case (op)
+            5'h00:   return old + rs2;
+            5'h04:   return old ^ rs2;
+            5'h0C:   return old & rs2;
+            5'h08:   return old | rs2;
+            5'h10:   return ($signed(old) < $signed(rs2)) ? old : rs2;
+            5'h14:   return ($signed(old) < $signed(rs2)) ? rs2 : old;
+            5'h18:   return (old < rs2) ? old : rs2;
+            5'h1C:   return (old < rs2) ? rs2 : old;
+            default: return rs2;
+        endcase
+    endfunction
 
     entry_t entry, entry_mem, entry_ret;
     int     step;
@@ -143,14 +163,6 @@ module RS5Debug
     assign stepped     = started && !RS5.stall && !RS5.hold && (RS5.exec_valid || RS5.ctrl_execute.exc_ilegal_inst);
     assign fetch_fault = RS5.RAISE_EXCEPTION && RS5.ctrl_execute.exc_inst_access_fault;
 
-    /* An AMO is held in execute while it loads, modifies and stores: amo_operand
-     * carries the loaded value one cycle before it carries the value stored back */
-    logic [31:0] amo_loaded;
-    always_ff @(posedge RS5.clk) begin
-        if (!RS5.stall)
-            amo_loaded <= RS5.execute1.amo_operand;
-    end
-
     /* Execute: everything known when the instruction is committed */
     /* LR/SC and vector memory/register effects are not traced */
     always_comb begin
@@ -163,6 +175,10 @@ module RS5Debug
         entry.mret      = RS5.MACHINE_RETURN;
         entry.irq       = RS5.interrupt_ack_o;
         entry.priv      = RS5.privilege;
+        entry.amo       = 1'b0;
+        entry.amo_op    = instruction[31:27];
+        entry.amo_rs2   = RS5.rs2_data_execute;
+        entry.amo_addr  = RS5.mem_address_exec;
 
         if (stepped) begin
             if (RS5.ctrl_execute.compressed) begin
@@ -185,11 +201,7 @@ module RS5Debug
                 if (RS5.ctrl_execute.is_store)
                     entry.log = {entry.log, $sformatf("mem[%s] <- %s\n", paddr_str(RS5.mem_address_exec), data_str(RS5.rs2_data_execute, RS5.ctrl_execute.is_byte, RS5.ctrl_execute.is_half))};
 
-                if (RS5.ctrl_execute.is_amo) begin
-                    entry.log = {entry.log, $sformatf("mem[RW,%s] -> %s\n", paddr_str(RS5.mem_address_exec), hex_str(amo_loaded, 32))};
-                    entry.log = {entry.log, $sformatf("mem[%s] <- %s\n",    paddr_str(RS5.mem_address_exec), hex_str(RS5.execute1.amo_operand, 32))};
-                end
-
+                entry.amo  = RS5.ctrl_execute.is_amo;
                 entry.load = RS5.ctrl_execute.is_load;
             end
         end
@@ -215,7 +227,7 @@ module RS5Debug
         end
     end
 
-    /* AMOs write rd while held in execute, before they are committed */
+    /* Register writes seen before their instruction is logged */
     string rd_write, rd_pending;
     always_comb begin
         rd_write = "";
@@ -236,6 +248,11 @@ module RS5Debug
     always_ff @(posedge RS5.clk) begin
         if (fd != 0 && fresh && RS5.rsp_ok && entry_ret.valid) begin
             $fwrite(fd, "%s", entry_ret.log);
+
+            if (entry_ret.amo) begin
+                $fwrite(fd, "mem[RW,%s] -> %s\n", paddr_str(entry_ret.amo_addr), hex_str(RS5.retire1.mem_data_i, 32));
+                $fwrite(fd, "mem[%s] <- %s\n",    paddr_str(entry_ret.amo_addr), hex_str(amo_store(entry_ret.amo_op, RS5.retire1.mem_data_i, entry_ret.amo_rs2), 32));
+            end
 
             if (entry_ret.load)
                 $fwrite(fd, "mem[R,%s] -> %s\n",

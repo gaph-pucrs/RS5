@@ -273,7 +273,6 @@ module decode
 
     logic         amo_invalid;
     iType_e       decode_atomic;
-    iTypeAtomic_e amo_op_next;
     if (AMOEXT != AMO_OFF) begin : gen_amo_on
         always_comb begin
             unique case (funct7[6:2])
@@ -283,35 +282,19 @@ module decode
             endcase
         end
 
+        /* The operation itself is executed at the memory (atop) */
         if (AMOEXT != AMO_ZALRSC) begin : gen_zaamo_on
-            iTypeAtomic_e decode_amo;
-            always_comb begin
-                unique case (funct7[6:2])
-                    5'b00000: decode_amo = AMOADD;
-                    5'b00001: decode_amo = AMOSWAP;
-                    5'b00100: decode_amo = AMOXOR;
-                    5'b01000: decode_amo = AMOOR;
-                    5'b01100: decode_amo = AMOAND;
-                    5'b10000: decode_amo = AMOMIN;
-                    5'b10100: decode_amo = AMOMAX;
-                    5'b11000: decode_amo = AMOMINU;
-                    5'b11100: decode_amo = AMOMAXU;
-                    default:  decode_amo = AMONOP;
-                endcase
-            end
-
-            assign amo_invalid = (instruction_operation == AMO_W) && (decode_amo == AMONOP);
-            assign amo_op_next = decode_amo;
+            assign amo_invalid = (instruction_operation == AMO_W)
+                              && !(funct7[6:2] inside {5'b00000, 5'b00001, 5'b00100, 5'b01000, 5'b01100,
+                                                       5'b10000, 5'b10100, 5'b11000, 5'b11100});
         end
         else begin : gen_zaamo_off
             assign amo_invalid = 1'b0;
-            assign amo_op_next = AMONOP;
         end
     end
     else begin : gen_amo_off
         assign decode_atomic = INVALID;
         assign amo_invalid   = 1'b0;
-        assign amo_op_next   = AMONOP;
     end
 
     always_comb begin
@@ -530,7 +513,8 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     logic is_load;
-    assign is_load  = (opcode == 5'b00000) || (instruction_operation == LR_W);
+    /* LR, SC and AMO also write rd with the memory response */
+    assign is_load  = (opcode == 5'b00000) || (instruction_operation inside {LR_W, SC_W, AMO_W});
 
     logic  [4:0]    locked_register;
     logic  [4:0]    locked_register_r;
@@ -854,7 +838,6 @@ module decode
             default:   ctrl.zbkb_op = ZBKBNOP;
         endcase
 
-        ctrl.amo_op          = amo_op_next;
         ctrl.vector_op       = vector_operation;
 
         // SHA2 sub-op

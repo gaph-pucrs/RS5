@@ -71,8 +71,10 @@ module RS5
     output logic                    data_we_o,
     output logic [BUS_WIDTH/8-1:0]  data_be_o,
     output logic [BUS_WIDTH-1:0]    data_wdata_o,
+    output logic [5:0]              data_atop_o,
     input  logic                    data_rvalid_i,
-    input  logic [BUS_WIDTH-1:0]    data_rdata_i
+    input  logic [BUS_WIDTH-1:0]    data_rdata_i,
+    input  logic                    data_exokay_i
 );
 
     /* Cycles from instr_gnt_i to instr_rvalid_i of a typical fetch. The fetch */
@@ -303,7 +305,6 @@ module RS5
     logic                  exec_valid;
 
     logic                  load_access_fault;
-    logic           [31:0] reservation_data;
 
     csrOperation_e         csr_operation;
     exceptionCode_e        Exception_Code;
@@ -314,6 +315,13 @@ module RS5
 
     logic                   mem_enable;
     logic                   dmem_req;
+
+    /* Data request of the instruction in mem_access, before the skid buffer */
+    logic            [31:0] lsu_addr;
+    logic                   lsu_we;
+    logic [BUS_WIDTH/8-1:0] lsu_be;
+    logic   [BUS_WIDTH-1:0] lsu_wdata;
+    logic             [5:0] lsu_atop;
     logic                   rsp_ok;
     logic            [31:0] mem_address_exec;
     /* We always mask the two lsbs */
@@ -326,7 +334,6 @@ module RS5
     execute #(
         .Environment  (Environment ),
         .MULEXT       (MULEXT      ),
-        .AMOEXT       (AMOEXT      ),
         .COMPRESSED   (COMPRESSED  ),
         .ZKNEEnable   (ZKNEEnable  ),
         .ZBKBEnable   (ZBKBEnable  ),
@@ -358,7 +365,6 @@ module RS5
         .instruction_i           (instruction_execute          ),
 
         .exc_load_access_fault_i (load_access_fault            ),
-        .reservation_data_i      (reservation_data             ),
 
         .privilege_i             (privilege                    ),
         .interrupt_pending_i     (interrupt_pending            ),
@@ -381,9 +387,10 @@ module RS5
         .mem_address_exec_o      (mem_address_exec             ),
         .mem_address_o           (mem_address                  ),
         .mem_enable_o            (mem_enable                   ),
-        .mem_we_o                (data_we_o                    ),
-        .mem_be_o                (data_be_o                    ),
-        .mem_write_data_o        (data_wdata_o                 ),
+        .mem_we_o                (lsu_we                       ),
+        .mem_be_o                (lsu_be                       ),
+        .mem_write_data_o        (lsu_wdata                    ),
+        .mem_atop_o              (lsu_atop                     ),
         .mem_read_data_i         (data_rdata_i                 ),
         .mem_rsp_ok_i            (rsp_ok                       ),
         
@@ -405,25 +412,6 @@ module RS5
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////// MEMORY ACCESS ///////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-    logic [31:0] result_retire;
-
-    mem_access mem_access1 (
-        .clk                    (clk              ),
-        .reset_n                (reset_n          ),
-        .stall                  (stall            ),
-
-        .ctrl_i                 (ctrl_mem_access  ),
-        .rd_i                   (rd_mem_access    ),
-        .result_i               (result_mem_access),
-
-        .load_access_fault_i    (load_access_fault),
-        .rsp_ok_i               (rsp_ok           ),
-        
-        .ctrl_o                 (ctrl_retire      ),
-        .result_o               (result_retire    ),
-        .rd_o                   (rd_retire        )
-    );
 
     /* Unused without MMU */
     /* verilator lint_off UNUSEDSIGNAL */
@@ -448,7 +436,7 @@ module RS5
             .size_i     (mvmds                          ),
             .address_i  ({mem_address[31:2], 2'b00}     ),
             .exception_o(mmu_data_fault                 ),
-            .address_o  (data_addr_o                    )
+            .address_o  (lsu_addr                       )
         );
 
         assign load_access_fault    = mem_enable && mmu_data_fault;
@@ -456,43 +444,47 @@ module RS5
     end
     else begin : gen_d_mmu_off
         assign load_access_fault       = 1'b0;
-        assign data_addr_o             = {mem_address[31:2], 2'b00};
+        assign lsu_addr                = {mem_address[31:2], 2'b00};
         assign dmem_req                = mem_enable;
     end
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////// OBI DATA INTERFACE //////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    logic [31:0] result_retire;
 
-    /* The request leaves execute registered and waits in mem_access for gnt.  */
-    /* Its response is awaited when the instruction reaches retire. When the   */
-    /* pipeline is stalled waiting for that response, the next request may     */
-    /* already be granted: it is not issued again.                             */
-    logic data_granted;
-    logic rsp_pending;
+    mem_access #(
+        .BUS_WIDTH(BUS_WIDTH)
+    ) mem_access1 (
+        .clk                (clk              ),
+        .reset_n            (reset_n          ),
+        .stall_o            (stall            ),
 
-    assign data_req_o = dmem_req && !data_granted;
-    assign stall      = (data_req_o && !data_gnt_i) || (rsp_pending && !data_rvalid_i);
-    assign rsp_ok     = !rsp_pending || data_rvalid_i;
+        .ctrl_i             (ctrl_mem_access  ),
+        .rd_i               (rd_mem_access    ),
+        .result_i           (result_mem_access),
 
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            data_granted <= 1'b0;
-        else if (!stall)
-            data_granted <= 1'b0;
-        else if (data_req_o && data_gnt_i)
-            data_granted <= 1'b1;
-    end
+        .load_access_fault_i(load_access_fault),
 
-    /* Without a stall, a request in mem_access was granted and moves to retire */
-    always_ff @(posedge clk or negedge reset_n) begin
-        if (!reset_n)
-            rsp_pending <= 1'b0;
-        else if (!stall)
-            rsp_pending <= dmem_req;
-        else if (data_rvalid_i)
-            rsp_pending <= 1'b0;
-    end
+        .req_i              (dmem_req         ),
+        .addr_i             (lsu_addr         ),
+        .we_i               (lsu_we           ),
+        .be_i               (lsu_be           ),
+        .wdata_i            (lsu_wdata        ),
+        .atop_i             (lsu_atop         ),
+
+        .data_req_o         (data_req_o       ),
+        .data_gnt_i         (data_gnt_i       ),
+        .data_addr_o        (data_addr_o      ),
+        .data_we_o          (data_we_o        ),
+        .data_be_o          (data_be_o        ),
+        .data_wdata_o       (data_wdata_o     ),
+        .data_atop_o        (data_atop_o      ),
+        .data_rvalid_i      (data_rvalid_i    ),
+
+        .rsp_ok_o           (rsp_ok           ),
+
+        .ctrl_o             (ctrl_retire      ),
+        .result_o           (result_retire    ),
+        .rd_o               (rd_retire        )
+    );
 
     /* The register bank is written once the read data is present */
     always_comb begin
@@ -504,20 +496,14 @@ module RS5
 /////////////////////////////////////////////////////////// RETIRE //////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    retire #(
-        .AMOEXT      (AMOEXT)
-    ) retire1 (
-        .clk               (clk                   ),
-        .reset_n           (reset_n               ),
-
+    retire retire1 (
         .ctrl_i            (ctrl_writeback        ),
         .result_i          (result_retire         ),
 
         .mem_data_i        (data_rdata_i[31:0]    ),
+        .mem_exokay_i      (data_exokay_i         ),
 
-        .regbank_data_o    (regbank_data_writeback),
-
-        .reservation_data_o(reservation_data      )
+        .regbank_data_o    (regbank_data_writeback)
     );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

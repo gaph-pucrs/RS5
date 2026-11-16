@@ -17,14 +17,13 @@
 ./vector/vectorLSU.sv
 ./vector/vectorRegbank.sv
 ./vectorUnit.sv
-./amo.sv
+./AtomicALU.sv
 ./CSRBank.sv
 ./decode.sv
 ./decompresser.sv
 ./div.sv
 ./execute.sv
 ./fetch.sv
-./lrsc.sv
 ./mmu.sv
 ./mulNbits.sv
 ./mul.sv

@@ -149,19 +149,6 @@ package RS5_pkg;
         NONE, WRITE, SET, CLEAR
     } csrOperation_e;
 
-    typedef enum  logic[9:0] {
-        AMONOP  = 10'b0000000001,
-        AMOSWAP = 10'b0000000010,
-        AMOADD  = 10'b0000000100,
-        AMOXOR  = 10'b0000001000,
-        AMOAND  = 10'b0000010000,
-        AMOOR   = 10'b0000100000,
-        AMOMIN  = 10'b0001000000,
-        AMOMAX  = 10'b0010000000,
-        AMOMINU = 10'b0100000000,
-        AMOMAXU = 10'b1000000000
-    } iTypeAtomic_e;
-
     typedef enum logic[10:0] {
         SHA2NOP   = 11'b00000000001,
         SHA2SIG0  = 11'b00000000010,
@@ -262,8 +249,6 @@ package RS5_pkg;
     } iTypeVector_e;
 
     typedef struct packed {
-        // AMO operation select (one-hot, AMONOP when unused)
-        iTypeAtomic_e amo_op;
         // SHA2 operation select (one-hot, SHA2NOP when unused)
         iTypeSha2_e  sha2_op;
         // Kyber operation select (one-hot, KYBNOP when unused)
@@ -362,7 +347,6 @@ package RS5_pkg;
     typedef struct packed {
         logic        rd_we;
         logic        is_load;
-        logic        is_lr;
         logic        is_sc;
         logic        is_byte;
         logic        is_half;

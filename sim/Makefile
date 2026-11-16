@@ -42,6 +42,10 @@ endif
 ifeq ($(origin IMEM_LATENCY),command line)
 VERILATOR_FLAGS += -GIMEM_LATENCY=$(IMEM_LATENCY)
 endif
+# Second simulated hart competing for atomics (atomic-test)
+ifeq ($(origin HART1),command line)
+VERILATOR_FLAGS += -GHART1=$(HART1)
+endif
 # Bound monitors, enabled with e.g. make DEBUG=1 LOCKSTEP=0
 DEBUG     ?= 0
 LOCKSTEP  ?= 0

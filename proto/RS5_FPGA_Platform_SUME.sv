@@ -62,6 +62,12 @@ module RS5_FPGA_Platform
     logic                   cpu_instruction_enable, cpu_instruction_rvalid;
     logic                   cpu_data_req, cpu_data_gnt, cpu_data_we, cpu_data_rvalid;
     logic [3:0]             cpu_data_be;
+
+    /* RS5 data interface, in front of the atomic unit */
+    logic                   core_data_req, core_data_gnt, core_data_we, core_data_rvalid, core_data_exokay;
+    logic [31:0]            core_data_address, core_data_in, core_data_out;
+    logic [3:0]             core_data_be;
+    logic [5:0]             core_data_atop;
     logic                   cpu_operation_enable, enable_ram, enable_peripherals, enable_rtc, enable_plic;
     logic                   enable_rtc_r, enable_plic_r, enable_peripherals_r;
     logic [63:0]            mtime;
@@ -168,14 +174,43 @@ module RS5_FPGA_Platform
         .instr_addr_o           (cpu_instruction_address),
         .instr_rvalid_i         (cpu_instruction_rvalid),
         .instr_rdata_i          (cpu_instruction),
-        .data_req_o             (cpu_data_req),
-        .data_gnt_i             (cpu_data_gnt),
-        .data_addr_o            (cpu_data_address),
-        .data_we_o              (cpu_data_we),
-        .data_be_o              (cpu_data_be),
-        .data_wdata_o           (cpu_data_out),
-        .data_rvalid_i          (cpu_data_rvalid),
-        .data_rdata_i           (cpu_data_in)
+        .data_req_o             (core_data_req),
+        .data_gnt_i             (core_data_gnt),
+        .data_addr_o            (core_data_address),
+        .data_we_o              (core_data_we),
+        .data_be_o              (core_data_be),
+        .data_wdata_o           (core_data_out),
+        .data_atop_o            (core_data_atop),
+        .data_rvalid_i          (core_data_rvalid),
+        .data_rdata_i           (core_data_in),
+        .data_exokay_i          (core_data_exokay)
+    );
+
+    /* Atomics are executed in front of the memory and peripherals */
+    AtomicALU #(
+        .AMOEXT(AMOEXT)
+    ) atomic_alu (
+        .clk       (clk),
+        .reset_n   (reset_n),
+        .req_i     (core_data_req),
+        .gnt_o     (core_data_gnt),
+        .addr_i    (core_data_address),
+        .we_i      (core_data_we),
+        .be_i      (core_data_be),
+        .wdata_i   (core_data_out),
+        .atop_i    (core_data_atop),
+        .aid_i     (1'b0),
+        .rvalid_o  (core_data_rvalid),
+        .rdata_o   (core_data_in),
+        .exokay_o  (core_data_exokay),
+        .req_o     (cpu_data_req),
+        .gnt_i     (cpu_data_gnt),
+        .addr_o    (cpu_data_address),
+        .we_o      (cpu_data_we),
+        .be_o      (cpu_data_be),
+        .wdata_o   (cpu_data_out),
+        .rvalid_i  (cpu_data_rvalid),
+        .rdata_i   (cpu_data_in)
     );
 
 //////////////////////////////////////////////////////////////////////////////

@@ -107,6 +107,14 @@ make -C sim GNT_DELAY=2 RSP_DELAY=3 RANDOM_DELAY=1 SEED=7 DUALPORT_MEM=0 BRANCHP
 With `RANDOM_DELAY=1`, each delay is drawn from 0 up to these values, with the given `SEED`.
 The core is configured for an instruction memory latency of `1 + RSP_DELAY` (`IMEM_LATENCY`), which can also be set.
 
+Atomic instructions are executed in front of the memory by [rtl/AtomicALU.sv](rtl/AtomicALU.sv).
+To check that they stay atomic against another hart, run the atomic test with a simulated second hart ([sim/AtomicHart.sv](sim/AtomicHart.sv)); the last printed value is 1 when it passes:
+
+```bash
+make -C app/baremetal/tests/atomic-test
+make -C sim HART1=1 BIN_FILE=../app/baremetal/tests/atomic-test/atomic-test.bin
+```
+
 ### Simulate with Modelsim/Questa
 
 ```bash

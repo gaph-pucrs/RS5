@@ -59,6 +59,9 @@ module testbench
     parameter  int           SEED            = 1;
     parameter  int           IMEM_LATENCY    = 1 + RSP_DELAY;  /* the core sizes its fetch for it */
 
+    /* A second, simulated hart competing for atomics (app/baremetal/tests/atomic-test) */
+    parameter  bit           HART1           = 1'b0;
+
     /* Overridable from the simulator command line, e.g. Verilator -GVEnable=1 -GVLEN=256 */
     parameter  bit           VEnable         = 1'b0;
     parameter  int           VLEN            = 512;
@@ -97,10 +100,17 @@ module testbench
     /* OBI interfaces of the core */
     logic                   instr_req, instr_gnt, instr_rvalid;
     logic [31:0]            instr_addr, instr_rdata;
-    logic                   data_req, data_gnt, data_we, data_rvalid;
+    logic                   data_req, data_gnt, data_we, data_rvalid, data_exokay;
     logic [31:0]            data_addr;
     logic [BUS_WIDTH/8-1:0] data_be;
     logic [BUS_WIDTH  -1:0] data_wdata, data_rdata;
+    logic [5:0]             data_atop;
+
+    /* Data OBI behind the atomic unit */
+    logic                   bus_req, bus_gnt, bus_we, bus_rvalid;
+    logic [31:0]            bus_addr;
+    logic [BUS_WIDTH/8-1:0] bus_be;
+    logic [BUS_WIDTH  -1:0] bus_wdata, bus_rdata;
 
     /* Targets behind the OBI delay models */
     /* Number of used bits is defined by the memory size */
@@ -198,8 +208,151 @@ module testbench
         .data_we_o              (data_we),
         .data_be_o              (data_be),
         .data_wdata_o           (data_wdata),
+        .data_atop_o            (data_atop),
         .data_rvalid_i          (data_rvalid),
-        .data_rdata_i           (data_rdata)
+        .data_rdata_i           (data_rdata),
+        .data_exokay_i          (data_exokay)
+    );
+
+//////////////////////////////////////////////////////////////////////////////
+// Atomics, executed in front of the memory
+//////////////////////////////////////////////////////////////////////////////
+
+    /* Requests reaching the atomic unit, from RS5 alone or arbitrated with hart 1 */
+    logic                   amu_req, amu_gnt, amu_we, amu_rvalid, amu_exokay;
+    logic [31:0]            amu_addr;
+    logic [BUS_WIDTH/8-1:0] amu_be;
+    logic [BUS_WIDTH  -1:0] amu_wdata, amu_rdata;
+    logic [5:0]             amu_atop;
+    logic                   amu_aid;
+
+    if (HART1) begin : gen_hart1
+        logic        hart_req, hart_gnt, hart_we, hart_rvalid;
+        logic [31:0] hart_addr, hart_wdata;
+        logic  [3:0] hart_be;
+        logic  [5:0] hart_atop;
+
+        AtomicHart hart1 (
+            .clk      (clk),
+            .reset_n  (reset_n),
+            .req_o    (hart_req),
+            .gnt_i    (hart_gnt),
+            .addr_o   (hart_addr),
+            .we_o     (hart_we),
+            .be_o     (hart_be),
+            .wdata_o  (hart_wdata),
+            .atop_o   (hart_atop),
+            .rvalid_i (hart_rvalid),
+            .rdata_i  (amu_rdata[31:0]),
+            .exokay_i (amu_exokay)
+        );
+
+        /* Round robin, kept until granted so the request stays stable */
+        logic prefer_hart;
+        logic held, held_hart;
+        logic sel_hart;
+        assign sel_hart = held ? held_hart : (hart_req && (!data_req || prefer_hart));
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                prefer_hart <= 1'b0;
+            else if (amu_req && amu_gnt)
+                prefer_hart <= !sel_hart;
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                held <= 1'b0;
+            else
+                held <= amu_req && !amu_gnt;
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                held_hart <= 1'b0;
+            else
+                held_hart <= sel_hart;
+        end
+
+        assign amu_req   = sel_hart ? hart_req   : data_req;
+        assign amu_addr  = sel_hart ? hart_addr  : data_addr;
+        assign amu_we    = sel_hart ? hart_we    : data_we;
+        assign amu_be    = sel_hart ? (BUS_WIDTH/8)'(hart_be) : data_be;
+        assign amu_wdata = sel_hart ? BUS_WIDTH'(hart_wdata) : data_wdata;
+        assign amu_atop  = sel_hart ? hart_atop  : data_atop;
+        assign amu_aid   = sel_hart;
+        assign data_gnt  = !sel_hart && amu_gnt;
+        assign hart_gnt  =  sel_hart && amu_gnt;
+
+        /* Responses come back in order: route each one to its manager */
+        logic [15:0] owners;
+        logic  [3:0] owners_head, owners_tail;
+
+        always_ff @(posedge clk) begin
+            if (amu_req && amu_gnt)
+                owners[owners_tail] <= sel_hart;
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                owners_tail <= '0;
+            else if (amu_req && amu_gnt)
+                owners_tail <= owners_tail + 1'b1;
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                owners_head <= '0;
+            else if (amu_rvalid)
+                owners_head <= owners_head + 1'b1;
+        end
+
+        logic rsp_hart;
+        assign rsp_hart    = owners[owners_head];
+        assign data_rvalid = amu_rvalid && !rsp_hart;
+        assign hart_rvalid = amu_rvalid &&  rsp_hart;
+    end
+    else begin : gen_hart1_off
+        assign amu_req     = data_req;
+        assign amu_addr    = data_addr;
+        assign amu_we      = data_we;
+        assign amu_be      = data_be;
+        assign amu_wdata   = data_wdata;
+        assign amu_atop    = data_atop;
+        assign amu_aid     = 1'b0;
+        assign data_gnt    = amu_gnt;
+        assign data_rvalid = amu_rvalid;
+    end
+
+    assign data_rdata  = amu_rdata;
+    assign data_exokay = amu_exokay;
+
+    AtomicALU #(
+        .AMOEXT    (AMOEXT   ),
+        .BUS_WIDTH (BUS_WIDTH),
+        .NUM_IDS   (2        )
+    ) atomic_alu (
+        .clk       (clk),
+        .reset_n   (reset_n),
+        .req_i     (amu_req),
+        .gnt_o     (amu_gnt),
+        .addr_i    (amu_addr),
+        .we_i      (amu_we),
+        .be_i      (amu_be),
+        .wdata_i   (amu_wdata),
+        .atop_i    (amu_atop),
+        .aid_i     (amu_aid),
+        .rvalid_o  (amu_rvalid),
+        .rdata_o   (amu_rdata),
+        .exokay_o  (amu_exokay),
+        .req_o     (bus_req),
+        .gnt_i     (bus_gnt),
+        .addr_o    (bus_addr),
+        .we_o      (bus_we),
+        .be_o      (bus_be),
+        .wdata_o   (bus_wdata),
+        .rvalid_i  (bus_rvalid),
+        .rdata_i   (bus_rdata)
     );
 
 //////////////////////////////////////////////////////////////////////////////
@@ -245,14 +398,14 @@ module testbench
     ) data_obi (
         .clk        (clk),
         .reset_n    (reset_n),
-        .req_i      (data_req),
-        .gnt_o      (data_gnt),
-        .addr_i     (data_addr),
-        .we_i       (data_we),
-        .be_i       (data_be),
-        .wdata_i    (data_wdata),
-        .rvalid_o   (data_rvalid),
-        .rdata_o    (data_rdata),
+        .req_i      (bus_req),
+        .gnt_o      (bus_gnt),
+        .addr_i     (bus_addr),
+        .we_i       (bus_we),
+        .be_i       (bus_be),
+        .wdata_i    (bus_wdata),
+        .rvalid_o   (bus_rvalid),
+        .rdata_o    (bus_rdata),
         .ready_i    (1'b1),
         .en_o       (mem_operation_enable),
         .we_o       (mem_write_enable),

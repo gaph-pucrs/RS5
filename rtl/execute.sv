@@ -29,7 +29,6 @@ module execute
 #(
     parameter environment_e Environment  = ASIC,
     parameter mul_e         MULEXT       = MUL_M,
-    parameter atomic_e      AMOEXT       = AMO_A,
     parameter bit           COMPRESSED   = 1'b1,
     parameter bit           ZKNEEnable   = 1'b0,
     parameter bit           ZBKBEnable   = 1'b0,
@@ -71,10 +70,6 @@ module execute
 
     /* Combinational inputs from mem_access */
     input   logic                   exc_load_access_fault_i,
-    /* Not used without zalrsc */
-    /* verilator lint_off UNUSEDSIGNAL */
-    input   logic [31:0]            reservation_data_i,
-    /* verilator lint_on UNUSEDSIGNAL */
     
     /* CSR interface */
     input   privilegeLevel_e        privilege_i,
@@ -102,7 +97,8 @@ module execute
     output  logic                   mem_we_o,
     output  logic [BUS_WIDTH/8-1:0] mem_be_o,
     output  logic [BUS_WIDTH-1:0]   mem_write_data_o,
-    /* Not used if VEnable or AMO is 0 */
+    output  logic [5:0]             mem_atop_o,
+    /* Not used without VEnable */
     /* verilator lint_off UNUSEDSIGNAL */
     input   logic [BUS_WIDTH-1:0]   mem_read_data_i,
     input   logic                   mem_rsp_ok_i,
@@ -149,10 +145,8 @@ module execute
 
     logic [31:0] sum_opB;
 
-    // Can be assigned by atomic instructions or rs1_data_i
+    // Can be assigned by Xkyber or rs1_data_i
     logic [31:0] first_operand;
-    logic [31:0] equal_opA;
-    logic [31:0] equal_opB;
 
     /* Unmuxed operators */
     assign less_than_unsigned     = rs1_data_i <  second_operand_i;
@@ -163,23 +157,9 @@ module execute
     assign srl_result             = rs1_data_i >> second_operand_i[4:0];
     assign sra_result             = $signed(rs1_data_i) >>> second_operand_i[4:0];
 
-    logic [31:0] amo_operand;
-
     logic [31:0] xkyber_alu_operand_a, xkyber_alu_operand_b;
 
-    /* Both arms fold to constant 0 when AMO and XKYBER are disabled */
-    /* verilator lint_off CASEOVERLAP */
-    always_comb begin
-        unique case (1'b1)
-            (AMOEXT inside {AMO_A, AMO_ZAAMO} && ctrl_i.is_amo):
-                first_operand = amo_operand;
-            (XKYBEREnable && ctrl_i.is_kyber):
-                first_operand = xkyber_alu_operand_a;
-            default:
-                first_operand = rs1_data_i;
-        endcase
-    end
-    /* verilator lint_on CASEOVERLAP */
+    assign first_operand = (XKYBEREnable && ctrl_i.is_kyber) ? xkyber_alu_operand_a : rs1_data_i;
 
     logic kyber_uses_opB;
     assign kyber_uses_opB = ctrl_i.kyber_op inside {KYBSUB, KYBMUL, KYBCOMPRESS};
@@ -200,7 +180,7 @@ module execute
     assign and_result = first_operand & second_operand_i;
     assign or_result  = first_operand | second_operand_i;
     assign xor_result = first_operand ^ second_operand_i;
-    assign equal      = equal_opA == equal_opB;
+    assign equal      = rs1_data_i == second_operand_i;
 
     /* We can't obtain the PC from fetch stage because it can be modified due */
     /* to load/store stalls when the current instruction is JAL[R]            */
@@ -223,9 +203,6 @@ module execute
 
     logic [31:0]          mem_write_data;
     logic [BUS_WIDTH-1:0] mem_write_data_vector;
-
-    logic        atomic_mem_read_enable;
-    logic        atomic_mem_write_enable;
 
     always_comb begin
         unique case (1'b1)
@@ -267,7 +244,7 @@ module execute
     assign mem_read_enable = ctrl_i.is_load || ctrl_i.is_lr;
 
     logic pmem_read_enable;
-    assign pmem_read_enable = (mem_read_enable || atomic_mem_read_enable || mem_read_enable_vector_inst);
+    assign pmem_read_enable = (mem_read_enable || mem_read_enable_vector_inst);
 
     always_comb begin
         unique case (1'b1)
@@ -284,7 +261,6 @@ module execute
         else if (!stall) begin
             unique case (1'b1)
                 ctrl_i.is_vector: mem_write_data_o <= mem_write_data_vector;
-                ctrl_i.is_amo:    mem_write_data_o <= {{(BUS_WIDTH-32){1'b0}}, amo_operand};
                 default:          mem_write_data_o <= {{(BUS_WIDTH-32){1'b0}}, mem_write_data};
             endcase
         end
@@ -301,10 +277,11 @@ module execute
         endcase
     end
 
-    assign mem_write_enable = ctrl_i.is_store ? mem_byte_lanes : '0;
+    /* SC and AMO are writes of the whole word, executed at the memory (atop) */
+    assign mem_write_enable = (ctrl_i.is_store || ctrl_i.is_sc || ctrl_i.is_amo) ? mem_byte_lanes : '0;
 
     logic [BUS_WIDTH/8-1:0] pmem_write_enable;
-    assign pmem_write_enable = {{(BUS_WIDTH/8-4){1'b0}}, (mem_write_enable | {4{atomic_mem_write_enable}})}  | mem_write_enable_vector;
+    assign pmem_write_enable = {{(BUS_WIDTH/8-4){1'b0}}, mem_write_enable} | mem_write_enable_vector;
 
     logic pmem_write;
     assign pmem_write = (pmem_write_enable != '0);
@@ -337,6 +314,14 @@ module execute
     logic mem_enable;
     assign mem_enable = pmem_read_enable || pmem_write;
 
+    /* OBI atop: {1, funct5} for LR, SC and AMO, 0 otherwise */
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            mem_atop_o <= '0;
+        else if (!stall)
+            mem_atop_o <= ctrl_i.is_amo_w ? {1'b1, instruction_i[31:27]} : '0;
+    end
+
 
     logic raise_exception;
 
@@ -348,7 +333,7 @@ module execute
             if (!reset_n)
                 mem_store_access <= 1'b0;
             else if (!stall)
-                mem_store_access <= ctrl_i.is_amo || ctrl_i.is_sc || pmem_write;
+                mem_store_access <= pmem_write;
         end
     end
     else begin : gen_store_access_off
@@ -615,145 +600,6 @@ module execute
         assign vlen_o  = '0;
     end
 
-////////////////////////////////////////////////////////////////////////////////
-// Atomic Extension
-////////////////////////////////////////////////////////////////////////////////
-
-    logic        atomic_hold;
-    logic        atomic_write_enable;
-    logic        lrsc_result;
-
-    if (AMOEXT != AMO_OFF) begin : gen_atomic_on
-        logic lrsc_write_enable;
-        logic lrsc_hold;
-        logic lrsc_mem_read_enable;
-        logic lrsc_mem_write_enable;
-
-        if (AMOEXT != AMO_ZAAMO) begin : gen_zalrsc_on
-            logic [31:0] reservation_addr;
-            always_ff @(posedge clk or negedge reset_n) begin
-                if (!reset_n) begin
-                    reservation_addr <= '0;
-                end
-                else if (!stall) begin
-                    unique case (1'b1)
-                        ctrl_i.is_lr: reservation_addr <= rs1_data_i;
-                        ctrl_i.is_sc: reservation_addr <= lrsc_hold ? reservation_addr : '0;
-                        default: ;
-                    endcase
-                end
-            end
-
-            logic lrsc_enable;
-            assign lrsc_enable = ctrl_i.is_sc && (rs1_data_i[1:0] == '0);
-
-            logic [31:0] cmp_opA;
-            logic [31:0] cmp_opB;
-
-            lrsc lrsc_m (
-                .clk               (clk                    ),
-                .reset_n           (reset_n                ),
-                .stall             (stall                  ),
-                .equal_i           (equal                  ),
-                .enable_i          (lrsc_enable            ),
-                .exception_i       (exc_load_access_fault_i),
-                .rs1_data_i        (rs1_data_i             ),
-                .data_i            (mem_read_data_i[31:0]  ),
-                .reservation_addr_i(reservation_addr       ),
-                .reservation_data_i(reservation_data_i     ),
-                .hold_o            (lrsc_hold              ),
-                .write_enable_o    (lrsc_write_enable      ),
-                .mem_read_enable_o (lrsc_mem_read_enable   ),
-                .mem_write_enable_o(lrsc_mem_write_enable  ),
-                .result_o          (lrsc_result            ),
-                .cmp_opA_o         (cmp_opA                ),
-                .cmp_opB_o         (cmp_opB                )
-            );
-
-            assign equal_opA = lrsc_enable ? cmp_opA : rs1_data_i;
-            assign equal_opB = lrsc_enable ? cmp_opB : second_operand_i;
-        end
-        else begin : gen_zalrsc_off
-            assign lrsc_result           = 1'b0;
-            assign lrsc_hold             = 1'b0;
-            assign lrsc_mem_read_enable  = 1'b0;
-            assign lrsc_mem_write_enable = 1'b0;
-            assign lrsc_write_enable     = 1'b0;
-            assign equal_opA             = rs1_data_i;
-            assign equal_opB             = second_operand_i;
-        end
-
-        logic amo_write_enable;
-        logic amo_hold;
-        logic amo_mem_read_enable;
-        logic amo_mem_write_enable;
-
-        if (AMOEXT != AMO_ZALRSC) begin : gen_zaamo_on
-            logic amo_enable;
-            assign amo_enable = ctrl_i.is_amo && (rs1_data_i[1:0] == '0);
-
-            logic amo_lt;
-            assign amo_lt = $signed(amo_operand) < $signed(rs2_data_i);
-
-            logic amo_ltu;
-            assign amo_ltu = amo_operand < rs2_data_i;
-
-            logic [31:0] amo_result;
-            always_comb begin
-                unique case (ctrl_i.amo_op)
-                    AMOADD:  amo_result = sum_result;
-                    AMOAND:  amo_result = and_result;
-                    AMOXOR:  amo_result = xor_result;
-                    AMOOR:   amo_result = or_result;
-                    AMOMAX:  amo_result = amo_lt  ? rs2_data_i  : amo_operand;
-                    AMOMIN:  amo_result = amo_lt  ? amo_operand : rs2_data_i;
-                    AMOMAXU: amo_result = amo_ltu ? rs2_data_i  : amo_operand;
-                    AMOMINU: amo_result = amo_ltu ? amo_operand : rs2_data_i;
-                    AMOSWAP: amo_result = rs2_data_i;
-                    default: amo_result = '0;
-                endcase
-            end
-
-            amo amo_m (
-                .clk               (clk                    ),
-                .reset_n           (reset_n                ),
-                .stall             (stall                  ),
-                .enable_i          (amo_enable             ),
-                .exception_i       (exc_load_access_fault_i),
-                .data_i            (mem_read_data_i[31:0]  ),
-                .amo_result_i      (amo_result             ),
-                .hold_o            (amo_hold               ),
-                .write_enable_o    (amo_write_enable       ),
-                .mem_read_enable_o (amo_mem_read_enable    ),
-                .mem_write_enable_o(amo_mem_write_enable   ),
-                .opA_o             (amo_operand            )
-            );
-
-        end
-        else begin : gen_zaamo_off
-            assign amo_hold             = 1'b0;
-            assign amo_mem_read_enable  = 1'b0;
-            assign amo_mem_write_enable = 1'b0;
-            assign amo_operand          = '0;
-            assign amo_write_enable     = 1'b0;
-        end
-
-        assign atomic_hold             = lrsc_hold             || amo_hold;
-        assign atomic_write_enable     = lrsc_write_enable     || amo_write_enable;
-        assign atomic_mem_read_enable  = lrsc_mem_read_enable  || amo_mem_read_enable;
-        assign atomic_mem_write_enable = lrsc_mem_write_enable || amo_mem_write_enable;
-    end
-    else begin : gen_atomic_off
-        assign amo_operand             = '0;
-        assign atomic_hold             = 1'b0;
-        assign atomic_mem_read_enable  = 1'b0;
-        assign atomic_mem_write_enable = 1'b0;
-        assign lrsc_result             = 1'b0;
-        assign atomic_write_enable     = 1'b0;
-        assign equal_opA               = rs1_data_i;
-        assign equal_opB               = second_operand_i;
-    end
-
 //////////////////////////////////////////////////////////////////////////////
 // Zicond Extension
 //////////////////////////////////////////////////////////////////////////////
@@ -896,7 +742,6 @@ module execute
             (MULEXT == MUL_M && ctrl_i.is_div):                  result = div_result;
             (MULEXT == MUL_M && ctrl_i.is_rem):                  result = rem_result;
             (MULEXT != MUL_OFF && ctrl_i.is_mul):                result = mul_result;
-            (AMOEXT inside {AMO_ZALRSC, AMO_A} && ctrl_i.is_sc): result = {31'h0, lrsc_result};
             (ZICONDEnable && ctrl_i.is_zicond):                  result = result_zicond;
             (ZBKBEnable && ctrl_i.is_zbkb):                      result = zbkb_result;
             (ZKNEEnable && ctrl_i.is_aes):                       result = aes_result;
@@ -907,20 +752,13 @@ module execute
         endcase
     end
 
-    logic we_atomic;
-    assign we_atomic  = (rd_i != '0 && atomic_write_enable);
-
     logic we_default;
     assign we_default = (ctrl_i.rd_we && rd_i != '0 && !hold_o && !raise_exception);
 
-    always_comb begin
-        unique case (1'b1)
-            ctrl_i.is_vector:   write_enable = ctrl_i.rd_we && rd_i != '0 && vector_wr_en;
-            ctrl_i.is_sc:       write_enable = we_atomic;
-            ctrl_i.is_amo:      write_enable = we_atomic;
-            default:            write_enable = we_default;
-        endcase
-    end
+    logic we_vector;
+    assign we_vector = (ctrl_i.rd_we && rd_i != '0 && vector_wr_en);
+
+    assign write_enable = ctrl_i.is_vector ? we_vector : we_default;
 
     assign write_enable_fwd_o = write_enable;
 
@@ -928,14 +766,12 @@ module execute
 // Output Registers
 ////////////////////////////////////////////////////////////////////////////////
 
-    assign hold_o = (hold_div || hold_mul  || hold_xkyber || hold_vector || atomic_hold) && !exc_load_access_fault_i;
+    assign hold_o = (hold_div || hold_mul  || hold_xkyber || hold_vector) && !exc_load_access_fault_i;
 
     wb_ctrl_t wb_ctrl_next;
     always_comb begin
         wb_ctrl_next.rd_we       = write_enable;
-        wb_ctrl_next.is_load     = ctrl_i.is_load || (ctrl_i.is_sc && !atomic_write_enable)
-                                                   || (ctrl_i.is_amo && atomic_write_enable);
-        wb_ctrl_next.is_lr       = ctrl_i.is_lr;
+        wb_ctrl_next.is_load     = ctrl_i.is_load || ctrl_i.is_lr || ctrl_i.is_amo;
         wb_ctrl_next.is_sc       = ctrl_i.is_sc;
         wb_ctrl_next.is_byte     = ctrl_i.is_byte;
         wb_ctrl_next.is_half     = ctrl_i.is_half;

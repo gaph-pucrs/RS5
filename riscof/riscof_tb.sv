@@ -86,9 +86,15 @@ module riscof_tb
     /* OBI interfaces of the core */
     logic                   instr_req, instr_gnt, instr_rvalid;
     logic [31:0]            instr_addr, instr_rdata;
-    logic                   data_req, data_gnt, data_we, data_rvalid;
+    logic                   data_req, data_gnt, data_we, data_rvalid, data_exokay;
     logic [31:0]            data_addr, data_wdata, data_rdata;
     logic [3:0]             data_be;
+    logic [5:0]             data_atop;
+
+    /* Data OBI behind the atomic unit */
+    logic                   bus_req, bus_gnt, bus_we, bus_rvalid;
+    logic [31:0]            bus_addr, bus_wdata, bus_rdata;
+    logic [3:0]             bus_be;
 
     /* Targets behind the OBI delay models */
     /* Number of used bits is defined by the memory size */
@@ -181,8 +187,37 @@ module riscof_tb
         .data_we_o              (data_we),
         .data_be_o              (data_be),
         .data_wdata_o           (data_wdata),
+        .data_atop_o            (data_atop),
         .data_rvalid_i          (data_rvalid),
-        .data_rdata_i           (data_rdata)
+        .data_rdata_i           (data_rdata),
+        .data_exokay_i          (data_exokay)
+    );
+
+    /* Atomics are executed in front of the memory */
+    AtomicALU #(
+        .AMOEXT(AMOEXT)
+    ) atomic_alu (
+        .clk       (clk),
+        .reset_n   (reset_n),
+        .req_i     (data_req),
+        .gnt_o     (data_gnt),
+        .addr_i    (data_addr),
+        .we_i      (data_we),
+        .be_i      (data_be),
+        .wdata_i   (data_wdata),
+        .atop_i    (data_atop),
+        .aid_i     (1'b0),
+        .rvalid_o  (data_rvalid),
+        .rdata_o   (data_rdata),
+        .exokay_o  (data_exokay),
+        .req_o     (bus_req),
+        .gnt_i     (bus_gnt),
+        .addr_o    (bus_addr),
+        .we_o      (bus_we),
+        .be_o      (bus_be),
+        .wdata_o   (bus_wdata),
+        .rvalid_i  (bus_rvalid),
+        .rdata_i   (bus_rdata)
     );
 
 //////////////////////////////////////////////////////////////////////////////
@@ -226,14 +261,14 @@ module riscof_tb
     ) data_obi (
         .clk        (clk),
         .reset_n    (reset_n),
-        .req_i      (data_req),
-        .gnt_o      (data_gnt),
-        .addr_i     (data_addr),
-        .we_i       (data_we),
-        .be_i       (data_be),
-        .wdata_i    (data_wdata),
-        .rvalid_o   (data_rvalid),
-        .rdata_o    (data_rdata),
+        .req_i      (bus_req),
+        .gnt_o      (bus_gnt),
+        .addr_i     (bus_addr),
+        .we_i       (bus_we),
+        .be_i       (bus_be),
+        .wdata_i    (bus_wdata),
+        .rvalid_o   (bus_rvalid),
+        .rdata_o    (bus_rdata),
         .ready_i    (1'b1),
         .en_o       (mem_operation_enable),
         .we_o       (mem_write_enable),
