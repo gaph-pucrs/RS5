@@ -119,10 +119,7 @@ module testbench
     /* verilator lint_on UNUSEDSIGNAL */
     logic                   instruction_enable;
 
-    /* RTC is 64 bits but the bus is 32 bits */
-    /* verilator lint_off UNUSEDSIGNAL */
-    logic [63:0]            data_rtc;
-    /* verilator lint_on UNUSEDSIGNAL */
+    logic [31:0]            data_rtc;
 
     logic                   interrupt_ack;
     logic [63:0]            mtime;
@@ -138,7 +135,7 @@ module testbench
     logic [BUS_WIDTH  -1:0] data_ram;
     logic [31:0]            data_plic;
     logic [BUS_WIDTH  -1:0] data_tb;
-    logic                   enable_tb_r, enable_rtc_r, enable_plic_r;
+    logic                   enable_tb_r, rtc_rvalid, plic_rvalid;
     logic                   mti, mei;
 
 //////////////////////////////////////////////////////////////////////////////
@@ -152,15 +149,18 @@ module testbench
 
     always_ff @(posedge clk) begin
         enable_tb_r     <= enable_tb;
-        enable_rtc_r    <= enable_rtc;
-        enable_plic_r   <= enable_plic;
     end
 
+    /* The peripherals are OBI subordinates behind the delay model: accessed in */
+    /* the grant cycle, they answer in the next one, as the delay model expects */
+    logic mem_we;
+    assign mem_we = (mem_write_enable != '0);
+
     always_comb begin
-        unique case ({enable_tb_r, enable_plic_r, enable_rtc_r})
+        unique case ({enable_tb_r, plic_rvalid, rtc_rvalid})
             3'b100:  mem_data_read = data_tb;
             3'b010:  mem_data_read = {{(BUS_WIDTH-32){1'b0}}, data_plic};
-            3'b001:  mem_data_read = {{(BUS_WIDTH-32){1'b0}}, data_rtc[31:0]};
+            3'b001:  mem_data_read = {{(BUS_WIDTH-32){1'b0}}, data_rtc};
             default: mem_data_read = data_ram;
         endcase
     end
@@ -496,16 +496,24 @@ module testbench
     logic [i_cnt:1] iack_periph;
     /* verilator lint_on UNUSED */
 
+    /* Always granted: the delay model grants for them */
+    /* verilator lint_off UNUSEDSIGNAL */
+    logic plic_gnt, rtc_gnt;
+    /* verilator lint_on UNUSEDSIGNAL */
+
     plic #(
         .i_cnt(i_cnt)
     ) plic1 (
         .clk     (clk),
         .reset_n (reset_n),
-        .en_i    (enable_plic),
-        .we_i    (mem_write_enable[3:0]),
+        .req_i   (enable_plic),
+        .gnt_o   (plic_gnt),
         .addr_i  (mem_address[23:0]),
-        .data_i  (mem_data_write[31:0]),
-        .data_o  (data_plic),
+        .we_i    (mem_we),
+        .be_i    (mem_write_enable[3:0]),
+        .wdata_i (mem_data_write[31:0]),
+        .rvalid_o(plic_rvalid),
+        .rdata_o (data_plic),
         .irq_i   ('0),
         .iack_i  (interrupt_ack),
         .iack_o  (iack_periph),
@@ -519,11 +527,14 @@ module testbench
     rtc rtc(
         .clk        (clk),
         .reset_n    (reset_n),
-        .en_i       (enable_rtc),
+        .req_i      (enable_rtc),
+        .gnt_o      (rtc_gnt),
         .addr_i     (mem_address[3:0]),
-        .we_i       ({4'h0, mem_write_enable[3:0]}),
-        .data_i     ({32'h0, mem_data_write[31:0]}),
-        .data_o     (data_rtc),
+        .we_i       (mem_we),
+        .be_i       (mem_write_enable[3:0]),
+        .wdata_i    (mem_data_write[31:0]),
+        .rvalid_o   (rtc_rvalid),
+        .rdata_o    (data_rtc),
         .mti_o      (mti),
         .mtime_o    (mtime)
     );

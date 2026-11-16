@@ -103,10 +103,7 @@ module riscof_tb
     /* verilator lint_on UNUSEDSIGNAL */
     logic                   instruction_ready;
 
-    /* RTC is 64 bits but the bus is 32 bits */
-    /* verilator lint_off UNUSEDSIGNAL */
-    logic [63:0]            data_rtc;
-    /* verilator lint_on UNUSEDSIGNAL */
+    logic [31:0]            data_rtc;
 
     logic                   interrupt_ack;
     logic [63:0]            mtime;
@@ -117,7 +114,7 @@ module riscof_tb
     logic [3:0]             mem_write_enable;
     byte                    char;
     logic [31:0]            data_ram, data_plic, data_tb;
-    logic                   enable_tb_r, enable_rtc_r, enable_plic_r;
+    logic                   enable_tb_r, rtc_rvalid, plic_rvalid;
     logic                   mti, mei;
 
 //////////////////////////////////////////////////////////////////////////////
@@ -128,16 +125,16 @@ module riscof_tb
     assign enable_plic = (mem_address[31:28] == 4'h4) && mem_operation_enable;
     assign enable_ram  = (mem_address[31:28] == 4'h8) && mem_operation_enable;
 
-    always_ff @(posedge clk) begin
-        enable_rtc_r    <= enable_rtc;
-        enable_plic_r   <= enable_plic;
-    end
+    /* The peripherals are OBI subordinates behind the delay model: accessed in */
+    /* the grant cycle, they answer in the next one, as the delay model expects */
+    logic mem_we;
+    assign mem_we = (mem_write_enable != '0);
 
     always_comb begin
-        if (enable_rtc_r) begin
-            mem_data_read = data_rtc[31:0];
+        if (rtc_rvalid) begin
+            mem_data_read = data_rtc;
         end
-        else if (enable_plic_r) begin
+        else if (plic_rvalid) begin
             mem_data_read = data_plic;
         end
         else begin
@@ -356,16 +353,24 @@ module riscof_tb
     logic [i_cnt:1] iack_periph;
     /* verilator lint_on UNUSED */
 
+    /* Always granted: the delay model grants for them */
+    /* verilator lint_off UNUSEDSIGNAL */
+    logic plic_gnt, rtc_gnt;
+    /* verilator lint_on UNUSEDSIGNAL */
+
     plic #(
         .i_cnt(i_cnt)
     ) plic1 (
         .clk     (clk),
         .reset_n (reset_n),
-        .en_i    (enable_plic),
-        .we_i    (mem_write_enable),
+        .req_i   (enable_plic),
+        .gnt_o   (plic_gnt),
         .addr_i  (mem_address[23:0]),
-        .data_i  (mem_data_write),
-        .data_o  (data_plic),
+        .we_i    (mem_we),
+        .be_i    (mem_write_enable),
+        .wdata_i (mem_data_write),
+        .rvalid_o(plic_rvalid),
+        .rdata_o (data_plic),
         .irq_i   ('0),
         .iack_i  (interrupt_ack),
         .iack_o  (iack_periph),
@@ -379,11 +384,14 @@ module riscof_tb
     rtc rtc(
         .clk        (clk),
         .reset_n    (reset_n),
-        .en_i       (enable_rtc),
+        .req_i      (enable_rtc),
+        .gnt_o      (rtc_gnt),
         .addr_i     (mem_address[3:0]),
-        .we_i       ({4'h0, mem_write_enable}),
-        .data_i     ({32'h0, mem_data_write}),
-        .data_o     (data_rtc),
+        .we_i       (mem_we),
+        .be_i       (mem_write_enable),
+        .wdata_i    (mem_data_write),
+        .rvalid_o   (rtc_rvalid),
+        .rdata_o    (data_rtc),
         .mti_o      (mti),
         .mtime_o    (mtime)
     );

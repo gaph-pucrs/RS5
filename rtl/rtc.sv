@@ -20,16 +20,20 @@
 module rtc (
     input  logic        clk,
     input  logic        reset_n,
-    input  logic        en_i,
 
-    /* Unaligned access is not supported */
+    /* OBI subordinate: always granted, answers in the next cycle */
+    input  logic        req_i,
+    output logic        gnt_o,
+    /* Bits [3:2] select mtime low/high or mtimecmp low/high */
     /* verilator lint_off UNUSEDSIGNAL */
     input  logic [3:0]  addr_i,
     /* verilator lint_on UNUSEDSIGNAL */
-    
-    input  logic [7:0]  we_i,
-    input  logic [63:0] data_i,
-    output logic [63:0] data_o,
+    input  logic        we_i,
+    input  logic [3:0]  be_i,
+    input  logic [31:0] wdata_i,
+    output logic        rvalid_o,
+    output logic [31:0] rdata_o,
+
     output logic        mti_o,
     output logic [63:0] mtime_o
 );
@@ -49,39 +53,45 @@ module rtc (
         end
     end
 
-    logic [63:0] r_data;
-    assign r_data = addr_i[3] ? mtimecmp : mtime;
+//////////////////////////////////////////////////////////////////////////////
+// OBI
+//////////////////////////////////////////////////////////////////////////////
 
-    logic [63:0] r_data_unaligned;
-    assign r_data_unaligned = addr_i[2] ? {32'h0, r_data[63:32]} : r_data;
+    assign gnt_o = 1'b1;
+
+    logic read;
+    logic write;
+    assign read  = req_i && !we_i;
+    assign write = req_i &&  we_i;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n)
-            data_o <= '0;
-        else if (en_i && we_i == '0)
-            data_o <= r_data_unaligned;
+            rvalid_o <= 1'b0;
+        else
+            rvalid_o <= req_i;
     end
 
-    logic [63:0] w_data;
-    always_comb begin
-        if (addr_i[2]) begin
-            w_data[63:56] = we_i[3] ? data_i[31:24] : r_data[63:56];
-            w_data[55:48] = we_i[2] ? data_i[23:16] : r_data[55:48];
-            w_data[47:40] = we_i[1] ? data_i[15: 8] : r_data[47:40];
-            w_data[39:32] = we_i[0] ? data_i[ 7: 0] : r_data[39:32];
-            w_data[31: 0] =                           r_data[31: 0];
-        end
-        else begin
-            w_data[63:56] = we_i[7] ? data_i[63:56] : r_data[63:56];
-            w_data[55:48] = we_i[6] ? data_i[55:48] : r_data[55:48];
-            w_data[47:40] = we_i[5] ? data_i[47:40] : r_data[47:40];
-            w_data[39:32] = we_i[4] ? data_i[39:32] : r_data[39:32];
-            w_data[31:24] = we_i[3] ? data_i[31:24] : r_data[31:24];
-            w_data[23:16] = we_i[2] ? data_i[23:16] : r_data[23:16];
-            w_data[15: 8] = we_i[1] ? data_i[15: 8] : r_data[15: 8];
-            w_data[ 7: 0] = we_i[0] ? data_i[ 7: 0] : r_data[ 7: 0];
-        end
+    logic [63:0] r_data;
+    assign r_data = addr_i[3] ? mtimecmp : mtime;
+
+    logic [31:0] r_word;
+    assign r_word = addr_i[2] ? r_data[63:32] : r_data[31:0];
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            rdata_o <= '0;
+        else if (read)
+            rdata_o <= r_word;
     end
+
+    logic [31:0] w_word;
+    assign w_word[31:24] = be_i[3] ? wdata_i[31:24] : r_word[31:24];
+    assign w_word[23:16] = be_i[2] ? wdata_i[23:16] : r_word[23:16];
+    assign w_word[15: 8] = be_i[1] ? wdata_i[15: 8] : r_word[15: 8];
+    assign w_word[ 7: 0] = be_i[0] ? wdata_i[ 7: 0] : r_word[ 7: 0];
+
+    logic [63:0] w_data;
+    assign w_data = addr_i[2] ? {w_word, r_data[31:0]} : {r_data[63:32], w_word};
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
@@ -89,7 +99,7 @@ module rtc (
         end
         else begin
             mtime <= mtime + 1'b1;
-            if (en_i && we_i != '0 && !addr_i[3])
+            if (write && !addr_i[3])
                 mtime <= w_data;
         end
     end
@@ -99,7 +109,7 @@ module rtc (
             mtimecmp <= '0;
         end
         else begin
-            if (en_i && we_i != '0 && addr_i[3])
+            if (write && addr_i[3])
                 mtimecmp <= w_data;
         end
     end

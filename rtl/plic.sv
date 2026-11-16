@@ -23,15 +23,18 @@ module plic
     input   logic                   clk,
     input   logic                   reset_n,
 
-    input   logic                   en_i,
-    input   logic  [3:0]            we_i,
+    /* OBI subordinate: always granted, answers in the next cycle */
+    input   logic                   req_i,
+    output  logic                   gnt_o,
     input   logic [23:0]            addr_i,
-    output  logic [31:0]            data_o,
-
+    input   logic                   we_i,
+    input   logic  [3:0]            be_i,
     /* Only a reduced number of bits is used depending on the number of interrupts */
     /* verilator lint_off UNUSEDSIGNAL */
-    input   logic [31:0]            data_i,
+    input   logic [31:0]            wdata_i,
     /* verilator lint_on UNUSEDSIGNAL */
+    output  logic                   rvalid_o,
+    output  logic [31:0]            rdata_o,
 
     input   logic [i_cnt:1]         irq_i,
     input   logic                   iack_i,
@@ -81,6 +84,20 @@ module plic
 // Memory Mapped Regs
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+    assign gnt_o = 1'b1;
+
+    logic read;
+    logic write;
+    assign read  = req_i && !we_i;
+    assign write = req_i &&  we_i;
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            rvalid_o <= 1'b0;
+        else
+            rvalid_o <= req_i;
+    end
+
     /* Register mux */
     logic [31:0] reg_val;
     always_comb begin
@@ -97,18 +114,18 @@ module plic
     /* verilator lint_off UNUSEDSIGNAL */
     logic [31:0] write_val;
     /* verilator lint_on UNUSEDSIGNAL */
-    assign write_val[31:24] = we_i[3] ? data_i[31:24] : reg_val[31:24];
-    assign write_val[23:16] = we_i[2] ? data_i[23:16] : reg_val[23:16];
-    assign write_val[15: 8] = we_i[1] ? data_i[15: 8] : reg_val[15: 8];
-    assign write_val[ 7: 0] = we_i[0] ? data_i[ 7: 0] : reg_val[ 7: 0];
+    assign write_val[31:24] = be_i[3] ? wdata_i[31:24] : reg_val[31:24];
+    assign write_val[23:16] = be_i[2] ? wdata_i[23:16] : reg_val[23:16];
+    assign write_val[15: 8] = be_i[1] ? wdata_i[15: 8] : reg_val[15: 8];
+    assign write_val[ 7: 0] = be_i[0] ? wdata_i[ 7: 0] : reg_val[ 7: 0];
 
     /* Read */
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
-            data_o <= '0;
-        end  
-        else if (en_i == 1'b1 && we_i == '0) begin
-            data_o <= reg_val;
+            rdata_o <= '0;
+        end
+        else if (read) begin
+            rdata_o <= reg_val;
         end
     end
 
@@ -117,7 +134,7 @@ module plic
         if (!reset_n) begin
             ie      <= '0;
         end
-        else if (en_i == 1'b1 && we_i != '0 && addr_i == 24'h002000) begin
+        else if (write && addr_i == 24'h002000) begin
             ie <= write_val[i_cnt:1];
         end 
     end
@@ -127,7 +144,7 @@ module plic
             iack_o <= '0;
         end
         else begin 
-            if (en_i == 1'b1 && we_i != '0 && addr_i == 24'h200004) 
+            if (write && addr_i == 24'h200004)
                 iack_o[write_val[$clog2(i_cnt+1):0]] <= 1'b1;
             else
                 iack_o <= '0;

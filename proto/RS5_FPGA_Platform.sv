@@ -57,10 +57,10 @@ module RS5_FPGA_Platform
     logic [3:0]             core_data_be;
     logic [5:0]             core_data_atop;
     logic                   cpu_operation_enable, enable_ram, enable_peripherals, enable_rtc, enable_plic;
-    logic                   enable_rtc_r, enable_plic_r, enable_peripherals_r;
+    logic                   rtc_gnt, rtc_rvalid, plic_gnt, plic_rvalid, enable_peripherals_r;
     logic [63:0]            mtime;
     logic [31:0]            data_bram, data_plic, data_peripherals;
-    logic [63:0]            data_rtc;
+    logic [31:0]            data_rtc;
     logic [3:0]             cpu_write_enable;
     logic                   stall;
     logic                   mei, mti;
@@ -108,16 +108,14 @@ module RS5_FPGA_Platform
     assign access_peripherals = enable_peripherals && cpu_data_gnt;
 
     always_ff @(posedge clk) begin
-        enable_rtc_r            <= access_rtc;
-        enable_plic_r           <= access_plic;
         enable_peripherals_r    <= access_peripherals;
     end
 
     always_comb begin
-        if (enable_rtc_r) begin
-            cpu_data_in = data_rtc[31:0];
+        if (rtc_rvalid) begin
+            cpu_data_in = data_rtc;
         end
-        else if (enable_plic_r) begin
+        else if (plic_rvalid) begin
             cpu_data_in = data_plic;
         end
         else if (enable_peripherals_r) begin
@@ -229,11 +227,14 @@ module RS5_FPGA_Platform
     rtc rtc(
         .clk        (clk),
         .reset_n    (reset_n),
-        .en_i       (access_rtc),
+        .req_i      (access_rtc),
+        .gnt_o      (rtc_gnt),
         .addr_i     (cpu_data_address[3:0]),
-        .we_i       ({4'h0, cpu_write_enable}),
-        .data_i     ({32'h0, cpu_data_out}),
-        .data_o     (data_rtc),
+        .we_i       (cpu_data_we),
+        .be_i       (cpu_data_be),
+        .wdata_i    (cpu_data_out),
+        .rvalid_o   (rtc_rvalid),
+        .rdata_o    (data_rtc),
         .mti_o      (mti),
         .mtime_o    (mtime)
     );
@@ -247,11 +248,14 @@ module RS5_FPGA_Platform
     ) plic1 (
         .clk     (clk),
         .reset_n (reset_n),
-        .en_i    (access_plic),
-        .we_i    (cpu_write_enable),
+        .req_i   (access_plic),
+        .gnt_o   (plic_gnt),
         .addr_i  (cpu_data_address[23:0]),
-        .data_i  (cpu_data_out),
-        .data_o  (data_plic),
+        .we_i    (cpu_data_we),
+        .be_i    (cpu_data_be),
+        .wdata_i (cpu_data_out),
+        .rvalid_o(plic_rvalid),
+        .rdata_o (data_plic),
         .irq_i   (irq_peripherals),
         .iack_i  (interrupt_ack),
         .irq_o   (mei),
