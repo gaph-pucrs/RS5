@@ -52,6 +52,7 @@ module RS5
     input  logic                    reset_n,
     input  logic                    sys_reset_i,
 
+    input  logic                    sip_i,
     input  logic                    tip_i,
     input  logic                    eip_i,
     output logic                    interrupt_ack_o,
@@ -554,6 +555,7 @@ module RS5
         .jump_misaligned_i          (decode_ctrl.jump_misaligned),
         .jump_target_i              (jump_target),
         .mtime_i                    (mtime_i),
+        .sip_i                      (sip_i),
         .tip_i                      (tip_i),
         .eip_i                      (eip_i),
         .interrupt_ack_i            (interrupt_ack_o),

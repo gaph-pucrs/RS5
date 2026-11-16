@@ -153,6 +153,7 @@ module RS5_FPGA_Platform
         .reset_n                (reset_n),
         .sys_reset_i            (1'b0),
         .mtime_i                (mtime),
+        .sip_i                  (1'b0),
         .tip_i                  (mti),
         .eip_i                  (mei),
         .interrupt_ack_o        (interrupt_ack),

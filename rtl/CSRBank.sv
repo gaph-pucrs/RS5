@@ -83,6 +83,7 @@ module CSRBank
 
     input   logic [63:0]        mtime_i,
 
+    input   logic               sip_i,
     input   logic               tip_i,
     input   logic               eip_i,
     input   logic               interrupt_ack_i,
@@ -251,10 +252,8 @@ module CSRBank
             mip_msip <= 1'b0;
         else if (sys_reset)
             mip_msip <= 1'b0;
-        else begin
-            if (write_enable_i && address_i == MIP)
-                mip_msip <= wr_data[3];
-        end
+        else
+            mip_msip <= sip_i;
     end
 
     logic mip_mtip;

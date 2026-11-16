@@ -48,7 +48,7 @@ The interface contains four signal groups:
 * Global signals: `clk`, `reset_n` (asynchronous), and `sys_reset_i` (synchronous);
 * Instruction memory: OBI read-only manager, `instr_*` signals;
 * Data bus: OBI manager, `data_*` signals;
-* Peripherals: `tip_i` for timer interrupts, `eip_i` for external interrupts optionally managed through PLIC, `interrupt_ack_o`, and `mtime_i` for optional cycle counter through MTIMER.
+* Peripherals: `sip_i` for software interrupts (`mip.MSIP` is read-only, driven by a memory-mapped register such as [mswi](../rtl/mswi.sv)), `tip_i` for timer interrupts, `eip_i` for external interrupts optionally managed through PLIC, `interrupt_ack_o`, and `mtime_i` for optional cycle counter through MTIMER.
 
 ### OBI interfaces
 

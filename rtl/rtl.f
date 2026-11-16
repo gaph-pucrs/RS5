@@ -36,3 +36,4 @@
 ./RS5_pkg.sv
 ./RS5.sv
 ./mtimer.sv
+./mswi.sv
