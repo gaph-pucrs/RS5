@@ -95,6 +95,23 @@ module RamArray
                 .dataB_o (dataB[k]                         )
             );
 
+            /* Backdoor read: each bank answers its own range or asks the next one */
+            if (k == NUM_BANKS - 1) begin : link
+                /* The last bank takes what is left: its select bits are not checked */
+                /* verilator lint_off UNUSEDSIGNAL */
+                function automatic logic [7:0] peek(input logic [MEM_ADDR_BITS-1:0] addr);
+                /* verilator lint_on UNUSEDSIGNAL */
+                    return mem.peek(addr[BANK_ADDR_BITS-1:0]);
+                endfunction
+            end
+            else begin : link
+                function automatic logic [7:0] peek(input logic [MEM_ADDR_BITS-1:0] addr);
+                    return (addr[MEM_ADDR_BITS-1:BANK_ADDR_BITS] == SEL_BITS'(k))
+                        ? mem.peek(addr[BANK_ADDR_BITS-1:0])
+                        : bank[k + 1].link.peek(addr);
+                endfunction
+            end
+
             initial begin
                 int fd;
                 longint offset;
@@ -125,6 +142,23 @@ module RamArray
 
         assign dataA_o = dataA[selA_r];
         assign dataB_o = dataB[selB_r];
+    end
+
+    /* Backdoor read for testbench monitors: MEM.backdoor.peek(bus address) */
+    /* Address bits above the memory are ignored                            */
+    if (MEM_ADDR_BITS <= BANK_ADDR_BITS) begin : backdoor
+        /* verilator lint_off UNUSEDSIGNAL */
+        function automatic logic [7:0] peek(input logic [31:0] addr);
+        /* verilator lint_on UNUSEDSIGNAL */
+            return single_bank.bank.peek(addr[MEM_ADDR_BITS-1:0]);
+        endfunction
+    end
+    else begin : backdoor
+        /* verilator lint_off UNUSEDSIGNAL */
+        function automatic logic [7:0] peek(input logic [31:0] addr);
+        /* verilator lint_on UNUSEDSIGNAL */
+            return banked.bank[0].link.peek(addr[MEM_ADDR_BITS-1:0]);
+        endfunction
     end
 
 endmodule

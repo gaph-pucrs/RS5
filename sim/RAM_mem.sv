@@ -49,6 +49,11 @@ module RAM_mem
 
     reg [7:0] RAM [0:MEM_WIDTH-1];
 
+    /* Backdoor read for testbench monitors: no port, no time */
+    function automatic logic [7:0] peek(input logic [($clog2(MEM_WIDTH) - 1):0] addr);
+        return RAM[addr];
+    endfunction
+
     initial begin
         int fd;
         fd = $fopen (BIN_FILE, "r");
