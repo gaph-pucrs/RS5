@@ -14,7 +14,9 @@
  *  - AMO*.W reads the word, writes the operation result and returns the
  *    original value.
  * A write by another manager (ordinary, SC or AMO) to a reserved word clears
- * that reservation. The reservation set is one 32-bit word. Atomics use the
+ * that reservation. So does resv_lost_i, for every reservation in the
+ * 2**RESV_BLOCK_BITS bytes block of resv_lost_addr_i: a coherent cache in
+ * front of the memory raises it when it loses write permission on a line. The reservation set is one 32-bit word. Atomics use the
  * word in the lowest bus lanes (addr_i is word aligned, be_i = 4'b1111).
  * AMOEXT builds only what the core issues: Zalrsc (LR/SC), Zaamo (AMOs),
  * A (both) or none, which leaves a plain pass-through.
@@ -27,6 +29,7 @@ module AtomicALU
     parameter RS5_pkg::atomic_e AMOEXT    = RS5_pkg::AMO_A,
     parameter int               BUS_WIDTH = 32,
     parameter int               NUM_IDS   = 1,    /* Managers that may hold a reservation */
+    parameter int               RESV_BLOCK_BITS = 2,  /* Size of a resv_lost_addr_i block, >= 2 */
     parameter int               AID_W     = (NUM_IDS > 1) ? $clog2(NUM_IDS) : 1
 )
 (
@@ -54,7 +57,13 @@ module AtomicALU
     output logic [BUS_WIDTH/8-1:0]   be_o,
     output logic [BUS_WIDTH-1:0]     wdata_o,
     input  logic                     rvalid_i,
-    input  logic [BUS_WIDTH-1:0]     rdata_i
+    input  logic [BUS_WIDTH-1:0]     rdata_i,
+
+    /* Reservations lost in a block (optional: the memory has no cache) */
+    input  logic                     resv_lost_i      = 1'b0,
+    /* verilator lint_off UNUSEDSIGNAL */
+    input  logic [31:0]              resv_lost_addr_i = '0      /* Offset in the block unused */
+    /* verilator lint_on UNUSEDSIGNAL */
 );
 
     localparam logic [4:0] OP_LR = 5'h02;
@@ -215,6 +224,8 @@ module AtomicALU
         else begin
             for (int i = 0; i < NUM_IDS; i++) begin
                 if (write_granted && AID_W'(i) != write_aid && resv_addr[i] == write_word)
+                    resv_valid[i] <= 1'b0;
+                if (resv_lost_i && resv_addr[i][29:RESV_BLOCK_BITS-2] == resv_lost_addr_i[31:RESV_BLOCK_BITS])
                     resv_valid[i] <= 1'b0;
             end
             if (accept_lr)
