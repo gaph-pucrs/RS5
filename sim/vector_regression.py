@@ -15,6 +15,9 @@ configuration in
   app/baremetal/tests/vector-tests/results/vlen<V>_llen<L>_bus<B>/{passed,failed}/<test>.txt
 A simulation that runs longer than SIM_TIMEOUT seconds (300 by default) is
 killed and counted as failed, so a hung test does not stop the regression.
+A test that does not build is not simulated: the compiler output is saved as
+its log in every configuration and the test counts as failed.
+The exit status is 1 when any test fails, 0 otherwise.
 
 Requirements (see "Vector regression tests" in README.md):
   - VEnable and the program are set on the xrun command line, so testbench.sv
@@ -102,7 +105,14 @@ def run_test(file, configs, extra, sim_timeout):
     """Build one test and simulate it on every configuration in parallel."""
     filename = file.name
     shutil.copy(file, DESTINATION_FOLDER / filename)
-    subprocess.run(["make", "-C", str(TESTS_FOLDER), "clean", "all"], stdout=subprocess.DEVNULL)
+    build = subprocess.run(["make", "-C", str(TESTS_FOLDER), "clean", "all"],
+                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    if build.returncode != 0:
+        for config, _ in configs:
+            (RESULTS_FOLDER / config / "failed" / f"{file.stem}.txt").write_text(build.stdout)
+        (DESTINATION_FOLDER / filename).unlink()
+        print(f"{filename} build failed", flush=True)
+        return
 
     with ThreadPoolExecutor(max_workers=len(configs)) as pool:
         jobs = [pool.submit(run_config, config, params, filename, extra, sim_timeout)
@@ -150,11 +160,13 @@ def main():
         passed = len(list((RESULTS_FOLDER / config / "passed").iterdir()))
         failed = len(list((RESULTS_FOLDER / config / "failed").iterdir()))
         print(f"{config}  Passed: {passed}  Failed: {failed}")
+    any_failed = False
     for config, _ in configs:
         failed = sorted(path.name for path in (RESULTS_FOLDER / config / "failed").iterdir())
         if failed:
             print(f"{config} failed:", *failed)
-    return 0
+            any_failed = True
+    return 1 if any_failed else 0
 
 
 if __name__ == "__main__":

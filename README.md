@@ -151,6 +151,8 @@ The configurations of a test run in parallel, each with its own Xcelium library 
 The tests in [class_disabled](app/baremetal/tests/vector-tests/class_disabled) also run on every configuration, with all vector class parameters set to 0.
 Each log goes to `app/baremetal/tests/vector-tests/results/vlen<V>_llen<L>_bus<B>/passed` or `.../failed`, and the script ends with a pass/fail count per configuration.
 A simulation that runs longer than `SIM_TIMEOUT` seconds (300 by default) is killed and counted as failed.
+A test that does not build is not simulated: the compiler output becomes its log and the test counts as failed.
+The script exits with status 1 when any test fails.
 
 The expected results do not depend on `VLEN`: compares stop at `vl`, and reductions, mask compares and `vslide1down` recompute the expected value from their sources and `vl` (see [test/vector_macros.h](app/baremetal/tests/vector-tests/test/vector_macros.h)).
 The golden vectors are written for `VLEN = 512`, so a smaller `VLEN` checks fewer elements.
