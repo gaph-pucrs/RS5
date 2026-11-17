@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 """Vector regression tests.
 
-Usage: ./vector_regression.py [--fast]
+Usage: ./vector_regression.py [--fast] [--vlen N...] [--llen N...]
+                               [--bus-width N...] [-k PATTERN]...
 
 Every test is compiled once and simulated on each VLEN x LLEN x BUS_WIDTH
 configuration:
   - default: VLENS="128 256 512", LLENS="32 64 128" and BUS_WIDTHS="32 64 128"
     (27 configurations); override them from the environment, e.g.
-    VLENS=512 LLENS=32 BUS_WIDTHS=32 ./vector_regression.py
+    VLENS=512 LLENS=32 BUS_WIDTHS=32 ./vector_regression.py, or with
+    --vlen, --llen and --bus-width, e.g. --vlen 512 --llen 32 64
   - --fast: only the 3 configurations in FAST_CONFIGS (VLEN, LLEN, BUS_WIDTH)
+-k PATTERN runs only the tests whose name (with or without .c) matches the
+glob PATTERN, e.g. -k vmseq -k 'vl*'; it can be given more than once.
 The configurations of one test run in parallel, each with its own Xcelium
 library (xcelium_vlen<V>_llen<L>_bus<B>.d). Results are saved per
 configuration in
@@ -31,6 +35,7 @@ Requirements (see "Vector regression tests" in README.md):
 """
 
 import argparse
+import fnmatch
 import os
 import re
 import shutil
@@ -103,6 +108,12 @@ def env_list(name, default):
     return [int(value) for value in os.environ.get(name, default).split()]
 
 
+def selected(file, patterns):
+    """True if no pattern was given or the test name matches one of them."""
+    return not patterns or any(fnmatch.fnmatch(file.name, pattern) or
+                               fnmatch.fnmatch(file.stem, pattern) for pattern in patterns)
+
+
 def config_name(vlen, llen, bus):
     return f"vlen{vlen}_llen{llen}_bus{bus}"
 
@@ -172,7 +183,17 @@ def main():
     parser = argparse.ArgumentParser(description="Vector regression tests.")
     parser.add_argument("--fast", action="store_true",
                         help="run only the configurations in FAST_CONFIGS")
+    parser.add_argument("--vlen", type=int, nargs="+", metavar="N",
+                        help="VLEN values (default: $VLENS or 128 256 512)")
+    parser.add_argument("--llen", type=int, nargs="+", metavar="N",
+                        help="LLEN values (default: $LLENS or 32 64 128)")
+    parser.add_argument("--bus-width", type=int, nargs="+", metavar="N",
+                        help="BUS_WIDTH values (default: $BUS_WIDTHS or 32 64 128)")
+    parser.add_argument("-k", dest="patterns", action="append", default=[], metavar="PATTERN",
+                        help="run only the tests whose name matches this glob (repeatable)")
     args = parser.parse_args()
+    if args.fast and (args.vlen or args.llen or args.bus_width):
+        parser.error("--fast cannot be combined with --vlen, --llen or --bus-width")
 
     os.chdir(SIM_FOLDER)
     sim_timeout = int(os.environ.get("SIM_TIMEOUT", "300"))
@@ -181,24 +202,33 @@ def main():
         triples = FAST_CONFIGS
     else:
         triples = [(vlen, llen, bus)
-                   for vlen in env_list("VLENS", "128 256 512")
-                   for llen in env_list("LLENS", "32 64 128")
-                   for bus in env_list("BUS_WIDTHS", "32 64 128")]
+                   for vlen in args.vlen or env_list("VLENS", "128 256 512")
+                   for llen in args.llen or env_list("LLENS", "32 64 128")
+                   for bus in args.bus_width or env_list("BUS_WIDTHS", "32 64 128")]
+
+    # (test file, extra xrun arguments) of each selected test
+    tests = [(file, []) for folder in SOURCE_FOLDERS for file in sorted(folder.glob("*.c"))]
+    tests += [(file, CLASS_OFF) for file in sorted((TESTS_FOLDER / "class_disabled").glob("*.c"))]
+    tests = [(file, extra) for file, extra in tests if selected(file, args.patterns)]
+    if not tests:
+        parser.error(f"no test matches {' '.join(args.patterns)}")
 
     # (folder name, xrun arguments) of each configuration
     configs = [(config_name(*triple), config_params(*triple)) for triple in triples]
     for config, _ in configs:
-        shutil.rmtree(RESULTS_FOLDER / config, ignore_errors=True)
-        (RESULTS_FOLDER / config / "passed").mkdir(parents=True)
-        (RESULTS_FOLDER / config / "failed").mkdir(parents=True)
+        if args.patterns:
+            # Keep the logs of the tests that do not run now
+            for file, _ in tests:
+                for verdict in ("passed", "failed"):
+                    (RESULTS_FOLDER / config / verdict / f"{file.stem}.txt").unlink(missing_ok=True)
+        else:
+            shutil.rmtree(RESULTS_FOLDER / config, ignore_errors=True)
+        (RESULTS_FOLDER / config / "passed").mkdir(parents=True, exist_ok=True)
+        (RESULTS_FOLDER / config / "failed").mkdir(parents=True, exist_ok=True)
 
     results = []
-    for folder in SOURCE_FOLDERS:
-        for file in sorted(folder.glob("*.c")):
-            results += run_test(file, configs, [], sim_timeout)
-
-    for file in sorted((TESTS_FOLDER / "class_disabled").glob("*.c")):
-        results += run_test(file, configs, CLASS_OFF, sim_timeout)
+    for file, extra in tests:
+        results += run_test(file, configs, extra, sim_timeout)
 
     print()
     for config, _ in configs:

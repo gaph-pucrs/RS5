@@ -147,6 +147,8 @@ make -C sim VENABLE=1 VLEN=256 BIN_FILE=../app/baremetal/tests/vector-tests/test
 
 [sim/vector_regression.py](sim/vector_regression.py) (Python 3, standard library only) builds each test in [app/baremetal/tests/vector-tests/operations](app/baremetal/tests/vector-tests/operations) and [mem_operations](app/baremetal/tests/vector-tests/mem_operations) once and simulates it with Xcelium on every `VLEN` x `LLEN` x `BUS_WIDTH` configuration: `VLEN` 128, 256 and 512, `LLEN` 32, 64 and 128 and `BUS_WIDTH` 32, 64 and 128 by default (27 configurations).
 With `--fast` it runs only three configurations (`VLEN`/`LLEN`/`BUS_WIDTH`): 256/32/32, 256/32/64 and 256/64/32.
+`--vlen`, `--llen` and `--bus-width` choose the values on the command line, and `-k PATTERN` runs only the tests whose name matches the glob (repeatable).
+With `-k`, the logs of the other tests in `results/` are kept.
 The configurations of a test run in parallel, each with its own Xcelium library (`sim/xcelium_vlen<V>_llen<L>_bus<B>.d`).
 The tests in [class_disabled](app/baremetal/tests/vector-tests/class_disabled) also run on every configuration, with all vector class parameters set to 0.
 Each log goes to `app/baremetal/tests/vector-tests/results/vlen<V>_llen<L>_bus<B>/passed` or `.../failed`, and the script ends with a pass/fail count per configuration and one line per failure with its reason:
@@ -171,6 +173,8 @@ cd sim                                                   # or run it from any fo
 ./vector_regression.py                                   # full matrix
 ./vector_regression.py --fast                            # 3 configurations
 VLENS=512 LLENS=32 BUS_WIDTHS=32 ./vector_regression.py  # a single configuration
+./vector_regression.py --vlen 512 --llen 32 64           # VLEN 512, LLEN 32 and 64, every BUS_WIDTH
+./vector_regression.py --fast -k vmseq -k 'vl*'          # only the tests that match
 ```
 
 ---
