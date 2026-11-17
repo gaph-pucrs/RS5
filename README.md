@@ -143,6 +143,12 @@ With Verilator, pass them through the Makefile:
 make -C sim VENABLE=1 VLEN=256 BIN_FILE=../app/baremetal/tests/vector-tests/test.bin
 ```
 
+`+BIN_FILE=<path>` on the simulator command line overrides `BIN_FILE` when the simulation starts, so an elaborated snapshot runs another program without a new elaboration:
+
+```bash
+xrun -R +BIN_FILE=../app/baremetal/tests/vector-tests/test.bin
+```
+
 ### Vector regression tests
 
 [sim/vector_regression.py](sim/vector_regression.py) (Python 3, standard library only) builds each test in [app/baremetal/tests/vector-tests/operations](app/baremetal/tests/vector-tests/operations) and [mem_operations](app/baremetal/tests/vector-tests/mem_operations) once and simulates it with Xcelium on every `VLEN` x `LLEN` x `BUS_WIDTH` configuration: `VLEN` 128, 256 and 512, `LLEN` 32, 64 and 128 and `BUS_WIDTH` 32, 64 and 128 by default (27 configurations).
