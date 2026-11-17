@@ -149,7 +149,8 @@ make -C sim VENABLE=1 VLEN=256 BIN_FILE=../app/baremetal/tests/vector-tests/test
 With `--fast` it runs only three configurations (`VLEN`/`LLEN`/`BUS_WIDTH`): 256/32/32, 256/32/64 and 256/64/32.
 The configurations of a test run in parallel, each with its own Xcelium library (`sim/xcelium_vlen<V>_llen<L>_bus<B>.d`).
 The tests in [class_disabled](app/baremetal/tests/vector-tests/class_disabled) also run on every configuration, with all vector class parameters set to 0.
-Each log goes to `app/baremetal/tests/vector-tests/results/vlen<V>_llen<L>_bus<B>/passed` or `.../failed`, and the script ends with a pass/fail count per configuration.
+Each log goes to `app/baremetal/tests/vector-tests/results/vlen<V>_llen<L>_bus<B>/passed` or `.../failed`, and the script ends with a pass/fail count per configuration and one line per failure with its reason:
+`BUILD` (the test does not compile), `TIMEOUT`, `TRAP` (unexpected trap), `CHECK` (the first wrong result and its test case) or `SIM` (no verdict in the log, e.g. an Xcelium error).
 A simulation that runs longer than `SIM_TIMEOUT` seconds (300 by default) is killed and counted as failed.
 A test that does not build is not simulated: the compiler output becomes its log and the test counts as failed.
 The script exits with status 1 when any test fails.
