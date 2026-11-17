@@ -155,7 +155,9 @@ xrun -R +BIN_FILE=../app/baremetal/tests/vector-tests/test.bin
 With `--fast` it runs only three configurations (`VLEN`/`LLEN`/`BUS_WIDTH`): 256/32/32, 256/32/64 and 256/64/32.
 `--vlen`, `--llen` and `--bus-width` choose the values on the command line, and `-k PATTERN` runs only the tests whose name matches the glob (repeatable).
 With `-k`, the logs of the other tests in `results/` are kept.
-The configurations of a test run in parallel, each with its own Xcelium library (`sim/xcelium_vlen<V>_llen<L>_bus<B>.d`).
+The work runs in parallel over `-j N` jobs (default: the number of CPUs, at most 64), in two steps:
+- each test is built in its own folder, `app/baremetal/tests/vector-tests/build/<test>/`, which keeps its `test.bin` and `test.lst`, while each configuration is elaborated once into its own Xcelium library (`sim/xcelium_vlen<V>_llen<L>_bus<B>.d`, plus `..._classoff.d` for the tests in `class_disabled`);
+- every test and configuration pair is simulated from that snapshot with `xrun -R +BIN_FILE=<path>`, so the slowest configuration of one test does not hold up the others.
 The tests in [class_disabled](app/baremetal/tests/vector-tests/class_disabled) also run on every configuration, with all vector class parameters set to 0.
 Each log goes to `app/baremetal/tests/vector-tests/results/vlen<V>_llen<L>_bus<B>/passed` or `.../failed`, and the script ends with a pass/fail count per configuration and one line per failure with its reason:
 `BUILD` (the test does not compile), `TIMEOUT`, `TRAP` (unexpected trap), `CHECK` (the first wrong result and its test case) or `SIM` (no verdict in the log, e.g. an Xcelium error).
@@ -181,6 +183,7 @@ cd sim                                                   # or run it from any fo
 VLENS=512 LLENS=32 BUS_WIDTHS=32 ./vector_regression.py  # a single configuration
 ./vector_regression.py --vlen 512 --llen 32 64           # VLEN 512, LLEN 32 and 64, every BUS_WIDTH
 ./vector_regression.py --fast -k vmseq -k 'vl*'          # only the tests that match
+./vector_regression.py -j 16                             # at most 16 parallel jobs
 ```
 
 ---
