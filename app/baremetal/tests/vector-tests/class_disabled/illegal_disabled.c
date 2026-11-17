@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SHL-0.51
 //
 // Runs with every vector class parameter of the existing instructions set to
-// 0 (see vector_regression.sh). Instructions of a disabled class must raise
+// 0 (see vector_regression.py). Instructions of a disabled class must raise
 // an illegal-instruction trap; the remaining ones must still execute.
 
 #include <stdint.h>

@@ -145,7 +145,7 @@ make -C sim VENABLE=1 VLEN=256 BIN_FILE=../app/baremetal/tests/vector-tests/test
 
 ### Vector regression tests
 
-[sim/vector_regression.sh](sim/vector_regression.sh) builds each test in [app/baremetal/tests/vector-tests/operations](app/baremetal/tests/vector-tests/operations) and [mem_operations](app/baremetal/tests/vector-tests/mem_operations) once and simulates it with Xcelium on every `VLEN` x `LLEN` x `BUS_WIDTH` configuration: `VLEN` 128, 256 and 512, `LLEN` 32, 64 and 128 and `BUS_WIDTH` 32, 64 and 128 by default (27 configurations).
+[sim/vector_regression.py](sim/vector_regression.py) (Python 3, standard library only) builds each test in [app/baremetal/tests/vector-tests/operations](app/baremetal/tests/vector-tests/operations) and [mem_operations](app/baremetal/tests/vector-tests/mem_operations) once and simulates it with Xcelium on every `VLEN` x `LLEN` x `BUS_WIDTH` configuration: `VLEN` 128, 256 and 512, `LLEN` 32, 64 and 128 and `BUS_WIDTH` 32, 64 and 128 by default (27 configurations).
 With `--fast` it runs only three configurations (`VLEN`/`LLEN`/`BUS_WIDTH`): 256/32/32, 256/32/64 and 256/64/32.
 The configurations of a test run in parallel, each with its own Xcelium library (`sim/xcelium_vlen<V>_llen<L>_bus<B>.d`).
 The tests in [class_disabled](app/baremetal/tests/vector-tests/class_disabled) also run on every configuration, with all vector class parameters set to 0.
@@ -164,10 +164,10 @@ The script sets `VEnable`, `VLEN`, `LLEN`, `BUS_WIDTH` and the vector test binar
 Then run:
 
 ```bash
-cd sim
-./vector_regression.sh                                   # full matrix
-./vector_regression.sh --fast                            # 3 configurations
-VLENS=512 LLENS=32 BUS_WIDTHS=32 ./vector_regression.sh  # a single configuration
+cd sim                                                   # or run it from any folder
+./vector_regression.py                                   # full matrix
+./vector_regression.py --fast                            # 3 configurations
+VLENS=512 LLENS=32 BUS_WIDTHS=32 ./vector_regression.py  # a single configuration
 ```
 
 ---
