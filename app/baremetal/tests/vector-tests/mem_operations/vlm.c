@@ -25,13 +25,16 @@ void TEST_CASE1(void) {
 
   VSET(16, e32, m8);
   asm volatile("vlm.v v1, (%0)" ::"r"(&ALIGNED_I8[1]));
+  // VCMP_U8 stores with vse8.v: with e32 and m8 its EMUL would be 2, and
+  // v1 is not a valid group of 2 registers, so compare with e8 and m1
+  VSET(16, e8, m1);
   VCMP_U8(3, v1, 0xd3, 0x40);
 
   VSET(17, e32, m8);
   asm volatile("vlm.v v1, (%0)" ::"r"(&ALIGNED_I8[1]));
   // The vector used by VCMP_U8 is actually 16 elements long
   // Don't store more if you don't want to overflow
-  VSET(16, e32, m8);
+  VSET(16, e8, m1);
   VCMP_U8(4, v1, 0xd3, 0x40, 0xd1);
 }
 
