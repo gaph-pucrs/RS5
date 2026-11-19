@@ -3,6 +3,7 @@
 
 Usage: ./vector_regression.py [--fast] [--vlen N...] [--llen N...]
                                [--bus-width N...] [-k PATTERN]... [-j N]
+       ./vector_regression.py --sail [--fast] [--vlen N...] [-k PATTERN]... [-j N]
 
 Every test is simulated on each VLEN x LLEN x BUS_WIDTH configuration:
   - default: VLENS="128 256 512", LLENS="32 64 128" and BUS_WIDTHS="32 64 128"
@@ -13,18 +14,28 @@ Every test is simulated on each VLEN x LLEN x BUS_WIDTH configuration:
 -k PATTERN runs only the tests whose name (with or without .c) matches the
 glob PATTERN, e.g. -k vmseq -k 'vl*'; it can be given more than once.
 
+--sail runs the tests on the Sail RISC-V reference model (sail_riscv_sim,
+module sail-riscv/0.12, or the path in $SAIL_RISCV_SIM) instead of RS5. The
+model is configured as Zve32x by sim/sail_zve32x.json; each VLEN is one
+configuration, sail_vlen<V> (--fast: VLEN = 256), and LLEN and BUS_WIDTH do
+not apply. The tests are built with make TARGET=sail, which skips the checks
+marked SKIP_ON_SAIL, and class_disabled/ does not run, since the model has no
+vector class parameters.
+
 The regression runs in two steps, both spread over -j/--jobs parallel jobs
 (default: the number of CPUs, at most 64):
   1. every test is built in its own folder,
-     app/baremetal/tests/vector-tests/build/<test>/, which keeps its test.bin
-     and test.lst; at the same time every configuration is elaborated once
+     app/baremetal/tests/vector-tests/build/<rs5|sail>/<test>/, which keeps its
+     test.bin and test.lst; at the same time every configuration is elaborated once
      into its own Xcelium library, xcelium_vlen<V>_llen<L>_bus<B>.d, and
      xcelium_vlen<V>_llen<L>_bus<B>_classoff.d for the tests in class_disabled/,
-     which run with every vector class parameter set to 0;
+     which run with every vector class parameter set to 0 (with --sail, a
+     Sail configuration with that VLEN is written instead);
   2. every (test, configuration) pair is simulated from that snapshot
-     (xrun -R), with the program given as +BIN_FILE=<path>.
+     (xrun -R), with the program given as +BIN_FILE=<path> (with --sail, by
+     sail_riscv_sim on the test's test.axf).
 Results are saved per configuration in
-  app/baremetal/tests/vector-tests/results/vlen<V>_llen<L>_bus<B>/{passed,failed}/<test>.txt
+  app/baremetal/tests/vector-tests/results/<configuration>/{passed,failed}/<test>.txt
 A simulation that runs longer than SIM_TIMEOUT seconds (300 by default) is
 killed and counted as failed, so a hung test does not stop the regression.
 A test that does not build is not simulated: the compiler output is saved as
@@ -67,9 +78,10 @@ FAST_CONFIGS = [
 TESTS_FOLDER = Path("../app/baremetal/tests/vector-tests")
 SOURCE_FOLDERS = [TESTS_FOLDER / "operations", TESTS_FOLDER / "mem_operations"]
 SUPPORT_FOLDER = TESTS_FOLDER / "test"  # headers and sources shared by every test
-BUILD_FILES = ["Makefile", "test.S", "rs5.ld"]
+BUILD_FILES = ["Makefile", "test.S", "rs5.ld", "sail.ld"]
 BUILD_FOLDER = TESTS_FOLDER / "build"
 RESULTS_FOLDER = TESTS_FOLDER / "results"
+SAIL_CONFIG = Path("sail_zve32x.json")  # VLEN = 512; vlen_exp is rewritten per VLEN
 
 # Tests in class_disabled/ run with every vector class parameter set to 0
 CLASS_PARAMETERS = [
@@ -90,7 +102,8 @@ class Test(NamedTuple):
 
 class Config(NamedTuple):
     name: str
-    params: tuple  # xrun arguments
+    params: tuple  # xrun arguments, or (Sail configuration file,) for the model
+    model: str = "rs5"  # "rs5" or "sail"
 
 
 class Result(NamedTuple):
@@ -123,7 +136,7 @@ def failure_reason(log, filename, timed_out, sim_timeout):
         cases = re.findall(r"^(Checking .*?)(?::|\.\.\.)?$", log[:failed.start()], re.MULTILINE)
         line = failed.group(0).strip()
         return "CHECK", f"{cases[-1]}: {line}" if cases else line
-    error = first_line(log, r"\*[EF],")
+    error = first_line(log, r"\*[EF],|[Ee]xception|[Ee]rror")
     return "SIM", error or "no PASSED or ERROR line in the log"
 
 
@@ -143,6 +156,25 @@ def make_config(vlen, llen, bus):
                   ("-defparam", f"testbench.VLEN={vlen}",
                    "-defparam", f"testbench.LLEN={llen}",
                    "-defparam", f"testbench.BUS_WIDTH={bus}"))
+
+
+def make_sail_config(vlen):
+    folder = BUILD_FOLDER / "sail"
+    return Config(f"sail_vlen{vlen}", (str(folder / f"sail_zve32x_vlen{vlen}.json"),), "sail")
+
+
+def write_sail_config(config, vlen):
+    """Write the Sail configuration of one VLEN; return "" or the error."""
+    if vlen < 32 or vlen & (vlen - 1):
+        return f"VLEN = {vlen} is not a power of 2 of at least 32"
+    text = SAIL_CONFIG.read_text()
+    text, count = re.subn(r'"vlen_exp": \d+', f'"vlen_exp": {vlen.bit_length() - 1}', text)
+    if count != 1:
+        return f"no single vlen_exp in {SAIL_CONFIG}"
+    path = Path(config.params[0])
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text)
+    return ""
 
 
 def library(config, classoff):
@@ -182,9 +214,9 @@ def run(command, output, timeout=None):
     return timed_out, process.returncode
 
 
-def build(test):
-    """Build a test in its own folder; return (built, compiler output)."""
-    folder = BUILD_FOLDER / test.file.stem
+def build(test, model):
+    """Build a test for RS5 or Sail in its own folder; return (built, compiler output)."""
+    folder = BUILD_FOLDER / model / test.file.stem
     shutil.rmtree(folder, ignore_errors=True)
     (folder / "test").mkdir(parents=True)
     for name in BUILD_FILES:
@@ -196,7 +228,7 @@ def build(test):
 
     log = folder / "build.log"
     with open(log, "w") as output:
-        _, returncode = run(["make", "-C", str(folder), "all"], output)
+        _, returncode = run(["make", "-C", str(folder), f"TARGET={model}", "all"], output)
     return returncode == 0, log.read_text(errors="replace")
 
 
@@ -213,12 +245,15 @@ def elaborate(config, classoff):
     return first_line(Path(log).read_text(errors="replace"), r"\*[EF],") or f"see sim/{log}"
 
 
-def simulate(test, config, sim_timeout):
+def simulate(test, config, sim_timeout, sail_sim):
     """Simulate a built test on one configuration, file the log, return its Result."""
     output_file = RESULTS_FOLDER / config.name / f"{test.file.stem}.txt"
-    bin_file = BUILD_FOLDER / test.file.stem / "test.bin"
-    command = ["xrun", "-R", "-xmlibdirname", library(config, test.classoff), "-l", "/dev/null",
-               f"+BIN_FILE={bin_file}"]
+    folder = BUILD_FOLDER / config.model / test.file.stem
+    if config.model == "sail":
+        command = [sail_sim, "--config", config.params[0], str(folder / "test.axf")]
+    else:
+        command = ["xrun", "-R", "-xmlibdirname", library(config, test.classoff), "-l", "/dev/null",
+                   f"+BIN_FILE={folder / 'test.bin'}"]
     with open(output_file, "w") as output:
         timed_out, _ = run(command, output, sim_timeout)
 
@@ -229,16 +264,22 @@ def simulate(test, config, sim_timeout):
     return Result(config.name, test.file.name, reason, detail)
 
 
-def run_regression(pool, tests, configs, sim_timeout):
-    """Build, elaborate and simulate; return the Results."""
-    builds = {test: pool.submit(build, test) for test in tests}
-    snapshots = {(config, classoff): pool.submit(elaborate, config, classoff)
-                 for config in configs for classoff in sorted({test.classoff for test in tests})}
+def run_regression(pool, tests, configs, sim_timeout, sail_sim, vlens):
+    """Build, elaborate (or write the Sail configurations) and simulate; return the Results."""
+    model = configs[0].model
+    builds = {test: pool.submit(build, test, model) for test in tests}
+    if model == "sail":
+        snapshots = {(config, False): pool.submit(write_sail_config, config, vlen)
+                     for config, vlen in zip(configs, vlens)}
+    else:
+        snapshots = {(config, classoff): pool.submit(elaborate, config, classoff)
+                     for config in configs for classoff in sorted({test.classoff for test in tests})}
 
     for (config, classoff), snapshot in snapshots.items():
         error = snapshot.result()
         if error:
-            print(f"{library(config, classoff)} elaboration failed: {error}", flush=True)
+            target = library(config, classoff) if config.model == "rs5" else config.params[0]
+            print(f"{target}: setup failed: {error}", flush=True)
 
     results = []
     simulations = {}
@@ -256,10 +297,10 @@ def run_regression(pool, tests, configs, sim_timeout):
             error = snapshots[(config, test.classoff)].result()
             if error:
                 log = RESULTS_FOLDER / config.name / "failed" / f"{test.file.stem}.txt"
-                log.write_text(f"Elaboration of {library(config, test.classoff)} failed: {error}\n")
-                results.append(Result(config.name, test.file.name, "SIM", f"elaboration: {error}"))
+                log.write_text(f"Setup of {config.name} failed: {error}\n")
+                results.append(Result(config.name, test.file.name, "SIM", f"setup: {error}"))
             else:
-                simulations[test].append(pool.submit(simulate, test, config, sim_timeout))
+                simulations[test].append(pool.submit(simulate, test, config, sim_timeout, sail_sim))
 
     for test, jobs in simulations.items():
         results += [job.result() for job in jobs]
@@ -281,9 +322,16 @@ def main():
                         help="run only the tests whose name matches this glob (repeatable)")
     parser.add_argument("-j", "--jobs", type=int, default=min(64, os.cpu_count() or 1),
                         metavar="N", help="parallel builds and simulations (default: %(default)s)")
+    parser.add_argument("--sail", action="store_true",
+                        help="run on the Sail reference model (Zve32x) instead of RS5")
     args = parser.parse_args()
     if args.fast and (args.vlen or args.llen or args.bus_width):
         parser.error("--fast cannot be combined with --vlen, --llen or --bus-width")
+    if args.sail and (args.llen or args.bus_width):
+        parser.error("--llen and --bus-width do not apply to --sail")
+    sail_sim = os.environ.get("SAIL_RISCV_SIM", "sail_riscv_sim")
+    if args.sail and not shutil.which(sail_sim):
+        parser.error(f"{sail_sim} not found: module load sail-riscv/0.12, or set SAIL_RISCV_SIM")
     if args.jobs < 1:
         parser.error("--jobs must be at least 1")
 
@@ -297,10 +345,17 @@ def main():
                    for vlen in args.vlen or env_list("VLENS", "128 256 512")
                    for llen in args.llen or env_list("LLENS", "32 64 128")
                    for bus in args.bus_width or env_list("BUS_WIDTHS", "32 64 128")]
-    configs = [make_config(*triple) for triple in triples]
+    if args.sail:
+        # Only VLEN applies to the model
+        vlens = sorted({vlen for vlen, _, _ in triples})
+        configs = [make_sail_config(vlen) for vlen in vlens]
+    else:
+        vlens = []
+        configs = [make_config(*triple) for triple in triples]
 
     tests = [Test(file, False) for folder in SOURCE_FOLDERS for file in sorted(folder.glob("*.c"))]
-    tests += [Test(file, True) for file in sorted((TESTS_FOLDER / "class_disabled").glob("*.c"))]
+    if not args.sail:
+        tests += [Test(file, True) for file in sorted((TESTS_FOLDER / "class_disabled").glob("*.c"))]
     tests = [test for test in tests if selected(test.file, args.patterns)]
     if not tests:
         parser.error(f"no test matches {' '.join(args.patterns)}")
@@ -318,7 +373,7 @@ def main():
 
     pool = ThreadPoolExecutor(max_workers=args.jobs)
     try:
-        results = run_regression(pool, tests, configs, sim_timeout)
+        results = run_regression(pool, tests, configs, sim_timeout, sail_sim, vlens)
     except KeyboardInterrupt:
         pool.shutdown(wait=False, cancel_futures=True)
         with running_lock:

@@ -156,7 +156,7 @@ With `--fast` it runs only three configurations (`VLEN`/`LLEN`/`BUS_WIDTH`): 256
 `--vlen`, `--llen` and `--bus-width` choose the values on the command line, and `-k PATTERN` runs only the tests whose name matches the glob (repeatable).
 With `-k`, the logs of the other tests in `results/` are kept.
 The work runs in parallel over `-j N` jobs (default: the number of CPUs, at most 64), in two steps:
-- each test is built in its own folder, `app/baremetal/tests/vector-tests/build/<test>/`, which keeps its `test.bin` and `test.lst`, while each configuration is elaborated once into its own Xcelium library (`sim/xcelium_vlen<V>_llen<L>_bus<B>.d`, plus `..._classoff.d` for the tests in `class_disabled`);
+- each test is built in its own folder, `app/baremetal/tests/vector-tests/build/rs5/<test>/`, which keeps its `test.bin` and `test.lst`, while each configuration is elaborated once into its own Xcelium library (`sim/xcelium_vlen<V>_llen<L>_bus<B>.d`, plus `..._classoff.d` for the tests in `class_disabled`);
 - every test and configuration pair is simulated from that snapshot with `xrun -R +BIN_FILE=<path>`, so the slowest configuration of one test does not hold up the others.
 The tests in [class_disabled](app/baremetal/tests/vector-tests/class_disabled) also run on every configuration, with all vector class parameters set to 0.
 Each log goes to `app/baremetal/tests/vector-tests/results/vlen<V>_llen<L>_bus<B>/passed` or `.../failed`, and the script ends with a pass/fail count per configuration and one line per failure with its reason:
@@ -185,6 +185,22 @@ VLENS=512 LLENS=32 BUS_WIDTHS=32 ./vector_regression.py  # a single configuratio
 ./vector_regression.py --fast -k vmseq -k 'vl*'          # only the tests that match
 ./vector_regression.py -j 16                             # at most 16 parallel jobs
 ```
+
+#### Reference model
+
+`--sail` runs the same tests on the [Sail RISC-V](https://github.com/riscv/sail-riscv) model instead of RS5, to check the expected values against a reference:
+
+```bash
+module load sail-riscv/0.12   # or set SAIL_RISCV_SIM to the sail_riscv_sim binary
+cd sim
+./vector_regression.py --sail                # VLEN 128, 256 and 512
+./vector_regression.py --sail --vlen 512 -k vmseq
+```
+
+[sim/sail_zve32x.json](sim/sail_zve32x.json) configures the model as RV32 with Zve32x (integer vectors, ELEN = 32), and the script rewrites its VLEN for each run.
+The tests are built with `make TARGET=sail` ([sail.ld](app/baremetal/tests/vector-tests/sail.ld) links them at `0x80000000`, and the console and the exit go through the model's `tohost`), into `build/sail/<test>/`, and the results go to `results/sail_vlen<V>/`.
+`LLEN` and `BUS_WIDTH` do not apply, and `class_disabled` does not run.
+A few checks are wrapped in `SKIP_ON_SAIL(...)` in the tests, where the model differs from RS5 for a reason given next to each one: Sail 0.12 deviations from RVV 1.0, choices the spec leaves to the implementation, and instructions RS5 does not implement yet.
 
 ---
 
