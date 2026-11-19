@@ -3,10 +3,15 @@
 _entry:
     /* Globally disable interrupts. When misa.V is set, also set       */
     /* mstatus.VS = Initial, otherwise vector instructions would trap. */
+#ifdef SAIL
+    /* The Sail model is configured as Zve32x, which leaves misa.V clear */
+    li   t0, 0x200
+#else
     csrr t0, misa
     srli t0, t0, 21
     andi t0, t0, 1
     slli t0, t0, 9
+#endif
     csrw mstatus, t0
     /* Install the trap handler used by the illegal-instruction tests */
     la   t0, trap_handler
@@ -58,6 +63,18 @@ _entry:
 
 	jal main
 
+#ifdef SAIL
+	/* The Sail model stops when tohost = (exit code << 1) | 1. On RV32 */
+	/* the model acts on the write of the upper word.                   */
+	slli a0, a0, 1
+	ori  a0, a0, 1
+	la   t0, tohost
+	sw   a0, 0(t0)
+	sw   zero, 4(t0)
+.sail_end:
+	jal zero, .sail_end
+#endif
+
 	li a0,0x80001000
 	addi a1,zero,'D'
 	addi a2,zero,'O'
@@ -98,6 +115,19 @@ trap_handler:
 	lw   t1, 0(t0)
 	csrr t0, mscratch
 	mret
+
+#ifdef SAIL
+/* Host-target interface of the Sail model, found through these symbols */
+	.section .tohost, "aw"
+	.align 6
+	.global tohost
+tohost:
+	.dword 0
+	.align 6
+	.global fromhost
+fromhost:
+	.dword 0
+#endif
 
 /* trap_save layout: { t1 spill, count, mcause, mepc, mtval } */
 	.data
