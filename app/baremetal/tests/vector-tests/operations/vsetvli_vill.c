@@ -46,7 +46,9 @@ void TEST_CASE1(void) {
   // vadd.vv v1, v2, v3 depends on vtype
   EXPECT_ILLEGAL(2, 0x022180d7);
   // vmv2r.v v2, v4 and vl1re8.v v1, (a0) do not
-  EXPECT_LEGAL(3, 0x9e40b157);
+  // RVV 1.0 lists whole-register moves among the instructions that do not depend on vtype;
+  // Sail 0.12 follows the later text that drops them and traps when vill is set
+  SKIP_ON_SAIL(EXPECT_LEGAL(3, 0x9e40b157));
   EXPECT_LEGAL(4, 0x02850087);
 }
 
@@ -91,7 +93,7 @@ void TEST_CASE4(void) {
   EXPECT_ILLEGAL(23, 0x02050087); // vle8.v v1, (a0)
   EXPECT_ILLEGAL(24, 0x02b50087); // vlm.v v1, (a0)
   EXPECT_ILLEGAL(25, 0x02b500a7); // vsm.v v1, (a0)
-  EXPECT_LEGAL(26, 0x9e40b157);   // vmv2r.v v2, v4
+  SKIP_ON_SAIL(EXPECT_LEGAL(26, 0x9e40b157)); // vmv2r.v v2, v4 (Sail traps, see case 3)
   EXPECT_LEGAL(27, 0x22850107);   // vl2re8.v v2, (a0)
   EXPECT_LEGAL(28, 0x028500a7);   // vs1r.v v1, (a0)
   // vsetvli clears vill

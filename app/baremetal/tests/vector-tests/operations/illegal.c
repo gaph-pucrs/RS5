@@ -29,7 +29,8 @@ void TEST_CASE1(void) {
   EXPECT_ILLEGAL(14, 0x9e20b0d7); // vmv2r.v v1, v2 (vd not aligned)
   EXPECT_ILLEGAL(15, 0x9e30b157); // vmv2r.v v2, v3 (vs2 not aligned)
   EXPECT_ILLEGAL(16, 0x9c2030d7); // vmv1r.v with vm = 0
-  EXPECT_ILLEGAL(17, 0x9e2000d7); // vmv1r.v as .vv
+  // vsmul.vv v1, v2, v0 (vmv<nr>r has no .vv form): RS5 does not implement vsmul yet
+  SKIP_ON_SAIL(EXPECT_ILLEGAL(17, 0x9e2000d7));
   EXPECT_ILLEGAL(18, 0x82d675d7); // vsetvl with funct7 != 1000000
   EXPECT_ILLEGAL(19, 0x00110057); // vadd.vv v0, v1, v2, v0.t (vd = v0)
   EXPECT_ILLEGAL(20, 0x5c110057); // vmerge.vvm v0, v1, v2, v0 (vd = v0)
@@ -41,10 +42,11 @@ void TEST_CASE1(void) {
   EXPECT_ILLEGAL(26, 0x02057087); // vle64.v (EEW = 64)
   EXPECT_ILLEGAL(27, 0x020570a7); // vse64.v (EEW = 64)
   EXPECT_ILLEGAL(28, 0x12050087); // vle8.v with mew = 1
-  EXPECT_ILLEGAL(29, 0x22050107); // vlseg2e8.v (segment, until P8)
-  EXPECT_ILLEGAL(30, 0x2ab50107); // vlsseg2e8.v (segment, until P8)
-  EXPECT_ILLEGAL(31, 0x22050127); // vsseg2e8.v (segment, until P8)
-  EXPECT_ILLEGAL(32, 0x03050087); // vle8ff.v (fault-only-first, until P8)
+  // Segments and fault-only-first are legal in Zve32x and run on Sail; RS5 traps until P8
+  SKIP_ON_SAIL(EXPECT_ILLEGAL(29, 0x22050107)); // vlseg2e8.v
+  SKIP_ON_SAIL(EXPECT_ILLEGAL(30, 0x2ab50107)); // vlsseg2e8.v
+  SKIP_ON_SAIL(EXPECT_ILLEGAL(31, 0x22050127)); // vsseg2e8.v
+  SKIP_ON_SAIL(EXPECT_ILLEGAL(32, 0x03050087)); // vle8ff.v
   EXPECT_ILLEGAL(33, 0x02150087); // unit-stride load lumop 00001
   EXPECT_ILLEGAL(34, 0x030500a7); // unit-stride store sumop 10000
   EXPECT_ILLEGAL(35, 0x42850207); // vl3re8.v (nf = 2)
@@ -59,7 +61,9 @@ void TEST_CASE1(void) {
   EXPECT_ILLEGAL(44, 0x04250007); // vluxei8.v v0, (a0), v2, v0.t (vd = v0)
   EXPECT_LEGAL(45, 0x022180d7); // vadd.vv v1, v2, v3
   EXPECT_LEGAL(46, 0x60110057); // vmseq.vv v0, v1, v2, v0.t (mask dest)
-  EXPECT_LEGAL(47, 0x00802057); // vredsum.vs v0, v8, v0, v0.t (reduction)
+  // vredsum.vs v0, v8, v0, v0.t: RVV 1.0 lets a masked reduction write its scalar
+  // result to v0; Sail 0.12 traps
+  SKIP_ON_SAIL(EXPECT_LEGAL(47, 0x00802057));
   EXPECT_LEGAL(48, 0x422025d7); // vmv.x.s a1, v2
   EXPECT_LEGAL(49, 0x4205e0d7); // vmv.s.x v1, a1
   EXPECT_LEGAL(50, 0x9e40b157); // vmv2r.v v2, v4
@@ -89,8 +93,9 @@ void TEST_CASE2(void) {
   EXPECT_ILLEGAL(110, 0xee822257); // vwmul.vv v4, v8, v4 (vs1 in low half of vd)
   EXPECT_LEGAL(111, 0xee642257); // vwmul.vv v4, v6, v8 (vs2 in high half of vd)
   EXPECT_LEGAL(112, 0xee852257); // vwmul.vv v4, v8, v10
-  EXPECT_ILLEGAL(113, 0x622201d7); // vmseq.vv v3, v2, v4 (vd inside vs2 group)
-  EXPECT_ILLEGAL(114, 0x622202d7); // vmseq.vv v5, v2, v4 (vd inside vs1 group)
+  // Reserved overlaps: RS5 traps, Sail does not check them, and RVV 1.0 allows both
+  SKIP_ON_SAIL(EXPECT_ILLEGAL(113, 0x622201d7)); // vmseq.vv v3, v2, v4 (vd inside vs2 group)
+  SKIP_ON_SAIL(EXPECT_ILLEGAL(114, 0x622202d7)); // vmseq.vv v5, v2, v4 (vd inside vs1 group)
   EXPECT_LEGAL(115, 0x62220157); // vmseq.vv v2, v2, v4 (vd = lowest of vs2)
   EXPECT_LEGAL(116, 0x622200d7); // vmseq.vv v1, v2, v4
   EXPECT_ILLEGAL(117, 0x0230a0d7); // vredsum.vs v1, v3, v1 (vs2 not aligned)

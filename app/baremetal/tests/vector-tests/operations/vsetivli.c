@@ -440,15 +440,16 @@ int main(void) {
   TEST_CASE5();
   TEST_CASE6();
   TEST_CASE7();
-  TEST_CASE8();
+  // Sail 0.12 accepts SEW = 64 > ELEN = 32 when LMUL > 1; Zve32x has no SEW = 64, so RVV 1.0 sets vill
+  SKIP_ON_SAIL(TEST_CASE8());
   TEST_CASE9();
   TEST_CASE10();
   TEST_CASE11();
-  TEST_CASE12();
+  SKIP_ON_SAIL(TEST_CASE12());
   TEST_CASE13();
   TEST_CASE14();
   TEST_CASE15();
-  TEST_CASE16();
+  SKIP_ON_SAIL(TEST_CASE16());
   TEST_CASE17();
   TEST_CASE18();
   TEST_CASE19();

@@ -66,8 +66,9 @@ void TEST_CASE2(void) {
   CHECK_EQ(7, v, 1);
   // vadd.vv v1, v2, v3 with vstart != 0 is illegal
   EXPECT_ILLEGAL(8, 0x022180d7);
-  // vle8.v v1, (a0) as well
-  EXPECT_ILLEGAL(9, 0x02050087);
+  // vle8.v v1, (a0) as well. RS5 never produces vstart != 0 for a load, so
+  // RVV 1.0 lets it trap; Sail executes it, which the spec also allows
+  SKIP_ON_SAIL(EXPECT_ILLEGAL(9, 0x02050087));
   // vsetvli executes and clears vstart
   traps_before = trap_save[1];
   VSET(16, e8, m1);

@@ -13,6 +13,17 @@
 #include "encoding.h"
 //#include "float_conversion.h"
 
+// SKIP_ON_SAIL(statement) drops statement when the test is built for the Sail
+// reference model (make TARGET=sail). It marks the few checks where the model
+// legitimately differs from RS5: Sail 0.12 deviations from RVV 1.0, choices
+// the spec leaves to the implementation, and instructions RS5 does not
+// implement yet. Each use says why.
+#ifdef SAIL
+#define SKIP_ON_SAIL(statement) do { } while (0)
+#else
+#define SKIP_ON_SAIL(statement) statement
+#endif
+
 #ifdef __SPIKE__
 #include <stdio.h>
 
