@@ -62,6 +62,13 @@ module CSRBank
 
     input   logic [31:0]        vtype_i,
     input   logic [31:0]        vlen_i,
+    /* One-cycle pulse when a vector instruction completes without a trap */
+    /* Not used without the vector unit */
+    /* verilator lint_off UNUSEDSIGNAL */
+    input   logic               vector_dirty_i,
+    /* verilator lint_on UNUSEDSIGNAL */
+    output  logic [1:0]         mstatus_vs_o,
+    output  logic               vstart_nonzero_o,
 
     input   logic               raise_exception_i,
     input   logic               machine_return_i,
@@ -117,7 +124,8 @@ module CSRBank
         2'b0,                        // YZ - Reserved
         XOSVMEnable || XKYBEREnable, // X - Non-standard extensions present
         1'b0,                        // W - Reserved
-        VEnable,                     // V - Vector extension
+        1'b0,                        // V - Vector extension: only the full V sets it,
+                                     //     and the vector unit implements Zve32x
         1'b1,                        // U - User mode implemented
         1'b0,                        // T - Reserved
         1'b0,                        // S - Supervisor mode implemented
@@ -195,9 +203,36 @@ module CSRBank
         end
     end
 
+    /* mstatus.VS: Off (00), Initial (01), Clean (10), Dirty (11). It resets */
+    /* to Initial so code that never writes mstatus can use the vector unit. */
+    logic [1:0] mstatus_vs;
+    if (VEnable) begin : gen_mstatus_vs_on
+        /* Writes to the vector CSRs also make the vector state Dirty */
+        logic vector_csr_write;
+        assign vector_csr_write = write_enable_i && (address_i inside {VSTART, VXSAT, VXRM, VCSR});
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                mstatus_vs <= 2'b01;
+            else if (sys_reset)
+                mstatus_vs <= 2'b01;
+            else begin
+                if (write_enable_i && address_i == MSTATUS)
+                    mstatus_vs <= wr_data[10:9];
+                else if (vector_dirty_i || vector_csr_write)
+                    mstatus_vs <= 2'b11;
+            end
+        end
+    end
+    else begin : gen_mstatus_vs_off
+        assign mstatus_vs = 2'b00;
+    end
+
+    assign mstatus_vs_o = mstatus_vs;
+
     logic [31:0] mstatus;
     assign mstatus = {
-        1'b0,        // SD
+        (mstatus_vs == 2'b11), // SD: FS and XS are always Off
         8'b0,        // WPRI
         1'b0,        // TSR
         1'b0,        // TW
@@ -208,7 +243,7 @@ module CSRBank
         2'b0,        // XS
         2'b0,        // FS
         mstatus_mpp, // MPP
-        2'b0,        // VS
+        mstatus_vs,  // VS
         1'b0,        // SPP
         mstatus_mpie,// MPIE
         1'b0,        // UBE
@@ -219,6 +254,61 @@ module CSRBank
         1'b0,        // SIE
         1'b0         // WPRI
     };
+
+////////////////////////////////////////////////////////////////////////////////
+// Vector CSRs: vstart, vxrm, vxsat, vcsr (vl, vtype and vlenb come from the vector unit)
+////////////////////////////////////////////////////////////////////////////////
+
+    /* vstart holds an element index below VLMAX <= VLEN. The core never     */
+    /* writes a nonzero value (a vector instruction with vstart != 0 traps), */
+    /* and every vector instruction that completes clears it.                */
+    logic [$clog2(VLEN)-1:0] vstart;
+    logic [1:0]              vxrm;
+    logic                    vxsat;
+
+    if (VEnable) begin : gen_vector_csrs_on
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                vstart <= '0;
+            else if (sys_reset)
+                vstart <= '0;
+            else begin
+                if (write_enable_i && address_i == VSTART)
+                    vstart <= wr_data[$clog2(VLEN)-1:0];
+                else if (vector_dirty_i)
+                    vstart <= '0;
+            end
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n) begin
+                vxrm  <= '0;
+                vxsat <= '0;
+            end
+            else if (sys_reset) begin
+                vxrm  <= '0;
+                vxsat <= '0;
+            end
+            else if (write_enable_i) begin
+                /* vcsr = {vxrm, vxsat} */
+                if (address_i == VCSR) begin
+                    vxrm  <= wr_data[2:1];
+                    vxsat <= wr_data[0];
+                end
+                else if (address_i == VXRM)
+                    vxrm  <= wr_data[1:0];
+                else if (address_i == VXSAT)
+                    vxsat <= wr_data[0];
+            end
+        end
+    end
+    else begin : gen_vector_csrs_off
+        assign vstart = '0;
+        assign vxrm   = '0;
+        assign vxsat  = '0;
+    end
+
+    assign vstart_nonzero_o = (vstart != '0);
 
 ////////////////////////////////////////////////////////////////////////////////
 // mtvec
@@ -1404,7 +1494,10 @@ module CSRBank
             MENVCFGH:       current_val = menvcfg[63:32];
 
             /* V CSRs */
-            VSTART:         current_val = '0;
+            VSTART:         current_val = 32'(vstart);
+            VXSAT:          current_val = {31'b0, vxsat};
+            VXRM:           current_val = {30'b0, vxrm};
+            VCSR:           current_val = {29'b0, vxrm, vxsat};
             VLENBYTES:      current_val = VEnable ? VLEN/8 : '0;
             VTYPE:          current_val = vtype_i;
             VL:             current_val = vlen_i;

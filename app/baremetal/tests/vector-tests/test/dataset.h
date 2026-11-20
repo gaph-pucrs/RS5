@@ -9,6 +9,9 @@
 
 #define SIZE 16
 #define L_SIZE 1024
+// Result buffers hold a whole store of the largest register group the tests
+// use (LMUL = 8 at VLEN = 512)
+#define R_BYTES 512
 
 static volatile uint64_t Au64[SIZE] __attribute__((aligned(128)));
 static volatile uint32_t Au32[SIZE] __attribute__((aligned(128)));
@@ -22,17 +25,17 @@ static volatile uint64_t Af64[SIZE] __attribute__((aligned(128)));
 static volatile uint32_t Af32[SIZE] __attribute__((aligned(128)));
 static volatile uint16_t Af16[SIZE] __attribute__((aligned(128)));
 
-static volatile uint64_t Ru64[SIZE] __attribute__((aligned(128)));
-static volatile uint32_t Ru32[SIZE] __attribute__((aligned(128)));
-static volatile uint16_t Ru16[SIZE] __attribute__((aligned(128)));
-static volatile uint8_t  Ru8 [SIZE] __attribute__((aligned(128)));
-static volatile int64_t  Ri64[SIZE] __attribute__((aligned(128)));
-static volatile int32_t  Ri32[SIZE] __attribute__((aligned(128)));
-static volatile int16_t  Ri16[SIZE] __attribute__((aligned(128)));
-static volatile int8_t   Ri8 [SIZE] __attribute__((aligned(128)));
-static volatile uint64_t Rf64[SIZE] __attribute__((aligned(128)));
-static volatile uint32_t Rf32[SIZE] __attribute__((aligned(128)));
-static volatile uint16_t Rf16[SIZE] __attribute__((aligned(128)));
+static volatile uint64_t Ru64[R_BYTES / 8] __attribute__((aligned(128)));
+static volatile uint32_t Ru32[R_BYTES / 4] __attribute__((aligned(128)));
+static volatile uint16_t Ru16[R_BYTES / 2] __attribute__((aligned(128)));
+static volatile uint8_t  Ru8 [R_BYTES / 1] __attribute__((aligned(128)));
+static volatile int64_t  Ri64[R_BYTES / 8] __attribute__((aligned(128)));
+static volatile int32_t  Ri32[R_BYTES / 4] __attribute__((aligned(128)));
+static volatile int16_t  Ri16[R_BYTES / 2] __attribute__((aligned(128)));
+static volatile int8_t   Ri8 [R_BYTES / 1] __attribute__((aligned(128)));
+static volatile uint64_t Rf64[R_BYTES / 8] __attribute__((aligned(128)));
+static volatile uint32_t Rf32[R_BYTES / 4] __attribute__((aligned(128)));
+static volatile uint16_t Rf16[R_BYTES / 2] __attribute__((aligned(128)));
 
 static volatile uint64_t Lu64[L_SIZE] __attribute__((aligned(128)));
 static volatile uint32_t Lu32[L_SIZE] __attribute__((aligned(128)));

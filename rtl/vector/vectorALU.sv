@@ -16,17 +16,17 @@
 module vectorALU
     import RS5_pkg::*;
 #(
-    parameter int VLEN                   = 64,
-    parameter int LLEN                   = 32,
-    parameter int VLENB                  = 8,
-    parameter bit V_LOGIC_ON             = 1'b1,
-    parameter bit V_MINMAX_ON            = 1'b1,
-    parameter bit V_REDLOGIC_ON          = 1'b1,
-    parameter bit V_REDMINMAX_ON         = 1'b1,
-    parameter bit V_REDSUM_ON            = 1'b1,
-    parameter bit V_MERGE_ON             = 1'b1,
-    parameter bit V_DIV_ON               = 1'b1,
-    parameter bit MULTI_CYCLE_REDUCTIONS = 1'b0
+    parameter int VLEN                  = 64,
+    parameter int LLEN                  = 32,
+    parameter int VLENB                 = 8,
+    parameter bit VLogicEnable          = 1'b1,
+    parameter bit VMinMaxEnable         = 1'b1,
+    parameter bit VRedLogicEnable       = 1'b1,
+    parameter bit VRedMinMaxEnable      = 1'b1,
+    parameter bit VRedSumEnable         = 1'b1,
+    parameter bit VMergeEnable          = 1'b1,
+    parameter bit VDivEnable            = 1'b1,
+    parameter bit VMultiCycleReductions = 1'b0
 ) (
     input  logic                        clk,
     input  logic                        reset_n,
@@ -130,12 +130,12 @@ module vectorALU
                                      :  second_operand[31:0];
 
     vectorReductions #(
-            .VLEN            (VLEN),
-            .VLENB           (VLENB),
-            .V_REDSUM_ON     (V_REDSUM_ON),
-            .V_REDLOGIC_ON   (V_REDLOGIC_ON),
-            .V_REDMINMAX_ON  (V_REDMINMAX_ON),
-            .MULTI_CYCLE     (MULTI_CYCLE_REDUCTIONS)
+            .VLEN                  (VLEN),
+            .VLENB                 (VLENB),
+            .VRedSumEnable         (VRedSumEnable),
+            .VRedLogicEnable       (VRedLogicEnable),
+            .VRedMinMaxEnable      (VRedMinMaxEnable),
+            .VMultiCycleReductions (VMultiCycleReductions)
     )   u_vector_reductions (
             .clk               (clk),
             .reset_n           (reset_n),
@@ -219,7 +219,7 @@ module vectorALU
 
     logic div_enable;
 
-    if (V_DIV_ON) begin : v_div_common_gen_on
+    if (VDivEnable) begin : v_div_common_gen_on
         assign div_enable = (vector_operation_i inside {VDIV, VDIVU, VREM, VREMU} && current_state == V_EXEC);
     end
     else begin : v_div_common_gen_off
@@ -236,16 +236,21 @@ module vectorALU
     logic [   VLEN -1:0]    result_lanes;
     logic [   VLEN -1:0]    result_mult_low;
 
-    assign enable_lane = current_state == V_EXEC && vector_operation_i != VNOP && !hold_widening_r && !hold_accumulation_r && !reduction_instruction && !slide_instruction;
+    /* The lanes stop in the extra cycle of a compare (hold_mask_r): with      */
+    /* LLEN > 32 a lane that kept running would restart its element counter, */
+    /* raise hold_llen again and re-arm hold_mask, so the compare never ends. */
+    /* Loads and stores do not use the lanes: with LLEN > 32 a running lane */
+    /* raises hold_llen and breaks the LSU sequencing.                      */
+    assign enable_lane = current_state == V_EXEC && !(vector_operation_i inside {VNOP, VLD, VST}) && !hold_widening_r && !hold_accumulation_r && !hold_mask_r && !reduction_instruction && !slide_instruction;
 
     generate
         for (genvar i_lane = 0; i_lane < LANES; i_lane++) begin : LANE_LOOP
             vectorLane #(
-                .LLEN        (LLEN),
-                .V_LOGIC_ON  (V_LOGIC_ON),
-                .V_MINMAX_ON (V_MINMAX_ON),
-                .V_MERGE_ON  (V_MERGE_ON),
-                .V_DIV_ON    (V_DIV_ON)
+                .LLEN          (LLEN),
+                .VLogicEnable  (VLogicEnable),
+                .VMinMaxEnable (VMinMaxEnable),
+                .VMergeEnable  (VMergeEnable),
+                .VDivEnable    (VDivEnable)
             )   u_vectorLane (
                 .clk               (clk),
                 .reset_n           (reset_n),

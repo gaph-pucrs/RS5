@@ -9,7 +9,8 @@
  * RAM_mem holds at most 2**28 bytes. RamArray splits the address space into
  * contiguous banks: the upper address bits select the bank (chip enable),
  * the lower bits address the byte inside it. Bank k is loaded with BIN_FILE
- * starting at file offset k * 2**BANK_ADDR_BITS.
+ * starting at file offset k * 2**BANK_ADDR_BITS. +BIN_FILE=<path> on the
+ * simulator command line overrides BIN_FILE, as in RAM_mem.
  *
  * Accesses must not cross a bank boundary. RS5 addresses are word aligned,
  * so this holds for BUS_WIDTH = 32.
@@ -80,7 +81,7 @@ module RamArray
             RAM_mem #(
                 .MEM_WIDTH (1 << BANK_ADDR_BITS),
                 .BUS_WIDTH (BUS_WIDTH          ),
-                .BIN_FILE  ("/dev/null"        )
+                .BIN_FILE  (""                 )
             ) mem (
                 .clk     (clk                              ),
                 .enA_i   (enA_i && selA == k               ),
@@ -98,14 +99,17 @@ module RamArray
             initial begin
                 int fd;
                 longint offset;
+                string bin_file;
+                bin_file = BIN_FILE;
+                void'($value$plusargs("BIN_FILE=%s", bin_file));
                 offset = longint'(k) << BANK_ADDR_BITS;
-                fd = $fopen(BIN_FILE, "r");
+                fd = $fopen(bin_file, "r");
                 if (fd == '0) begin
-                    $display("[%d] [RamArray] ERROR: %s not found.", $time(), BIN_FILE);
+                    $display("[%d] [RamArray] ERROR: %s not found.", $time(), bin_file);
                     $finish();
                 end
 
-                /* Banks past the end of BIN_FILE stay empty */
+                /* Banks past the end of the file stay empty */
                 void'($fseek(fd, 0, 2));
                 if (offset < $ftell(fd)) begin
                     void'($fseek(fd, int'(offset), 0));

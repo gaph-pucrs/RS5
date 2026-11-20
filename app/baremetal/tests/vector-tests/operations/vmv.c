@@ -108,14 +108,14 @@ static volatile uint32_t VM2_I32_2[32] = {
 
 void TEST_CASE4(void) {
   VSET(32, e32, m2);
-  VLOAD_32(v1, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
-  asm volatile("vmv.v.v v3, v1");
-  LVCMP_U32(13, v3, 32, VM2_I32);
+  VLOAD_32(v4, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  asm volatile("vmv.v.v v6, v4");
+  LVCMP_U32(13, v6, 32, VM2_I32);
 
   const uint32_t scalar = 0xdeadbeef;
   VSET(32, e32, m2);
-  asm volatile("vmv.v.x v3, %[A]" ::[A] "r"(scalar));
-  LVCMP_U32(14, v3, 32, VM2_I32_2);
+  asm volatile("vmv.v.x v4, %[A]" ::[A] "r"(scalar));
+  LVCMP_U32(14, v4, 32, VM2_I32_2);
 };
 
 int main(void) {

@@ -49,16 +49,23 @@ module RAM_mem
 
     reg [7:0] RAM [0:MEM_WIDTH-1];
 
+    /* +BIN_FILE=<path> on the simulator command line overrides BIN_FILE, so one */
+    /* elaborated snapshot runs any program. An empty BIN_FILE loads nothing.   */
     initial begin
         int fd;
-        fd = $fopen (BIN_FILE, "r");
-        if (fd == '0) begin
-            $display("[%d] [RAM_mem] ERROR: %s not found.", $time(), BIN_FILE);
-            $finish();
-        end
+        string bin_file;
+        bin_file = BIN_FILE;
+        if (BIN_FILE != "") begin
+            void'($value$plusargs("BIN_FILE=%s", bin_file));
+            fd = $fopen (bin_file, "r");
+            if (fd == '0) begin
+                $display("[%d] [RAM_mem] ERROR: %s not found.", $time(), bin_file);
+                $finish();
+            end
 
-        void'($fread(RAM, fd));
-        $fclose(fd);
+            void'($fread(RAM, fd));
+            $fclose(fd);
+        end
     end
 
     /* Write */
