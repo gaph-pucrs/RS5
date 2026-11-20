@@ -1,17 +1,11 @@
 	.section .text.init
 	.global _entry
 _entry:
-    /* Globally disable interrupts. When misa.V is set, also set       */
-    /* mstatus.VS = Initial, otherwise vector instructions would trap. */
-#ifdef SAIL
-    /* The Sail model is configured as Zve32x, which leaves misa.V clear */
+    /* Globally disable interrupts and set mstatus.VS = Initial, otherwise */
+    /* vector instructions would trap. misa.V cannot tell whether vectors  */
+    /* exist, since Zve32x leaves it clear; without vectors, mstatus.VS is */
+    /* read-only zero and the write has no effect.                         */
     li   t0, 0x200
-#else
-    csrr t0, misa
-    srli t0, t0, 21
-    andi t0, t0, 1
-    slli t0, t0, 9
-#endif
     csrw mstatus, t0
     /* Install the trap handler used by the illegal-instruction tests */
     la   t0, trap_handler
