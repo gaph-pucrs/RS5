@@ -104,6 +104,7 @@ puts "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 								../rtl/amo.sv 							\
 								../rtl/CSRBank.sv 						\
 								../rtl/decode.sv 						\
+								../rtl/vectorDecode.sv					\
 								../rtl/decompresser.sv 					\
 								../rtl/div.sv 							\
 								../rtl/mul.sv 							\
