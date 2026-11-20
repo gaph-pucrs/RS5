@@ -260,6 +260,13 @@ package RS5_pkg;
         VST             // Vector store (was iType_e VSTORE)
     } iTypeVector_e;
 
+    /* A masked vector instruction cannot write v0, unless it writes a mask */
+    /* (compares) or a scalar element (reductions)                          */
+    function automatic logic writes_mask_or_scalar(iTypeVector_e op);
+        return op inside {VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT,
+                          VREDSUM, VREDAND, VREDOR, VREDXOR, VREDMINU, VREDMIN, VREDMAXU, VREDMAX};
+    endfunction
+
     typedef struct packed {
         // AMO operation select (one-hot, AMONOP when unused)
         iTypeAtomic_e amo_op;
