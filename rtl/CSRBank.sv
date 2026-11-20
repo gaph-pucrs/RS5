@@ -124,7 +124,8 @@ module CSRBank
         2'b0,                        // YZ - Reserved
         XOSVMEnable || XKYBEREnable, // X - Non-standard extensions present
         1'b0,                        // W - Reserved
-        VEnable,                     // V - Vector extension
+        1'b0,                        // V - Vector extension: only the full V sets it,
+                                     //     and the vector unit implements Zve32x
         1'b1,                        // U - User mode implemented
         1'b0,                        // T - Reserved
         1'b0,                        // S - Supervisor mode implemented

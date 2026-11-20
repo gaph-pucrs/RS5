@@ -8,6 +8,8 @@
 //  - mstatus.VS goes to Dirty (and SD to 1) after a vector instruction or a
 //    write to a vector CSR
 //  - with mstatus.VS = Off, vector instructions and vector CSR accesses trap
+//  - misa.V is clear: it is set only for the full V extension, and Zve32x
+//    (ELEN = 32, no floating point) is not V
 
 #include <stdint.h>
 
@@ -132,6 +134,13 @@ void TEST_CASE4(void) {
   CHECK_EQ(18, v & MSTATUS_VS, 0x200);
 }
 
+// misa.V
+void TEST_CASE5(void) {
+  unsigned long v;
+  asm volatile("csrr %0, misa" : "=r"(v));
+  CHECK_EQ(19, (v >> 21) & 1, 0);
+}
+
 int main(void) {
   INIT_CHECK();
   enable_vec();
@@ -140,6 +149,7 @@ int main(void) {
   TEST_CASE2();
   TEST_CASE3();
   TEST_CASE4();
+  TEST_CASE5();
 
   EXIT_CHECK();
 }
