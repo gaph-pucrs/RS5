@@ -282,7 +282,7 @@ module vectorUnit
     /* Unit-stride and strided loads/stores: data group aligned to EMUL, checked */
     /* only for EEW = SEW (EMUL = LMUL). Indexed: data (EEW = SEW) aligned to     */
     /* LMUL, offsets checked only for an index EEW = SEW. The other EEW != SEW    */
-    /* cases and the destination/index overlap rules are P8.                      */
+    /* cases and the destination/index overlap rules are not implemented yet.     */
     logic mem_illegal;
     logic mem_eew_is_sew;
     logic mem_checked;

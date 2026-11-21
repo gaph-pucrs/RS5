@@ -201,9 +201,9 @@ package RS5_pkg;
         ZBKBREV8  = 12'b100000000000
     } iTypeZbkb_e;
 
-    /* Vector operation select. The entries after VSLIDE1DOWN are declared */
-    /* for the Zve32x packages P1-P7; the decoder returns VNOP (illegal)    */
-    /* for them until the package that implements the class lands.         */
+    /* Vector operation select. The entries after VSLIDE1DOWN are Zve32x   */
+    /* instructions not implemented yet; the decoder returns VNOP (illegal) */
+    /* for them until their class is implemented.                           */
     typedef enum logic [6:0] {
         VNOP,
         // Configuration
@@ -361,10 +361,10 @@ package RS5_pkg;
         logic        csr_wr_uses_rs1;
     } exec_ctrl_t;
 
-    /* Vector control decoded once in vectorUnit. P0 only needs mask_is_data; */
-    /* the Zve32x packages add their fields here.                            */
+    /* Vector control decoded once in vectorUnit. It only holds mask_is_data; */
+    /* the instructions not implemented yet add their fields here.           */
     typedef struct packed {
-        // v0 is an operand, not a mask (vmerge; vadc/vsbc in P1)
+        // v0 is an operand, not a mask (vmerge; vadc/vsbc once implemented)
         logic        mask_is_data;
     } vector_ctrl_t;
 

@@ -167,7 +167,7 @@ module vectorDecode
             6'b011110:     opi = '{VMSGTU, F_XI};
             6'b011111:     opi = '{VMSGT,  F_XI};
             6'b100101:     opi = '{VSLL,   F_VXI};
-            /* .vi is vmv<nr>r; .vv and .vx are vsmul (P4) */
+            /* .vi is vmv<nr>r; .vv and .vx are vsmul, not implemented yet */
             6'b100111:     opi = '{vmvr_legal ? VMVR : VNOP, F_I};
             6'b101000:     opi = '{VSRL,   F_VXI};
             6'b101001:     opi = '{VSRA,   F_VXI};
@@ -196,7 +196,8 @@ module vectorDecode
             6'b001110:     opm = '{VSLIDE1UP,   F_X};
             6'b001111:     opm = '{VSLIDE1DOWN, F_X};
             /* OPMVV (VWXUNARY0) selects by vs1: vmv.x.s is 00000,  */
-            /* vcpop and vfirst (P5) are 10000 and 10001.           */
+            /* vcpop and vfirst (not implemented yet) are 10000 and */
+            /* 10001.                                               */
             /* OPMVX (VRXUNARY0) is vmv.s.x, which requires vs2 = 0 */
             6'b010000:     opm = '{!vm        ? VNOP
                                  : !is_mvv    ? ((vs2 == '0) ? VMVSX : VNOP)
@@ -278,17 +279,17 @@ module vectorDecode
             mem_legal = 1'b0;
         else if (mop == 2'b00) begin
             unique case (lumop)
-                /* Segments (nf != 0) are P8 */
+                /* Segments (nf != 0) are not implemented yet */
                 5'b00000:   mem_legal = (nf == '0);
                 5'b01000:   mem_legal = whole_reg_legal;
                 /* vlm.v and vsm.v are encoded with EEW = 8 */
                 5'b01011:   mem_legal = vm && (nf == '0) && (funct3 == 3'b000);
-                /* Fault-only-first (10000) is P8 */
+                /* Fault-only-first (10000) is not implemented yet */
                 default:    mem_legal = 1'b0;
             endcase
         end
         else begin
-            /* Strided and indexed segments are P8 */
+            /* Strided and indexed segments are not implemented yet */
             mem_legal = (nf == '0);
         end
     end

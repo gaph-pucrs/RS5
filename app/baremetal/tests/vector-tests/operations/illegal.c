@@ -42,7 +42,7 @@ void TEST_CASE1(void) {
   EXPECT_ILLEGAL(26, 0x02057087); // vle64.v (EEW = 64)
   EXPECT_ILLEGAL(27, 0x020570a7); // vse64.v (EEW = 64)
   EXPECT_ILLEGAL(28, 0x12050087); // vle8.v with mew = 1
-  // Segments and fault-only-first are legal in Zve32x and run on Sail; RS5 traps until P8
+  // Segments and fault-only-first are legal in Zve32x and run on Sail; RS5 traps until they are implemented
   SKIP_ON_SAIL(EXPECT_ILLEGAL(29, 0x22050107)); // vlseg2e8.v
   SKIP_ON_SAIL(EXPECT_ILLEGAL(30, 0x2ab50107)); // vlsseg2e8.v
   SKIP_ON_SAIL(EXPECT_ILLEGAL(31, 0x22050127)); // vsseg2e8.v
