@@ -48,6 +48,7 @@ module vectorALU
     input  logic [7:0][(VLENB/4)-1:0]   mask_sew32,
 
     input  iTypeVector_e                vector_operation_i,
+    input  vector_ctrl_t                vctrl_i,
     input  vew_e                        vsew,
 
     input  logic                        accumulate_instruction,
@@ -262,6 +263,7 @@ module vectorALU
                 .mask_sew32_i      (mask_sew32[cycle_count_r][((LLEN/32)*i_lane)+:LLEN/32]),
                 .enable_i          (enable_lane),
                 .vector_operation_i(vector_operation_i),
+                .vctrl_i           (vctrl_i),
                 .vsew              (vsew),
                 .vm                (vm),
                 .mult_enable       (mult_enable),

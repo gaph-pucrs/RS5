@@ -36,6 +36,10 @@ module vectorLane
     input  logic               enable_i,
     /* verilator lint_on  UNUSEDSIGNAL */
     input  iTypeVector_e       vector_operation_i,
+    /* Only the fields of the adder are used here */
+    /* verilator lint_off UNUSEDSIGNAL */
+    input  vector_ctrl_t       vctrl_i,
+    /* verilator lint_on  UNUSEDSIGNAL */
     input  vew_e               vsew,
     input  logic               vm,
 
@@ -638,10 +642,6 @@ module vectorLane
 //////////////////////////////////////////////////////////////////////////////
 
     logic [31:0] subtraend;
-    logic [31:0] subtraend_neg;
-    logic [31:0] subtraend_8b;
-    logic [31:0] subtraend_16b;
-    logic [31:0] subtraend_32b;
     logic [31:0] summand_1;
     logic [31:0] summand_2;
     logic [31:0] summand_2_int;
@@ -660,16 +660,6 @@ module vectorLane
         endcase
     end
 
-    assign subtraend_neg = ~subtraend;
-
-    always_comb begin
-        subtraend_32b = subtraend_neg + 1'b1;
-        for (int i = 0; i < 2; i++)
-            subtraend_16b[(16*i)+:16] = subtraend_neg[(16*i)+:16] + 1'b1;
-        for (int i = 0; i < 4; i++)
-            subtraend_8b[(8*i)+:8] = subtraend_neg[(8*i)+:8] + 1'b1;
-    end
-
     always_comb begin
          unique case (vector_operation_i)
              VRSUB:   summand_1 = second_operand;
@@ -685,25 +675,20 @@ module vectorLane
                            ? result_mult_r
                            : second_operand;
 
-    always_comb begin
-        if (vector_operation_i inside {VSUB, VRSUB, VNMSAC, VNMSUB}) begin
-            unique case (vsew)
-                EW8:    summand_2 = subtraend_8b;
-                EW16:   summand_2 = subtraend_16b;
-                default:summand_2 = subtraend_32b;
-            endcase
-        end
-        else begin
-            summand_2 = summand_2_int;
-        end
-    end
+    /* A subtraction inverts the second addend; its +1 is the carry-in */
+    assign summand_2 = vctrl_i.is_sub ? ~subtraend : summand_2_int;
+
+    /* The first byte of each element takes the element carry-in, the */
+    /* other bytes take the carry-out of the byte below               */
+    logic elem_cin;
+    assign elem_cin = vctrl_i.is_sub;
 
     always_comb begin
         for (int i = 0; i < 4; i++) begin
             case (vsew)
-                EW16:    adder_carry[i] = (i%2 == 0) ? 1'b0 : result_add_bytes[i-1][8];
-                EW32:    adder_carry[i] = (i%4 == 0) ? 1'b0 : result_add_bytes[i-1][8];
-                default: adder_carry[i] = 1'b0;
+                EW16:    adder_carry[i] = (i%2 == 0) ? elem_cin : result_add_bytes[i-1][8];
+                EW32:    adder_carry[i] = (i%4 == 0) ? elem_cin : result_add_bytes[i-1][8];
+                default: adder_carry[i] = elem_cin;
             endcase
         end
     end

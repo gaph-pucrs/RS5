@@ -361,9 +361,12 @@ package RS5_pkg;
         logic        csr_wr_uses_rs1;
     } exec_ctrl_t;
 
-    /* Vector control decoded once in vectorUnit. It only holds mask_is_data; */
-    /* the instructions not implemented yet add their fields here.           */
+    /* Vector control decoded once in vectorUnit, from the operation and vm. */
+    /* The instructions not implemented yet add their fields here.          */
     typedef struct packed {
+        // The adder subtracts: the second addend is inverted and the
+        // carry-in of each element is set (a + ~b + 1 = a - b)
+        logic        is_sub;
         // v0 is an operand, not a mask (vmerge; vadc/vsbc once implemented)
         logic        mask_is_data;
     } vector_ctrl_t;

@@ -141,6 +141,9 @@ module vectorUnit
 
     assign elements_per_reg = VLENB >> vsew;
 
+    /* The adder computes a - b as a + ~b + 1 */
+    assign vctrl.is_sub       = (vector_operation_i inside {VSUB, VRSUB, VNMSAC, VNMSUB});
+
     /* v0 is data, not a mask: every body element is written (vmerge) */
     assign vctrl.mask_is_data = (vector_operation_i == VMERGE);
 
@@ -804,6 +807,7 @@ module vectorUnit
         .third_operand         (third_operand),
         .scalar_operand        (op1_scalar_i),
         .vector_operation_i    (vector_operation_i),
+        .vctrl_i               (vctrl),
         .cycle_count           (cycle_count),
         .cycle_count_r         (cycle_count_r),
         .vlmul                 (vlmul),
