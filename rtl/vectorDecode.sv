@@ -237,8 +237,11 @@ module vectorDecode
         endcase
     end
 
+    /* A masked instruction cannot write v0, unless it writes a mask */
+    /* (compares) or a scalar element (reductions)                   */
     logic writes_v0_masked;
-    assign writes_v0_masked = (opCat != OPCFG) && !vm && (vd == '0) && !writes_mask_or_scalar(decode_vector_opv);
+    assign writes_v0_masked = (opCat != OPCFG) && !vm && (vd == '0)
+                            && !(is_mask_result(decode_vector_opv) || is_reduction(decode_vector_opv));
 
     assign decode_vector_arith = (writes_v0_masked || !class_enabled(decode_vector_opv)) ? VNOP : decode_vector_opv;
 

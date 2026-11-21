@@ -131,13 +131,13 @@ module vectorUnit
 
     assign accumulate_instruction = (vector_operation_i inside {VMACC, VNMSAC, VMADD, VNMSUB});
     assign multiply_instruction   = (vector_operation_i inside {VMUL, VMULH, VMULHSU, VMULHU} | accumulate_instruction | widening_instruction);
-    assign reduction_instruction  = (vector_operation_i inside {VREDSUM, VREDMAXU, VREDMAX, VREDMINU, VREDMIN, VREDAND, VREDOR, VREDXOR});
+    assign reduction_instruction  = is_reduction(vector_operation_i);
     assign widening_instruction   = (vector_operation_i inside {VWMUL, VWMULU, VWMULSU});
     assign whole_reg_load_store   = (instruction_i[24:20] == 5'b01000 && (op_vload || op_vstore) && instruction_i[27:26] == 2'b00);
     assign mask_load_store        = (instruction_i[24:20] == 5'b01011 && (op_vload || op_vstore) && instruction_i[27:26] == 2'b00);
     /* Whole register loads/stores and vmv<nr>r ignore vl and vtype */
     assign whole_reg_instruction  = whole_reg_load_store || (op_vector && vector_operation_i == VMVR);
-    assign mask_instruction       = (vector_operation_i inside {VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT});
+    assign mask_instruction       = is_mask_result(vector_operation_i);
 
     assign elements_per_reg = VLENB >> vsew;
 

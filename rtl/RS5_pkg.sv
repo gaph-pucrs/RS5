@@ -260,11 +260,14 @@ package RS5_pkg;
         VST             // Vector store (was iType_e VSTORE)
     } iTypeVector_e;
 
-    /* A masked vector instruction cannot write v0, unless it writes a mask */
-    /* (compares) or a scalar element (reductions)                          */
-    function automatic logic writes_mask_or_scalar(iTypeVector_e op);
-        return op inside {VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT,
-                          VREDSUM, VREDAND, VREDOR, VREDXOR, VREDMINU, VREDMIN, VREDMAXU, VREDMAX};
+    /* Vector operations whose result is a mask (compares) */
+    function automatic logic is_mask_result(iTypeVector_e op);
+        return op inside {VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT};
+    endfunction
+
+    /* Vector reductions: they write a scalar result to element 0 of vd */
+    function automatic logic is_reduction(iTypeVector_e op);
+        return op inside {VREDSUM, VREDMAXU, VREDMAX, VREDMINU, VREDMIN, VREDAND, VREDOR, VREDXOR};
     endfunction
 
     typedef struct packed {
