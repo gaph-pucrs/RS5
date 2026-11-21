@@ -285,15 +285,47 @@ module vectorLane
         endcase
     end
 
+    /* Carry-out of each element, from the adder below. vmadc writes it  */
+    /* and vmsbc writes its inverse, the borrow-out. v0 is the carry-in   */
+    /* there, not a mask, so it is not ANDed in as for the compares.      */
+    logic [3:0] carry_out_8b;
+    logic [1:0] carry_out_16b;
+    logic       carry_out_32b;
+    logic       is_vmadc, is_vmsbc;
+
+    assign is_vmadc = VCarryEnable && (vector_operation_i == VMADC);
+    assign is_vmsbc = VCarryEnable && (vector_operation_i == VMSBC);
+
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             result_mask_o <= '0;
         end
         else begin
             unique case (vsew)
-                EW8:     result_mask_o[(4*cycle)+:4] <=        result_comparison_8b  & ({4{vm}} | mask_sew8);
-                EW16:    result_mask_o[(2*cycle)+:2] <= {2'b0, result_comparison_16b & ({2{vm}} | mask_sew16)};
-                default: result_mask_o[(  cycle)   ] <= {3'b0, result_comparison_32b & ({1{vm}} | mask_sew32)};
+                EW8: begin
+                    if (is_vmadc)
+                        result_mask_o[(4*cycle)+:4] <=  carry_out_8b;
+                    else if (is_vmsbc)
+                        result_mask_o[(4*cycle)+:4] <= ~carry_out_8b;
+                    else
+                        result_mask_o[(4*cycle)+:4] <= result_comparison_8b & ({4{vm}} | mask_sew8);
+                end
+                EW16: begin
+                    if (is_vmadc)
+                        result_mask_o[(2*cycle)+:2] <= {2'b0,  carry_out_16b};
+                    else if (is_vmsbc)
+                        result_mask_o[(2*cycle)+:2] <= {2'b0, ~carry_out_16b};
+                    else
+                        result_mask_o[(2*cycle)+:2] <= {2'b0, result_comparison_16b & ({2{vm}} | mask_sew16)};
+                end
+                default: begin
+                    if (is_vmadc)
+                        result_mask_o[cycle] <= {3'b0,  carry_out_32b};
+                    else if (is_vmsbc)
+                        result_mask_o[cycle] <= {3'b0, ~carry_out_32b};
+                    else
+                        result_mask_o[cycle] <= {3'b0, result_comparison_32b & ({1{vm}} | mask_sew32)};
+                end
             endcase
         end
     end
@@ -718,6 +750,15 @@ module vectorLane
         for (int i = 0; i < 4; i++) begin
             result_add[(8*i)+:8] = result_add_bytes[i][7:0];
         end
+    end
+
+    /* The carry-out of an element is the carry of its most significant byte */
+    always_comb begin
+        for (int i = 0; i < 4; i++)
+            carry_out_8b[i]  = result_add_bytes[i][8];
+        for (int i = 0; i < 2; i++)
+            carry_out_16b[i] = result_add_bytes[2*i+1][8];
+        carry_out_32b = result_add_bytes[3][8];
     end
 
 //////////////////////////////////////////////////////////////////////////////

@@ -82,7 +82,7 @@ module vectorDecode
             VAND, VOR, VXOR:                        return VLogicEnable;
             VMINU, VMIN, VMAXU, VMAX:               return VMinMaxEnable;
             VMERGE:                                 return VMergeEnable;
-            VADC, VSBC:                             return VCarryEnable;
+            VADC, VMADC, VSBC, VMSBC:               return VCarryEnable;
             VDIVU, VDIV, VREMU, VREM:               return VDivEnable;
             VREDAND, VREDOR, VREDXOR:               return VRedLogicEnable;
             VREDMINU, VREDMIN, VREDMAXU, VREDMAX:   return VRedMinMaxEnable;
@@ -160,7 +160,10 @@ module vectorDecode
             6'b001011:     opi = '{VXOR,   F_VXI};
             /* vadc and vsbc only exist with vm = 0 (v0 is the carry/borrow) */
             6'b010000:     opi = '{!vm ? VADC : VNOP, F_VXI};
+            /* vmadc and vmsbc with vm = 1 have no carry/borrow-in */
+            6'b010001:     opi = '{VMADC,  F_VXI};
             6'b010010:     opi = '{!vm ? VSBC : VNOP, F_VX};
+            6'b010011:     opi = '{VMSBC,  F_VX};
             /* vmv.v.* (vm = 1) requires vs2 = 0; vmerge is the vm = 0 form */
             6'b010111:     opi = '{!vm ? VMERGE : ((vs2 == '0) ? VMV : VNOP), F_VXI};
             6'b011000:     opi = '{VMSEQ,  F_VXI};

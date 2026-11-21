@@ -29,6 +29,8 @@ void TEST_CASE1(void) {
   EXPECT_LEGAL(16, 0x9621a0d7); // vmul.vv v1, v2, v3
   EXPECT_ILLEGAL(17, 0x402180d7); // vadc.vvm v1, v2, v3, v0 (VCarryEnable)
   EXPECT_ILLEGAL(18, 0x4825c0d7); // vsbc.vxm v1, v2, a1, v0 (VCarryEnable)
+  EXPECT_ILLEGAL(19, 0x442180d7); // vmadc.vvm v1, v2, v3, v0 (VCarryEnable)
+  EXPECT_ILLEGAL(20, 0x4e2180d7); // vmsbc.vv v1, v2, v3 (VCarryEnable)
 }
 
 int main(void) {

@@ -260,9 +260,10 @@ package RS5_pkg;
         VST             // Vector store (was iType_e VSTORE)
     } iTypeVector_e;
 
-    /* Vector operations whose result is a mask (compares) */
+    /* Vector operations whose result is a mask (compares, carry/borrow-out) */
     function automatic logic is_mask_result(iTypeVector_e op);
-        return op inside {VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT};
+        return op inside {VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT,
+                          VMADC, VMSBC};
     endfunction
 
     /* Vector reductions: they write a scalar result to element 0 of vd */
@@ -368,9 +369,9 @@ package RS5_pkg;
         // carry-in of each element is set (a + ~b + 1 = a - b)
         logic        is_sub;
         // The carry-in (borrow-in for a subtraction) of each element is
-        // its v0 bit (vadc, vsbc)
+        // its v0 bit (vadc, vsbc, and vmadc, vmsbc with vm = 0)
         logic        use_carry_in;
-        // v0 is an operand, not a mask (vmerge, vadc, vsbc)
+        // v0 is an operand, not a mask (vmerge, vadc, vsbc, vmadc, vmsbc)
         logic        mask_is_data;
     } vector_ctrl_t;
 

@@ -143,14 +143,15 @@ module vectorUnit
     assign elements_per_reg = VLENB >> vsew;
 
     /* The adder computes a - b as a + ~b + 1 */
-    assign vctrl.is_sub       = (vector_operation_i inside {VSUB, VRSUB, VNMSAC, VNMSUB, VSBC});
+    assign vctrl.is_sub       = (vector_operation_i inside {VSUB, VRSUB, VNMSAC, VNMSUB, VSBC, VMSBC});
 
-    /* vadc and vsbc take each element's carry or borrow from v0 */
-    assign vctrl.use_carry_in = !vm && (vector_operation_i inside {VADC, VSBC});
+    /* vadc, vsbc, and vmadc, vmsbc with vm = 0, take each element's carry */
+    /* or borrow from v0                                                    */
+    assign vctrl.use_carry_in = !vm && (vector_operation_i inside {VADC, VMADC, VSBC, VMSBC});
 
     /* v0 is data, not a mask: every body element is written */
     assign vctrl.mask_is_data = (vector_operation_i == VMERGE)
-                             || (VCarryEnable && (vector_operation_i inside {VADC, VSBC}));
+                             || (VCarryEnable && (vector_operation_i inside {VADC, VMADC, VSBC, VMSBC}));
 
     logic vm_effective;
     assign vm_effective = vm || vctrl.mask_is_data;
@@ -871,7 +872,7 @@ module vectorUnit
             compare_v0_copy_r <= 1'b0;
         end
         else if (!should_stall) begin
-            compare_vm_r      <= vm;
+            compare_vm_r      <= vm_effective;
             compare_v0_copy_r <= mask_instruction && rd == '0 && old_vd_valid;
         end
     end

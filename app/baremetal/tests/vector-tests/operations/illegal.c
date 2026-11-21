@@ -83,6 +83,14 @@ void TEST_CASE1(void) {
   EXPECT_LEGAL(64, 0x4022b0d7); // vadc.vim v1, v2, 5, v0
   EXPECT_LEGAL(65, 0x482180d7); // vsbc.vvm v1, v2, v3, v0
   EXPECT_LEGAL(66, 0x4825c0d7); // vsbc.vxm v1, v2, a1, v0
+  EXPECT_ILLEGAL(67, 0x4e22b0d7); // vmsbc.vi (no .vi form)
+  EXPECT_ILLEGAL(68, 0x4c22b0d7); // vmsbc.vim (no .vi form)
+  EXPECT_LEGAL(69, 0x44110057); // vmadc.vvm v0, v1, v2, v0 (mask dest)
+  EXPECT_LEGAL(70, 0x462180d7); // vmadc.vv v1, v2, v3
+  EXPECT_LEGAL(71, 0x4622b0d7); // vmadc.vi v1, v2, 5
+  EXPECT_LEGAL(72, 0x4425c0d7); // vmadc.vxm v1, v2, a1, v0
+  EXPECT_LEGAL(73, 0x4c2180d7); // vmsbc.vvm v1, v2, v3, v0
+  EXPECT_LEGAL(74, 0x4e25c0d7); // vmsbc.vx v1, v2, a1
 }
 
 // Reserved register groups and SEW/LMUL, rejected by the vector unit with
@@ -136,6 +144,13 @@ void TEST_CASE2(void) {
   EXPECT_ILLEGAL(140, 0x48428157); // vsbc.vvm v2, v4, v5, v0 (vs1 not aligned)
   EXPECT_LEGAL(141, 0x40430157); // vadc.vvm v2, v4, v6, v0
   EXPECT_LEGAL(142, 0x48430157); // vsbc.vvm v2, v4, v6, v0
+  EXPECT_ILLEGAL(143, 0x463200d7); // vmadc.vv v1, v3, v4 (vs2 not aligned)
+  EXPECT_ILLEGAL(144, 0x4c2280d7); // vmsbc.vvm v1, v2, v5, v0 (vs1 not aligned)
+  // Reserved overlaps, as in cases 113 and 114: RS5 traps, Sail does not check them
+  SKIP_ON_SAIL(EXPECT_ILLEGAL(145, 0x462201d7)); // vmadc.vv v3, v2, v4 (vd inside vs2 group)
+  SKIP_ON_SAIL(EXPECT_ILLEGAL(146, 0x4c2202d7)); // vmsbc.vvm v5, v2, v4, v0 (vd inside vs1 group)
+  EXPECT_LEGAL(147, 0x46220157); // vmadc.vv v2, v2, v4 (vd = lowest of vs2)
+  EXPECT_LEGAL(148, 0x4e220157); // vmsbc.vv v2, v2, v4 (vd = lowest of vs2)
 }
 
 int main(void) {
