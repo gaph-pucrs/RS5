@@ -86,7 +86,7 @@ SAIL_CONFIG = Path("sail_zve32x.json")  # VLEN = 512; vlen_exp is rewritten per 
 # Tests in class_disabled/ run with every vector class parameter set to 0
 CLASS_PARAMETERS = [
     "VLogicEnable", "VMinMaxEnable", "VMergeEnable", "VDivEnable",
-    "VRedLogicEnable", "VRedMinMaxEnable", "VRedSumEnable",
+    "VRedLogicEnable", "VRedMinMaxEnable", "VRedSumEnable", "VCarryEnable",
 ]
 CLASS_OFF = [arg for name in CLASS_PARAMETERS for arg in ("-defparam", f"testbench.{name}=0")]
 

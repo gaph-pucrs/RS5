@@ -23,6 +23,7 @@ module vectorUnit
     parameter bit           VLogicEnable          = 1'b1,
     parameter bit           VMinMaxEnable         = 1'b1,
     parameter bit           VMergeEnable          = 1'b1,
+    parameter bit           VCarryEnable          = 1'b1,
     parameter bit           VDivEnable            = 1'b1,
     parameter bit           VRedLogicEnable       = 1'b1,
     parameter bit           VRedMinMaxEnable      = 1'b1,
@@ -142,10 +143,14 @@ module vectorUnit
     assign elements_per_reg = VLENB >> vsew;
 
     /* The adder computes a - b as a + ~b + 1 */
-    assign vctrl.is_sub       = (vector_operation_i inside {VSUB, VRSUB, VNMSAC, VNMSUB});
+    assign vctrl.is_sub       = (vector_operation_i inside {VSUB, VRSUB, VNMSAC, VNMSUB, VSBC});
 
-    /* v0 is data, not a mask: every body element is written (vmerge) */
-    assign vctrl.mask_is_data = (vector_operation_i == VMERGE);
+    /* vadc and vsbc take each element's carry or borrow from v0 */
+    assign vctrl.use_carry_in = !vm && (vector_operation_i inside {VADC, VSBC});
+
+    /* v0 is data, not a mask: every body element is written */
+    assign vctrl.mask_is_data = (vector_operation_i == VMERGE)
+                             || (VCarryEnable && (vector_operation_i inside {VADC, VSBC}));
 
     logic vm_effective;
     assign vm_effective = vm || vctrl.mask_is_data;
@@ -796,6 +801,7 @@ module vectorUnit
         .VRedMinMaxEnable      (VRedMinMaxEnable     ),
         .VRedSumEnable         (VRedSumEnable        ),
         .VMergeEnable          (VMergeEnable         ),
+        .VCarryEnable          (VCarryEnable         ),
         .VDivEnable            (VDivEnable           ),
         .VMultiCycleReductions (VMultiCycleReductions)
     ) vectorALU1 (

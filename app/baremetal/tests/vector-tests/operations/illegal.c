@@ -73,6 +73,16 @@ void TEST_CASE1(void) {
   EXPECT_LEGAL(54, 0x22850107); // vl2re8.v v2, (a0)
   EXPECT_LEGAL(55, 0x028500a7); // vs1r.v v1, (a0)
   EXPECT_LEGAL(56, 0x02b50087); // vlm.v v1, (a0)
+  EXPECT_ILLEGAL(57, 0x422180d7); // vadc.vvm with vm = 1 (reserved)
+  EXPECT_ILLEGAL(58, 0x4a2180d7); // vsbc.vvm with vm = 1 (reserved)
+  EXPECT_ILLEGAL(59, 0x4822b0d7); // vsbc.vim (no .vi form)
+  EXPECT_ILLEGAL(60, 0x40110057); // vadc.vvm v0, v1, v2, v0 (vd = v0)
+  EXPECT_ILLEGAL(61, 0x48110057); // vsbc.vvm v0, v1, v2, v0 (vd = v0)
+  EXPECT_LEGAL(62, 0x402180d7); // vadc.vvm v1, v2, v3, v0
+  EXPECT_LEGAL(63, 0x4025c0d7); // vadc.vxm v1, v2, a1, v0
+  EXPECT_LEGAL(64, 0x4022b0d7); // vadc.vim v1, v2, 5, v0
+  EXPECT_LEGAL(65, 0x482180d7); // vsbc.vvm v1, v2, v3, v0
+  EXPECT_LEGAL(66, 0x4825c0d7); // vsbc.vxm v1, v2, a1, v0
 }
 
 // Reserved register groups and SEW/LMUL, rejected by the vector unit with
@@ -120,6 +130,12 @@ void TEST_CASE2(void) {
   VSET(16, e8, mf2);
   EXPECT_ILLEGAL(136, 0xee42a257); // vwmul.vv v4, v4, v5 (overlap, source EMUL < 1)
   EXPECT_LEGAL(137, 0xee532257); // vwmul.vv v4, v5, v6
+  VSET(16, e8, m2);
+  EXPECT_ILLEGAL(138, 0x402200d7); // vadc.vvm v1, v2, v4, v0 (vd not aligned)
+  EXPECT_ILLEGAL(139, 0x40320157); // vadc.vvm v2, v3, v4, v0 (vs2 not aligned)
+  EXPECT_ILLEGAL(140, 0x48428157); // vsbc.vvm v2, v4, v5, v0 (vs1 not aligned)
+  EXPECT_LEGAL(141, 0x40430157); // vadc.vvm v2, v4, v6, v0
+  EXPECT_LEGAL(142, 0x48430157); // vsbc.vvm v2, v4, v6, v0
 }
 
 int main(void) {

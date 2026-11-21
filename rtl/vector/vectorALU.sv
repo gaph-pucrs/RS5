@@ -25,6 +25,7 @@ module vectorALU
     parameter bit VRedMinMaxEnable      = 1'b1,
     parameter bit VRedSumEnable         = 1'b1,
     parameter bit VMergeEnable          = 1'b1,
+    parameter bit VCarryEnable          = 1'b1,
     parameter bit VDivEnable            = 1'b1,
     parameter bit VMultiCycleReductions = 1'b0
 ) (
@@ -251,6 +252,7 @@ module vectorALU
                 .VLogicEnable  (VLogicEnable),
                 .VMinMaxEnable (VMinMaxEnable),
                 .VMergeEnable  (VMergeEnable),
+                .VCarryEnable  (VCarryEnable),
                 .VDivEnable    (VDivEnable)
             )   u_vectorLane (
                 .clk               (clk),

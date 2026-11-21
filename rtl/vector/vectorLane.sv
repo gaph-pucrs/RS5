@@ -20,6 +20,7 @@ module vectorLane
     parameter bit VLogicEnable  = 1'b1,
     parameter bit VMinMaxEnable = 1'b1,
     parameter bit VMergeEnable  = 1'b1,
+    parameter bit VCarryEnable  = 1'b1,
     parameter bit VDivEnable    = 1'b1
 ) (
     input  logic              clk,
@@ -678,17 +679,31 @@ module vectorLane
     /* A subtraction inverts the second addend; its +1 is the carry-in */
     assign summand_2 = vctrl_i.is_sub ? ~subtraend : summand_2_int;
 
-    /* The first byte of each element takes the element carry-in, the */
-    /* other bytes take the carry-out of the byte below               */
-    logic elem_cin;
-    assign elem_cin = vctrl_i.is_sub;
+    /* Carry-in of the element that starts at each byte: 1 for a        */
+    /* subtraction, and for vadc/vsbc the element's v0 bit as carry, or */
+    /* its inverse as borrow (a + ~b + ~bin = a - b - bin)              */
+    logic [3:0] elem_v0;
+    logic [3:0] elem_cin;
 
     always_comb begin
         for (int i = 0; i < 4; i++) begin
+            unique case (vsew)
+                EW16:    elem_v0[i] = mask_sew16[i/2];
+                EW32:    elem_v0[i] = mask_sew32;
+                default: elem_v0[i] = mask_sew8[i];
+            endcase
+            elem_cin[i] = vctrl_i.is_sub ^ (VCarryEnable && vctrl_i.use_carry_in && elem_v0[i]);
+        end
+    end
+
+    /* The first byte of each element takes the element carry-in, the */
+    /* other bytes take the carry-out of the byte below               */
+    always_comb begin
+        for (int i = 0; i < 4; i++) begin
             case (vsew)
-                EW16:    adder_carry[i] = (i%2 == 0) ? elem_cin : result_add_bytes[i-1][8];
-                EW32:    adder_carry[i] = (i%4 == 0) ? elem_cin : result_add_bytes[i-1][8];
-                default: adder_carry[i] = elem_cin;
+                EW16:    adder_carry[i] = (i%2 == 0) ? elem_cin[i] : result_add_bytes[i-1][8];
+                EW32:    adder_carry[i] = (i%4 == 0) ? elem_cin[i] : result_add_bytes[i-1][8];
+                default: adder_carry[i] = elem_cin[i];
             endcase
         end
     end

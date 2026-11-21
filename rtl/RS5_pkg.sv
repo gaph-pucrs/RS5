@@ -201,9 +201,9 @@ package RS5_pkg;
         ZBKBREV8  = 12'b100000000000
     } iTypeZbkb_e;
 
-    /* Vector operation select. The entries after VSLIDE1DOWN are Zve32x   */
-    /* instructions not implemented yet; the decoder returns VNOP (illegal) */
-    /* for them until their class is implemented.                           */
+    /* Vector operation select. The entries after VSLIDE1DOWN are the      */
+    /* Zve32x classes added later; the decoder returns VNOP (illegal) for   */
+    /* the instructions of a class not implemented yet.                     */
     typedef enum logic [6:0] {
         VNOP,
         // Configuration
@@ -367,7 +367,10 @@ package RS5_pkg;
         // The adder subtracts: the second addend is inverted and the
         // carry-in of each element is set (a + ~b + 1 = a - b)
         logic        is_sub;
-        // v0 is an operand, not a mask (vmerge; vadc/vsbc once implemented)
+        // The carry-in (borrow-in for a subtraction) of each element is
+        // its v0 bit (vadc, vsbc)
+        logic        use_carry_in;
+        // v0 is an operand, not a mask (vmerge, vadc, vsbc)
         logic        mask_is_data;
     } vector_ctrl_t;
 

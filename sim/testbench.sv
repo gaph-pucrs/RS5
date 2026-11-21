@@ -60,6 +60,7 @@ module testbench
     parameter  bit           VLogicEnable          = 1'b1;
     parameter  bit           VMinMaxEnable         = 1'b1;
     parameter  bit           VMergeEnable          = 1'b1;
+    parameter  bit           VCarryEnable          = 1'b1;
     parameter  bit           VDivEnable            = 1'b1;
     parameter  bit           VRedLogicEnable       = 1'b1;
     parameter  bit           VRedMinMaxEnable      = 1'b1;
@@ -178,6 +179,7 @@ module testbench
         .VLogicEnable          (VLogicEnable         ),
         .VMinMaxEnable         (VMinMaxEnable        ),
         .VMergeEnable          (VMergeEnable         ),
+        .VCarryEnable          (VCarryEnable         ),
         .VDivEnable            (VDivEnable           ),
         .VRedLogicEnable       (VRedLogicEnable      ),
         .VRedMinMaxEnable      (VRedMinMaxEnable     ),
