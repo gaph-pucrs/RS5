@@ -142,8 +142,11 @@ module vectorUnit
 
     assign elements_per_reg = VLENB >> vsew;
 
-    /* The adder computes a - b as a + ~b + 1 */
-    assign vctrl.is_sub       = (vector_operation_i inside {VSUB, VRSUB, VNMSAC, VNMSUB, VSBC, VMSBC});
+    /* The adder computes a - b as a + ~b + 1. The magnitude compares and */
+    /* min/max subtract too, and the lanes take a >= b from the carry-out */
+    assign vctrl.is_sub       = (vector_operation_i inside {VSUB, VRSUB, VNMSAC, VNMSUB, VSBC, VMSBC,
+                                                            VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT,
+                                                            VMINU, VMIN, VMAXU, VMAX});
 
     /* vadc, vsbc, and vmadc, vmsbc with vm = 0, take each element's carry */
     /* or borrow from v0                                                    */
