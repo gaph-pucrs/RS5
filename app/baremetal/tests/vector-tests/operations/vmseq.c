@@ -14,9 +14,11 @@ void TEST_CASE1(void) {
   VLOAD_8(v3, 0xf2, 0x01, 0xf0, 0x0f, 0xf2, 0x01, 0xf0, 0x0f, 0xf2, 0x01, 0xf0,
           0x0f, 0xf2, 0x01, 0xf0, 0x0f);
   VCLEAR(v1);
+  CMP_SAVE(v1);
   asm volatile("vmseq.vv v1, v2, v3");
+  CMP_VL();
   VSET(2, e8, m1);
-  VCMP_U8(1, v1, 0xcc, 0xcc);
+  VMCMP_MASK(1, v1, 0xcc, 0xcc);
 
   VSET(16, e16, m1);
   VLOAD_16(v2, 0xffff, 0x0000, 0xf0f0, 0x0f0f, 0xffff, 0x0000, 0xf0f0, 0x0f0f,
@@ -24,9 +26,11 @@ void TEST_CASE1(void) {
   VLOAD_16(v3, 0xf2ff, 0x0100, 0xf0f0, 0x0f0f, 0xf2ff, 0x0100, 0xf0f0, 0x0f0f,
            0xf2ff, 0x0100, 0xf0f0, 0x0f0f, 0xf2ff, 0x0100, 0xf0f0, 0x0f0f);
   VCLEAR(v1);
+  CMP_SAVE(v1);
   asm volatile("vmseq.vv v1, v2, v3");
+  CMP_VL();
   VSET(2, e8, m1);
-  VCMP_U8(2, v1, 0xcc, 0xcc);
+  VMCMP_MASK(2, v1, 0xcc, 0xcc);
 
   VSET(16, e32, m1);
   VLOAD_32(v2, 0xffffffff, 0x00000000, 0xf0f0f0f0, 0x0f0f0f0f, 0xffffffff,
@@ -38,9 +42,11 @@ void TEST_CASE1(void) {
            0xf0f0f0f0, 0x0f0f0f0f, 0xfff2ffff, 0x01000000, 0xf0f0f0f0,
            0x0f0f0f0f);
   VCLEAR(v1);
+  CMP_SAVE(v1);
   asm volatile("vmseq.vv v1, v2, v3");
+  CMP_VL();
   VSET(2, e8, m1);
-  VCMP_U8(3, v1, 0xcc, 0xcc);
+  VMCMP_MASK(3, v1, 0xcc, 0xcc);
 
 //   VSET(16, e64, m1);
 //   VLOAD_64(v2, 0xffffffffffffffff, 0x0000000000000000, 0xf0f0f0f0f0f0f0f0,
@@ -69,9 +75,11 @@ void TEST_CASE2(void) {
           0x0f, 0xf2, 0x01, 0xf0, 0x0f);
   VLOAD_8(v0, 0xaa, 0xaa);
   VCLEAR(v1);
+  CMP_SAVE(v1);
   asm volatile("vmseq.vv v1, v2, v3, v0.t");
+  CMP_VL();
   VSET(2, e8, m1);
-  VCMP_U8(5, v1, 0x88, 0x88);
+  VMCMP_MASK(5, v1, 0x88, 0x88);
 
   VSET(16, e16, m1);
   VLOAD_16(v2, 0xffff, 0x0000, 0xf0f0, 0x0f0f, 0xffff, 0x0000, 0xf0f0, 0x0f0f,
@@ -80,9 +88,11 @@ void TEST_CASE2(void) {
            0xf2ff, 0x0100, 0xf0f0, 0x0f0f, 0xf2ff, 0x0100, 0xf0f0, 0x0f0f);
   VLOAD_8(v0, 0xaa, 0xaa);
   VCLEAR(v1);
+  CMP_SAVE(v1);
   asm volatile("vmseq.vv v1, v2, v3, v0.t");
+  CMP_VL();
   VSET(2, e8, m1);
-  VCMP_U8(6, v1, 0x88, 0x88);
+  VMCMP_MASK(6, v1, 0x88, 0x88);
 
   VSET(16, e32, m1);
   VLOAD_32(v2, 0xffffffff, 0x00000000, 0xf0f0f0f0, 0x0f0f0f0f, 0xffffffff,
@@ -95,9 +105,11 @@ void TEST_CASE2(void) {
            0x0f0f0f0f);
   VLOAD_8(v0, 0xaa, 0xaa);
   VCLEAR(v1);
+  CMP_SAVE(v1);
   asm volatile("vmseq.vv v1, v2, v3, v0.t");
+  CMP_VL();
   VSET(2, e8, m1);
-  VCMP_U8(7, v1, 0x88, 0x88);
+  VMCMP_MASK(7, v1, 0x88, 0x88);
 
 //   VSET(16, e64, m1);
 //   VLOAD_64(v2, 0xffffffffffffffff, 0x0000000000000000, 0xf0f0f0f0f0f0f0f0,
@@ -126,17 +138,21 @@ void TEST_CASE3(void) {
   VLOAD_8(v2, 0xff, 0x00, 0xf0, 0x0f, 0xff, 0x00, 0xf0, 0x0f, 0xff, 0x00, 0xf0,
           0x0f, 0xff, 0x00, 0xf0, 0x0f);
   VCLEAR(v1);
+  CMP_SAVE(v1);
   asm volatile("vmseq.vx v1, v2, %[A]" ::[A] "r"(scalar));
+  CMP_VL();
   VSET(2, e8, m1);
-  VCMP_U8(9, v1, 0x11, 0x11);
+  VMCMP_MASK(9, v1, 0x11, 0x11);
 
   VSET(16, e16, m1);
   VLOAD_16(v2, 0xffff, 0x0000, 0xf0f0, 0x0f0f, 0xffff, 0x0000, 0xf0f0, 0x0f0f,
            0xffff, 0x0000, 0xf0f0, 0x0f0f, 0xffff, 0x0000, 0xf0f0, 0x0f0f);
   VCLEAR(v1);
+  CMP_SAVE(v1);
   asm volatile("vmseq.vx v1, v2, %[A]" ::[A] "r"(scalar));
+  CMP_VL();
   VSET(2, e8, m1);
-  VCMP_U8(10, v1, 0x11, 0x11);
+  VMCMP_MASK(10, v1, 0x11, 0x11);
 
   VSET(16, e32, m1);
   VLOAD_32(v2, 0xffffffff, 0x00000000, 0xf0f0f0f0, 0x0f0f0f0f, 0xffffffff,
@@ -144,9 +160,11 @@ void TEST_CASE3(void) {
            0xf0f0f0f0, 0x0f0f0f0f, 0xffffffff, 0x00000000, 0xf0f0f0f0,
            0x0f0f0f0f);
   VCLEAR(v1);
+  CMP_SAVE(v1);
   asm volatile("vmseq.vx v1, v2, %[A]" ::[A] "r"(scalar));
+  CMP_VL();
   VSET(2, e8, m1);
-  VCMP_U8(11, v1, 0x11, 0x11);
+  VMCMP_MASK(11, v1, 0x11, 0x11);
 
 //   VSET(16, e64, m1);
 //   VLOAD_64(v2, 0xffffffffffffffff, 0x0000000000000000, 0xf0f0f0f0f0f0f0f0,
@@ -169,18 +187,22 @@ void TEST_CASE4(void) {
           0x0f, 0xff, 0x00, 0xf0, 0x0f);
   VLOAD_8(v0, 0x10, 0x10);
   VCLEAR(v1);
+  CMP_SAVE(v1);
   asm volatile("vmseq.vx v1, v2, %[A], v0.t" ::[A] "r"(scalar));
+  CMP_VL();
   VSET(2, e8, m1);
-  VCMP_U8(13, v1, 0x10, 0x10);
+  VMCMP_MASK(13, v1, 0x10, 0x10);
 
   VSET(16, e16, m1);
   VLOAD_16(v2, 0xffff, 0x0000, 0xf0f0, 0x0f0f, 0xffff, 0x0000, 0xf0f0, 0x0f0f,
            0xffff, 0x0000, 0xf0f0, 0x0f0f, 0xffff, 0x0000, 0xf0f0, 0x0f0f);
   VLOAD_8(v0, 0x10, 0x10);
   VCLEAR(v1);
+  CMP_SAVE(v1);
   asm volatile("vmseq.vx v1, v2, %[A], v0.t" ::[A] "r"(scalar));
+  CMP_VL();
   VSET(2, e8, m1);
-  VCMP_U8(14, v1, 0x10, 0x10);
+  VMCMP_MASK(14, v1, 0x10, 0x10);
 
   VSET(16, e32, m1);
   VLOAD_32(v2, 0xffffffff, 0x00000000, 0xf0f0f0f0, 0x0f0f0f0f, 0xffffffff,
@@ -189,9 +211,11 @@ void TEST_CASE4(void) {
            0x0f0f0f0f);
   VLOAD_8(v0, 0x10, 0x10);
   VCLEAR(v1);
+  CMP_SAVE(v1);
   asm volatile("vmseq.vx v1, v2, %[A], v0.t" ::[A] "r"(scalar));
+  CMP_VL();
   VSET(2, e8, m1);
-  VCMP_U8(15, v1, 0x10, 0x10);
+  VMCMP_MASK(15, v1, 0x10, 0x10);
 
 //   VSET(16, e64, m1);
 //   VLOAD_64(v2, 0xffffffffffffffff, 0x0000000000000000, 0xf0f0f0f0f0f0f0f0,
@@ -212,17 +236,21 @@ void TEST_CASE5(void) {
   VLOAD_8(v2, 0x0f, 0x00, 0xf0, 0x0f, 0x0f, 0x00, 0xf0, 0x0f, 0x0f, 0x00, 0xf0,
           0x0f, 0x0f, 0x00, 0xf0, 0x0f);
   VCLEAR(v1);
+  CMP_SAVE(v1);
   asm volatile("vmseq.vi v1, v2, 15");
+  CMP_VL();
   VSET(2, e8, m1);
-  VCMP_U8(17, v1, 0x99, 0x99);
+  VMCMP_MASK(17, v1, 0x99, 0x99);
 
   VSET(16, e16, m1);
   VLOAD_16(v2, 0x000f, 0x0000, 0xf0f0, 0x0f0f, 0x000f, 0x0000, 0xf0f0, 0x0f0f,
            0x000f, 0x0000, 0xf0f0, 0x0f0f, 0x000f, 0x0000, 0xf0f0, 0x0f0f);
   VCLEAR(v1);
+  CMP_SAVE(v1);
   asm volatile("vmseq.vi v1, v2, 15");
+  CMP_VL();
   VSET(2, e8, m1);
-  VCMP_U8(18, v1, 0x11, 0x11);
+  VMCMP_MASK(18, v1, 0x11, 0x11);
 
   VSET(16, e32, m1);
   VLOAD_32(v2, 0x0000000f, 0x00000000, 0xf0f0f0f0, 0x0f0f0f0f, 0x0000000f,
@@ -230,9 +258,11 @@ void TEST_CASE5(void) {
            0xf0f0f0f0, 0x0f0f0f0f, 0x0000000f, 0x00000000, 0xf0f0f0f0,
            0x0f0f0f0f);
   VCLEAR(v1);
+  CMP_SAVE(v1);
   asm volatile("vmseq.vi v1, v2, 15");
+  CMP_VL();
   VSET(2, e8, m1);
-  VCMP_U8(19, v1, 0x11, 0x11);
+  VMCMP_MASK(19, v1, 0x11, 0x11);
 
 //   VSET(16, e64, m1);
 //   VLOAD_64(v2, 0x000000000000000f, 0x0000000000000000, 0xf0f0f0f0f0f0f0f0,
@@ -253,18 +283,22 @@ void TEST_CASE6(void) {
           0x0f, 0x0f, 0x00, 0xf0, 0x0f);
   VLOAD_8(v0, 0x10, 0x10);
   VCLEAR(v1);
+  CMP_SAVE(v1);
   asm volatile("vmseq.vi v1, v2, 15, v0.t");
+  CMP_VL();
   VSET(2, e8, m1);
-  VCMP_U8(21, v1, 0x10, 0x10);
+  VMCMP_MASK(21, v1, 0x10, 0x10);
 
   VSET(16, e16, m1);
   VLOAD_16(v2, 0x000f, 0x0000, 0xf0f0, 0x0f0f, 0x000f, 0x0000, 0xf0f0, 0x0f0f,
            0x000f, 0x0000, 0xf0f0, 0x0f0f, 0x000f, 0x0000, 0xf0f0, 0x0f0f);
   VLOAD_8(v0, 0x10, 0x10);
   VCLEAR(v1);
+  CMP_SAVE(v1);
   asm volatile("vmseq.vi v1, v2, 15, v0.t");
+  CMP_VL();
   VSET(2, e8, m1);
-  VCMP_U8(22, v1, 0x10, 0x10);
+  VMCMP_MASK(22, v1, 0x10, 0x10);
 
   VSET(16, e32, m1);
   VLOAD_32(v2, 0x0000000f, 0x00000000, 0xf0f0f0f0, 0x0f0f0f0f, 0x0000000f,
@@ -273,9 +307,11 @@ void TEST_CASE6(void) {
            0x0f0f0f0f);
   VLOAD_8(v0, 0x10, 0x10);
   VCLEAR(v1);
+  CMP_SAVE(v1);
   asm volatile("vmseq.vi v1, v2, 15, v0.t");
+  CMP_VL();
   VSET(2, e8, m1);
-  VCMP_U8(23, v1, 0x10, 0x10);
+  VMCMP_MASK(23, v1, 0x10, 0x10);
 
 //   VSET(16, e64, m1);
 //   VLOAD_64(v2, 0x000000000000000f, 0x0000000000000000, 0xf0f0f0f0f0f0f0f0,
@@ -309,9 +345,11 @@ void TEST_CASE7(void) {
            0x01000000, 0xf0f0f0f0, 0x0f0f0f0f, 0xfff2ffff, 0x01000000,
            0xf0f0f0f0, 0x0f0f0f0f, 0xfff2ffff, 0x01000000, 0xf0f0f0f0,
            0x0f0f0f0f);
+  CMP_SAVE(v1);
   asm volatile("vmseq.vv v1, v2, v4");
+  CMP_VL();
   VSET(4, e8, m1);
-  VCMP_U8(25, v1, 0xcc, 0xcc, 0xcc, 0xcc);
+  VMCMP_MASK(25, v1, 0xcc, 0xcc, 0xcc, 0xcc);
 };
 
 int main(void) {

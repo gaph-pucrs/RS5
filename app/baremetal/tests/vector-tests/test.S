@@ -1,8 +1,15 @@
 	.section .text.init
 	.global _entry
 _entry:
-    /* Globally disable interrupts */
-    csrw mstatus, zero
+    /* Globally disable interrupts and set mstatus.VS = Initial, otherwise */
+    /* vector instructions would trap. misa.V cannot tell whether vectors  */
+    /* exist, since Zve32x leaves it clear; without vectors, mstatus.VS is */
+    /* read-only zero and the write has no effect.                         */
+    li   t0, 0x200
+    csrw mstatus, t0
+    /* Install the trap handler used by the illegal-instruction tests */
+    la   t0, trap_handler
+    csrw mtvec, t0
 	csrw mip, zero
 	csrw mie, zero
 	/* zero-initialize all registers */
@@ -50,6 +57,18 @@ _entry:
 
 	jal main
 
+#ifdef SAIL
+	/* The Sail model stops when tohost = (exit code << 1) | 1. On RV32 */
+	/* the model acts on the write of the upper word.                   */
+	slli a0, a0, 1
+	ori  a0, a0, 1
+	la   t0, tohost
+	sw   a0, 0(t0)
+	sw   zero, 4(t0)
+.sail_end:
+	jal zero, .sail_end
+#endif
+
 	li a0,0x80001000
 	addi a1,zero,'D'
 	addi a2,zero,'O'
@@ -65,3 +84,48 @@ _entry:
 	li	s10, 0x80000000		# this will interrupt the simulation (assertion)
 	sw	zero, 0(s10)
 	jal zero, .end
+
+/* Minimal trap handler: counts the trap, records mcause, mepc and mtval */
+/* and resumes at the next instruction. Vector instructions are always  */
+/* 32 bits wide, so mepc + 4 is the next instruction.                   */
+	.align 2
+	.global trap_handler
+trap_handler:
+	csrw mscratch, t0
+	la   t0, trap_save
+	sw   t1, 0(t0)
+	lw   t1, 4(t0)
+	addi t1, t1, 1
+	sw   t1, 4(t0)
+	csrr t1, mcause
+	sw   t1, 8(t0)
+	csrr t1, mepc
+	sw   t1, 12(t0)
+	csrr t1, mtval
+	sw   t1, 16(t0)
+	csrr t1, mepc
+	addi t1, t1, 4
+	csrw mepc, t1
+	lw   t1, 0(t0)
+	csrr t0, mscratch
+	mret
+
+#ifdef SAIL
+/* Host-target interface of the Sail model, found through these symbols */
+	.section .tohost, "aw"
+	.align 6
+	.global tohost
+tohost:
+	.dword 0
+	.align 6
+	.global fromhost
+fromhost:
+	.dword 0
+#endif
+
+/* trap_save layout: { t1 spill, count, mcause, mepc, mtval } */
+	.data
+	.align 2
+	.global trap_save
+trap_save:
+	.word 0, 0, 0, 0, 0

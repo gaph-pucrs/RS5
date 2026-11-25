@@ -3,6 +3,15 @@ CFLAGS_STRIP = -fdata-sections -ffunction-sections
 LDFLAGS_STRIP = --gc-sections
 
 GCC_RISCV = riscv64-elf-gcc -march=rv32imv_zicsr -mabi=ilp32 -Os $(CFLAGS_STRIP) -DDEBUG_PORT -static -mcmodel=medany -fvisibility=hidden -nostdlib -nostartfiles -mno-relax -DPRINTF_DISABLE_SUPPORT_FLOAT=1
+
+# TARGET=sail builds for the Sail RISC-V model (sail.ld, console and exit through tohost)
+TARGET ?= rs5
+ifeq ($(TARGET),sail)
+GCC_RISCV += -DSAIL
+LDSCRIPT = sail.ld
+else
+LDSCRIPT = rs5.ld
+endif
 AS_RISCV = riscv64-elf-as -march=rv32imv_zicsr -mabi=ilp32
 LD_RISCV = riscv64-elf-ld -melf32lriscv
 DUMP_RISCV = riscv64-elf-objdump #-Mno-aliases
@@ -15,7 +24,7 @@ TEST_C_OBJS = $(addsuffix .o,$(basename $(wildcard test/*.c)))
 
 all: $(TEST_OBJS) $(TEST_C_OBJS)
 	$(GCC_RISCV) -c test.S -o test.o
-	$(GCC_RISCV) -Trs5.ld -Wl,-Map,test.map,-N -o test.axf \
+	$(GCC_RISCV) -T$(LDSCRIPT) -Wl,-Map,test.map,-N -o test.axf \
 		test.o $(TEST_OBJS) $(TEST_C_OBJS) -lgcc -lc
 	$(DUMP_RISCV) --disassemble --reloc test.axf > test.lst
 	$(DUMP_RISCV) -h test.axf > test.sec

@@ -16,12 +16,12 @@
 module vectorReductions
     import RS5_pkg::*;
 #(
-    parameter int VLEN           = 64,
-    parameter int VLENB          = 8,
-    parameter int V_REDSUM_ON    = 1'b1,
-    parameter int V_REDLOGIC_ON  = 1'b1,
-    parameter int V_REDMINMAX_ON = 1'b1,
-    parameter bit MULTI_CYCLE    = 1'b0
+    parameter int VLEN                  = 64,
+    parameter int VLENB                 = 8,
+    parameter bit VRedSumEnable         = 1'b1,
+    parameter bit VRedLogicEnable       = 1'b1,
+    parameter bit VRedMinMaxEnable      = 1'b1,
+    parameter bit VMultiCycleReductions = 1'b0
 ) (
     input  logic                       clk,
     /* verilator lint_off UNUSEDSIGNAL */
@@ -66,7 +66,7 @@ module vectorReductions
 
     logic [$clog2(TREE_LEVELS_8b):0] cycle_counter;
 
-    if (MULTI_CYCLE) begin  : multi_cycle_reduction_on
+    if (VMultiCycleReductions) begin  : multi_cycle_reduction_on
         logic                            last_cycle;
 
         always_ff @(posedge clk or negedge reset_n) begin
@@ -115,17 +115,17 @@ module vectorReductions
     // *********************************
     //  SUM
     // *********************************
-    if (V_REDSUM_ON) begin : v_redsum_gen_on
+    if (VRedSumEnable) begin : v_redsum_gen_on
         logic [ 7:0] result_redsum_8b;
         logic [15:0] result_redsum_16b;
         logic [31:0] result_redsum_32b;
 
         vectorReductionTree #(
-            .SEW             (8),
-            .VLEN            (VLEN),
-            .ELEMENTS_PER_REG(VLEN/8),
-            .RED_OP          (RED_SUM),
-            .MULTI_CYCLE     (MULTI_CYCLE)
+            .SEW                   (8),
+            .VLEN                  (VLEN),
+            .ELEMENTS_PER_REG      (VLEN/8),
+            .RED_OP                (RED_SUM),
+            .VMultiCycleReductions (VMultiCycleReductions)
         )   reduction_tree_sum_8b (
             .clk           (clk),
             .reset_n       (reset_n),
@@ -140,11 +140,11 @@ module vectorReductions
         );
 
         vectorReductionTree #(
-            .SEW             (16),
-            .VLEN            (VLEN),
-            .ELEMENTS_PER_REG(VLEN/16),
-            .RED_OP          (RED_SUM),
-            .MULTI_CYCLE     (MULTI_CYCLE)
+            .SEW                   (16),
+            .VLEN                  (VLEN),
+            .ELEMENTS_PER_REG      (VLEN/16),
+            .RED_OP                (RED_SUM),
+            .VMultiCycleReductions (VMultiCycleReductions)
         )   reduction_tree_sum_16b (
             .clk           (clk),
             .reset_n       (reset_n),
@@ -159,11 +159,11 @@ module vectorReductions
         );
 
         vectorReductionTree #(
-            .SEW             (32),
-            .VLEN            (VLEN),
-            .ELEMENTS_PER_REG(VLEN/32),
-            .RED_OP          (RED_SUM),
-            .MULTI_CYCLE     (MULTI_CYCLE)
+            .SEW                   (32),
+            .VLEN                  (VLEN),
+            .ELEMENTS_PER_REG      (VLEN/32),
+            .RED_OP                (RED_SUM),
+            .VMultiCycleReductions (VMultiCycleReductions)
         )   reduction_tree_sum_32b (
             .clk           (clk),
             .reset_n       (reset_n),
@@ -201,7 +201,7 @@ module vectorReductions
     // *********************************
     //  LOGIC
     // *********************************
-    if (V_REDLOGIC_ON) begin : v_redlogic_gen_on
+    if (VRedLogicEnable) begin : v_redlogic_gen_on
         /////////////////////////////////////////////////
         // 8 Bits
         /////////////////////////////////////////////////
@@ -210,11 +210,11 @@ module vectorReductions
         logic [ 7:0] result_redxor_8b;
 
         vectorReductionTree #(
-            .SEW             (8),
-            .VLEN            (VLEN),
-            .ELEMENTS_PER_REG(VLEN/8),
-            .RED_OP          (RED_AND),
-            .MULTI_CYCLE     (MULTI_CYCLE)
+            .SEW                   (8),
+            .VLEN                  (VLEN),
+            .ELEMENTS_PER_REG      (VLEN/8),
+            .RED_OP                (RED_AND),
+            .VMultiCycleReductions (VMultiCycleReductions)
         )   reduction_tree_and_8b (
             .clk           (clk),
             .reset_n       (reset_n),
@@ -229,11 +229,11 @@ module vectorReductions
         );
 
         vectorReductionTree #(
-            .SEW             (8),
-            .VLEN            (VLEN),
-            .ELEMENTS_PER_REG(VLEN/8),
-            .RED_OP          (RED_OR),
-            .MULTI_CYCLE     (MULTI_CYCLE)
+            .SEW                   (8),
+            .VLEN                  (VLEN),
+            .ELEMENTS_PER_REG      (VLEN/8),
+            .RED_OP                (RED_OR),
+            .VMultiCycleReductions (VMultiCycleReductions)
         )   reduction_tree_or_8b (
             .clk           (clk),
             .reset_n       (reset_n),
@@ -248,11 +248,11 @@ module vectorReductions
         );
 
         vectorReductionTree #(
-            .SEW             (8),
-            .VLEN            (VLEN),
-            .ELEMENTS_PER_REG(VLEN/8),
-            .RED_OP          (RED_XOR),
-            .MULTI_CYCLE     (MULTI_CYCLE)
+            .SEW                   (8),
+            .VLEN                  (VLEN),
+            .ELEMENTS_PER_REG      (VLEN/8),
+            .RED_OP                (RED_XOR),
+            .VMultiCycleReductions (VMultiCycleReductions)
         )   reduction_tree_xor_8b (
             .clk           (clk),
             .reset_n       (reset_n),
@@ -274,11 +274,11 @@ module vectorReductions
         logic [15:0] result_redxor_16b;
 
         vectorReductionTree #(
-            .SEW             (16),
-            .VLEN            (VLEN),
-            .ELEMENTS_PER_REG(VLEN/16),
-            .RED_OP          (RED_AND),
-            .MULTI_CYCLE     (MULTI_CYCLE)
+            .SEW                   (16),
+            .VLEN                  (VLEN),
+            .ELEMENTS_PER_REG      (VLEN/16),
+            .RED_OP                (RED_AND),
+            .VMultiCycleReductions (VMultiCycleReductions)
         )   reduction_tree_and_16b (
             .clk           (clk),
             .reset_n       (reset_n),
@@ -293,11 +293,11 @@ module vectorReductions
         );
 
         vectorReductionTree #(
-            .SEW             (16),
-            .VLEN            (VLEN),
-            .ELEMENTS_PER_REG(VLEN/16),
-            .RED_OP          (RED_OR),
-            .MULTI_CYCLE     (MULTI_CYCLE)
+            .SEW                   (16),
+            .VLEN                  (VLEN),
+            .ELEMENTS_PER_REG      (VLEN/16),
+            .RED_OP                (RED_OR),
+            .VMultiCycleReductions (VMultiCycleReductions)
         )   reduction_tree_or_16b (
             .clk           (clk),
             .reset_n       (reset_n),
@@ -312,11 +312,11 @@ module vectorReductions
         );
 
         vectorReductionTree #(
-            .SEW             (16),
-            .VLEN            (VLEN),
-            .ELEMENTS_PER_REG(VLEN/16),
-            .RED_OP          (RED_XOR),
-            .MULTI_CYCLE     (MULTI_CYCLE)
+            .SEW                   (16),
+            .VLEN                  (VLEN),
+            .ELEMENTS_PER_REG      (VLEN/16),
+            .RED_OP                (RED_XOR),
+            .VMultiCycleReductions (VMultiCycleReductions)
         )   reduction_tree_xor_16b (
             .clk           (clk),
             .reset_n       (reset_n),
@@ -338,11 +338,11 @@ module vectorReductions
         logic [31:0] result_redxor_32b;
 
         vectorReductionTree #(
-            .SEW             (32),
-            .VLEN            (VLEN),
-            .ELEMENTS_PER_REG(VLEN/32),
-            .RED_OP          (RED_AND),
-            .MULTI_CYCLE     (MULTI_CYCLE)
+            .SEW                   (32),
+            .VLEN                  (VLEN),
+            .ELEMENTS_PER_REG      (VLEN/32),
+            .RED_OP                (RED_AND),
+            .VMultiCycleReductions (VMultiCycleReductions)
         )   reduction_tree_and_32b (
             .clk           (clk),
             .reset_n       (reset_n),
@@ -357,11 +357,11 @@ module vectorReductions
         );
 
         vectorReductionTree #(
-            .SEW             (32),
-            .VLEN            (VLEN),
-            .ELEMENTS_PER_REG(VLEN/32),
-            .RED_OP          (RED_OR),
-            .MULTI_CYCLE     (MULTI_CYCLE)
+            .SEW                   (32),
+            .VLEN                  (VLEN),
+            .ELEMENTS_PER_REG      (VLEN/32),
+            .RED_OP                (RED_OR),
+            .VMultiCycleReductions (VMultiCycleReductions)
         )   reduction_tree_or_32b (
             .clk           (clk),
             .reset_n       (reset_n),
@@ -376,11 +376,11 @@ module vectorReductions
         );
 
         vectorReductionTree #(
-            .SEW             (32),
-            .VLEN            (VLEN),
-            .ELEMENTS_PER_REG(VLEN/32),
-            .RED_OP          (RED_XOR),
-            .MULTI_CYCLE     (MULTI_CYCLE)
+            .SEW                   (32),
+            .VLEN                  (VLEN),
+            .ELEMENTS_PER_REG      (VLEN/32),
+            .RED_OP                (RED_XOR),
+            .VMultiCycleReductions (VMultiCycleReductions)
         )   reduction_tree_xor_32b (
             .clk           (clk),
             .reset_n       (reset_n),
@@ -428,7 +428,7 @@ module vectorReductions
     // *********************************
     //  MIN-MAX
     // *********************************
-    if (V_REDMINMAX_ON) begin : v_redminmax_gen_on
+    if (VRedMinMaxEnable) begin : v_redminmax_gen_on
         /////////////////////////////////////////////////
         // 8 Bits
         /////////////////////////////////////////////////
@@ -438,11 +438,11 @@ module vectorReductions
         logic [ 7:0] result_redmaxu_8b;
 
         vectorReductionTree #(
-            .SEW             (8),
-            .VLEN            (VLEN),
-            .ELEMENTS_PER_REG(VLEN/8),
-            .RED_OP          (RED_MIN),
-            .MULTI_CYCLE     (MULTI_CYCLE)
+            .SEW                   (8),
+            .VLEN                  (VLEN),
+            .ELEMENTS_PER_REG      (VLEN/8),
+            .RED_OP                (RED_MIN),
+            .VMultiCycleReductions (VMultiCycleReductions)
         )   reduction_tree_min_8b (
             .clk           (clk),
             .reset_n       (reset_n),
@@ -457,11 +457,11 @@ module vectorReductions
         );
 
         vectorReductionTree #(
-            .SEW             (8),
-            .VLEN            (VLEN),
-            .ELEMENTS_PER_REG(VLEN/8),
-            .RED_OP          (RED_MINU),
-            .MULTI_CYCLE     (MULTI_CYCLE)
+            .SEW                   (8),
+            .VLEN                  (VLEN),
+            .ELEMENTS_PER_REG      (VLEN/8),
+            .RED_OP                (RED_MINU),
+            .VMultiCycleReductions (VMultiCycleReductions)
         )   reduction_tree_minu_8b (
             .clk           (clk),
             .reset_n       (reset_n),
@@ -476,11 +476,11 @@ module vectorReductions
         );
 
         vectorReductionTree #(
-            .SEW             (8),
-            .VLEN            (VLEN),
-            .ELEMENTS_PER_REG(VLEN/8),
-            .RED_OP          (RED_MAX),
-            .MULTI_CYCLE     (MULTI_CYCLE)
+            .SEW                   (8),
+            .VLEN                  (VLEN),
+            .ELEMENTS_PER_REG      (VLEN/8),
+            .RED_OP                (RED_MAX),
+            .VMultiCycleReductions (VMultiCycleReductions)
         )   reduction_tree_max_8b (
             .clk           (clk),
             .reset_n       (reset_n),
@@ -495,11 +495,11 @@ module vectorReductions
         );
 
         vectorReductionTree #(
-            .SEW             (8),
-            .VLEN            (VLEN),
-            .ELEMENTS_PER_REG(VLEN/8),
-            .RED_OP          (RED_MAXU),
-            .MULTI_CYCLE     (MULTI_CYCLE)
+            .SEW                   (8),
+            .VLEN                  (VLEN),
+            .ELEMENTS_PER_REG      (VLEN/8),
+            .RED_OP                (RED_MAXU),
+            .VMultiCycleReductions (VMultiCycleReductions)
         )   reduction_tree_maxu_8b (
             .clk           (clk),
             .reset_n       (reset_n),
@@ -522,11 +522,11 @@ module vectorReductions
         logic [15:0] result_redmaxu_16b;
 
         vectorReductionTree #(
-            .SEW             (16),
-            .VLEN            (VLEN),
-            .ELEMENTS_PER_REG(VLEN/16),
-            .RED_OP          (RED_MIN),
-            .MULTI_CYCLE     (MULTI_CYCLE)
+            .SEW                   (16),
+            .VLEN                  (VLEN),
+            .ELEMENTS_PER_REG      (VLEN/16),
+            .RED_OP                (RED_MIN),
+            .VMultiCycleReductions (VMultiCycleReductions)
         )   reduction_tree_min_16b (
             .clk           (clk),
             .reset_n       (reset_n),
@@ -541,11 +541,11 @@ module vectorReductions
         );
 
         vectorReductionTree #(
-            .SEW             (16),
-            .VLEN            (VLEN),
-            .ELEMENTS_PER_REG(VLEN/16),
-            .RED_OP          (RED_MINU),
-            .MULTI_CYCLE     (MULTI_CYCLE)
+            .SEW                   (16),
+            .VLEN                  (VLEN),
+            .ELEMENTS_PER_REG      (VLEN/16),
+            .RED_OP                (RED_MINU),
+            .VMultiCycleReductions (VMultiCycleReductions)
         )   reduction_tree_minu_16b (
             .clk           (clk),
             .reset_n       (reset_n),
@@ -560,11 +560,11 @@ module vectorReductions
         );
 
         vectorReductionTree #(
-            .SEW             (16),
-            .VLEN            (VLEN),
-            .ELEMENTS_PER_REG(VLEN/16),
-            .RED_OP          (RED_MAX),
-            .MULTI_CYCLE     (MULTI_CYCLE)
+            .SEW                   (16),
+            .VLEN                  (VLEN),
+            .ELEMENTS_PER_REG      (VLEN/16),
+            .RED_OP                (RED_MAX),
+            .VMultiCycleReductions (VMultiCycleReductions)
         )   reduction_tree_max_16b (
             .clk           (clk),
             .reset_n       (reset_n),
@@ -579,11 +579,11 @@ module vectorReductions
         );
 
         vectorReductionTree #(
-            .SEW             (16),
-            .VLEN            (VLEN),
-            .ELEMENTS_PER_REG(VLEN/16),
-            .RED_OP          (RED_MAXU),
-            .MULTI_CYCLE     (MULTI_CYCLE)
+            .SEW                   (16),
+            .VLEN                  (VLEN),
+            .ELEMENTS_PER_REG      (VLEN/16),
+            .RED_OP                (RED_MAXU),
+            .VMultiCycleReductions (VMultiCycleReductions)
         )   reduction_tree_maxu_16b (
             .clk           (clk),
             .reset_n       (reset_n),
@@ -606,11 +606,11 @@ module vectorReductions
         logic [31:0] result_redmaxu_32b;
 
         vectorReductionTree #(
-            .SEW             (32),
-            .VLEN            (VLEN),
-            .ELEMENTS_PER_REG(VLEN/32),
-            .RED_OP          (RED_MIN),
-            .MULTI_CYCLE     (MULTI_CYCLE)
+            .SEW                   (32),
+            .VLEN                  (VLEN),
+            .ELEMENTS_PER_REG      (VLEN/32),
+            .RED_OP                (RED_MIN),
+            .VMultiCycleReductions (VMultiCycleReductions)
         )   reduction_tree_min_32b (
             .clk           (clk),
             .reset_n       (reset_n),
@@ -625,11 +625,11 @@ module vectorReductions
         );
 
         vectorReductionTree #(
-            .SEW             (32),
-            .VLEN            (VLEN),
-            .ELEMENTS_PER_REG(VLEN/32),
-            .RED_OP          (RED_MINU),
-            .MULTI_CYCLE     (MULTI_CYCLE)
+            .SEW                   (32),
+            .VLEN                  (VLEN),
+            .ELEMENTS_PER_REG      (VLEN/32),
+            .RED_OP                (RED_MINU),
+            .VMultiCycleReductions (VMultiCycleReductions)
         )   reduction_tree_minu_32b (
             .clk           (clk),
             .reset_n       (reset_n),
@@ -644,11 +644,11 @@ module vectorReductions
         );
 
         vectorReductionTree #(
-            .SEW             (32),
-            .VLEN            (VLEN),
-            .ELEMENTS_PER_REG(VLEN/32),
-            .RED_OP          (RED_MAX),
-            .MULTI_CYCLE     (MULTI_CYCLE)
+            .SEW                   (32),
+            .VLEN                  (VLEN),
+            .ELEMENTS_PER_REG      (VLEN/32),
+            .RED_OP                (RED_MAX),
+            .VMultiCycleReductions (VMultiCycleReductions)
         )   reduction_tree_max_32b (
             .clk           (clk),
             .reset_n       (reset_n),
@@ -663,11 +663,11 @@ module vectorReductions
         );
 
         vectorReductionTree #(
-            .SEW             (32),
-            .VLEN            (VLEN),
-            .ELEMENTS_PER_REG(VLEN/32),
-            .RED_OP          (RED_MAXU),
-            .MULTI_CYCLE     (MULTI_CYCLE)
+            .SEW                   (32),
+            .VLEN                  (VLEN),
+            .ELEMENTS_PER_REG      (VLEN/32),
+            .RED_OP                (RED_MAXU),
+            .VMultiCycleReductions (VMultiCycleReductions)
         )   reduction_tree_maxu_32b (
             .clk           (clk),
             .reset_n       (reset_n),

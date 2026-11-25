@@ -24,27 +24,27 @@ void TEST_CASE1(void) {
   VSET(32, e8, m1);
   asm volatile("vlm.v v0, (%0)" ::"r"(ALIGNED_I8_GOLD));
   asm volatile("vsm.v v0, (%0)" ::"r"(ALIGNED_I8_BUF));
-  VMCMP(uint8_t, % hhu, 1, ALIGNED_I8_BUF, ALIGNED_I8_GOLD, 4);
+  VMCMP(uint8_t, % hhu, 1, ALIGNED_I8_BUF, ALIGNED_I8_GOLD, (current_vl() + 7) / 8);
 
   VSET(29, e8, m1);
   asm volatile("vlm.v v0, (%0)" ::"r"(ALIGNED_I8_GOLD));
   asm volatile("vsm.v v0, (%0)" ::"r"(ALIGNED_I8_BUF));
-  VMCMP(uint8_t, % hhu, 2, ALIGNED_I8_BUF, ALIGNED_I8_GOLD, 4);
+  VMCMP(uint8_t, % hhu, 2, ALIGNED_I8_BUF, ALIGNED_I8_GOLD, (current_vl() + 7) / 8);
 
   VSET(29, e32, m1);
   asm volatile("vlm.v v0, (%0)" ::"r"(ALIGNED_I8_GOLD));
   asm volatile("vsm.v v0, (%0)" ::"r"(ALIGNED_I8_BUF));
-  VMCMP(uint8_t, % hhu, 3, ALIGNED_I8_BUF, ALIGNED_I8_GOLD, 4);
+  VMCMP(uint8_t, % hhu, 3, ALIGNED_I8_BUF, ALIGNED_I8_GOLD, (current_vl() + 7) / 8);
 
   VSET(29, e32, m8);
   asm volatile("vlm.v v0, (%0)" ::"r"(ALIGNED_I8_GOLD));
   asm volatile("vsm.v v0, (%0)" ::"r"(ALIGNED_I8_BUF));
-  VMCMP(uint8_t, % hhu, 4, ALIGNED_I8_BUF, ALIGNED_I8_GOLD, 4);
+  VMCMP(uint8_t, % hhu, 4, ALIGNED_I8_BUF, ALIGNED_I8_GOLD, (current_vl() + 7) / 8);
 
   VSET(29, e32, m8);
   asm volatile("vlm.v v1, (%0)" ::"r"(ALIGNED_I8_GOLD));
   asm volatile("vsm.v v1, (%0)" ::"r"(ALIGNED_I8_BUF));
-  VMCMP(uint8_t, % hhu, 5, ALIGNED_I8_BUF, ALIGNED_I8_GOLD, 4);
+  VMCMP(uint8_t, % hhu, 5, ALIGNED_I8_BUF, ALIGNED_I8_GOLD, (current_vl() + 7) / 8);
 }
 
 int main(void) {

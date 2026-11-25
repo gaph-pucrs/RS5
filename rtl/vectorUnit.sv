@@ -16,10 +16,18 @@
 module vectorUnit
     import RS5_pkg::*;
 #(
-    parameter environment_e Environment = ASIC,
-    parameter int           VLEN        = 64,
-    parameter int           LLEN        = 32,
-    parameter int           BUS_WIDTH   = 32
+    parameter environment_e Environment           = ASIC,
+    parameter int           VLEN                  = 64,
+    parameter int           LLEN                  = 32,
+    parameter int           BUS_WIDTH             = 32,
+    parameter bit           VLogicEnable          = 1'b1,
+    parameter bit           VMinMaxEnable         = 1'b1,
+    parameter bit           VMergeEnable          = 1'b1,
+    parameter bit           VDivEnable            = 1'b1,
+    parameter bit           VRedLogicEnable       = 1'b1,
+    parameter bit           VRedMinMaxEnable      = 1'b1,
+    parameter bit           VRedSumEnable         = 1'b1,
+    parameter bit           VMultiCycleReductions = 1'b0
 )
 (
     input   logic                  clk,
@@ -37,6 +45,9 @@ module vectorUnit
 
     output  logic [31:0]           vtype_o,
     output  logic [31:0]           vlen_o,
+    output  logic                  vill_o,
+    /* Reserved register group or SEW/LMUL for the instruction (traps) */
+    output  logic                  illegal_cfg_o,
 
     output logic [31:0]            mem_address_o,
     output logic                   mem_read_enable_o,
@@ -62,6 +73,7 @@ module vectorUnit
     logic        reduction_instruction;
     logic        widening_instruction;
     logic        whole_reg_load_store;
+    logic        whole_reg_instruction;
     logic        mask_load_store;
 
     logic        accumulate_instruction_r;
@@ -69,6 +81,9 @@ module vectorUnit
     logic        multiply_instruction_r;
     logic        reduction_instruction_r;
     logic        widening_instruction_r;
+
+    /* Control decoded once from the operation (fields are added per package) */
+    vector_ctrl_t vctrl;
 
     vew_e   vsew, vsew_effective;
     vlmul_e vlmul, vlmul_effective;
@@ -116,13 +131,21 @@ module vectorUnit
 
     assign accumulate_instruction = (vector_operation_i inside {VMACC, VNMSAC, VMADD, VNMSUB});
     assign multiply_instruction   = (vector_operation_i inside {VMUL, VMULH, VMULHSU, VMULHU} | accumulate_instruction | widening_instruction);
-    assign reduction_instruction  = (vector_operation_i inside {VREDSUM, VREDMAXU, VREDMAX, VREDMINU, VREDMIN, VREDAND, VREDOR, VREDXOR});
+    assign reduction_instruction  = is_reduction(vector_operation_i);
     assign widening_instruction   = (vector_operation_i inside {VWMUL, VWMULU, VWMULSU});
     assign whole_reg_load_store   = (instruction_i[24:20] == 5'b01000 && (op_vload || op_vstore) && instruction_i[27:26] == 2'b00);
     assign mask_load_store        = (instruction_i[24:20] == 5'b01011 && (op_vload || op_vstore) && instruction_i[27:26] == 2'b00);
-    assign mask_instruction       = (vector_operation_i inside {VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT});
+    /* Whole register loads/stores and vmv<nr>r ignore vl and vtype */
+    assign whole_reg_instruction  = whole_reg_load_store || (op_vector && vector_operation_i == VMVR);
+    assign mask_instruction       = is_mask_result(vector_operation_i);
 
     assign elements_per_reg = VLENB >> vsew;
+
+    /* v0 is data, not a mask: every body element is written (vmerge) */
+    assign vctrl.mask_is_data = (vector_operation_i == VMERGE);
+
+    logic vm_effective;
+    assign vm_effective = vm || vctrl.mask_is_data;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
@@ -169,11 +192,119 @@ module vectorUnit
         .rd                     (rd),
         .vtype_o                (vtype_o),
         .vlen_o                 (vlen_o),
+        .vill_o                 (vill_o),
         .vsew                   (vsew),
         .vlmul                  (vlmul),
         .vl                     (vl),
         .vl_next                (vl_next)
     );
+
+//////////////////////////////////////////////////////////////////////////////
+// Illegal configurations: checks that depend on vtype (the encoding-only
+// checks are in the decoder). Does not depend on enable_i, which execute
+// gates with this output.
+//////////////////////////////////////////////////////////////////////////////
+
+    /* Registers in a group of LMUL; a fractional LMUL uses one register */
+    logic [3:0] lmul_regs;
+    logic       lmul_ge1;
+    always_comb begin
+        unique case (vlmul)
+            LMUL_2:  lmul_regs = 4'd2;
+            LMUL_4:  lmul_regs = 4'd4;
+            LMUL_8:  lmul_regs = 4'd8;
+            default: lmul_regs = 4'd1;
+        endcase
+    end
+    assign lmul_ge1 = (vlmul inside {LMUL_1, LMUL_2, LMUL_4, LMUL_8});
+
+    /* Group sizes are powers of two, so alignment is a mask of the low bits */
+    function automatic logic misaligned(logic [4:0] reg_num, logic [4:0] group_regs);
+        return (reg_num & (group_regs - 5'd1)) != '0;
+    endfunction
+
+    function automatic logic groups_overlap(logic [4:0] a, logic [4:0] a_regs, logic [4:0] b, logic [4:0] b_regs);
+        return ({1'b0, a} < {1'b0, b} + {1'b0, b_regs}) && ({1'b0, b} < {1'b0, a} + {1'b0, a_regs});
+    endfunction
+
+    /* Widening: EEW = 2*SEW and EMUL = 2*LMUL must be legal (SEW <= 16, LMUL <= 4).    */
+    /* The destination may overlap a source only in its highest-numbered half, and only */
+    /* when the source EMUL is at least 1.                                              */
+    logic [4:0] vd_regs;
+    assign vd_regs = widening_instruction ? (lmul_ge1 ? {lmul_regs, 1'b0} : 5'd1) : {1'b0, lmul_regs};
+
+    function automatic logic widening_overlap(logic [4:0] dst, logic [4:0] dst_regs, logic [4:0] src, logic [4:0] src_regs, logic src_emul_ge1);
+        return groups_overlap(dst, dst_regs, src, src_regs) && !(src_emul_ge1 && ({1'b0, src} == {1'b0, dst} + {1'b0, src_regs}));
+    endfunction
+
+    /* Compares write one mask register, which may only overlap the lowest-numbered */
+    /* register of a source group                                                   */
+    function automatic logic mask_dest_overlap(logic [4:0] dst, logic [4:0] src, logic [4:0] src_regs);
+        return (dst > src) && ({1'b0, dst} < {1'b0, src} + {1'b0, src_regs});
+    endfunction
+
+    logic arith_checked;
+    logic vs1_is_vector;
+    logic check_vd, check_vs2, check_vs1;
+    logic arith_illegal;
+
+    assign arith_checked = !(vector_operation_i inside {VNOP, VSETVL, VSETVLI, VSETIVLI, VMVR, VMVXS, VMVSX, VLD, VST});
+    assign vs1_is_vector = (opCat inside {OPIVV, OPMVV});
+    assign check_vd      = !(mask_instruction || reduction_instruction);
+    assign check_vs2     = (vector_operation_i != VMV);
+    assign check_vs1     = vs1_is_vector && !reduction_instruction;
+
+    always_comb begin
+        arith_illegal = 1'b0;
+        if (check_vd  && misaligned(rd,  vd_regs))           arith_illegal = 1'b1;
+        if (check_vs2 && misaligned(rs2, {1'b0, lmul_regs})) arith_illegal = 1'b1;
+        if (check_vs1 && misaligned(rs1, {1'b0, lmul_regs})) arith_illegal = 1'b1;
+
+        if (widening_instruction) begin
+            if (vsew != EW8 && vsew != EW16)                 arith_illegal = 1'b1;
+            if (vlmul == LMUL_8)                             arith_illegal = 1'b1;
+            if (widening_overlap(rd, vd_regs, rs2, {1'b0, lmul_regs}, lmul_ge1))
+                                                             arith_illegal = 1'b1;
+            if (vs1_is_vector && widening_overlap(rd, vd_regs, rs1, {1'b0, lmul_regs}, lmul_ge1))
+                                                             arith_illegal = 1'b1;
+        end
+
+        if (mask_instruction) begin
+            if (mask_dest_overlap(rd, rs2, {1'b0, lmul_regs}))                  arith_illegal = 1'b1;
+            if (vs1_is_vector && mask_dest_overlap(rd, rs1, {1'b0, lmul_regs})) arith_illegal = 1'b1;
+        end
+
+        /* vslide1up cannot write over its source */
+        if (vector_operation_i == VSLIDE1UP && groups_overlap(rd, {1'b0, lmul_regs}, rs2, {1'b0, lmul_regs}))
+                                                             arith_illegal = 1'b1;
+    end
+
+    /* Unit-stride and strided loads/stores: data group aligned to EMUL, checked */
+    /* only for EEW = SEW (EMUL = LMUL). Indexed: data (EEW = SEW) aligned to     */
+    /* LMUL, offsets checked only for an index EEW = SEW. The other EEW != SEW    */
+    /* cases and the destination/index overlap rules are not implemented yet.     */
+    logic mem_illegal;
+    logic mem_eew_is_sew;
+    logic mem_checked;
+    logic mem_indexed;
+    always_comb begin
+        unique case (instruction_i[14:12])
+            3'b000:  mem_eew_is_sew = (vsew == EW8);
+            3'b101:  mem_eew_is_sew = (vsew == EW16);
+            default: mem_eew_is_sew = (vsew == EW32);
+        endcase
+    end
+    /* Whole register and mask accesses (unit-stride, lumop 01000 and 01011) */
+    /* are not checked here. Decoded from the instruction, not enable_i.     */
+    assign mem_indexed = instruction_i[26];
+    assign mem_checked = (vector_operation_i inside {VLD, VST})
+                      && !(instruction_i[27:26] == 2'b00 && instruction_i[24:20] inside {5'b01000, 5'b01011});
+    assign mem_illegal = mem_checked && (
+                            ((mem_indexed || mem_eew_is_sew) && misaligned(rd,  {1'b0, lmul_regs}))
+                        ||  ( mem_indexed && mem_eew_is_sew  && misaligned(rs2, {1'b0, lmul_regs}))
+                        );
+
+    assign illegal_cfg_o = (arith_checked && arith_illegal) || mem_illegal;
 
 //////////////////////////////////////////////////////////////////////////////
 // MASKs
@@ -183,11 +314,19 @@ module vectorUnit
     logic [7:0][(VLENB/2)-1:0] mask_sew16;
     logic [7:0][(VLENB/4)-1:0] mask_sew32;
 
+    /* A compare can write v0 while v0 is its mask, and with LMUL > 1 it    */
+    /* writes the destination once per source register. The mask then comes */
+    /* from the copy of the old destination taken before the first write.   */
+    logic [VLEN-1:0] mask_source;
+    logic            old_vd_valid;
+
+    assign mask_source = (mask_instruction && rd == '0 && old_vd_valid) ? third_operand : v0_mask;
+
     always_comb begin
         for (int i = 0; i < 8; i++) begin
-            mask_sew8 [i] = v0_mask[( VLENB   *(i+1))-1-:VLENB];
-            mask_sew16[i] = v0_mask[((VLENB/2)*(i+1))-1-:VLENB/2];
-            mask_sew32[i] = v0_mask[((VLENB/4)*(i+1))-1-:VLENB/4];
+            mask_sew8 [i] = mask_source[( VLENB   *(i+1))-1-:VLENB];
+            mask_sew16[i] = mask_source[((VLENB/2)*(i+1))-1-:VLENB/2];
+            mask_sew32[i] = mask_source[((VLENB/4)*(i+1))-1-:VLENB/4];
         end
     end
 
@@ -359,7 +498,7 @@ module vectorUnit
         else if (!should_stall) begin
             if (next_state == V_IDLE)
                 vl_curr_reg <= 0;
-            else if (whole_reg_load_store)
+            else if (whole_reg_instruction)
                 vl_curr_reg <= '1;
             else if (mask_load_store)
                 vl_curr_reg <= (vl >> 3) + ((vl[2:0] & 3'h7) != 3'h0 ? 1 : 0);
@@ -379,7 +518,7 @@ module vectorUnit
                 total_elements_processed <= total_elements_processed + elements_per_reg;
         end
 
-    assign vector_process_done = (total_elements_processed >= vl && !whole_reg_load_store && op_vector);
+    assign vector_process_done = (total_elements_processed >= vl && !whole_reg_instruction && op_vector);
 
 //////////////////////////////////////////////////////////////////////////////
 // Register Bank
@@ -417,6 +556,10 @@ module vectorUnit
                 endcase
             end
         end
+        /* Compares read the old destination on their first hold cycle */
+        else if (mask_instruction && hold) begin
+            vs2_addr = rd;
+        end
         else begin
             vs2_addr = rs2_addr;
         end
@@ -442,34 +585,39 @@ module vectorUnit
         end
         else if (!should_stall && (state == V_EXEC) && (!hold || hold_widening) && !op_vstore && vector_operation_i != VMVXS) begin
             if (reduction_instruction || vector_operation_i == VMVSX) begin
-                unique case (vsew_effective)
-                    EW8:     write_enable <= {'0, 1'b1};
-                    EW16:    write_enable <= {'0, 2'b11};
-                    default: write_enable <= {'0, 4'b1111};
-                endcase
+                /* With vl = 0 they do not write the destination */
+                if (vl == '0)
+                    write_enable <= '0;
+                else begin
+                    unique case (vsew_effective)
+                        EW8:     write_enable <= {'0, 1'b1};
+                        EW16:    write_enable <= {'0, 2'b11};
+                        default: write_enable <= {'0, 4'b1111};
+                    endcase
+                end
             end
-            else if (whole_reg_load_store || mask_instruction) begin
+            else if (whole_reg_instruction || mask_instruction) begin
                 write_enable <= '1;
             end
             else begin
                 unique case (vsew_effective)
                     EW8:
                         for (int i = 0; i < VLENB; i++)
-                            if ((vm || mask_sew8[cycle_count_r][i]) && (i < vl_curr_reg))
+                            if ((vm_effective || mask_sew8[cycle_count_r][i]) && (i < vl_curr_reg))
                                 write_enable[i] <= 1'b1;
                             else
                                 write_enable[i] <= 1'b0;
 
                     EW16:
                         for (int i = 0; i < VLENB/2; i++)
-                            if ((vm || mask_sew16[cycle_count_r][i]) && (i < vl_curr_reg))
+                            if ((vm_effective || mask_sew16[cycle_count_r][i]) && (i < vl_curr_reg))
                                 write_enable[(i*2)+:2] <= 2'b11;
                             else
                                 write_enable[(i*2)+:2] <= 2'b00;
 
                     default:
                         for (int i = 0; i < VLENB/4; i++)
-                            if ((vm || mask_sew32[cycle_count_r][i]) && (i < vl_curr_reg))
+                            if ((vm_effective || mask_sew32[cycle_count_r][i]) && (i < vl_curr_reg))
                                 write_enable[(i*4)+:4] <= 4'b1111;
                             else
                                 write_enable[(i*4)+:4] <= 4'b0000;
@@ -542,12 +690,26 @@ module vectorUnit
         end
     end
 
+    /* For compares, third_operand keeps the old destination: it is taken */
+    /* on the first hold cycle, before the instruction writes vd.          */
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             third_operand <= '0;
         end
-        else if (!should_stall && hold) begin
+        else if (!should_stall && hold && !(mask_instruction && old_vd_valid)) begin
             third_operand <= vs2_data;
+        end
+    end
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            old_vd_valid <= 1'b0;
+        end
+        else if (!should_stall) begin
+            if (next_state == V_IDLE)
+                old_vd_valid <= 1'b0;
+            else if (mask_instruction && hold)
+                old_vd_valid <= 1'b1;
         end
     end
 
@@ -622,10 +784,17 @@ module vectorUnit
                             : vl_curr_reg;
 
     vectorALU #(
-        .VLEN   (VLEN),
-        .LLEN   (LLEN),
-        .VLENB  (VLENB),
-        .MULTI_CYCLE_REDUCTIONS(1'b0)
+        .VLEN                  (VLEN                 ),
+        .LLEN                  (LLEN                 ),
+        .VLENB                 (VLENB                ),
+        .VLogicEnable          (VLogicEnable         ),
+        .VMinMaxEnable         (VMinMaxEnable        ),
+        .VRedLogicEnable       (VRedLogicEnable      ),
+        .VRedMinMaxEnable      (VRedMinMaxEnable     ),
+        .VRedSumEnable         (VRedSumEnable        ),
+        .VMergeEnable          (VMergeEnable         ),
+        .VDivEnable            (VDivEnable           ),
+        .VMultiCycleReductions (VMultiCycleReductions)
     ) vectorALU1 (
         .clk                   (clk),
         .reset_n               (reset_n),
@@ -675,11 +844,38 @@ module vectorUnit
         end
     end
 
+    /* A compare writes only its active body elements: masked-off elements */
+    /* and the tail keep the old destination (undisturbed is always legal). */
+    /* The write happens one cycle after the compare computed it, when the  */
+    /* next instruction may already be in execute, so vm and the mask      */
+    /* source are registered like mask_instruction_r.                       */
+    logic            compare_vm_r;
+    logic            compare_v0_copy_r;
+    logic [VLEN-1:0] compare_body;
+    logic [VLEN-1:0] compare_active;
+    logic [VLEN-1:0] result_compare;
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            compare_vm_r      <= 1'b0;
+            compare_v0_copy_r <= 1'b0;
+        end
+        else if (!should_stall) begin
+            compare_vm_r      <= vm;
+            compare_v0_copy_r <= mask_instruction && rd == '0 && old_vd_valid;
+        end
+    end
+
+    /* Elements below vl (VLEN + 1 bits so vl = VLEN fits; truncated) */
+    assign compare_body   = ~({(VLEN+1){1'b1}} << vl);
+    assign compare_active = compare_body & (compare_vm_r ? '1 : (compare_v0_copy_r ? third_operand : v0_mask));
+    assign result_compare = (third_operand & ~compare_active) | (result_alu_mask & compare_active);
+
     always_comb begin
         if (op_vload_r)
             result = result_lsu;
         else if (mask_instruction_r)
-            result = result_alu_mask;
+            result = result_compare;
         else
             result = result_alu;
     end
@@ -694,10 +890,11 @@ module vectorUnit
             wr_en_scalar_o = 1'b1;
         end
         else if (vector_operation_i == VMVXS) begin
+            /* SEW < XLEN is sign-extended */
             unique case (vsew_effective)
-                EW8:     res_scalar_o = {'0, first_operand[7:0]};
-                EW16:    res_scalar_o = {'0, first_operand[15:0]};
-                default: res_scalar_o =      first_operand[31:0];
+                EW8:     res_scalar_o = {{24{first_operand[ 7]}}, first_operand[ 7:0]};
+                EW16:    res_scalar_o = {{16{first_operand[15]}}, first_operand[15:0]};
+                default: res_scalar_o =                           first_operand[31:0];
             endcase
             wr_en_scalar_o = 1'b1;
         end

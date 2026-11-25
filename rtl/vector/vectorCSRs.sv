@@ -25,15 +25,14 @@ module vectorCSRs
     input   logic                   is_vector_op_i,
     input   iTypeVector_e           vector_operation_i,
     input   logic [31:0]            op1_scalar_i,
-    /* verilator lint_off UNUSEDSIGNAL */
     input   logic [31:0]            op2_scalar_i,
     input   logic [10:0]            zimm,
-    /* verilator lint_on UNUSEDSIGNAL */
     input   logic [4:0]             rs1,
     input   logic [4:0]             rd,
 
     output  logic [31:0]            vtype_o,
     output  logic [31:0]            vlen_o,
+    output  logic                   vill_o,
 
     output  vew_e                   vsew,
     output  vlmul_e                 vlmul,
@@ -43,40 +42,52 @@ module vectorCSRs
 
     logic [$bits(VLENB)-1:0] elementsPerRegister;
     logic [$bits(VLEN)-1:0]  vl_max;
-    logic        vill, vill_next, vma, vma_next, vta, vta_next;
+    logic        vill, vma, vma_next, vta, vta_next;
     vew_e        vsew_next;
     vlmul_e      vlmul_next;
-    logic        cfg_error, cfg_error_r;
+    logic        cfg_error, reserved_bits;
+    logic [$bits(VLEN)-1:0] vl_requested;
 
 //////////////////////////////////////////////////////////////////////////////
 // Combinational
 //////////////////////////////////////////////////////////////////////////////
 
+    /* vill is set for SEW > ELEN = 32, the reserved LMUL, the reserved vtype */
+    /* bits, and for fractional LMUL with SEW > LMUL * ELEN (the minimum the  */
+    /* spec requires): mf8 never, mf4 only with e8, mf2 with e8 and e16.      */
     always_comb begin
-        case (vlmul_next)
-            LMUL_1_8:   cfg_error = (vsew_next inside {EW16, EW32, EW64})
-                                    ? 1'b1
-                                    : 1'b0;
-            LMUL_1_4:   cfg_error = (vsew_next inside {EW32, EW64})
-                                    ? 1'b1
-                                    : 1'b0;
-            LMUL_1_2:   cfg_error = (vsew_next == EW64)
-                                    ? 1'b1
-                                    : 1'b0;
-            default:    cfg_error   = 1'b0;
+        if (reserved_bits || !(vsew_next inside {EW8, EW16, EW32}))
+            cfg_error = 1'b1;
+        else begin
+            unique case (vlmul_next)
+                LMUL_RSVD:  cfg_error = 1'b1;
+                LMUL_1_8:   cfg_error = 1'b1;
+                LMUL_1_4:   cfg_error = (vsew_next != EW8);
+                LMUL_1_2:   cfg_error = (vsew_next == EW32);
+                default:    cfg_error = 1'b0;
+            endcase
+        end
+    end
+
+    /* vsetvl takes vtype from rs2, where bit 31 (vill) and bits 30:8 are   */
+    /* reserved. vsetvli has an 11-bit zimm and vsetivli a 10-bit one (zimm */
+    /* bit 10 is then part of the opcode); bits 8 and up are reserved.      */
+    always_comb begin
+        unique case (vector_operation_i)
+            VSETVL:     reserved_bits = (op2_scalar_i[31:8] != '0);
+            VSETIVLI:   reserved_bits = (zimm[9:8] != '0);
+            default:    reserved_bits = (zimm[10:8] != '0);
         endcase
     end
 
     always_comb begin
         if (vector_operation_i == VSETVL) begin
-            vill_next  = op2_scalar_i[31];
             vma_next   = op2_scalar_i[7];
             vta_next   = op2_scalar_i[6];
             vsew_next  = vew_e'(op2_scalar_i[5:3]);
             vlmul_next = vlmul_e'(op2_scalar_i[2:0]);
         end
         else begin
-            vill_next  = zimm[8];
             vma_next   = zimm[7];
             vta_next   = zimm[6];
             vsew_next  = vew_e'(zimm[5:3]);
@@ -99,24 +110,27 @@ module vectorCSRs
 
     always_comb begin
         if (vector_operation_i == VSETIVLI)
-            vl_next = ({'0, rs1} > vl_max) ? vl_max : {'0, rs1};
+            vl_requested = ({'0, rs1} > vl_max) ? vl_max : {'0, rs1};
         else if (rd != '0 && rs1 == '0)
-            vl_next = vl_max;
+            vl_requested = vl_max;
         else if (rd == '0 && rs1 == '0)
-            vl_next = vl;
+            vl_requested = vl;
         else
-            vl_next = (op1_scalar_i > vl_max) ? vl_max : op1_scalar_i;
-            //vl_next = (vector_operation_i == VSETVL) ? op1_scalar_i : {'0, op1_scalar_i[4:0]};
+            vl_requested = (op1_scalar_i > vl_max) ? vl_max : op1_scalar_i;
     end
+
+    /* With vill set, vl and rd are 0 */
+    assign vl_next = cfg_error ? '0 : vl_requested;
 
 //////////////////////////////////////////////////////////////////////////////
 // Registers
 //////////////////////////////////////////////////////////////////////////////
 
+    /* vtype resets with vill = 1 and vl = 0, as the spec recommends. With */
+    /* vill set the other vtype fields read as 0.                          */
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
-            cfg_error_r <= 1'b0;
-            vill        <= 1'b0;
+            vill        <= 1'b1;
             vma         <= 1'b0;
             vta         <= 1'b0;
             vsew        <= EW8;
@@ -124,17 +138,12 @@ module vectorCSRs
             vl          <= '0;
         end
         else if (is_vector_op_i && vector_operation_i inside {VSETVL, VSETVLI, VSETIVLI}) begin
-            cfg_error_r <= cfg_error;
-            vill        <= vill_next | cfg_error;
-            vma         <= vma_next;
-            vta         <= vta_next;
-            vsew        <= vsew_next;
-            vlmul       <= vlmul_next;
-            vl          <=  (cfg_error)
-                            ? '0
-                            : vl_next;
-
-            //$display("[%0t] Set VSEW = %s, VLMUL = %s, VL = %d\n", $time, vsew_next, vlmul_next, vl_next);
+            vill        <= cfg_error;
+            vma         <= cfg_error ? 1'b0   : vma_next;
+            vta         <= cfg_error ? 1'b0   : vta_next;
+            vsew        <= cfg_error ? EW8    : vsew_next;
+            vlmul       <= cfg_error ? LMUL_1 : vlmul_next;
+            vl          <= vl_next;
         end
     end
 
@@ -143,9 +152,8 @@ module vectorCSRs
 //////////////////////////////////////////////////////////////////////////////
 
     assign vlen_o   = {'0, vl};
-    assign vtype_o  = (cfg_error_r)
-                    ? {1'b1, 31'b0}
-                    : {vill, 23'b0, vma, vta, vsew, vlmul};
+    assign vtype_o  = {vill, 23'b0, vma, vta, vsew, vlmul};
+    assign vill_o   = vill;
 
 endmodule
 /* verilator lint_on WIDTHEXPAND */

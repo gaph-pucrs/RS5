@@ -17,6 +17,7 @@
 ./vector/vectorLSU.sv
 ./vector/vectorRegbank.sv
 ./vectorUnit.sv
+./vectorDecode.sv
 ./amo.sv
 ./CSRBank.sv
 ./decode.sv

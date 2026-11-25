@@ -16,11 +16,11 @@
 module vectorLane
     import RS5_pkg::*;
 #(
-    parameter int LLEN        = 32,
-    parameter bit V_LOGIC_ON  = 1'b1,
-    parameter bit V_MINMAX_ON = 1'b1,
-    parameter bit V_MERGE_ON  = 1'b1,
-    parameter bit V_DIV_ON    = 1'b1
+    parameter int LLEN          = 32,
+    parameter bit VLogicEnable  = 1'b1,
+    parameter bit VMinMaxEnable = 1'b1,
+    parameter bit VMergeEnable  = 1'b1,
+    parameter bit VDivEnable    = 1'b1
 ) (
     input  logic              clk,
     input  logic              reset_n,
@@ -135,7 +135,7 @@ module vectorLane
     logic [31:0] result_or;
     logic [31:0] result_xor;
 
-    if (V_LOGIC_ON) begin : v_logic_gen_on
+    if (VLogicEnable) begin : v_logic_gen_on
         always_comb begin
             result_and = first_operand & second_operand;
             result_or  = first_operand | second_operand;
@@ -186,7 +186,7 @@ module vectorLane
 
     logic [31:0] result_merge;
 
-    if(V_MERGE_ON) begin : v_merge_gen_on
+    if(VMergeEnable) begin : v_merge_gen_on
         always_comb begin
             unique case (vsew)
                 EW8: begin
@@ -302,7 +302,7 @@ module vectorLane
     logic [31:0] result_maxu;
     logic [31:0] result_max;
 
-    if (V_MINMAX_ON) begin : v_minmax_gen_on
+    if (VMinMaxEnable) begin : v_minmax_gen_on
         always_comb begin
             unique case (vsew)
                 EW8: begin
@@ -496,7 +496,7 @@ module vectorLane
     logic  div_enable_16b;
     logic  div_enable_32b;
 
-    if (V_DIV_ON) begin : v_div_common_gen_on
+    if (VDivEnable) begin : v_div_common_gen_on
         assign div_enable_8b  = (div_enable && vsew == EW8);
         assign div_enable_16b = (div_enable && vsew == EW16);
         assign div_enable_32b = (div_enable && vsew == EW32);
@@ -520,7 +520,7 @@ module vectorLane
 
     generate
         for (genvar i_div8b = 0; i_div8b < 4; i_div8b++) begin : DIV8B_LOOP
-            if (V_DIV_ON) begin : v_div_8b_gen_on
+            if (VDivEnable) begin : v_div_8b_gen_on
                 div #(
                     .N(8)
                 ) div8b (
@@ -552,7 +552,7 @@ module vectorLane
 
     generate
         for (genvar i_div16b = 0; i_div16b < 2; i_div16b++) begin : DIV16B_LOOP
-            if (V_DIV_ON) begin : v_div_16b_gen_on
+            if (VDivEnable) begin : v_div_16b_gen_on
                 div #(
                     .N(16)
                 ) div16b (
@@ -582,7 +582,7 @@ module vectorLane
     logic [31:0] div_result_32b;
     logic [31:0] rem_result_32b;
 
-    if (V_DIV_ON) begin : v_div_32b_gen_on
+    if (VDivEnable) begin : v_div_32b_gen_on
         div #(
             .N(32)
         ) div32b (
@@ -607,7 +607,7 @@ module vectorLane
 // Division Demux
 //////////////////////////////////////////////////////////////////////////////
 
-    if (V_DIV_ON) begin : v_div_mux_gen_on
+    if (VDivEnable) begin : v_div_mux_gen_on
         always_comb begin
             unique case (vsew)
                 EW8: begin

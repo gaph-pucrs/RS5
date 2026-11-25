@@ -143,26 +143,64 @@ With Verilator, pass them through the Makefile:
 make -C sim VENABLE=1 VLEN=256 BIN_FILE=../app/baremetal/tests/vector-tests/test.bin
 ```
 
+`+BIN_FILE=<path>` on the simulator command line overrides `BIN_FILE` when the simulation starts, so an elaborated snapshot runs another program without a new elaboration:
+
+```bash
+xrun -R +BIN_FILE=../app/baremetal/tests/vector-tests/test.bin
+```
+
 ### Vector regression tests
 
-[sim/vector_regression.sh](sim/vector_regression.sh) builds and simulates each test in [app/baremetal/tests/vector-tests/operations](app/baremetal/tests/vector-tests/operations) with Xcelium.
-Each log goes to `app/baremetal/tests/vector-tests/results/passed` or `app/baremetal/tests/vector-tests/results/failed`.
+[sim/vector_regression.py](sim/vector_regression.py) (Python 3, standard library only) builds each test in [app/baremetal/tests/vector-tests/operations](app/baremetal/tests/vector-tests/operations) and [mem_operations](app/baremetal/tests/vector-tests/mem_operations) once and simulates it with Xcelium on every `VLEN` x `LLEN` x `BUS_WIDTH` configuration: `VLEN` 128, 256 and 512, `LLEN` 32, 64 and 128 and `BUS_WIDTH` 32, 64 and 128 by default (27 configurations).
+With `--fast` it runs only three configurations (`VLEN`/`LLEN`/`BUS_WIDTH`): 256/32/32, 256/32/64 and 256/64/32.
+`--vlen`, `--llen` and `--bus-width` choose the values on the command line, and `-k PATTERN` runs only the tests whose name matches the glob (repeatable).
+With `-k`, the logs of the other tests in `results/` are kept.
+The work runs in parallel over `-j N` jobs (default: the number of CPUs, at most 64), in two steps:
+- each test is built in its own folder, `app/baremetal/tests/vector-tests/build/rs5/<test>/`, which keeps its `test.bin` and `test.lst`, while each configuration is elaborated once into its own Xcelium library (`sim/xcelium_vlen<V>_llen<L>_bus<B>.d`, plus `..._classoff.d` for the tests in `class_disabled`);
+- every test and configuration pair is simulated from that snapshot with `xrun -R +BIN_FILE=<path>`, so the slowest configuration of one test does not hold up the others.
+The tests in [class_disabled](app/baremetal/tests/vector-tests/class_disabled) also run on every configuration, with all vector class parameters set to 0.
+Each log goes to `app/baremetal/tests/vector-tests/results/vlen<V>_llen<L>_bus<B>/passed` or `.../failed`, and the script ends with a pass/fail count per configuration and one line per failure with its reason:
+`BUILD` (the test does not compile), `TIMEOUT`, `TRAP` (unexpected trap), `CHECK` (the first wrong result and its test case) or `SIM` (no verdict in the log, e.g. an Xcelium error).
+A simulation that runs longer than `SIM_TIMEOUT` seconds (300 by default) is killed and counted as failed.
+A test that does not build is not simulated: the compiler output becomes its log and the test counts as failed.
+The script exits with status 1 when any test fails.
 
-The tests' expected results assume a specific configuration. Before running the script:
+The expected results do not depend on `VLEN`: compares stop at `vl`, and reductions, mask compares and `vslide1down` recompute the expected value from their sources and `vl` (see [test/vector_macros.h](app/baremetal/tests/vector-tests/test/vector_macros.h)).
+The golden vectors are written for `VLEN = 512`, so a smaller `VLEN` checks fewer elements.
 
-1. The tests' expected results assume `VLEN = 512`; any other VLEN makes them report false failures.
-   The script sets `VEnable = 1`, `VLEN = 512` and the vector test binary on the xrun command line, so [sim/testbench.sv](sim/testbench.sv) needs no editing.
-2. Build the tests with **GCC 13**, or turn off auto-vectorization.
-   Newer GCC releases auto-vectorize the test code with RVV instructions, which changes the code under test and breaks the tests.
-   If you use a newer GCC, add `-fno-tree-vectorize` to `GCC_RISCV` in [app/baremetal/tests/vector-tests/Makefile](app/baremetal/tests/vector-tests/Makefile).
-   Check your version with `riscv64-elf-gcc --version`.
+Before running the script, build the tests with **GCC 13**, or turn off auto-vectorization.
+Newer GCC releases auto-vectorize the test code with RVV instructions, which changes the code under test and breaks the tests.
+If you use a newer GCC, add `-fno-tree-vectorize` to `GCC_RISCV` in [app/baremetal/tests/vector-tests/Makefile](app/baremetal/tests/vector-tests/Makefile).
+Check your version with `riscv64-elf-gcc --version`.
+The script sets `VEnable`, `VLEN`, `LLEN`, `BUS_WIDTH` and the vector test binary on the xrun command line, so [sim/testbench.sv](sim/testbench.sv) needs no editing.
 
 Then run:
 
 ```bash
-cd sim
-./vector_regression.sh
+cd sim                                                   # or run it from any folder
+./vector_regression.py                                   # full matrix
+./vector_regression.py --fast                            # 3 configurations
+VLENS=512 LLENS=32 BUS_WIDTHS=32 ./vector_regression.py  # a single configuration
+./vector_regression.py --vlen 512 --llen 32 64           # VLEN 512, LLEN 32 and 64, every BUS_WIDTH
+./vector_regression.py --fast -k vmseq -k 'vl*'          # only the tests that match
+./vector_regression.py -j 16                             # at most 16 parallel jobs
 ```
+
+#### Reference model
+
+`--sail` runs the same tests on the [Sail RISC-V](https://github.com/riscv/sail-riscv) model instead of RS5, to check the expected values against a reference:
+
+```bash
+module load sail-riscv/0.12   # or set SAIL_RISCV_SIM to the sail_riscv_sim binary
+cd sim
+./vector_regression.py --sail                # VLEN 128, 256 and 512
+./vector_regression.py --sail --vlen 512 -k vmseq
+```
+
+[sim/sail_zve32x.json](sim/sail_zve32x.json) configures the model as RV32 with Zve32x (integer vectors, ELEN = 32), and the script rewrites its VLEN for each run.
+The tests are built with `make TARGET=sail` ([sail.ld](app/baremetal/tests/vector-tests/sail.ld) links them at `0x80000000`, and the console and the exit go through the model's `tohost`), into `build/sail/<test>/`, and the results go to `results/sail_vlen<V>/`.
+`LLEN` and `BUS_WIDTH` do not apply, and `class_disabled` does not run.
+A few checks are wrapped in `SKIP_ON_SAIL(...)` in the tests, where the model differs from RS5 for a reason given next to each one: Sail 0.12 deviations from RVV 1.0, choices the spec leaves to the implementation, and instructions RS5 does not implement yet.
 
 ---
 

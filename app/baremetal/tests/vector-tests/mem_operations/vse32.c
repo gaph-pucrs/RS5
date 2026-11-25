@@ -271,6 +271,7 @@ void TEST_CASE11(void) {
            0x38197598, 0x18931795, 0x81937598, 0x18747547, 0x3eeeeeee,
            0x90139301, 0xab8b9148, 0x90318509, 0x31897598, 0x83195999,
            0x89139848);
+  LIMIT_TO_VL(); // RS5: compare only the elements loaded into v8
   VSET(16, e8, m2);
   asm volatile("vse32.v v8, (%0)" ::"r"(ALIGNED_I32));
   VCLEAR(v8);

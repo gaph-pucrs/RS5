@@ -201,65 +201,74 @@ package RS5_pkg;
         ZBKBREV8  = 12'b100000000000
     } iTypeZbkb_e;
 
-    typedef enum logic [5:0] {
+    /* Vector operation select. The entries after VSLIDE1DOWN are Zve32x   */
+    /* instructions not implemented yet; the decoder returns VNOP (illegal) */
+    /* for them until their class is implemented.                           */
+    typedef enum logic [6:0] {
         VNOP,
-        VSETVL,
-        VSETVLI,
-        VSETIVLI,
-        VADD,
-        VSUB,
-        VRSUB,
-        VAND,
-        VOR,
-        VXOR,
-        VSLL,
-        VSRL,
-        VSRA,
-        VMSEQ,
-        VMSNE,
-        VMSLTU,
-        VMSLT,
-        VMSLEU,
-        VMSLE,
-        VMSGTU,
-        VMSGT,
-        VMINU,
-        VMIN,
-        VMAXU,
-        VMAX,
-        VMUL,
-        VMULH,
-        VMULHU,
-        VMULHSU,
-        VWMUL,
-        VWMULU,
-        VWMULSU,
-        VDIVU,
-        VDIV,
-        VREMU,
-        VREM,
-        VMACC,
-        VNMSAC,
-        VMADD,
-        VNMSUB,
+        // Configuration
+        VSETVL, VSETVLI, VSETIVLI,
+        // Add/subtract
+        VADD, VSUB, VRSUB,
+        // Bitwise logical (VLogicEnable)
+        VAND, VOR, VXOR,
+        // Shifts
+        VSLL, VSRL, VSRA,
+        // Integer compares
+        VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT,
+        // Min/max (VMinMaxEnable)
+        VMINU, VMIN, VMAXU, VMAX,
+        // Multiply and widening multiply
+        VMUL, VMULH, VMULHU, VMULHSU, VWMUL, VWMULU, VWMULSU,
+        // Divide and remainder (VDivEnable)
+        VDIVU, VDIV, VREMU, VREM,
+        // Multiply-add
+        VMACC, VNMSAC, VMADD, VNMSUB,
+        // Sum reduction (VRedSumEnable)
         VREDSUM,
-        VREDMAXU,
-        VREDMAX,
-        VREDMINU,
-        VREDMIN,
-        VREDAND,
-        VREDOR,
-        VREDXOR,
-        VMV,
-        VMVR,
-        VMVSX,
-        VMVXS,
+        // Min/max reductions (VRedMinMaxEnable)
+        VREDMAXU, VREDMAX, VREDMINU, VREDMIN,
+        // Logical reductions (VRedLogicEnable)
+        VREDAND, VREDOR, VREDXOR,
+        // Moves
+        VMV, VMVR, VMVSX, VMVXS,
+        // Merge (VMergeEnable)
         VMERGE,
-        VSLIDE1UP,
-        VSLIDE1DOWN,
+        // Slide by one
+        VSLIDE1UP, VSLIDE1DOWN,
+        // Integer extension (VExtendEnable)
+        VEXT,
+        // Widening add/sub, multiply-add and reduction (VWidenEnable)
+        VWADDSUB, VWMACC, VWREDSUM,
+        // Add/subtract with carry (VCarryEnable)
+        VADC, VMADC, VSBC, VMSBC,
+        // Narrowing shift (VNarrowEnable)
+        VNSRL, VNSRA,
+        // Fixed point (VFixedPointEnable)
+        VSADDU, VSADD, VSSUBU, VSSUB, VAADDU, VAADD, VASUBU, VASUB,
+        VSMUL, VSSRL, VSSRA, VNCLIPU, VNCLIP,
+        // Mask logical (VMaskLogicEnable)
+        VMAND, VMNAND, VMANDN, VMXOR, VMOR, VMNOR, VMORN, VMXNOR,
+        // Mask bits (VMaskBitsEnable)
+        VCPOP, VFIRST, VMSBF, VMSIF, VMSOF, VIOTA, VID,
+        // Slide (VSlideEnable)
+        VSLIDEUP, VSLIDEDOWN,
+        // Gather and compress (VGatherEnable)
+        VRGATHER, VRGATHEREI16, VCOMPRESS,
+        // Loads and stores
         VLD,            // Vector load  (was iType_e VLOAD)
         VST             // Vector store (was iType_e VSTORE)
     } iTypeVector_e;
+
+    /* Vector operations whose result is a mask (compares) */
+    function automatic logic is_mask_result(iTypeVector_e op);
+        return op inside {VMSEQ, VMSNE, VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT};
+    endfunction
+
+    /* Vector reductions: they write a scalar result to element 0 of vd */
+    function automatic logic is_reduction(iTypeVector_e op);
+        return op inside {VREDSUM, VREDMAXU, VREDMAX, VREDMINU, VREDMIN, VREDAND, VREDOR, VREDXOR};
+    endfunction
 
     typedef struct packed {
         // AMO operation select (one-hot, AMONOP when unused)
@@ -302,6 +311,8 @@ package RS5_pkg;
         logic        is_vector;
         // Vector loads/stores (subset of is_vector)
         logic        is_vector_mem;
+        // Vector instruction that depends on vtype (traps when vill = 1)
+        logic        uses_vtype;
         logic        is_zicond;
         logic        is_sha2;
         logic        is_zbkb;
@@ -350,6 +361,13 @@ package RS5_pkg;
         logic        csr_wr_uses_rs1;
     } exec_ctrl_t;
 
+    /* Vector control decoded once in vectorUnit. It only holds mask_is_data; */
+    /* the instructions not implemented yet add their fields here.           */
+    typedef struct packed {
+        // v0 is an operand, not a mask (vmerge; vadc/vsbc once implemented)
+        logic        mask_is_data;
+    } vector_ctrl_t;
+
     typedef struct packed {
         logic        valid;
         logic        compressed;
@@ -388,7 +406,8 @@ package RS5_pkg;
     typedef enum  logic[1:0] {DIRECT, VECTORED} trapMode_e;
 
     typedef enum  logic[11:0] {
-        VSTART        = 12'h008,
+        VSTART        = 12'h008, VXSAT, VXRM,
+        VCSR          = 12'h00F,
         MSTATUS       = 12'h300, MISA, 
         MIE           = 12'h304, MTVEC, MCOUNTEREN,
         MENVCFG       = 12'h30A, 

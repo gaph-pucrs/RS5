@@ -56,6 +56,15 @@ module testbench
     parameter  bit           VEnable         = 1'b0;
     parameter  int           VLEN            = 512;
     parameter  int           LLEN            = 32;
+    /* Vector instruction classes, e.g. xrun -defparam testbench.VDivEnable=0 */
+    parameter  bit           VLogicEnable          = 1'b1;
+    parameter  bit           VMinMaxEnable         = 1'b1;
+    parameter  bit           VMergeEnable          = 1'b1;
+    parameter  bit           VDivEnable            = 1'b1;
+    parameter  bit           VRedLogicEnable       = 1'b1;
+    parameter  bit           VRedMinMaxEnable      = 1'b1;
+    parameter  bit           VRedSumEnable         = 1'b1;
+    parameter  bit           VMultiCycleReductions = 1'b0;
 
     parameter  int           BUS_WIDTH       = 32;
     localparam int           MEM_ADDR_BITS   = 28;
@@ -165,7 +174,15 @@ module testbench
         .HPMCOUNTEREnable(USE_HPMCOUNTER),
         .IQUEUE_SIZE     (IQUEUE_SIZE   ),
         .BRANCHPRED      (BRANCHPRED    ),
-        .FORWARDING      (FORWARDING    )
+        .FORWARDING      (FORWARDING    ),
+        .VLogicEnable          (VLogicEnable         ),
+        .VMinMaxEnable         (VMinMaxEnable        ),
+        .VMergeEnable          (VMergeEnable         ),
+        .VDivEnable            (VDivEnable           ),
+        .VRedLogicEnable       (VRedLogicEnable      ),
+        .VRedMinMaxEnable      (VRedMinMaxEnable     ),
+        .VRedSumEnable         (VRedSumEnable        ),
+        .VMultiCycleReductions (VMultiCycleReductions)
     ) dut (
         .clk                    (clk),
         .reset_n                (reset_n),

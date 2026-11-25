@@ -38,7 +38,14 @@ module decode
     parameter bit           ZICONDEnable = 1'b0,
     parameter bit           VEnable      = 1'b0,
     parameter bit           BRANCHPRED   = 1'b1,
-    parameter bit           FORWARDING   = 1'b1
+    parameter bit           FORWARDING   = 1'b1,
+    parameter bit           VLogicEnable     = 1'b1,
+    parameter bit           VMinMaxEnable    = 1'b1,
+    parameter bit           VMergeEnable     = 1'b1,
+    parameter bit           VDivEnable       = 1'b1,
+    parameter bit           VRedLogicEnable  = 1'b1,
+    parameter bit           VRedMinMaxEnable = 1'b1,
+    parameter bit           VRedSumEnable    = 1'b1
 )
 (
     input   logic           clk,
@@ -340,112 +347,33 @@ module decode
 //  Decode Vector Instruction
 //////////////////////////////////////////////////////////////////////////////
 
+    /* VNOP on an OP-V, LOAD-FP or STORE-FP opcode means the encoding is */
+    /* reserved or not supported, and raises an illegal instruction.     */
     iTypeVector_e vector_operation;
+    logic         vector_invalid;
+    logic         vector_uses_vtype;
 
     if (VEnable) begin : v_enable_decode_gen_on
-        iTypeVector_e decode_vector_opcfg;
-        iTypeVector_e decode_vector_opi;
-        iTypeVector_e decode_vector_opm;
-
-        opCat_e opCat;
-
-        assign opCat = opCat_e'(funct3);
-
-        always_comb begin
-            unique case (instruction_i[31:30]) inside
-                2'b0?:      decode_vector_opcfg = VSETVLI;
-                2'b11:      decode_vector_opcfg = VSETIVLI;
-                2'b10:      decode_vector_opcfg = VSETVL;
-                default:    decode_vector_opcfg = VNOP;
-            endcase
-        end
-
-        always_comb begin
-            unique case (funct7[6:1]) inside
-                6'b000000:     decode_vector_opi = VADD;
-                6'b000010:     decode_vector_opi = VSUB;
-                6'b000011:     decode_vector_opi = VRSUB;
-                6'b000100:     decode_vector_opi = VMINU;
-                6'b000101:     decode_vector_opi = VMIN;
-                6'b000110:     decode_vector_opi = VMAXU;
-                6'b000111:     decode_vector_opi = VMAX;
-                6'b001001:     decode_vector_opi = VAND;
-                6'b001010:     decode_vector_opi = VOR;
-                6'b001011:     decode_vector_opi = VXOR;
-                6'b010111:     decode_vector_opi = (funct7[0]) ? VMV : VMERGE;
-                6'b011000:     decode_vector_opi = VMSEQ;
-                6'b011001:     decode_vector_opi = VMSNE;
-                6'b011010:     decode_vector_opi = VMSLTU;
-                6'b011011:     decode_vector_opi = VMSLT;
-                6'b011100:     decode_vector_opi = VMSLEU;
-                6'b011101:     decode_vector_opi = VMSLE;
-                6'b011110:     decode_vector_opi = VMSGTU;
-                6'b011111:     decode_vector_opi = VMSGT;
-                6'b100101:     decode_vector_opi = VSLL;
-                6'b100111:     decode_vector_opi = VMVR;
-                6'b101000:     decode_vector_opi = VSRL;
-                6'b101001:     decode_vector_opi = VSRA;
-                default:       decode_vector_opi = VNOP;
-            endcase
-        end
-
-        always_comb begin
-            unique case (funct7[6:1]) inside
-                6'b000000:     decode_vector_opm = VREDSUM;
-                6'b000001:     decode_vector_opm = VREDAND;
-                6'b000010:     decode_vector_opm = VREDOR;
-                6'b000011:     decode_vector_opm = VREDXOR;
-                6'b000100:     decode_vector_opm = VREDMINU;
-                6'b000101:     decode_vector_opm = VREDMIN;
-                6'b000110:     decode_vector_opm = VREDMAXU;
-                6'b000111:     decode_vector_opm = VREDMAX;
-                6'b001110:     decode_vector_opm = VSLIDE1UP;
-                6'b001111:     decode_vector_opm = VSLIDE1DOWN;
-                6'b010000:     decode_vector_opm = (opCat == OPMVX)
-                                                ? VMVSX
-                                                : VMVXS;
-                6'b100000:     decode_vector_opm = VDIVU;
-                6'b100001:     decode_vector_opm = VDIV;
-                6'b100010:     decode_vector_opm = VREMU;
-                6'b100011:     decode_vector_opm = VREM;
-                6'b100100:     decode_vector_opm = VMULHU;
-                6'b100101:     decode_vector_opm = VMUL;
-                6'b100110:     decode_vector_opm = VMULHSU;
-                6'b100111:     decode_vector_opm = VMULH;
-                6'b101101:     decode_vector_opm = VMACC;
-                6'b101111:     decode_vector_opm = VNMSAC;
-                6'b101001:     decode_vector_opm = VMADD;
-                6'b101011:     decode_vector_opm = VNMSUB;
-                6'b111000:     decode_vector_opm = VWMULU;
-                6'b111010:     decode_vector_opm = VWMULSU;
-                6'b111011:     decode_vector_opm = VWMUL;
-                default:       decode_vector_opm = VNOP;
-            endcase
-        end
-
-        always_comb begin
-            if (instruction_operation == VECTOR) begin
-                unique case (opCat) inside
-                    OPCFG:               vector_operation = decode_vector_opcfg;
-                    OPIVV, OPIVX, OPIVI: vector_operation = decode_vector_opi;
-                    OPMVV, OPMVX:        vector_operation = decode_vector_opm;
-                    default:             vector_operation = VNOP;
-                endcase
-            end
-            else if (instruction_operation == VLOAD) begin
-                vector_operation = VLD;
-            end
-            else if (instruction_operation == VSTORE) begin
-                vector_operation = VST;
-            end
-            else begin
-                vector_operation = VNOP;
-            end
-        end
-
+        vectorDecode #(
+            .VLogicEnable     (VLogicEnable),
+            .VMinMaxEnable    (VMinMaxEnable),
+            .VMergeEnable     (VMergeEnable),
+            .VDivEnable       (VDivEnable),
+            .VRedLogicEnable  (VRedLogicEnable),
+            .VRedMinMaxEnable (VRedMinMaxEnable),
+            .VRedSumEnable    (VRedSumEnable)
+        ) vectorDecode1 (
+            .instruction_i           (instruction_i),
+            .instruction_operation_i (instruction_operation),
+            .vector_operation_o      (vector_operation),
+            .vector_invalid_o        (vector_invalid),
+            .vector_uses_vtype_o     (vector_uses_vtype)
+        );
     end
     else begin : v_enable_decode_gen_off
-        assign vector_operation = VNOP;
+        assign vector_operation  = VNOP;
+        assign vector_invalid    = 1'b0;
+        assign vector_uses_vtype = 1'b0;
     end
 
 //////////////////////////////////////////////////////////////////////////////
@@ -667,7 +595,7 @@ module decode
 //////////////////////////////////////////////////////////////////////////////
 
     logic invalid_inst;
-    assign invalid_inst = ((instruction_i[1:0] != '1) || instruction_operation == INVALID || amo_invalid) && !invalid;
+    assign invalid_inst = ((instruction_i[1:0] != '1) || instruction_operation == INVALID || amo_invalid || vector_invalid) && !invalid;
 
     logic exc_inst_access_fault;
     assign exc_inst_access_fault = ctrl_i.inst_fault && !invalid;
@@ -808,6 +736,7 @@ module decode
         ctrl.aes_is_mix      = ZKNEEnable   && instruction_operation == AES32ESMI;
         ctrl.is_vector       = VEnable      && instruction_operation inside {VECTOR, VLOAD, VSTORE};
         ctrl.is_vector_mem   = VEnable      && instruction_operation inside {VLOAD, VSTORE};
+        ctrl.uses_vtype      = vector_uses_vtype;
         ctrl.is_zicond       = ZICONDEnable && instruction_operation inside {CZERO_EQZ, CZERO_NEZ};
         ctrl.zicond_is_eqz   = ZICONDEnable && instruction_operation == CZERO_EQZ;
         ctrl.is_sha2         = ZKNHEnable   && instruction_operation inside {SIG0, SIG1, SUM0, SUM1, SIG0H, SIG0L,
