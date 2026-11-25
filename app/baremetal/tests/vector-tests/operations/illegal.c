@@ -91,6 +91,10 @@ void TEST_CASE1(void) {
   EXPECT_LEGAL(72, 0x4425c0d7); // vmadc.vxm v1, v2, a1, v0
   EXPECT_LEGAL(73, 0x4c2180d7); // vmsbc.vvm v1, v2, v3, v0
   EXPECT_LEGAL(74, 0x4e25c0d7); // vmsbc.vx v1, v2, a1
+  EXPECT_ILLEGAL(75, 0x4a112157); // vzext.vf8 v2, v1 (needs SEW = 64)
+  EXPECT_ILLEGAL(76, 0x4a11a157); // vsext.vf8 v2, v1 (needs SEW = 64)
+  EXPECT_ILLEGAL(77, 0x4a102157); // VXUNARY0 with vs1 = 00000 (unassigned)
+  EXPECT_ILLEGAL(78, 0x4a142157); // VXUNARY0 with vs1 = 01000 (unassigned)
 }
 
 // Reserved register groups and SEW/LMUL, rejected by the vector unit with
@@ -151,6 +155,32 @@ void TEST_CASE2(void) {
   SKIP_ON_SAIL(EXPECT_ILLEGAL(146, 0x4c2202d7)); // vmsbc.vvm v5, v2, v4, v0 (vd inside vs1 group)
   EXPECT_LEGAL(147, 0x46220157); // vmadc.vv v2, v2, v4 (vd = lowest of vs2)
   EXPECT_LEGAL(148, 0x4e220157); // vmsbc.vv v2, v2, v4 (vd = lowest of vs2)
+  VSET(16, e8, m1);
+  EXPECT_ILLEGAL(149, 0x4a132157); // vzext.vf2 v2, v1 (SEW = 8)
+  EXPECT_ILLEGAL(150, 0x4a13a157); // vsext.vf2 v2, v1 (SEW = 8)
+  VSET(16, e16, m1);
+  EXPECT_ILLEGAL(151, 0x4a122157); // vzext.vf4 v2, v1 (SEW = 16)
+  EXPECT_ILLEGAL(152, 0x4a12a157); // vsext.vf4 v2, v1 (SEW = 16)
+  EXPECT_LEGAL(153, 0x4a132157); // vzext.vf2 v2, v1
+  EXPECT_ILLEGAL(154, 0x48132057); // vzext.vf2 v0, v1, v0.t (vd = v0)
+  EXPECT_LEGAL(155, 0x48132157); // vzext.vf2 v2, v1, v0.t
+  EXPECT_ILLEGAL(156, 0x4a232157); // vzext.vf2 v2, v2 (overlap, source EMUL < 1)
+  VSET(16, e16, m2);
+  EXPECT_ILLEGAL(157, 0x4a1321d7); // vzext.vf2 v3, v1 (vd not aligned)
+  EXPECT_ILLEGAL(158, 0x4a232157); // vzext.vf2 v2, v2 (vs2 in low half of vd)
+  EXPECT_LEGAL(159, 0x4a332157); // vzext.vf2 v2, v3 (vs2 in high half of vd)
+  EXPECT_LEGAL(160, 0x4a13a157); // vsext.vf2 v2, v1 (vs2 EMUL = 1, vs1 field is not a register)
+  VSET(16, e32, m4);
+  EXPECT_ILLEGAL(161, 0x4a332257); // vzext.vf2 v4, v3 (vs2 not aligned to EMUL = 2)
+  EXPECT_ILLEGAL(162, 0x4a432257); // vzext.vf2 v4, v4 (vs2 in low half of vd)
+  EXPECT_LEGAL(163, 0x4a632257); // vzext.vf2 v4, v6 (vs2 in high half of vd)
+  EXPECT_LEGAL(164, 0x4a83a257); // vsext.vf2 v4, v8
+  EXPECT_ILLEGAL(165, 0x4a622257); // vzext.vf4 v4, v6 (vs2 not in highest quarter of vd)
+  EXPECT_LEGAL(166, 0x4a722257); // vzext.vf4 v4, v7 (vs2 in highest quarter of vd)
+  EXPECT_LEGAL(167, 0x4a12a257); // vsext.vf4 v4, v1
+  VSET(16, e32, m2);
+  EXPECT_ILLEGAL(168, 0x4a322157); // vzext.vf4 v2, v3 (overlap, source EMUL < 1)
+  EXPECT_LEGAL(169, 0x4a122157); // vzext.vf4 v2, v1
 }
 
 int main(void) {

@@ -159,6 +159,21 @@ module vectorUnit
     logic vm_effective;
     assign vm_effective = vm || vctrl.mask_is_data;
 
+    /* vzext and vsext: vs1 bit 1 is set for the extension by 2 (00110, */
+    /* 00111) and clear for the extension by 4 (00100, 00101)           */
+    vext_sel_e ext_sel;
+    always_comb begin
+        if (!(vector_operation_i inside {VZEXT, VSEXT}))
+            ext_sel = EXT_NONE;
+        else if (rs1[1])
+            ext_sel = EXT_VF2;
+        else
+            ext_sel = EXT_VF4;
+    end
+
+    assign vctrl.ext_sel    = ext_sel;
+    assign vctrl.ext_signed = (vector_operation_i == VSEXT);
+
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             accumulate_instruction_r <= 1'b0;
@@ -239,15 +254,43 @@ module vectorUnit
         return ({1'b0, a} < {1'b0, b} + {1'b0, b_regs}) && ({1'b0, b} < {1'b0, a} + {1'b0, a_regs});
     endfunction
 
-    /* Widening: EEW = 2*SEW and EMUL = 2*LMUL must be legal (SEW <= 16, LMUL <= 4).    */
-    /* The destination may overlap a source only in its highest-numbered half, and only */
-    /* when the source EMUL is at least 1.                                              */
+    /* Widening: EEW = 2*SEW and EMUL = 2*LMUL must be legal (SEW <= 16, LMUL <= 4). */
     logic [4:0] vd_regs;
     assign vd_regs = widening_instruction ? (lmul_ge1 ? {lmul_regs, 1'b0} : 5'd1) : {1'b0, lmul_regs};
 
+    /* The destination may overlap a source of a narrower EEW (widening,  */
+    /* extension) only in its highest-numbered part, and only when the    */
+    /* source EMUL is at least 1                                          */
     function automatic logic widening_overlap(logic [4:0] dst, logic [4:0] dst_regs, logic [4:0] src, logic [4:0] src_regs, logic src_emul_ge1);
-        return groups_overlap(dst, dst_regs, src, src_regs) && !(src_emul_ge1 && ({1'b0, src} == {1'b0, dst} + {1'b0, src_regs}));
+        return groups_overlap(dst, dst_regs, src, src_regs)
+            && !(src_emul_ge1 && ({1'b0, src} + {1'b0, src_regs} == {1'b0, dst} + {1'b0, dst_regs}));
     endfunction
+
+    /* vzext and vsext read vs2 with EEW = SEW/f and EMUL = LMUL/f: a group of */
+    /* LMUL/f registers, or one register when EMUL < 1                          */
+    logic [4:0] vs2_regs;
+    logic       vs2_emul_ge1;
+    always_comb begin
+        vs2_regs     = {1'b0, lmul_regs};
+        vs2_emul_ge1 = lmul_ge1;
+        unique case (ext_sel)
+            EXT_VF2: begin
+                vs2_emul_ge1 = (vlmul inside {LMUL_2, LMUL_4, LMUL_8});
+                if (vs2_emul_ge1)
+                    vs2_regs = {2'b0, lmul_regs[3:1]};
+                else
+                    vs2_regs = 5'd1;
+            end
+            EXT_VF4: begin
+                vs2_emul_ge1 = (vlmul inside {LMUL_4, LMUL_8});
+                if (vs2_emul_ge1)
+                    vs2_regs = {3'b0, lmul_regs[3:2]};
+                else
+                    vs2_regs = 5'd1;
+            end
+            default: ;
+        endcase
+    end
 
     /* Compares write one mask register, which may only overlap the lowest-numbered */
     /* register of a source group                                                   */
@@ -264,12 +307,13 @@ module vectorUnit
     assign vs1_is_vector = (opCat inside {OPIVV, OPMVV});
     assign check_vd      = !(mask_instruction || reduction_instruction);
     assign check_vs2     = (vector_operation_i != VMV);
-    assign check_vs1     = vs1_is_vector && !reduction_instruction;
+    /* In vzext and vsext the vs1 field selects the extension */
+    assign check_vs1     = vs1_is_vector && !reduction_instruction && (ext_sel == EXT_NONE);
 
     always_comb begin
         arith_illegal = 1'b0;
         if (check_vd  && misaligned(rd,  vd_regs))           arith_illegal = 1'b1;
-        if (check_vs2 && misaligned(rs2, {1'b0, lmul_regs})) arith_illegal = 1'b1;
+        if (check_vs2 && misaligned(rs2, vs2_regs))          arith_illegal = 1'b1;
         if (check_vs1 && misaligned(rs1, {1'b0, lmul_regs})) arith_illegal = 1'b1;
 
         if (widening_instruction) begin
@@ -280,6 +324,12 @@ module vectorUnit
             if (vs1_is_vector && widening_overlap(rd, vd_regs, rs1, {1'b0, lmul_regs}, lmul_ge1))
                                                              arith_illegal = 1'b1;
         end
+
+        /* The source EEW = SEW/f must be at least 8 */
+        if (ext_sel == EXT_VF2 && vsew == EW8)               arith_illegal = 1'b1;
+        if (ext_sel == EXT_VF4 && vsew != EW32)              arith_illegal = 1'b1;
+        if (ext_sel != EXT_NONE && widening_overlap(rd, vd_regs, rs2, vs2_regs, vs2_emul_ge1))
+                                                             arith_illegal = 1'b1;
 
         if (mask_instruction) begin
             if (mask_dest_overlap(rd, rs2, {1'b0, lmul_regs}))                  arith_illegal = 1'b1;
@@ -537,8 +587,29 @@ module vectorUnit
 //////////////////////////////////////////////////////////////////////////////
 
     // ADDRESS CALCULATION
+    /* vzext and vsext iterate over the destination registers: each source */
+    /* register is read for f of them, one slice of it each time            */
+    logic [3:0] vs2_reg_offset;
+    logic [1:0] ext_slice;
+    always_comb begin
+        unique case (ext_sel)
+            EXT_VF2: begin
+                vs2_reg_offset = {1'b0, cycle_count[3:1]};
+                ext_slice      = {1'b0, cycle_count[0]};
+            end
+            EXT_VF4: begin
+                vs2_reg_offset = {2'b0, cycle_count[3:2]};
+                ext_slice      = cycle_count[1:0];
+            end
+            default: begin
+                vs2_reg_offset = cycle_count;
+                ext_slice      = '0;
+            end
+        endcase
+    end
+
     assign rs1_addr = cycle_count + rs1;
-    assign rs2_addr = cycle_count + rs2;
+    assign rs2_addr = vs2_reg_offset + rs2;
     assign rd_addr  = cycle_count + rd;
 
     always_comb begin
@@ -693,12 +764,26 @@ module vectorUnit
 // Operands
 //////////////////////////////////////////////////////////////////////////////
 
+    /* vs2 extended to SEW (vzext, vsext); unchanged for the other operations */
+    logic [VLEN-1:0] vs2_extended;
+
+    vectorExtend #(
+        .VLEN (VLEN)
+    ) vectorExtendVs2 (
+        .data_i       (vs2_data),
+        .ext_sel_i    (vctrl.ext_sel),
+        .ext_signed_i (vctrl.ext_signed),
+        .slice_i      (ext_slice),
+        .vsew_i       (vsew),
+        .data_o       (vs2_extended)
+    );
+
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             first_operand <= '0;
         end
         else if (!should_stall && !hold) begin
-            first_operand  <= vs2_data;
+            first_operand  <= vs2_extended;
         end
     end
 

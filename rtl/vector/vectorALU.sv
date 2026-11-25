@@ -372,7 +372,8 @@ module vectorALU
             VREDMAX, VREDMAXU,
             VREDAND, VREDOR:   result_o = {'0, result_reductions};
             VMV, VMVSX:        result_o = second_operand_r;
-            VMVR:              result_o = first_operand_r;
+            VMVR,
+            VZEXT, VSEXT:      result_o = first_operand_r;
             VMUL, VMULH,
             VMULHU, VMULHSU:   result_o = result_mult_low;
             VWMUL, VWMULU,

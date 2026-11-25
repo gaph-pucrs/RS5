@@ -189,6 +189,17 @@ module vectorDecode
     // OPMVV, OPMVX
     ////////////////////////////////////////////////////////////////////////
 
+    /* VXUNARY0 (OPMVV) selects by vs1: vzext and vsext by 4 are 00100 and */
+    /* 00101, by 2 are 00110 and 00111. By 8 (00010, 00011) needs SEW = 64 */
+    iTypeVector_e vxunary0;
+    always_comb begin
+        unique case (vs1)
+            5'b00100, 5'b00110: vxunary0 = VZEXT;
+            5'b00101, 5'b00111: vxunary0 = VSEXT;
+            default:            vxunary0 = VNOP;
+        endcase
+    end
+
     funct6_decode_t opm;
     always_comb begin
         unique case (funct6) inside
@@ -211,6 +222,7 @@ module vectorDecode
                                  : !is_mvv    ? ((vs2 == '0) ? VMVSX : VNOP)
                                  : (vs1 == '0) ? VMVXS
                                  :              VNOP, F_VX};
+            6'b010010:     opm = '{vxunary0,    F_V};
             6'b100000:     opm = '{VDIVU,       F_VX};
             6'b100001:     opm = '{VDIV,        F_VX};
             6'b100010:     opm = '{VREMU,       F_VX};

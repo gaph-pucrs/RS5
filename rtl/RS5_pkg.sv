@@ -236,8 +236,8 @@ package RS5_pkg;
         VMERGE,
         // Slide by one
         VSLIDE1UP, VSLIDE1DOWN,
-        // Integer extension (VExtendEnable)
-        VEXT,
+        // Integer extension
+        VZEXT, VSEXT,
         // Widening add/sub, multiply-add and reduction (VWidenEnable)
         VWADDSUB, VWMACC, VWREDSUM,
         // Add/subtract with carry (VCarryEnable)
@@ -362,6 +362,11 @@ package RS5_pkg;
         logic        csr_wr_uses_rs1;
     } exec_ctrl_t;
 
+    /* Integer extension of a vector source: none, or from 1/2 or 1/4 of SEW */
+    typedef enum logic [1:0] {
+        EXT_NONE, EXT_VF2, EXT_VF4
+    } vext_sel_e;
+
     /* Vector control decoded once in vectorUnit, from the operation and vm. */
     /* The instructions not implemented yet add their fields here.          */
     typedef struct packed {
@@ -373,6 +378,10 @@ package RS5_pkg;
         logic        use_carry_in;
         // v0 is an operand, not a mask (vmerge, vadc, vsbc, vmadc, vmsbc)
         logic        mask_is_data;
+        // vs2 is extended to SEW from 1/2 or 1/4 of it (vzext, vsext)
+        vext_sel_e   ext_sel;
+        // The extension copies the sign (vsext)
+        logic        ext_signed;
     } vector_ctrl_t;
 
     typedef struct packed {

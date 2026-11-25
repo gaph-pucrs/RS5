@@ -113,6 +113,7 @@ puts "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 								../rtl/vector/vectorCSRs.sv				\
 								../rtl/vector/vectorLane.sv				\
 								../rtl/vector/vectorSlide.sv			\
+								../rtl/vector/vectorExtend.sv			\
 								../rtl/vector/vectorReductionTree.sv 	\
 								../rtl/vector/vectorReductions.sv		\
 								../rtl/vector/vectorALU.sv				\
