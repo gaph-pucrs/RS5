@@ -15,7 +15,8 @@
  * Takes the part of the register selected by slice_i and extends each of its
  * elements to SEW, with zeros or with the sign: half of the register for vf2
  * (SEW/2 to SEW) and a quarter for vf4 (SEW/4 to SEW). With EXT_NONE the
- * register passes unchanged.
+ * register passes unchanged. With ExtendByFour = 0 there is no extension by
+ * 4 and EXT_VF4 also passes the register unchanged.
  */
 
 `include "../RS5_pkg.sv"
@@ -23,7 +24,9 @@
 module vectorExtend
     import RS5_pkg::*;
 #(
-    parameter int VLEN = 64
+    parameter int VLEN         = 64,
+    /* The extension by 4 (vf4); the vs1 extender only extends by 2 */
+    parameter bit ExtendByFour = 1'b1
 ) (
     input  logic [VLEN-1:0] data_i,
     input  vext_sel_e       ext_sel_i,
@@ -49,12 +52,16 @@ module vectorExtend
     end
 
     always_comb begin
-        unique case (slice_i)
-            2'd0:    quarter = data_i[(VLEN/4)-1:0];
-            2'd1:    quarter = data_i[(VLEN/2)-1:VLEN/4];
-            2'd2:    quarter = data_i[(3*VLEN/4)-1:VLEN/2];
-            default: quarter = data_i[VLEN-1:3*VLEN/4];
-        endcase
+        if (!ExtendByFour)
+            quarter = '0;
+        else begin
+            unique case (slice_i)
+                2'd0:    quarter = data_i[(VLEN/4)-1:0];
+                2'd1:    quarter = data_i[(VLEN/2)-1:VLEN/4];
+                2'd2:    quarter = data_i[(3*VLEN/4)-1:VLEN/2];
+                default: quarter = data_i[VLEN-1:3*VLEN/4];
+            endcase
+        end
     end
 
     always_comb begin
@@ -73,8 +80,10 @@ module vectorExtend
             end
             /* SEW = 32 extends bytes */
             EXT_VF4: begin
-                for (int i = 0; i < VLENB/4; i++)
-                    data_o[(32*i)+:32] = {{24{ext_signed_i && quarter[(8*i)+7]}}, quarter[(8*i)+:8]};
+                if (ExtendByFour) begin
+                    for (int i = 0; i < VLENB/4; i++)
+                        data_o[(32*i)+:32] = {{24{ext_signed_i && quarter[(8*i)+7]}}, quarter[(8*i)+:8]};
+                end
             end
             default: ;
         endcase

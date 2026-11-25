@@ -874,8 +874,10 @@ module vectorUnit
         .data_o       (vs2_extended)
     );
 
+    /* vs1 is only extended by 2 (widening add and subtract) */
     vectorExtend #(
-        .VLEN (VLEN)
+        .VLEN         (VLEN),
+        .ExtendByFour (1'b0)
     ) vectorExtendVs1 (
         .data_i       (vs1_data),
         .ext_sel_i    (vs1_ext_sel),
