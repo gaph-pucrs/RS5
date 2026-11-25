@@ -73,6 +73,8 @@ module vectorUnit
     logic        multiply_instruction;
     logic        reduction_instruction;
     logic        widening_instruction;
+    logic        widening_multiply;
+    logic        integer_extension;
     logic        whole_reg_load_store;
     logic        whole_reg_instruction;
     logic        mask_load_store;
@@ -81,7 +83,7 @@ module vectorUnit
     logic        mask_instruction_nr;
     logic        multiply_instruction_r;
     logic        reduction_instruction_r;
-    logic        widening_instruction_r;
+    logic        widening_multiply_r;
 
     /* Control decoded once from the operation (fields are added per package) */
     vector_ctrl_t vctrl;
@@ -131,20 +133,29 @@ module vectorUnit
     assign op_vector = enable_i && !(vector_operation_i == VLD) && !(vector_operation_i == VST);
 
     assign accumulate_instruction = (vector_operation_i inside {VMACC, VNMSAC, VMADD, VNMSUB});
-    assign multiply_instruction   = (vector_operation_i inside {VMUL, VMULH, VMULHSU, VMULHU} | accumulate_instruction | widening_instruction);
+    assign multiply_instruction   = (vector_operation_i inside {VMUL, VMULH, VMULHSU, VMULHU} | accumulate_instruction | widening_multiply);
     assign reduction_instruction  = is_reduction(vector_operation_i);
-    assign widening_instruction   = (vector_operation_i inside {VWMUL, VWMULU, VWMULSU});
+    /* Widening: the destination has EEW = 2*SEW and EMUL = 2*LMUL. The */
+    /* widening multiply writes both destination registers of a source  */
+    /* register from one product (hold_widening); the widening add and  */
+    /* subtract extend their sources and iterate over the destination   */
+    assign widening_multiply      = (vector_operation_i inside {VWMUL, VWMULU, VWMULSU});
+    assign widening_instruction   = widening_multiply || (vector_operation_i inside {VWADDU, VWADD, VWSUBU, VWSUB});
+    assign integer_extension      = (vector_operation_i inside {VZEXT, VSEXT});
     assign whole_reg_load_store   = (instruction_i[24:20] == 5'b01000 && (op_vload || op_vstore) && instruction_i[27:26] == 2'b00);
     assign mask_load_store        = (instruction_i[24:20] == 5'b01011 && (op_vload || op_vstore) && instruction_i[27:26] == 2'b00);
     /* Whole register loads/stores and vmv<nr>r ignore vl and vtype */
     assign whole_reg_instruction  = whole_reg_load_store || (op_vector && vector_operation_i == VMVR);
     assign mask_instruction       = is_mask_result(vector_operation_i);
 
-    assign elements_per_reg = VLENB >> vsew;
+    /* Elements done per cycle: one destination register, or one source */
+    /* register for the widening multiply, which writes two per cycle    */
+    assign elements_per_reg = widening_multiply ? (VLENB >> vsew) : (VLENB >> vsew_effective);
 
     /* The adder computes a - b as a + ~b + 1. The magnitude compares and */
     /* min/max subtract too, and the lanes take a >= b from the carry-out */
     assign vctrl.is_sub       = (vector_operation_i inside {VSUB, VRSUB, VNMSAC, VNMSUB, VSBC, VMSBC,
+                                                            VWSUBU, VWSUB,
                                                             VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT,
                                                             VMINU, VMIN, VMAXU, VMAX});
 
@@ -159,20 +170,26 @@ module vectorUnit
     logic vm_effective;
     assign vm_effective = vm || vctrl.mask_is_data;
 
-    /* vzext and vsext: vs1 bit 1 is set for the extension by 2 (00110, */
-    /* 00111) and clear for the extension by 4 (00100, 00101)           */
+    /* The sources are extended to the destination SEW: by 2 for the     */
+    /* widening add and subtract; for vzext and vsext, vs1 bit 1 is set  */
+    /* for the extension by 2 (00110, 00111) and clear for the extension */
+    /* by 4 (00100, 00101)                                               */
     vext_sel_e ext_sel;
     always_comb begin
-        if (!(vector_operation_i inside {VZEXT, VSEXT}))
-            ext_sel = EXT_NONE;
-        else if (rs1[1])
+        if (integer_extension) begin
+            if (rs1[1])
+                ext_sel = EXT_VF2;
+            else
+                ext_sel = EXT_VF4;
+        end
+        else if (widening_instruction && !widening_multiply)
             ext_sel = EXT_VF2;
         else
-            ext_sel = EXT_VF4;
+            ext_sel = EXT_NONE;
     end
 
     assign vctrl.ext_sel    = ext_sel;
-    assign vctrl.ext_signed = (vector_operation_i == VSEXT);
+    assign vctrl.ext_signed = (vector_operation_i inside {VSEXT, VWADD, VWSUB});
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
@@ -180,7 +197,7 @@ module vectorUnit
             mask_instruction_nr      <= 1'b0;
             multiply_instruction_r   <= 1'b0;
             reduction_instruction_r  <= 1'b0;
-            widening_instruction_r   <= 1'b0;
+            widening_multiply_r      <= 1'b0;
         end
         else if (!should_stall) begin
             if (next_state == V_EXEC) begin
@@ -188,14 +205,14 @@ module vectorUnit
                 mask_instruction_nr      <= mask_instruction;
                 multiply_instruction_r   <= multiply_instruction;
                 reduction_instruction_r  <= reduction_instruction;
-                widening_instruction_r   <= widening_instruction;
+                widening_multiply_r      <= widening_multiply;
             end
             else begin
                 accumulate_instruction_r <= 1'b0;
                 mask_instruction_nr      <= 1'b0;
                 multiply_instruction_r   <= 1'b0;
                 reduction_instruction_r  <= 1'b0;
-                widening_instruction_r   <= 1'b0;
+                widening_multiply_r      <= 1'b0;
             end
         end
     end
@@ -273,23 +290,25 @@ module vectorUnit
     always_comb begin
         vs2_regs     = {1'b0, lmul_regs};
         vs2_emul_ge1 = lmul_ge1;
-        unique case (ext_sel)
-            EXT_VF2: begin
-                vs2_emul_ge1 = (vlmul inside {LMUL_2, LMUL_4, LMUL_8});
-                if (vs2_emul_ge1)
-                    vs2_regs = {2'b0, lmul_regs[3:1]};
-                else
-                    vs2_regs = 5'd1;
-            end
-            EXT_VF4: begin
-                vs2_emul_ge1 = (vlmul inside {LMUL_4, LMUL_8});
-                if (vs2_emul_ge1)
-                    vs2_regs = {3'b0, lmul_regs[3:2]};
-                else
-                    vs2_regs = 5'd1;
-            end
-            default: ;
-        endcase
+        if (integer_extension) begin
+            unique case (ext_sel)
+                EXT_VF2: begin
+                    vs2_emul_ge1 = (vlmul inside {LMUL_2, LMUL_4, LMUL_8});
+                    if (vs2_emul_ge1)
+                        vs2_regs = {2'b0, lmul_regs[3:1]};
+                    else
+                        vs2_regs = 5'd1;
+                end
+                EXT_VF4: begin
+                    vs2_emul_ge1 = (vlmul inside {LMUL_4, LMUL_8});
+                    if (vs2_emul_ge1)
+                        vs2_regs = {3'b0, lmul_regs[3:2]};
+                    else
+                        vs2_regs = 5'd1;
+                end
+                default: ;
+            endcase
+        end
     end
 
     /* Compares write one mask register, which may only overlap the lowest-numbered */
@@ -308,7 +327,7 @@ module vectorUnit
     assign check_vd      = !(mask_instruction || reduction_instruction);
     assign check_vs2     = (vector_operation_i != VMV);
     /* In vzext and vsext the vs1 field selects the extension */
-    assign check_vs1     = vs1_is_vector && !reduction_instruction && (ext_sel == EXT_NONE);
+    assign check_vs1     = vs1_is_vector && !reduction_instruction && !integer_extension;
 
     always_comb begin
         arith_illegal = 1'b0;
@@ -326,10 +345,12 @@ module vectorUnit
         end
 
         /* The source EEW = SEW/f must be at least 8 */
-        if (ext_sel == EXT_VF2 && vsew == EW8)               arith_illegal = 1'b1;
-        if (ext_sel == EXT_VF4 && vsew != EW32)              arith_illegal = 1'b1;
-        if (ext_sel != EXT_NONE && widening_overlap(rd, vd_regs, rs2, vs2_regs, vs2_emul_ge1))
+        if (integer_extension) begin
+            if (ext_sel == EXT_VF2 && vsew == EW8)           arith_illegal = 1'b1;
+            if (ext_sel == EXT_VF4 && vsew != EW32)          arith_illegal = 1'b1;
+            if (widening_overlap(rd, vd_regs, rs2, vs2_regs, vs2_emul_ge1))
                                                              arith_illegal = 1'b1;
+        end
 
         if (mask_instruction) begin
             if (mask_dest_overlap(rd, rs2, {1'b0, lmul_regs}))                  arith_illegal = 1'b1;
@@ -540,7 +561,7 @@ module vectorUnit
         if (!reset_n)
             cycle_count_r <= 0;
         else if (!should_stall) begin
-            if (widening_instruction && (!hold || hold_widening))
+            if (widening_multiply && (!hold || hold_widening))
                 cycle_count_r <= cycle_count_vd;
             else if (!hold)
                 cycle_count_r <= cycle_count;
@@ -587,29 +608,30 @@ module vectorUnit
 //////////////////////////////////////////////////////////////////////////////
 
     // ADDRESS CALCULATION
-    /* vzext and vsext iterate over the destination registers: each source */
-    /* register is read for f of them, one slice of it each time            */
-    logic [3:0] vs2_reg_offset;
+    /* Operations that extend their sources iterate over the destination */
+    /* registers: each source register is read for f of them, one slice  */
+    /* of it each time                                                   */
+    logic [3:0] src_reg_offset;
     logic [1:0] ext_slice;
     always_comb begin
         unique case (ext_sel)
             EXT_VF2: begin
-                vs2_reg_offset = {1'b0, cycle_count[3:1]};
+                src_reg_offset = {1'b0, cycle_count[3:1]};
                 ext_slice      = {1'b0, cycle_count[0]};
             end
             EXT_VF4: begin
-                vs2_reg_offset = {2'b0, cycle_count[3:2]};
+                src_reg_offset = {2'b0, cycle_count[3:2]};
                 ext_slice      = cycle_count[1:0];
             end
             default: begin
-                vs2_reg_offset = cycle_count;
+                src_reg_offset = cycle_count;
                 ext_slice      = '0;
             end
         endcase
     end
 
-    assign rs1_addr = cycle_count + rs1;
-    assign rs2_addr = vs2_reg_offset + rs2;
+    assign rs1_addr = src_reg_offset + rs1;
+    assign rs2_addr = src_reg_offset + rs2;
     assign rd_addr  = cycle_count + rd;
 
     always_comb begin
@@ -733,12 +755,22 @@ module vectorUnit
 // Replicate Immediate and Scalar
 //////////////////////////////////////////////////////////////////////////////
 
+    /* The widening add and subtract truncate the scalar to SEW and extend */
+    /* it to 2*SEW, like their vector sources                              */
     always_comb begin
-        unique case (vsew)
-            EW8:     scalar_replicated = {(VLENB)  {op1_scalar_i[ 7:0]}};
-            EW16:    scalar_replicated = {(VLENB/2){op1_scalar_i[15:0]}};
-            default: scalar_replicated = {(VLENB/4){op1_scalar_i[31:0]}};
-        endcase
+        if (ext_sel == EXT_NONE) begin
+            unique case (vsew)
+                EW8:     scalar_replicated = {(VLENB)  {op1_scalar_i[ 7:0]}};
+                EW16:    scalar_replicated = {(VLENB/2){op1_scalar_i[15:0]}};
+                default: scalar_replicated = {(VLENB/4){op1_scalar_i[31:0]}};
+            endcase
+        end
+        else begin
+            unique case (vsew)
+                EW8:     scalar_replicated = {(VLENB/2){{ 8{vctrl.ext_signed && op1_scalar_i[ 7]}}, op1_scalar_i[ 7:0]}};
+                default: scalar_replicated = {(VLENB/4){{16{vctrl.ext_signed && op1_scalar_i[15]}}, op1_scalar_i[15:0]}};
+            endcase
+        end
     end
 
     always_comb begin
@@ -764,8 +796,9 @@ module vectorUnit
 // Operands
 //////////////////////////////////////////////////////////////////////////////
 
-    /* vs2 extended to SEW (vzext, vsext); unchanged for the other operations */
-    logic [VLEN-1:0] vs2_extended;
+    /* The sources extended to the destination SEW (vzext, vsext, widening */
+    /* add and subtract); unchanged for the other operations               */
+    logic [VLEN-1:0] vs2_extended, vs1_extended;
 
     vectorExtend #(
         .VLEN (VLEN)
@@ -774,8 +807,19 @@ module vectorUnit
         .ext_sel_i    (vctrl.ext_sel),
         .ext_signed_i (vctrl.ext_signed),
         .slice_i      (ext_slice),
-        .vsew_i       (vsew),
+        .vsew_i       (vsew_effective),
         .data_o       (vs2_extended)
+    );
+
+    vectorExtend #(
+        .VLEN (VLEN)
+    ) vectorExtendVs1 (
+        .data_i       (vs1_data),
+        .ext_sel_i    (vctrl.ext_sel),
+        .ext_signed_i (vctrl.ext_signed),
+        .slice_i      (ext_slice),
+        .vsew_i       (vsew_effective),
+        .data_o       (vs1_extended)
     );
 
     always_ff @(posedge clk or negedge reset_n) begin
@@ -825,7 +869,7 @@ module vectorUnit
                 unique case (opCat)
                     OPIVX, OPFVF, OPMVX: second_operand <= scalar_replicated;
                     OPIVI:               second_operand <= imm_replicated;
-                    default:             second_operand <= vs1_data;
+                    default:             second_operand <= vs1_extended;
                 endcase
             end
         end
@@ -875,6 +919,10 @@ module vectorUnit
 // ALU
 //////////////////////////////////////////////////////////////////////////////
 
+    /* The operations that extend their sources compute at the destination SEW */
+    vew_e vsew_alu;
+    assign vsew_alu = (ext_sel == EXT_NONE) ? vsew : vsew_effective;
+
     logic [$bits(VLEN )-1:0] vl_reductions;
     assign vl_reductions = (vl_curr_reg > elements_per_reg)
                             ? elements_per_reg
@@ -916,9 +964,9 @@ module vectorUnit
         .mask_instruction      (mask_instruction_nr),
         .multiply_instruction  (multiply_instruction_r),
         .reduction_instruction (reduction_instruction_r),
-        .widening_instruction  (widening_instruction_r),
+        .widening_instruction  (widening_multiply_r),
         .current_state         (state),
-        .vsew                  (vsew),
+        .vsew                  (vsew_alu),
         .hold_o                (hold_alu),
         .hold_widening_o       (hold_widening),
         .result_mask_o         (result_alu_mask),

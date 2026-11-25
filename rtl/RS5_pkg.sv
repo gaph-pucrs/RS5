@@ -238,8 +238,10 @@ package RS5_pkg;
         VSLIDE1UP, VSLIDE1DOWN,
         // Integer extension
         VZEXT, VSEXT,
-        // Widening add/sub, multiply-add and reduction (VWidenEnable)
-        VWADDSUB, VWMACC, VWREDSUM,
+        // Widening add/subtract
+        VWADDU, VWADD, VWSUBU, VWSUB,
+        // Widening multiply-add and sum reduction
+        VWMACC, VWREDSUM,
         // Add/subtract with carry (VCarryEnable)
         VADC, VMADC, VSBC, VMSBC,
         // Narrowing shift (VNarrowEnable)
