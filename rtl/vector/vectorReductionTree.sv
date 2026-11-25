@@ -31,8 +31,8 @@ module vectorReductionTree
 
     input  logic [$bits(VLEN)-1:0]               vl,
     input  logic                                 vm,
-    input  logic [7:0][ELEMENTS_PER_REG-1:0]     mask,
-    input  logic [3:0]                           cycle_count_r,
+    /* Mask of the elements of this pass */
+    input  logic [ELEMENTS_PER_REG-1:0]          mask,
 
     // cycle signal is only used on multi-cycle
     /* verilator lint_off UNUSEDSIGNAL */
@@ -56,7 +56,7 @@ module vectorReductionTree
             // First Level
             for (int i = 0; i < ELEMENTS_PER_REG; i++) begin
                 if (i == 0) begin
-                    if ((vm || mask[cycle_count_r][0]) && i < vl) begin
+                    if ((vm || mask[0]) && i < vl) begin
                         if (RED_OP == RED_MAX) begin
                             result[0][i] = ($signed(first_operand[0]) > $signed(second_operand))
                                             ? first_operand[0]
@@ -95,7 +95,7 @@ module vectorReductionTree
                     end
                 end
                 else begin
-                    if ((vm || mask[cycle_count_r][i]) && i < vl) begin
+                    if ((vm || mask[i]) && i < vl) begin
                         result[0][i] = first_operand[i];
                     end
                     else begin
@@ -210,7 +210,7 @@ module vectorReductionTree
             else if (cycle == '0) begin // First Level
                 for (int i = 0; i < ELEMENTS_PER_REG; i++) begin
                     if (i == 0) begin
-                        if ((vm || mask[cycle_count_r][0]) && i < vl) begin
+                        if ((vm || mask[0]) && i < vl) begin
                             if (RED_OP == RED_MAX) begin
                                operand[i] <= ($signed(first_operand[0]) > $signed(second_operand))
                                                 ? first_operand[0]
@@ -249,7 +249,7 @@ module vectorReductionTree
                         end
                     end
                     else begin
-                        if ((vm || mask[cycle_count_r][i]) && i < vl) begin
+                        if ((vm || mask[i]) && i < vl) begin
                            operand[i] <= first_operand[i];
                         end
                         else begin

@@ -113,6 +113,17 @@ module vectorReductions
     end
 
     // *********************************
+    // Mask of this pass
+    // *********************************
+    logic [ VLENB   -1:0] mask_8b;
+    logic [(VLENB/2)-1:0] mask_16b;
+    logic [(VLENB/4)-1:0] mask_32b;
+
+    assign mask_8b  = mask_sew8 [cycle_count_r];
+    assign mask_16b = mask_sew16[cycle_count_r];
+    assign mask_32b = mask_sew32[cycle_count_r];
+
+    // *********************************
     //  SUM
     // *********************************
     if (VRedSumEnable) begin : v_redsum_gen_on
@@ -133,8 +144,7 @@ module vectorReductions
             .second_operand(second_operand[7:0]),
             .vl            (vl),
             .vm            (vm),
-            .mask          (mask_sew8),
-            .cycle_count_r (cycle_count_r),
+            .mask          (mask_8b),
             .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redsum_8b)
         );
@@ -152,8 +162,7 @@ module vectorReductions
             .second_operand(second_operand[15:0]),
             .vl            (vl),
             .vm            (vm),
-            .mask          (mask_sew16),
-            .cycle_count_r (cycle_count_r),
+            .mask          (mask_16b),
             .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redsum_16b)
         );
@@ -171,8 +180,7 @@ module vectorReductions
             .second_operand(second_operand[31:0]),
             .vl            (vl),
             .vm            (vm),
-            .mask          (mask_sew32),
-            .cycle_count_r (cycle_count_r),
+            .mask          (mask_32b),
             .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redsum_32b)
         );
@@ -222,8 +230,7 @@ module vectorReductions
             .second_operand(second_operand[7:0]),
             .vl            (vl),
             .vm            (vm),
-            .mask          (mask_sew8),
-            .cycle_count_r (cycle_count_r),
+            .mask          (mask_8b),
             .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redand_8b)
         );
@@ -241,8 +248,7 @@ module vectorReductions
             .second_operand(second_operand[7:0]),
             .vl            (vl),
             .vm            (vm),
-            .mask          (mask_sew8),
-            .cycle_count_r (cycle_count_r),
+            .mask          (mask_8b),
             .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redor_8b)
         );
@@ -260,8 +266,7 @@ module vectorReductions
             .second_operand(second_operand[7:0]),
             .vl            (vl),
             .vm            (vm),
-            .mask          (mask_sew8),
-            .cycle_count_r (cycle_count_r),
+            .mask          (mask_8b),
             .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redxor_8b)
         );
@@ -286,8 +291,7 @@ module vectorReductions
             .second_operand(second_operand[15:0]),
             .vl            (vl),
             .vm            (vm),
-            .mask          (mask_sew16),
-            .cycle_count_r (cycle_count_r),
+            .mask          (mask_16b),
             .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redand_16b)
         );
@@ -305,8 +309,7 @@ module vectorReductions
             .second_operand(second_operand[15:0]),
             .vl            (vl),
             .vm            (vm),
-            .mask          (mask_sew16),
-            .cycle_count_r (cycle_count_r),
+            .mask          (mask_16b),
             .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redor_16b)
         );
@@ -324,8 +327,7 @@ module vectorReductions
             .second_operand(second_operand[15:0]),
             .vl            (vl),
             .vm            (vm),
-            .mask          (mask_sew16),
-            .cycle_count_r (cycle_count_r),
+            .mask          (mask_16b),
             .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redxor_16b)
         );
@@ -350,8 +352,7 @@ module vectorReductions
             .second_operand(second_operand[31:0]),
             .vl            (vl),
             .vm            (vm),
-            .mask          (mask_sew32),
-            .cycle_count_r (cycle_count_r),
+            .mask          (mask_32b),
             .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redand_32b)
         );
@@ -369,8 +370,7 @@ module vectorReductions
             .second_operand(second_operand[31:0]),
             .vl            (vl),
             .vm            (vm),
-            .mask          (mask_sew32),
-            .cycle_count_r (cycle_count_r),
+            .mask          (mask_32b),
             .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redor_32b)
         );
@@ -388,8 +388,7 @@ module vectorReductions
             .second_operand(second_operand[31:0]),
             .vl            (vl),
             .vm            (vm),
-            .mask          (mask_sew32),
-            .cycle_count_r (cycle_count_r),
+            .mask          (mask_32b),
             .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redxor_32b)
         );
@@ -450,8 +449,7 @@ module vectorReductions
             .second_operand(second_operand[7:0]),
             .vl            (vl),
             .vm            (vm),
-            .mask          (mask_sew8),
-            .cycle_count_r (cycle_count_r),
+            .mask          (mask_8b),
             .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redmin_8b)
         );
@@ -469,8 +467,7 @@ module vectorReductions
             .second_operand(second_operand[7:0]),
             .vl            (vl),
             .vm            (vm),
-            .mask          (mask_sew8),
-            .cycle_count_r (cycle_count_r),
+            .mask          (mask_8b),
             .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redminu_8b)
         );
@@ -488,8 +485,7 @@ module vectorReductions
             .second_operand(second_operand[7:0]),
             .vl            (vl),
             .vm            (vm),
-            .mask          (mask_sew8),
-            .cycle_count_r (cycle_count_r),
+            .mask          (mask_8b),
             .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redmax_8b)
         );
@@ -507,8 +503,7 @@ module vectorReductions
             .second_operand(second_operand[7:0]),
             .vl            (vl),
             .vm            (vm),
-            .mask          (mask_sew8),
-            .cycle_count_r (cycle_count_r),
+            .mask          (mask_8b),
             .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redmaxu_8b)
         );
@@ -534,8 +529,7 @@ module vectorReductions
             .second_operand(second_operand[15:0]),
             .vl            (vl),
             .vm            (vm),
-            .mask          (mask_sew16),
-            .cycle_count_r (cycle_count_r),
+            .mask          (mask_16b),
             .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redmin_16b)
         );
@@ -553,8 +547,7 @@ module vectorReductions
             .second_operand(second_operand[15:0]),
             .vl            (vl),
             .vm            (vm),
-            .mask          (mask_sew16),
-            .cycle_count_r (cycle_count_r),
+            .mask          (mask_16b),
             .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redminu_16b)
         );
@@ -572,8 +565,7 @@ module vectorReductions
             .second_operand(second_operand[15:0]),
             .vl            (vl),
             .vm            (vm),
-            .mask          (mask_sew16),
-            .cycle_count_r (cycle_count_r),
+            .mask          (mask_16b),
             .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redmax_16b)
         );
@@ -591,8 +583,7 @@ module vectorReductions
             .second_operand(second_operand[15:0]),
             .vl            (vl),
             .vm            (vm),
-            .mask          (mask_sew16),
-            .cycle_count_r (cycle_count_r),
+            .mask          (mask_16b),
             .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redmaxu_16b)
         );
@@ -618,8 +609,7 @@ module vectorReductions
             .second_operand(second_operand[31:0]),
             .vl            (vl),
             .vm            (vm),
-            .mask          (mask_sew32),
-            .cycle_count_r (cycle_count_r),
+            .mask          (mask_32b),
             .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redmin_32b)
         );
@@ -637,8 +627,7 @@ module vectorReductions
             .second_operand(second_operand[31:0]),
             .vl            (vl),
             .vm            (vm),
-            .mask          (mask_sew32),
-            .cycle_count_r (cycle_count_r),
+            .mask          (mask_32b),
             .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redminu_32b)
         );
@@ -656,8 +645,7 @@ module vectorReductions
             .second_operand(second_operand[31:0]),
             .vl            (vl),
             .vm            (vm),
-            .mask          (mask_sew32),
-            .cycle_count_r (cycle_count_r),
+            .mask          (mask_32b),
             .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redmax_32b)
         );
@@ -675,8 +663,7 @@ module vectorReductions
             .second_operand(second_operand[31:0]),
             .vl            (vl),
             .vm            (vm),
-            .mask          (mask_sew32),
-            .cycle_count_r (cycle_count_r),
+            .mask          (mask_32b),
             .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redmaxu_32b)
         );
