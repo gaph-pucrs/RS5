@@ -12,8 +12,11 @@
 // vl < VLMAX with the tail undisturbed. As in vwmul.c, the masked cases
 // first clear the whole destination (16 elements of 2*SEW), so that the
 // masked-off elements compare equal at VLEN > 128.
-// The .wv and .wx cases (TEST_CASE5 to TEST_CASE8) are commented out:
-// RS5 does not implement those forms yet.
+// In the .wv and .wx cases the 2*SEW source is loaded with SEW equal to
+// its EEW, since RS5 loads still take EEW = SEW. TEST_CASE16 to
+// TEST_CASE21 are RS5 .wv and .wx cases: LMUL > 1, vd = vs2, a .wx scalar
+// truncated to SEW, masking across destination registers, a fractional
+// LMUL and vl < VLMAX with the tail undisturbed.
 
 #include "vector_macros.h"
 
@@ -130,118 +133,126 @@ void TEST_CASE4(void) {
   // VCMP_U64(12, v6, 0, -3, 0, -1, 0, 1, 0, 3, 0, -3, 0, -1, 0, 1, 0, 3);
 }
 
-// void TEST_CASE5(void) {
-//   VSET(16, e8, m1);
-//   VLOAD_16(v2, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
-//   VLOAD_8(v4, 8, 7, 6, 5, 4, 3, 2, 1, 8, 7, 6, 5, 4, 3, 2, 1);
-//   asm volatile("vwsub.wv v6, v2, v4");
-//   VSET(16, e16, m1);
-//   VCMP_U16(13, v6, -7, -5, -3, -1, 1, 3, 5, 7, -7, -5, -3, -1, 1, 3, 5, 7);
-//
-//   VSET(16, e16, m1);
-//   VLOAD_32(v2, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
-//   VLOAD_16(v4, 8, 7, 6, 5, 4, 3, 2, 1, 8, 7, 6, 5, 4, 3, 2, 1);
-//   asm volatile("vwsub.wv v6, v2, v4");
-//   VSET(16, e32, m1);
-//   VCMP_U32(14, v6, -7, -5, -3, -1, 1, 3, 5, 7, -7, -5, -3, -1, 1, 3, 5, 7);
-//
-//   // VSET(16, e32, m1);
-//   // VLOAD_64(v2, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
-//   // VLOAD_32(v4, 8, 7, 6, 5, 4, 3, 2, 1, 8, 7, 6, 5, 4, 3, 2, 1);
-//   // asm volatile("vwsub.wv v6, v2, v4");
-//   // VSET(16, e64, m1);
-//   // VCMP_U64(15, v6, -7, -5, -3, -1, 1, 3, 5, 7, -7, -5, -3, -1, 1, 3, 5, 7);
-// }
+void TEST_CASE5(void) {
+  VSET(16, e16, m2);
+  VLOAD_16(v2, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  VSET(16, e8, m1);
+  VLOAD_8(v4, 8, 7, 6, 5, 4, 3, 2, 1, 8, 7, 6, 5, 4, 3, 2, 1);
+  asm volatile("vwsub.wv v6, v2, v4");
+  VSET(16, e16, m1);
+  VCMP_U16(13, v6, -7, -5, -3, -1, 1, 3, 5, 7, -7, -5, -3, -1, 1, 3, 5, 7);
 
-// void TEST_CASE6(void) {
-//   VSET(32, e8, m1);
-//   VCLEAR(v6);
-//   VSET(16, e8, m1);
-//   VLOAD_16(v2, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
-//   VLOAD_8(v4, 8, 7, 6, 5, 4, 3, 2, 1, 8, 7, 6, 5, 4, 3, 2, 1);
-//   VLOAD_8(v0, 0xAA, 0xAA);
-//   VCLEAR(v6);
-//   asm volatile("vwsub.wv v6, v2, v4, v0.t");
-//   VSET(16, e16, m1);
-//   VCMP_U16(16, v6, 0, -5, 0, -1, 0, 3, 0, 7, 0, -5, 0, -1, 0, 3, 0, 7);
-//
-//   VSET(32, e16, m1);
-//   VCLEAR(v6);
-//   VSET(16, e16, m1);
-//   VLOAD_32(v2, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
-//   VLOAD_16(v4, 8, 7, 6, 5, 4, 3, 2, 1, 8, 7, 6, 5, 4, 3, 2, 1);
-//   VLOAD_8(v0, 0xAA, 0xAA);
-//   VCLEAR(v6);
-//   asm volatile("vwsub.wv v6, v2, v4, v0.t");
-//   VSET(16, e32, m1);
-//   VCMP_U32(17, v6, 0, -5, 0, -1, 0, 3, 0, 7, 0, -5, 0, -1, 0, 3, 0, 7);
-//
-//   // VSET(16, e32, m1);
-//   // VLOAD_64(v2, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
-//   // VLOAD_32(v4, 8, 7, 6, 5, 4, 3, 2, 1, 8, 7, 6, 5, 4, 3, 2, 1);
-//   // VLOAD_8(v0, 0xAA, 0xAA);
-//   // VCLEAR(v6);
-//   // asm volatile("vwsub.wv v6, v2, v4, v0.t");
-//   // VSET(16, e64, m1);
-//   // VCMP_U64(18, v6, 0, -5, 0, -1, 0, 3, 0, 7, 0, -5, 0, -1, 0, 3, 0, 7);
-// }
+  VSET(16, e32, m2);
+  VLOAD_32(v2, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  VSET(16, e16, m1);
+  VLOAD_16(v4, 8, 7, 6, 5, 4, 3, 2, 1, 8, 7, 6, 5, 4, 3, 2, 1);
+  asm volatile("vwsub.wv v6, v2, v4");
+  VSET(16, e32, m1);
+  VCMP_U32(14, v6, -7, -5, -3, -1, 1, 3, 5, 7, -7, -5, -3, -1, 1, 3, 5, 7);
 
-// void TEST_CASE7(void) {
-//   const uint32_t scalar = 5;
-//
-//   VSET(16, e8, m1);
-//   VLOAD_16(v2, 1, -2, 3, -4, 5, -6, 7, -8, 9, -10, 11, -12, 13, -14, 15, -16);
-//   asm volatile("vwsub.wx v6, v2, %[A]" ::[A] "r"(scalar));
-//   VSET(16, e16, m1);
-//   VCMP_U16(19, v6, -4, -7, -2, -9, 0, -11, 2, -13, 4, -15, 6, -17, 8, -19, 10,
-//            -21);
-//
-//   VSET(16, e16, m1);
-//   VLOAD_32(v2, 1, -2, 3, -4, 5, -6, 7, -8, 9, -10, 11, -12, 13, -14, 15, -16);
-//   asm volatile("vwsub.wx v6, v2, %[A]" ::[A] "r"(scalar));
-//   VSET(16, e32, m1);
-//   VCMP_U32(20, v6, -4, -7, -2, -9, 0, -11, 2, -13, 4, -15, 6, -17, 8, -19, 10,
-//            -21);
-//
-//   // VSET(16, e32, m1);
-//   // VLOAD_64(v2, 1, -2, 3, -4, 5, -6, 7, -8, 9, -10, 11, -12, 13, -14, 15, -16);
-//   // asm volatile("vwsub.wx v6, v2, %[A]" ::[A] "r"(scalar));
-//   // VSET(16, e64, m1);
-//   // VCMP_U64(21, v6, -4, -7, -2, -9, 0, -11, 2, -13, 4, -15, 6, -17, 8, -19, 10,
-//   //          -21);
-// }
+  // VSET(16, e32, m1);
+  // VLOAD_64(v2, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  // VLOAD_32(v4, 8, 7, 6, 5, 4, 3, 2, 1, 8, 7, 6, 5, 4, 3, 2, 1);
+  // asm volatile("vwsub.wv v6, v2, v4");
+  // VSET(16, e64, m1);
+  // VCMP_U64(15, v6, -7, -5, -3, -1, 1, 3, 5, 7, -7, -5, -3, -1, 1, 3, 5, 7);
+}
 
-// void TEST_CASE8(void) {
-//   const uint32_t scalar = 5;
-//
-//   VSET(32, e8, m1);
-//   VCLEAR(v6);
-//   VSET(16, e8, m1);
-//   VLOAD_16(v2, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
-//   VLOAD_8(v0, 0xAA, 0xAA);
-//   VCLEAR(v6);
-//   asm volatile("vwsub.wx v6, v2, %[A], v0.t" ::[A] "r"(scalar));
-//   VSET(16, e16, m1);
-//   VCMP_U16(22, v6, 0, -3, 0, -1, 0, 1, 0, 3, 0, -3, 0, -1, 0, 1, 0, 3);
-//
-//   VSET(32, e16, m1);
-//   VCLEAR(v6);
-//   VSET(16, e16, m1);
-//   VLOAD_32(v2, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
-//   VLOAD_8(v0, 0xAA, 0xAA);
-//   VCLEAR(v6);
-//   asm volatile("vwsub.wx v6, v2, %[A], v0.t" ::[A] "r"(scalar));
-//   VSET(16, e32, m1);
-//   VCMP_U32(23, v6, 0, -3, 0, -1, 0, 1, 0, 3, 0, -3, 0, -1, 0, 1, 0, 3);
-//
-//   // VSET(16, e32, m1);
-//   // VLOAD_64(v2, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
-//   // VLOAD_8(v0, 0xAA, 0xAA);
-//   // VCLEAR(v6);
-//   // asm volatile("vwsub.wx v6, v2, %[A], v0.t" ::[A] "r"(scalar));
-//   // VSET(16, e64, m1);
-//   // VCMP_U64(24, v6, 0, -3, 0, -1, 0, 1, 0, 3, 0, -3, 0, -1, 0, 1, 0, 3);
-// }
+void TEST_CASE6(void) {
+  VSET(32, e8, m1);
+  VCLEAR(v6);
+  VSET(16, e16, m2);
+  VLOAD_16(v2, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  VSET(16, e8, m1);
+  VLOAD_8(v4, 8, 7, 6, 5, 4, 3, 2, 1, 8, 7, 6, 5, 4, 3, 2, 1);
+  VLOAD_8(v0, 0xAA, 0xAA);
+  VCLEAR(v6);
+  asm volatile("vwsub.wv v6, v2, v4, v0.t");
+  VSET(16, e16, m1);
+  VCMP_U16(16, v6, 0, -5, 0, -1, 0, 3, 0, 7, 0, -5, 0, -1, 0, 3, 0, 7);
+
+  VSET(32, e16, m1);
+  VCLEAR(v6);
+  VSET(16, e32, m2);
+  VLOAD_32(v2, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  VSET(16, e16, m1);
+  VLOAD_16(v4, 8, 7, 6, 5, 4, 3, 2, 1, 8, 7, 6, 5, 4, 3, 2, 1);
+  VLOAD_8(v0, 0xAA, 0xAA);
+  VCLEAR(v6);
+  asm volatile("vwsub.wv v6, v2, v4, v0.t");
+  VSET(16, e32, m1);
+  VCMP_U32(17, v6, 0, -5, 0, -1, 0, 3, 0, 7, 0, -5, 0, -1, 0, 3, 0, 7);
+
+  // VSET(16, e32, m1);
+  // VLOAD_64(v2, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  // VLOAD_32(v4, 8, 7, 6, 5, 4, 3, 2, 1, 8, 7, 6, 5, 4, 3, 2, 1);
+  // VLOAD_8(v0, 0xAA, 0xAA);
+  // VCLEAR(v6);
+  // asm volatile("vwsub.wv v6, v2, v4, v0.t");
+  // VSET(16, e64, m1);
+  // VCMP_U64(18, v6, 0, -5, 0, -1, 0, 3, 0, 7, 0, -5, 0, -1, 0, 3, 0, 7);
+}
+
+void TEST_CASE7(void) {
+  const uint32_t scalar = 5;
+
+  VSET(16, e16, m2);
+  VLOAD_16(v2, 1, -2, 3, -4, 5, -6, 7, -8, 9, -10, 11, -12, 13, -14, 15, -16);
+  VSET(16, e8, m1);
+  asm volatile("vwsub.wx v6, v2, %[A]" ::[A] "r"(scalar));
+  VSET(16, e16, m1);
+  VCMP_U16(19, v6, -4, -7, -2, -9, 0, -11, 2, -13, 4, -15, 6, -17, 8, -19, 10,
+           -21);
+
+  VSET(16, e32, m2);
+  VLOAD_32(v2, 1, -2, 3, -4, 5, -6, 7, -8, 9, -10, 11, -12, 13, -14, 15, -16);
+  VSET(16, e16, m1);
+  asm volatile("vwsub.wx v6, v2, %[A]" ::[A] "r"(scalar));
+  VSET(16, e32, m1);
+  VCMP_U32(20, v6, -4, -7, -2, -9, 0, -11, 2, -13, 4, -15, 6, -17, 8, -19, 10,
+           -21);
+
+  // VSET(16, e32, m1);
+  // VLOAD_64(v2, 1, -2, 3, -4, 5, -6, 7, -8, 9, -10, 11, -12, 13, -14, 15, -16);
+  // asm volatile("vwsub.wx v6, v2, %[A]" ::[A] "r"(scalar));
+  // VSET(16, e64, m1);
+  // VCMP_U64(21, v6, -4, -7, -2, -9, 0, -11, 2, -13, 4, -15, 6, -17, 8, -19, 10,
+  //          -21);
+}
+
+void TEST_CASE8(void) {
+  const uint32_t scalar = 5;
+
+  VSET(32, e8, m1);
+  VCLEAR(v6);
+  VSET(16, e16, m2);
+  VLOAD_16(v2, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  VSET(16, e8, m1);
+  VLOAD_8(v0, 0xAA, 0xAA);
+  VCLEAR(v6);
+  asm volatile("vwsub.wx v6, v2, %[A], v0.t" ::[A] "r"(scalar));
+  VSET(16, e16, m1);
+  VCMP_U16(22, v6, 0, -3, 0, -1, 0, 1, 0, 3, 0, -3, 0, -1, 0, 1, 0, 3);
+
+  VSET(32, e16, m1);
+  VCLEAR(v6);
+  VSET(16, e32, m2);
+  VLOAD_32(v2, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  VSET(16, e16, m1);
+  VLOAD_8(v0, 0xAA, 0xAA);
+  VCLEAR(v6);
+  asm volatile("vwsub.wx v6, v2, %[A], v0.t" ::[A] "r"(scalar));
+  VSET(16, e32, m1);
+  VCMP_U32(23, v6, 0, -3, 0, -1, 0, 1, 0, 3, 0, -3, 0, -1, 0, 1, 0, 3);
+
+  // VSET(16, e32, m1);
+  // VLOAD_64(v2, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  // VLOAD_8(v0, 0xAA, 0xAA);
+  // VCLEAR(v6);
+  // asm volatile("vwsub.wx v6, v2, %[A], v0.t" ::[A] "r"(scalar));
+  // VSET(16, e64, m1);
+  // VCMP_U64(24, v6, 0, -3, 0, -1, 0, 1, 0, 3, 0, -3, 0, -1, 0, 1, 0, 3);
+}
 
 // LMUL = 2: e8 sources of two registers, e16 destination of four (at
 // VLEN = 128); each source register is read for two destination registers
@@ -342,6 +353,100 @@ void TEST_CASE15(void) {
                    0xaaaa, 0xaaaa, 0xaaaa, 0xaaaa, 0xaaaa, 0xaaaa, 0xaaaa, 0xaaaa);
 }
 
+// .wv with LMUL = 2: the 2*SEW source is a group of four registers (at
+// VLEN = 128), read once for each destination register
+void TEST_CASE16(void) {
+  VSET(32, e16, m4);
+  VLOAD_16(v8, 0x857f, 0xcda2, 0x4ec1, 0xdeeb, 0xfe51, 0xd266, 0x6f5d, 0x4d16,
+               0xce2d, 0xcb36, 0xf9de, 0xbef9, 0x1c2a, 0xad49, 0x671d, 0x788b,
+               0x68e0, 0x8958, 0xe572, 0x0544, 0xa668, 0xc39a, 0x30b3, 0x301d,
+               0xd05a, 0xcbc8, 0xea3b, 0x7b8e, 0x03cd, 0x5519, 0x70e0, 0x198e);
+  VSET(32, e8, m2);
+  VLOAD_8(v4, 0xb9, 0x0c, 0xb4, 0xe8, 0x72, 0xc6, 0xa9, 0x93,
+              0x69, 0xb0, 0xd8, 0xb9, 0xf5, 0x42, 0x58, 0x94,
+              0xef, 0x73, 0xc1, 0xd9, 0xae, 0xbb, 0x2d, 0xc3,
+              0x0b, 0x13, 0x31, 0x07, 0x5d, 0xf3, 0xe7, 0xe0);
+  asm volatile("vwsub.wv v12, v8, v4");
+  VSET(32, e16, m4);
+  VCMP_U16(32, v12, 0x85c6, 0xcd96, 0x4f0d, 0xdf03, 0xfddf, 0xd2a0, 0x6fb4, 0x4d83,
+                    0xcdc4, 0xcb86, 0xfa06, 0xbf40, 0x1c35, 0xad07, 0x66c5, 0x78f7,
+                    0x68f1, 0x88e5, 0xe5b1, 0x056b, 0xa6ba, 0xc3df, 0x3086, 0x305a,
+                    0xd04f, 0xcbb5, 0xea0a, 0x7b87, 0x0370, 0x5526, 0x70f9, 0x19ae);
+}
+
+// .wv with vd = vs2: they have the same EEW, so they may overlap
+void TEST_CASE17(void) {
+  VSET(16, e16, m2);
+  VLOAD_16(v8, 0xd12c, 0x6cdf, 0x339a, 0x2ce0, 0x8db4, 0x2686, 0xef41, 0xb38c,
+               0x86e1, 0x1fa4, 0x19ca, 0x253b, 0xa18c, 0x9832, 0x7fcd, 0xeea6);
+  VSET(16, e8, m1);
+  VLOAD_8(v4, 0xd9, 0x1c, 0x72, 0xd5, 0x17, 0xa6, 0x26, 0x01,
+              0x96, 0x13, 0xb6, 0x7d, 0xee, 0x1c, 0x7d, 0xc1);
+  asm volatile("vwsub.wv v8, v8, v4");
+  VSET(16, e16, m2);
+  VCMP_U16(33, v8, 0xd153, 0x6cc3, 0x3328, 0x2d0b, 0x8d9d, 0x26e0, 0xef1b, 0xb38b,
+                   0x874b, 0x1f91, 0x1a14, 0x24be, 0xa19e, 0x9816, 0x7f50, 0xeee5);
+}
+
+// e16 .wx: the scalar is truncated to SEW (0x8001)
+void TEST_CASE18(void) {
+  const uint32_t scalar = 0xabcd8001;
+  VSET(8, e32, m2);
+  VLOAD_32(v2, 0x00516886, 0x005eab59, 0x0087fd4b, 0x0063c8ca,
+               0x00b7ac7a, 0x002bcec5, 0x0007ef0a, 0x006a8077);
+  VSET(8, e16, m1);
+  asm volatile("vwsub.wx v6, v2, %[A]" ::[A] "r"(scalar));
+  VSET(8, e32, m2);
+  VCMP_U32(34, v6, 0x0051e885, 0x005f2b58, 0x00887d4a, 0x006448c9,
+                   0x00b82c79, 0x002c4ec4, 0x00086f09, 0x006b0076);
+}
+
+// Masked .wx: the scalar is truncated to SEW (0x80), and the elements of
+// the second destination register (at VLEN = 128) take their mask from the
+// matching v0 bits
+void TEST_CASE19(void) {
+  const uint32_t scalar = 0x12345680;
+  VSET(16, e16, m2);
+  VCLEAR(v6);
+  VLOAD_16(v2, 0x81c0, 0x35c3, 0xf43e, 0xe2c6, 0x319a, 0x4025, 0xc456, 0xf7f3,
+               0xe087, 0x39fb, 0xb99c, 0xbe80, 0x2e1c, 0x66fd, 0xb967, 0xace5);
+  VSET(16, e8, m1);
+  VLOAD_8(v0, 0x5a, 0xc3);
+  asm volatile("vwsub.wx v6, v2, %[A], v0.t" ::[A] "r"(scalar));
+  VSET(16, e16, m2);
+  VCMP_U16(35, v6, 0x0000, 0x3643, 0x0000, 0xe346, 0x321a, 0x0000, 0xc4d6, 0x0000,
+                   0xe107, 0x3a7b, 0x0000, 0x0000, 0x0000, 0x0000, 0xb9e7, 0xad65);
+}
+
+// Fractional LMUL = 1/2: the 2*SEW source and the destination are one
+// register
+void TEST_CASE20(void) {
+  VSET(8, e16, m1);
+  VLOAD_16(v2, 0xcd6d, 0xd4ff, 0xd916, 0x30bb, 0xc0fd, 0x9445, 0x443a, 0x5e69);
+  VSET(8, e8, mf2);
+  VLOAD_8(v4, 0xe0, 0xd3, 0xfc, 0xb3, 0x3f, 0x05, 0xd2, 0x62);
+  asm volatile("vwsub.wv v6, v2, v4");
+  VSET(8, e16, m1);
+  VCMP_U16(36, v6, 0xcd8d, 0xd52c, 0xd91a, 0x3108, 0xc0be, 0x9440, 0x4468, 0x5e07);
+}
+
+// .wv with vl < VLMAX and tu: only the body is written
+void TEST_CASE21(void) {
+  VSET(16, e16, m2);
+  VLOAD_16(v6, 0xaaaa, 0xaaaa, 0xaaaa, 0xaaaa, 0xaaaa, 0xaaaa, 0xaaaa, 0xaaaa,
+               0xaaaa, 0xaaaa, 0xaaaa, 0xaaaa, 0xaaaa, 0xaaaa, 0xaaaa, 0xaaaa);
+  VLOAD_16(v2, 0x191a, 0x743c, 0xbdee, 0x7eb0, 0x5060, 0xe865, 0xc41e, 0xc4df,
+               0x51f0, 0xe2d8, 0xf974, 0x8b05, 0x38e1, 0x3cd0, 0xeac7, 0x991b);
+  VSET(16, e8, m1);
+  VLOAD_8(v4, 0xc7, 0x79, 0xc7, 0xa4, 0xc3, 0x84, 0x03, 0x54,
+              0xa4, 0x47, 0x60, 0x47, 0x43, 0xb9, 0x76, 0x36);
+  asm volatile("vsetivli t0, 5, e8, m1, tu, mu" ::: "t0");
+  asm volatile("vwsub.wv v6, v2, v4");
+  VSET(16, e16, m2);
+  VCMP_U16(37, v6, 0x1953, 0x73c3, 0xbe27, 0x7f0c, 0x509d, 0xaaaa, 0xaaaa, 0xaaaa,
+                   0xaaaa, 0xaaaa, 0xaaaa, 0xaaaa, 0xaaaa, 0xaaaa, 0xaaaa, 0xaaaa);
+}
+
 int main(void) {
   INIT_CHECK();
   enable_vec();
@@ -350,10 +455,10 @@ int main(void) {
   TEST_CASE2();
   TEST_CASE3();
   TEST_CASE4();
-  // TEST_CASE5();
-  // TEST_CASE6();
-  // TEST_CASE7();
-  // TEST_CASE8();
+  TEST_CASE5();
+  TEST_CASE6();
+  TEST_CASE7();
+  TEST_CASE8();
   TEST_CASE9();
   TEST_CASE10();
   TEST_CASE11();
@@ -361,6 +466,12 @@ int main(void) {
   TEST_CASE13();
   TEST_CASE14();
   TEST_CASE15();
+  TEST_CASE16();
+  TEST_CASE17();
+  TEST_CASE18();
+  TEST_CASE19();
+  TEST_CASE20();
+  TEST_CASE21();
 
   EXIT_CHECK();
 }

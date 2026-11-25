@@ -203,6 +203,27 @@ void TEST_CASE2(void) {
   VSET(16, e8, mf2);
   EXPECT_ILLEGAL(185, 0xc6432257); // vwadd.vv v4, v4, v6 (overlap, source EMUL < 1)
   EXPECT_LEGAL(186, 0xc6532257); // vwadd.vv v4, v5, v6
+  VSET(16, e8, m1);
+  EXPECT_LEGAL(187, 0xd6232257); // vwadd.wv v4, v2, v6
+  EXPECT_LEGAL(188, 0xd6432257); // vwadd.wv v4, v4, v6 (vd = vs2, same EEW)
+  EXPECT_ILLEGAL(189, 0xd6332257); // vwadd.wv v4, v3, v6 (vs2 not aligned to 2*LMUL)
+  EXPECT_ILLEGAL(190, 0xd6222257); // vwadd.wv v4, v2, v4 (vs1 in low half of vd)
+  EXPECT_LEGAL(191, 0xd622a257); // vwadd.wv v4, v2, v5 (vs1 in high half of vd)
+  EXPECT_LEGAL(192, 0xda25e257); // vwsubu.wx v4, v2, a1
+  EXPECT_ILLEGAL(193, 0xd4222057); // vwadd.wv v0, v2, v4, v0.t (vd = v0)
+  VSET(16, e32, m1);
+  EXPECT_ILLEGAL(194, 0xd225e257); // vwaddu.wx v4, v2, a1 (widening with SEW = 32)
+  VSET(16, e8, m8);
+  EXPECT_ILLEGAL(195, 0xde042857); // vwsub.wv v16, v0, v8 (widening with LMUL = 8)
+  VSET(16, e16, m2);
+  EXPECT_LEGAL(196, 0xde812257); // vwsub.wv v4, v8, v2
+  EXPECT_ILLEGAL(197, 0xde612257); // vwsub.wv v4, v6, v2 (vs2 not aligned to 2*LMUL)
+  EXPECT_LEGAL(198, 0xde412257); // vwsub.wv v4, v4, v2 (vd = vs2, same EEW)
+  EXPECT_LEGAL(199, 0xda45e457); // vwsubu.wx v8, v4, a1
+  EXPECT_ILLEGAL(200, 0xde822257); // vwsub.wv v4, v8, v4 (vs1 in low half of vd)
+  VSET(16, e8, mf2);
+  EXPECT_ILLEGAL(201, 0xd6422257); // vwadd.wv v4, v4, v4 (vs1 overlap, source EMUL < 1)
+  EXPECT_LEGAL(202, 0xd642a257); // vwadd.wv v4, v4, v5 (vd = vs2, same EEW)
 }
 
 int main(void) {

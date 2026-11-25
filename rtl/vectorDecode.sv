@@ -239,6 +239,10 @@ module vectorDecode
             6'b110001:     opm = '{VWADD,       F_VX};
             6'b110010:     opm = '{VWSUBU,      F_VX};
             6'b110011:     opm = '{VWSUB,       F_VX};
+            6'b110100:     opm = '{VWADDU_W,    F_VX};
+            6'b110101:     opm = '{VWADD_W,     F_VX};
+            6'b110110:     opm = '{VWSUBU_W,    F_VX};
+            6'b110111:     opm = '{VWSUB_W,     F_VX};
             6'b111000:     opm = '{VWMULU,      F_VX};
             6'b111010:     opm = '{VWMULSU,     F_VX};
             6'b111011:     opm = '{VWMUL,       F_VX};

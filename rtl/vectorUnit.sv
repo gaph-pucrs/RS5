@@ -140,7 +140,8 @@ module vectorUnit
     /* register from one product (hold_widening); the widening add and  */
     /* subtract extend their sources and iterate over the destination   */
     assign widening_multiply      = (vector_operation_i inside {VWMUL, VWMULU, VWMULSU});
-    assign widening_instruction   = widening_multiply || (vector_operation_i inside {VWADDU, VWADD, VWSUBU, VWSUB});
+    assign widening_instruction   = widening_multiply || (vector_operation_i inside {VWADDU, VWADD, VWSUBU, VWSUB,
+                                                                                      VWADDU_W, VWADD_W, VWSUBU_W, VWSUB_W});
     assign integer_extension      = (vector_operation_i inside {VZEXT, VSEXT});
     assign whole_reg_load_store   = (instruction_i[24:20] == 5'b01000 && (op_vload || op_vstore) && instruction_i[27:26] == 2'b00);
     assign mask_load_store        = (instruction_i[24:20] == 5'b01011 && (op_vload || op_vstore) && instruction_i[27:26] == 2'b00);
@@ -155,7 +156,7 @@ module vectorUnit
     /* The adder computes a - b as a + ~b + 1. The magnitude compares and */
     /* min/max subtract too, and the lanes take a >= b from the carry-out */
     assign vctrl.is_sub       = (vector_operation_i inside {VSUB, VRSUB, VNMSAC, VNMSUB, VSBC, VMSBC,
-                                                            VWSUBU, VWSUB,
+                                                            VWSUBU, VWSUB, VWSUBU_W, VWSUB_W,
                                                             VMSLTU, VMSLT, VMSLEU, VMSLE, VMSGTU, VMSGT,
                                                             VMINU, VMIN, VMAXU, VMAX});
 
@@ -189,7 +190,8 @@ module vectorUnit
     end
 
     assign vctrl.ext_sel    = ext_sel;
-    assign vctrl.ext_signed = (vector_operation_i inside {VSEXT, VWADD, VWSUB});
+    assign vctrl.ext_signed = (vector_operation_i inside {VSEXT, VWADD, VWSUB, VWADD_W, VWSUB_W});
+    assign vctrl.src2_wide  = (vector_operation_i inside {VWADDU_W, VWADD_W, VWSUBU_W, VWSUB_W});
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
@@ -284,7 +286,8 @@ module vectorUnit
     endfunction
 
     /* vzext and vsext read vs2 with EEW = SEW/f and EMUL = LMUL/f: a group of */
-    /* LMUL/f registers, or one register when EMUL < 1                          */
+    /* LMUL/f registers, or one register when EMUL < 1. In vwadd.w* and        */
+    /* vwsub.w* vs2 has the destination EEW and EMUL                           */
     logic [4:0] vs2_regs;
     logic       vs2_emul_ge1;
     always_comb begin
@@ -308,6 +311,9 @@ module vectorUnit
                 end
                 default: ;
             endcase
+        end
+        else if (vctrl.src2_wide) begin
+            vs2_regs = vd_regs;
         end
     end
 
@@ -338,7 +344,8 @@ module vectorUnit
         if (widening_instruction) begin
             if (vsew != EW8 && vsew != EW16)                 arith_illegal = 1'b1;
             if (vlmul == LMUL_8)                             arith_illegal = 1'b1;
-            if (widening_overlap(rd, vd_regs, rs2, {1'b0, lmul_regs}, lmul_ge1))
+            /* vs2 of vwadd.w* and vwsub.w* has the destination EEW: it may overlap vd */
+            if (!vctrl.src2_wide && widening_overlap(rd, vd_regs, rs2, {1'b0, lmul_regs}, lmul_ge1))
                                                              arith_illegal = 1'b1;
             if (vs1_is_vector && widening_overlap(rd, vd_regs, rs1, {1'b0, lmul_regs}, lmul_ge1))
                                                              arith_illegal = 1'b1;
@@ -630,8 +637,17 @@ module vectorUnit
         endcase
     end
 
+    /* The 2*SEW vs2 of vwadd.w* and vwsub.w* is read with the destination */
+    logic [3:0] src2_reg_offset;
+    always_comb begin
+        if (vctrl.src2_wide)
+            src2_reg_offset = cycle_count;
+        else
+            src2_reg_offset = src_reg_offset;
+    end
+
     assign rs1_addr = src_reg_offset + rs1;
-    assign rs2_addr = src_reg_offset + rs2;
+    assign rs2_addr = src2_reg_offset + rs2;
     assign rd_addr  = cycle_count + rd;
 
     always_comb begin
@@ -799,12 +815,16 @@ module vectorUnit
     /* The sources extended to the destination SEW (vzext, vsext, widening */
     /* add and subtract); unchanged for the other operations               */
     logic [VLEN-1:0] vs2_extended, vs1_extended;
+    vext_sel_e       vs2_ext_sel;
+
+    /* vs2 of vwadd.w* and vwsub.w* is not extended */
+    assign vs2_ext_sel = vctrl.src2_wide ? EXT_NONE : vctrl.ext_sel;
 
     vectorExtend #(
         .VLEN (VLEN)
     ) vectorExtendVs2 (
         .data_i       (vs2_data),
-        .ext_sel_i    (vctrl.ext_sel),
+        .ext_sel_i    (vs2_ext_sel),
         .ext_signed_i (vctrl.ext_signed),
         .slice_i      (ext_slice),
         .vsew_i       (vsew_effective),

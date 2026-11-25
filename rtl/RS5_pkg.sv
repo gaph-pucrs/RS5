@@ -239,7 +239,7 @@ package RS5_pkg;
         // Integer extension
         VZEXT, VSEXT,
         // Widening add/subtract
-        VWADDU, VWADD, VWSUBU, VWSUB,
+        VWADDU, VWADD, VWSUBU, VWSUB, VWADDU_W, VWADD_W, VWSUBU_W, VWSUB_W,
         // Widening multiply-add and sum reduction
         VWMACC, VWREDSUM,
         // Add/subtract with carry (VCarryEnable)
@@ -382,8 +382,10 @@ package RS5_pkg;
         logic        mask_is_data;
         // vs2 is extended to SEW from 1/2 or 1/4 of it (vzext, vsext)
         vext_sel_e   ext_sel;
-        // The extension copies the sign (vsext)
+        // The extension copies the sign (vsext, signed widening add/subtract)
         logic        ext_signed;
+        // vs2 already has EEW = 2*SEW and is not extended (vwadd.w*, vwsub.w*)
+        logic        src2_wide;
     } vector_ctrl_t;
 
     typedef struct packed {
