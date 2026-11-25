@@ -119,9 +119,34 @@ module vectorReductions
     logic [(VLENB/2)-1:0] mask_16b;
     logic [(VLENB/4)-1:0] mask_32b;
 
+    /* The widening sum reductions read each source register in two passes */
+    /* of 2*SEW elements: pass c takes half c[0] of the SEW mask of source  */
+    /* register c >> 1                                                      */
+    logic       wide_reduction;
+    logic [2:0] src_reg;
+
+    assign wide_reduction = (vector_operation_i inside {VWREDSUMU, VWREDSUM});
+    assign src_reg        = cycle_count_r[3:1];
+
     assign mask_8b  = mask_sew8 [cycle_count_r];
-    assign mask_16b = mask_sew16[cycle_count_r];
-    assign mask_32b = mask_sew32[cycle_count_r];
+
+    always_comb begin
+        if (!wide_reduction)
+            mask_16b = mask_sew16[cycle_count_r];
+        else if (cycle_count_r[0])
+            mask_16b = mask_sew8[src_reg][VLENB-1:VLENB/2];
+        else
+            mask_16b = mask_sew8[src_reg][(VLENB/2)-1:0];
+    end
+
+    always_comb begin
+        if (!wide_reduction)
+            mask_32b = mask_sew32[cycle_count_r];
+        else if (cycle_count_r[0])
+            mask_32b = mask_sew16[src_reg][(VLENB/2)-1:VLENB/4];
+        else
+            mask_32b = mask_sew16[src_reg][(VLENB/4)-1:0];
+    end
 
     // *********************************
     //  SUM
@@ -712,7 +737,9 @@ module vectorReductions
             unique case(vector_operation_i)
                 VREDOR:   result_o <= result_redor;
                 VREDXOR:  result_o <= result_redxor;
-                VREDSUM:  result_o <= result_redsum;
+                VREDSUM,
+                VWREDSUMU,
+                VWREDSUM: result_o <= result_redsum;
                 VREDMIN:  result_o <= result_redmin;
                 VREDMINU: result_o <= result_redminu;
                 VREDMAX:  result_o <= result_redmax;

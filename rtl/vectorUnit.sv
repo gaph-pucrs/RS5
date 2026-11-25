@@ -75,6 +75,7 @@ module vectorUnit
     logic        widening_instruction;
     logic        widening_multiply;
     logic        integer_extension;
+    logic        widening_reduction;
     logic        whole_reg_load_store;
     logic        whole_reg_instruction;
     logic        mask_load_store;
@@ -103,7 +104,9 @@ module vectorUnit
     logic [4:0]       rs1_addr, rs2_addr, rd_addr;
     logic [4:0]       vs1_addr, vs2_addr;
     logic [VLEN-1:0]  vs1_data, vs2_data;
-    logic [3:0]       cycle_count, cycle_count_r, cycle_count_vd;
+    logic [3:0]       cycle_count, cycle_count_r;
+    /* Up to 16: vwredsum with LMUL = 8 reads each source register twice */
+    logic [4:0]       cycle_count_vd;
     logic             hazard_detected;
     logic             hold, hold_widening, hold_alu, hold_lsu;
     logic             should_stall;
@@ -143,6 +146,8 @@ module vectorUnit
     assign widening_instruction   = widening_multiply || (vector_operation_i inside {VWADDU, VWADD, VWSUBU, VWSUB,
                                                                                       VWADDU_W, VWADD_W, VWSUBU_W, VWSUB_W});
     assign integer_extension      = (vector_operation_i inside {VZEXT, VSEXT});
+    /* The widening sum reductions extend vs2 and reduce it at 2*SEW */
+    assign widening_reduction     = (vector_operation_i inside {VWREDSUMU, VWREDSUM});
     assign whole_reg_load_store   = (instruction_i[24:20] == 5'b01000 && (op_vload || op_vstore) && instruction_i[27:26] == 2'b00);
     assign mask_load_store        = (instruction_i[24:20] == 5'b01011 && (op_vload || op_vstore) && instruction_i[27:26] == 2'b00);
     /* Whole register loads/stores and vmv<nr>r ignore vl and vtype */
@@ -183,14 +188,14 @@ module vectorUnit
             else
                 ext_sel = EXT_VF4;
         end
-        else if (widening_instruction && !widening_multiply)
+        else if ((widening_instruction && !widening_multiply) || widening_reduction)
             ext_sel = EXT_VF2;
         else
             ext_sel = EXT_NONE;
     end
 
     assign vctrl.ext_sel    = ext_sel;
-    assign vctrl.ext_signed = (vector_operation_i inside {VSEXT, VWADD, VWSUB, VWADD_W, VWSUB_W});
+    assign vctrl.ext_signed = (vector_operation_i inside {VSEXT, VWADD, VWSUB, VWADD_W, VWSUB_W, VWREDSUM});
     assign vctrl.src2_wide  = (vector_operation_i inside {VWADDU_W, VWADD_W, VWSUBU_W, VWSUB_W});
 
     always_ff @(posedge clk or negedge reset_n) begin
@@ -352,6 +357,9 @@ module vectorUnit
         end
 
         /* The source EEW = SEW/f must be at least 8 */
+        /* The widening sum reductions take any LMUL: vd is one element */
+        if (widening_reduction && vsew == EW32)              arith_illegal = 1'b1;
+
         if (integer_extension) begin
             if (ext_sel == EXT_VF2 && vsew == EW8)           arith_illegal = 1'b1;
             if (ext_sel == EXT_VF4 && vsew != EW32)          arith_illegal = 1'b1;
@@ -460,6 +468,8 @@ module vectorUnit
                 ||  (vlmul_effective == LMUL_2  && cycle_count_vd < 2)
                 ||  (vlmul_effective == LMUL_4  && cycle_count_vd < 4)
                 ||  (vlmul_effective == LMUL_8  && cycle_count_vd < 8)
+                /* vwredsum with LMUL = 8 reads each source register twice */
+                ||  (widening_reduction && vlmul == LMUL_8 && cycle_count_vd < 16)
                 )
                 && (!vector_process_done)
                 )
@@ -479,7 +489,7 @@ module vectorUnit
 //////////////////////////////////////////////////////////////////////////////
 
     always_comb begin
-        if (widening_instruction) begin
+        if (widening_instruction || widening_reduction) begin
             unique case (vsew)
                 EW8:
                     vsew_effective = EW16;
@@ -519,7 +529,7 @@ module vectorUnit
         else if (mask_load_store) begin
             vlmul_effective = LMUL_1;
         end
-        else if (widening_instruction) begin
+        else if (widening_instruction || widening_reduction) begin
             unique case (vlmul)
                 LMUL_1:
                     vlmul_effective = LMUL_2;
@@ -815,10 +825,12 @@ module vectorUnit
     /* The sources extended to the destination SEW (vzext, vsext, widening */
     /* add and subtract); unchanged for the other operations               */
     logic [VLEN-1:0] vs2_extended, vs1_extended;
-    vext_sel_e       vs2_ext_sel;
+    vext_sel_e       vs2_ext_sel, vs1_ext_sel;
 
-    /* vs2 of vwadd.w* and vwsub.w* is not extended */
-    assign vs2_ext_sel = vctrl.src2_wide ? EXT_NONE : vctrl.ext_sel;
+    /* vs2 of vwadd.w* and vwsub.w* is not extended, and neither is vs1[0] */
+    /* of vwredsum, which already has EEW = 2*SEW                          */
+    assign vs2_ext_sel = vctrl.src2_wide   ? EXT_NONE : vctrl.ext_sel;
+    assign vs1_ext_sel = widening_reduction ? EXT_NONE : vctrl.ext_sel;
 
     vectorExtend #(
         .VLEN (VLEN)
@@ -835,7 +847,7 @@ module vectorUnit
         .VLEN (VLEN)
     ) vectorExtendVs1 (
         .data_i       (vs1_data),
-        .ext_sel_i    (vctrl.ext_sel),
+        .ext_sel_i    (vs1_ext_sel),
         .ext_signed_i (vctrl.ext_signed),
         .slice_i      (ext_slice),
         .vsew_i       (vsew_effective),

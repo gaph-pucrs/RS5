@@ -240,8 +240,10 @@ package RS5_pkg;
         VZEXT, VSEXT,
         // Widening add/subtract
         VWADDU, VWADD, VWSUBU, VWSUB, VWADDU_W, VWADD_W, VWSUBU_W, VWSUB_W,
-        // Widening multiply-add and sum reduction
-        VWMACC, VWREDSUM,
+        // Widening multiply-add
+        VWMACC,
+        // Widening sum reduction (VRedSumEnable)
+        VWREDSUMU, VWREDSUM,
         // Add/subtract with carry (VCarryEnable)
         VADC, VMADC, VSBC, VMSBC,
         // Narrowing shift (VNarrowEnable)
@@ -270,7 +272,8 @@ package RS5_pkg;
 
     /* Vector reductions: they write a scalar result to element 0 of vd */
     function automatic logic is_reduction(iTypeVector_e op);
-        return op inside {VREDSUM, VREDMAXU, VREDMAX, VREDMINU, VREDMIN, VREDAND, VREDOR, VREDXOR};
+        return op inside {VREDSUM, VREDMAXU, VREDMAX, VREDMINU, VREDMIN, VREDAND, VREDOR, VREDXOR,
+                          VWREDSUMU, VWREDSUM};
     endfunction
 
     typedef struct packed {

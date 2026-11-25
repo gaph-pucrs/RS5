@@ -95,6 +95,9 @@ void TEST_CASE1(void) {
   EXPECT_ILLEGAL(76, 0x4a11a157); // vsext.vf8 v2, v1 (needs SEW = 64)
   EXPECT_ILLEGAL(77, 0x4a102157); // VXUNARY0 with vs1 = 00000 (unassigned)
   EXPECT_ILLEGAL(78, 0x4a142157); // VXUNARY0 with vs1 = 01000 (unassigned)
+  EXPECT_ILLEGAL(79, 0xc625c0d7); // vwredsum.vx v1, v2, a1 (no .vx form)
+  EXPECT_ILLEGAL(80, 0xc221b0d7); // vwredsumu.vi v1, v2, 3 (no .vi form)
+  EXPECT_LEGAL(81, 0xc62180d7); // vwredsum.vs v1, v2, v3
 }
 
 // Reserved register groups and SEW/LMUL, rejected by the vector unit with
@@ -224,6 +227,16 @@ void TEST_CASE2(void) {
   VSET(16, e8, mf2);
   EXPECT_ILLEGAL(201, 0xd6422257); // vwadd.wv v4, v4, v4 (vs1 overlap, source EMUL < 1)
   EXPECT_LEGAL(202, 0xd642a257); // vwadd.wv v4, v4, v5 (vd = vs2, same EEW)
+  VSET(16, e32, m1);
+  EXPECT_ILLEGAL(203, 0xc62180d7); // vwredsum.vs v1, v2, v3 (widening with SEW = 32)
+  VSET(16, e8, m8);
+  EXPECT_LEGAL(204, 0xc68100d7); // vwredsum.vs v1, v8, v2 (LMUL = 8: vd is one element)
+  // vs2 not aligned: RVV 1.0 reserves it (RS5 traps), but Sail 0.12 stops on an
+  // internal assertion for the widening reductions instead of trapping
+  SKIP_ON_SAIL(EXPECT_ILLEGAL(205, 0xc24100d7)); // vwredsumu.vs v1, v4, v2
+  VSET(16, e16, m2);
+  EXPECT_LEGAL(206, 0xc62281d7); // vwredsum.vs v3, v2, v5 (vd and vs1 are not groups)
+  SKIP_ON_SAIL(EXPECT_ILLEGAL(207, 0xc23080d7)); // vwredsumu.vs v1, v3, v1 (vs2 not aligned, as in 205)
 }
 
 int main(void) {

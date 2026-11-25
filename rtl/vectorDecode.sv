@@ -86,7 +86,7 @@ module vectorDecode
             VDIVU, VDIV, VREMU, VREM:               return VDivEnable;
             VREDAND, VREDOR, VREDXOR:               return VRedLogicEnable;
             VREDMINU, VREDMIN, VREDMAXU, VREDMAX:   return VRedMinMaxEnable;
-            VREDSUM:                                return VRedSumEnable;
+            VREDSUM, VWREDSUMU, VWREDSUM:           return VRedSumEnable;
             default:                                return 1'b1;
         endcase
     endfunction
@@ -179,6 +179,9 @@ module vectorDecode
             6'b100111:     opi = '{vmvr_legal ? VMVR : VNOP, F_I};
             6'b101000:     opi = '{VSRL,   F_VXI};
             6'b101001:     opi = '{VSRA,   F_VXI};
+            /* The widening sum reductions only exist as .vs (OPIVV) */
+            6'b110000:     opi = '{VWREDSUMU, F_V};
+            6'b110001:     opi = '{VWREDSUM,  F_V};
             default:       opi = '{VNOP,   F_NONE};
         endcase
     end

@@ -31,6 +31,8 @@ void TEST_CASE1(void) {
   EXPECT_ILLEGAL(18, 0x4825c0d7); // vsbc.vxm v1, v2, a1, v0 (VCarryEnable)
   EXPECT_ILLEGAL(19, 0x442180d7); // vmadc.vvm v1, v2, v3, v0 (VCarryEnable)
   EXPECT_ILLEGAL(20, 0x4e2180d7); // vmsbc.vv v1, v2, v3 (VCarryEnable)
+  EXPECT_ILLEGAL(21, 0xc62180d7); // vwredsum.vs v1, v2, v3 (VRedSumEnable)
+  EXPECT_ILLEGAL(22, 0xc22180d7); // vwredsumu.vs v1, v2, v3 (VRedSumEnable)
 }
 
 int main(void) {
