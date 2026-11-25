@@ -354,7 +354,7 @@ module fetch
         else if (sys_reset)
             instruction_o <= 32'h00000013;
         else if (enable_i || is_jumping)
-            instruction_o <= instruction;
+            instruction_o <= valid ? instruction : 32'h00000013;
     end
 
     /* The instruction being built came from a faulting fetch */
