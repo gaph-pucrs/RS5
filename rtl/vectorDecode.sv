@@ -249,6 +249,11 @@ module vectorDecode
             6'b111000:     opm = '{VWMULU,      F_VX};
             6'b111010:     opm = '{VWMULSU,     F_VX};
             6'b111011:     opm = '{VWMUL,       F_VX};
+            6'b111100:     opm = '{VWMACCU,     F_VX};
+            6'b111101:     opm = '{VWMACC,      F_VX};
+            /* vwmaccus only exists as .vx */
+            6'b111110:     opm = '{VWMACCUS,    F_X};
+            6'b111111:     opm = '{VWMACCSU,    F_VX};
             default:       opm = '{VNOP,        F_NONE};
         endcase
     end

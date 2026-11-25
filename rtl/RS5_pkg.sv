@@ -241,7 +241,7 @@ package RS5_pkg;
         // Widening add/subtract
         VWADDU, VWADD, VWSUBU, VWSUB, VWADDU_W, VWADD_W, VWSUBU_W, VWSUB_W,
         // Widening multiply-add
-        VWMACC,
+        VWMACCU, VWMACC, VWMACCSU, VWMACCUS,
         // Widening sum reduction (VRedSumEnable)
         VWREDSUMU, VWREDSUM,
         // Add/subtract with carry (VCarryEnable)

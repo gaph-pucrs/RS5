@@ -98,6 +98,8 @@ void TEST_CASE1(void) {
   EXPECT_ILLEGAL(79, 0xc625c0d7); // vwredsum.vx v1, v2, a1 (no .vx form)
   EXPECT_ILLEGAL(80, 0xc221b0d7); // vwredsumu.vi v1, v2, 3 (no .vi form)
   EXPECT_LEGAL(81, 0xc62180d7); // vwredsum.vs v1, v2, v3
+  EXPECT_ILLEGAL(82, 0xfa312257); // vwmaccus.vv v4, v2, v3 (no .vv form)
+  EXPECT_LEGAL(83, 0xf625e257); // vwmacc.vx v4, a1, v2
 }
 
 // Reserved register groups and SEW/LMUL, rejected by the vector unit with
@@ -237,6 +239,26 @@ void TEST_CASE2(void) {
   VSET(16, e16, m2);
   EXPECT_LEGAL(206, 0xc62281d7); // vwredsum.vs v3, v2, v5 (vd and vs1 are not groups)
   SKIP_ON_SAIL(EXPECT_ILLEGAL(207, 0xc23080d7)); // vwredsumu.vs v1, v3, v1 (vs2 not aligned, as in 205)
+  VSET(16, e8, m1);
+  EXPECT_LEGAL(208, 0xf6312257); // vwmacc.vv v4, v2, v3
+  EXPECT_LEGAL(209, 0xf225e257); // vwmaccu.vx v4, a1, v2
+  EXPECT_ILLEGAL(210, 0xf4312057); // vwmacc.vv v0, v2, v3, v0.t (vd = v0)
+  EXPECT_ILLEGAL(211, 0xfe412257); // vwmaccsu.vv v4, v2, v4 (vs2 in low half of vd)
+  EXPECT_ILLEGAL(212, 0xf6222257); // vwmacc.vv v4, v4, v2 (vs1 in low half of vd)
+  EXPECT_LEGAL(213, 0xfe512257); // vwmaccsu.vv v4, v2, v5 (vs2 in high half of vd)
+  EXPECT_LEGAL(214, 0xfa55e257); // vwmaccus.vx v4, a1, v5 (vs2 in high half of vd)
+  VSET(16, e32, m1);
+  EXPECT_ILLEGAL(215, 0xf6312257); // vwmacc.vv v4, v2, v3 (widening with SEW = 32)
+  EXPECT_ILLEGAL(216, 0xfa25e257); // vwmaccus.vx v4, a1, v2 (widening with SEW = 32)
+  VSET(16, e8, m8);
+  EXPECT_ILLEGAL(217, 0xf2802857); // vwmaccu.vv v16, v0, v8 (widening with LMUL = 8)
+  VSET(16, e16, m2);
+  EXPECT_ILLEGAL(218, 0xf6a42157); // vwmacc.vv v2, v8, v10 (vd not aligned to 4)
+  EXPECT_LEGAL(219, 0xf6a42257); // vwmacc.vv v4, v8, v10
+  EXPECT_ILLEGAL(220, 0xf2342257); // vwmaccu.vv v4, v8, v3 (vs2 not aligned)
+  VSET(16, e8, mf2);
+  EXPECT_ILLEGAL(221, 0xf6432257); // vwmacc.vv v4, v6, v4 (overlap, source EMUL < 1)
+  EXPECT_LEGAL(222, 0xf6532257); // vwmacc.vv v4, v6, v5
 }
 
 int main(void) {

@@ -86,7 +86,51 @@ module vectorALU
         end
     end
 
-    assign hold_widening_o = widening_instruction && !hold && !hold_widening_r;
+    /* The widening multiply-add adds each half of the registered product  */
+    /* to the old destination: WM_MUL multiplies, and its last cycle holds */
+    /* while the product is registered; WM_LO adds the low half to vd[2c]  */
+    /* and raises hold_widening_o; WM_HI adds the high half to vd[2c+1]    */
+    typedef enum logic [1:0] {
+        WM_MUL, WM_LO, WM_HI
+    } wmacc_phase_e;
+
+    logic         widening_accumulate;
+    logic         hold_product;
+    wmacc_phase_e wmacc_phase;
+
+    assign widening_accumulate = widening_instruction && (vector_operation_i inside {VWMACCU, VWMACC, VWMACCSU, VWMACCUS});
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            wmacc_phase <= WM_MUL;
+        end
+        else if (!stall) begin
+            if (!widening_accumulate)
+                wmacc_phase <= WM_MUL;
+            else if (!hold) begin
+                unique case (wmacc_phase)
+                    WM_MUL:  wmacc_phase <= WM_LO;
+                    WM_LO:   wmacc_phase <= WM_HI;
+                    default: wmacc_phase <= WM_MUL;
+                endcase
+            end
+        end
+    end
+
+    assign hold_product = widening_accumulate && (wmacc_phase == WM_MUL) && !hold;
+
+    always_comb begin
+        if (widening_accumulate)
+            hold_widening_o = (wmacc_phase == WM_LO) && !hold;
+        else
+            hold_widening_o = widening_instruction && !hold && !hold_widening_r;
+    end
+
+    /* In WM_LO and WM_HI the lanes add at 2*SEW: they take a half of the */
+    /* product and the old destination (third_operand), and keep the      */
+    /* product registered                                                 */
+    logic wmacc_add;
+    assign wmacc_add = widening_accumulate && (wmacc_phase != WM_MUL);
 
 //////////////////////////////////////////////////////////////////////////////
 // Accumulation Control
@@ -193,8 +237,12 @@ module vectorALU
 
     always_comb begin
         unique case (vector_operation_i)
-            VMULH,   VWMUL:   mult_signed_mode = 2'b11;
-            VMULHSU, VWMULSU: mult_signed_mode = 2'b01;
+            /* Bit 0 is the sign of vs2 (first operand), bit 1 of vs1 or rs1 */
+            VMULH,   VWMUL,
+            VWMACC:           mult_signed_mode = 2'b11;
+            VMULHSU, VWMULSU,
+            VWMACCUS:         mult_signed_mode = 2'b01;
+            VWMACCSU:         mult_signed_mode = 2'b10;
             default:          mult_signed_mode = 2'b00;
         endcase
     end
@@ -213,6 +261,7 @@ module vectorALU
                         &&  (!ended_acc)
                         &&  (!hold_widening_r == 1'b1)
                         &&  (!hold_accumulation_r)
+                        &&  (!wmacc_add)
                         );
 
 //////////////////////////////////////////////////////////////////////////////
@@ -243,7 +292,52 @@ module vectorALU
     /* raise hold_llen again and re-arm hold_mask, so the compare never ends. */
     /* Loads and stores do not use the lanes: with LLEN > 32 a running lane */
     /* raises hold_llen and breaks the LSU sequencing.                      */
-    assign enable_lane = current_state == V_EXEC && !(vector_operation_i inside {VNOP, VLD, VST}) && !hold_widening_r && !hold_accumulation_r && !hold_mask_r && !reduction_instruction && !slide_instruction;
+    /* The widening multiply-add keeps the lanes running in WM_HI, which */
+    /* follows its hold_widening_o                                       */
+    assign enable_lane = current_state == V_EXEC && !(vector_operation_i inside {VNOP, VLD, VST}) && !(hold_widening_r && !widening_accumulate) && !hold_accumulation_r && !hold_mask_r && !reduction_instruction && !slide_instruction;
+
+    /* Lane inputs of the widening multiply-add: a widening multiply in */
+    /* WM_MUL, then an add at 2*SEW of a product half and the old vd    */
+    logic [VLEN-1:0] lane_first_operand, lane_second_operand;
+    iTypeVector_e    lane_operation;
+    vew_e            lane_vsew, vsew_wide;
+    logic            lane_hold_widening;
+
+    always_comb begin
+        if (vsew == EW8)
+            vsew_wide = EW16;
+        else
+            vsew_wide = EW32;
+    end
+
+    always_comb begin
+        if (!widening_accumulate) begin
+            lane_operation      = vector_operation_i;
+            lane_vsew           = vsew;
+            lane_first_operand  = first_operand;
+            lane_second_operand = second_operand;
+        end
+        else if (wmacc_phase == WM_MUL) begin
+            lane_operation      = VWMUL;
+            lane_vsew           = vsew;
+            lane_first_operand  = first_operand;
+            lane_second_operand = second_operand;
+        end
+        else if (wmacc_phase == WM_LO) begin
+            lane_operation      = VADD;
+            lane_vsew           = vsew_wide;
+            lane_first_operand  = result_lanes_mult[VLEN-1:0];
+            lane_second_operand = third_operand;
+        end
+        else begin
+            lane_operation      = VADD;
+            lane_vsew           = vsew_wide;
+            lane_first_operand  = result_lanes_mult[(2*VLEN)-1:VLEN];
+            lane_second_operand = third_operand;
+        end
+    end
+
+    assign lane_hold_widening = hold_widening_r || wmacc_add;
 
     generate
         for (genvar i_lane = 0; i_lane < LANES; i_lane++) begin : LANE_LOOP
@@ -257,19 +351,19 @@ module vectorALU
             )   u_vectorLane (
                 .clk               (clk),
                 .reset_n           (reset_n),
-                .first_operand_i   (first_operand [(LLEN*i_lane)+:LLEN]),
-                .second_operand_i  (second_operand[(LLEN*i_lane)+:LLEN]),
+                .first_operand_i   (lane_first_operand [(LLEN*i_lane)+:LLEN]),
+                .second_operand_i  (lane_second_operand[(LLEN*i_lane)+:LLEN]),
                 .third_operand_i   (third_operand [(LLEN*i_lane)+:LLEN]),
                 .mask_sew8_i       (mask_sew8 [cycle_count_r][((LLEN/ 8)*i_lane)+:LLEN/8]),
                 .mask_sew16_i      (mask_sew16[cycle_count_r][((LLEN/16)*i_lane)+:LLEN/16]),
                 .mask_sew32_i      (mask_sew32[cycle_count_r][((LLEN/32)*i_lane)+:LLEN/32]),
                 .enable_i          (enable_lane),
-                .vector_operation_i(vector_operation_i),
+                .vector_operation_i(lane_operation),
                 .vctrl_i           (vctrl_i),
-                .vsew              (vsew),
+                .vsew              (lane_vsew),
                 .vm                (vm),
                 .mult_enable       (mult_enable),
-                .hold_widening     (hold_widening_r),
+                .hold_widening     (lane_hold_widening),
                 .mult_signed_mode  (mult_signed_mode),
                 .div_enable        (div_enable),
                 .hold_o            (hold_lanes[i_lane]),
@@ -339,7 +433,7 @@ module vectorALU
 
     assign hold = |hold_lanes;
 
-    assign hold_o = hold | hold_widening_o | hold_accumulation | hold_reductions | hold_mask;
+    assign hold_o = hold | hold_widening_o | hold_product | hold_accumulation | hold_reductions | hold_mask;
 
 //////////////////////////////////////////////////////////////////////////////
 // Result Demux

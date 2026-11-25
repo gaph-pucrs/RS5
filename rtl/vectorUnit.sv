@@ -139,10 +139,12 @@ module vectorUnit
     assign multiply_instruction   = (vector_operation_i inside {VMUL, VMULH, VMULHSU, VMULHU} | accumulate_instruction | widening_multiply);
     assign reduction_instruction  = is_reduction(vector_operation_i);
     /* Widening: the destination has EEW = 2*SEW and EMUL = 2*LMUL. The */
-    /* widening multiply writes both destination registers of a source  */
-    /* register from one product (hold_widening); the widening add and  */
-    /* subtract extend their sources and iterate over the destination   */
-    assign widening_multiply      = (vector_operation_i inside {VWMUL, VWMULU, VWMULSU});
+    /* widening multiply and multiply-add write both destination        */
+    /* registers of a source register from one product (hold_widening); */
+    /* the widening add and subtract extend their sources and iterate   */
+    /* over the destination                                             */
+    assign widening_multiply      = (vector_operation_i inside {VWMUL, VWMULU, VWMULSU,
+                                                                VWMACCU, VWMACC, VWMACCSU, VWMACCUS});
     assign widening_instruction   = widening_multiply || (vector_operation_i inside {VWADDU, VWADD, VWSUBU, VWSUB,
                                                                                       VWADDU_W, VWADD_W, VWSUBU_W, VWSUB_W});
     assign integer_extension      = (vector_operation_i inside {VZEXT, VSEXT});
@@ -690,6 +692,11 @@ module vectorUnit
         /* Compares read the old destination on their first hold cycle */
         else if (mask_instruction && hold) begin
             vs2_addr = rd;
+        end
+        /* The widening multiply-add reads the old vd[2c] while it multiplies, */
+        /* and vd[2c+1] in the hold_widening cycle, when it adds to vd[2c]     */
+        else if (vector_operation_i inside {VWMACCU, VWMACC, VWMACCSU, VWMACCUS} && hold) begin
+            vs2_addr = vd_addr + hold_widening;
         end
         else begin
             vs2_addr = rs2_addr;
