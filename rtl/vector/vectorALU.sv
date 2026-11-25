@@ -57,6 +57,8 @@ module vectorALU
     input  logic                        multiply_instruction,
     input  logic                        reduction_instruction,
     input  logic                        widening_instruction,
+    input  logic                        widening_accumulate,
+    input  logic                        widening_reduction,
 
     output logic                        hold_o,
     output logic                        hold_widening_o,
@@ -94,11 +96,8 @@ module vectorALU
         WM_MUL, WM_LO, WM_HI
     } wmacc_phase_e;
 
-    logic         widening_accumulate;
     logic         hold_product;
     wmacc_phase_e wmacc_phase;
-
-    assign widening_accumulate = widening_instruction && (vector_operation_i inside {VWMACCU, VWMACC, VWMACCSU, VWMACCUS});
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
@@ -188,6 +187,7 @@ module vectorALU
             .stall             (stall),
             .enable_i          (reduction_instruction),
             .vector_operation_i(vector_operation_i),
+            .widening_reduction(widening_reduction),
             .first_operand     (first_operand),
             .second_operand    (second_operand_reductions),
             .vsew              (vsew),

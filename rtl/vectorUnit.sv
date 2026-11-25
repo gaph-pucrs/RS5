@@ -85,6 +85,9 @@ module vectorUnit
     logic        multiply_instruction_r;
     logic        reduction_instruction_r;
     logic        widening_multiply_r;
+    logic        widening_accumulate;
+    logic        widening_accumulate_r;
+    logic        widening_reduction_r;
 
     /* Control decoded once from the operation (fields are added per package) */
     vector_ctrl_t vctrl;
@@ -148,6 +151,7 @@ module vectorUnit
     assign widening_instruction   = widening_multiply || (vector_operation_i inside {VWADDU, VWADD, VWSUBU, VWSUB,
                                                                                       VWADDU_W, VWADD_W, VWSUBU_W, VWSUB_W});
     assign integer_extension      = (vector_operation_i inside {VZEXT, VSEXT});
+    assign widening_accumulate    = (vector_operation_i inside {VWMACCU, VWMACC, VWMACCSU, VWMACCUS});
     /* The widening sum reductions extend vs2 and reduce it at 2*SEW */
     assign widening_reduction     = (vector_operation_i inside {VWREDSUMU, VWREDSUM});
     assign whole_reg_load_store   = (instruction_i[24:20] == 5'b01000 && (op_vload || op_vstore) && instruction_i[27:26] == 2'b00);
@@ -207,6 +211,8 @@ module vectorUnit
             multiply_instruction_r   <= 1'b0;
             reduction_instruction_r  <= 1'b0;
             widening_multiply_r      <= 1'b0;
+            widening_accumulate_r    <= 1'b0;
+            widening_reduction_r     <= 1'b0;
         end
         else if (!should_stall) begin
             if (next_state == V_EXEC) begin
@@ -215,6 +221,8 @@ module vectorUnit
                 multiply_instruction_r   <= multiply_instruction;
                 reduction_instruction_r  <= reduction_instruction;
                 widening_multiply_r      <= widening_multiply;
+                widening_accumulate_r    <= widening_accumulate;
+                widening_reduction_r     <= widening_reduction;
             end
             else begin
                 accumulate_instruction_r <= 1'b0;
@@ -222,6 +230,8 @@ module vectorUnit
                 multiply_instruction_r   <= 1'b0;
                 reduction_instruction_r  <= 1'b0;
                 widening_multiply_r      <= 1'b0;
+                widening_accumulate_r    <= 1'b0;
+                widening_reduction_r     <= 1'b0;
             end
         end
     end
@@ -976,9 +986,26 @@ module vectorUnit
     vew_e vsew_alu;
     assign vsew_alu = (ext_sel == EXT_NONE) ? vsew : vsew_effective;
 
+    /* Constant during an instruction: registered when it starts, so that */
+    /* the ALU takes them from flip-flops instead of from the decode of   */
+    /* the operation                                                      */
+    vew_e                    vsew_alu_r;
+    logic [$bits(VLENB)-1:0] elements_per_reg_r;
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            vsew_alu_r         <= EW8;
+            elements_per_reg_r <= '0;
+        end
+        else if (!should_stall && next_state == V_EXEC) begin
+            vsew_alu_r         <= vsew_alu;
+            elements_per_reg_r <= elements_per_reg;
+        end
+    end
+
     logic [$bits(VLEN )-1:0] vl_reductions;
-    assign vl_reductions = (vl_curr_reg > elements_per_reg)
-                            ? elements_per_reg
+    assign vl_reductions = (vl_curr_reg > elements_per_reg_r)
+                            ? elements_per_reg_r
                             : vl_curr_reg;
 
     vectorALU #(
@@ -1018,8 +1045,10 @@ module vectorUnit
         .multiply_instruction  (multiply_instruction_r),
         .reduction_instruction (reduction_instruction_r),
         .widening_instruction  (widening_multiply_r),
+        .widening_accumulate   (widening_accumulate_r),
+        .widening_reduction    (widening_reduction_r),
         .current_state         (state),
-        .vsew                  (vsew_alu),
+        .vsew                  (vsew_alu_r),
         .hold_o                (hold_alu),
         .hold_widening_o       (hold_widening),
         .result_mask_o         (result_alu_mask),
