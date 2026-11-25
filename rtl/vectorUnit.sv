@@ -710,6 +710,20 @@ module vectorUnit
     end
 
     // WRITE ENABLE GENERATION
+    /* Elements below vl in the destination register being written. In   */
+    /* the hold_widening scheme, vl_curr_reg counts from the first       */
+    /* element of the source register, so the second destination         */
+    /* register (odd cycle_count_r) starts half a source register later  */
+    logic [$bits(VLEN)-1:0] vl_write;
+    always_comb begin
+        if (!(widening_multiply && cycle_count_r[0]))
+            vl_write = vl_curr_reg;
+        else if (vl_curr_reg > (elements_per_reg >> 1))
+            vl_write = vl_curr_reg - (elements_per_reg >> 1);
+        else
+            vl_write = '0;
+    end
+
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             write_enable <= '0;
@@ -734,21 +748,21 @@ module vectorUnit
                 unique case (vsew_effective)
                     EW8:
                         for (int i = 0; i < VLENB; i++)
-                            if ((vm_effective || mask_sew8[cycle_count_r][i]) && (i < vl_curr_reg))
+                            if ((vm_effective || mask_sew8[cycle_count_r][i]) && (i < vl_write))
                                 write_enable[i] <= 1'b1;
                             else
                                 write_enable[i] <= 1'b0;
 
                     EW16:
                         for (int i = 0; i < VLENB/2; i++)
-                            if ((vm_effective || mask_sew16[cycle_count_r][i]) && (i < vl_curr_reg))
+                            if ((vm_effective || mask_sew16[cycle_count_r][i]) && (i < vl_write))
                                 write_enable[(i*2)+:2] <= 2'b11;
                             else
                                 write_enable[(i*2)+:2] <= 2'b00;
 
                     default:
                         for (int i = 0; i < VLENB/4; i++)
-                            if ((vm_effective || mask_sew32[cycle_count_r][i]) && (i < vl_curr_reg))
+                            if ((vm_effective || mask_sew32[cycle_count_r][i]) && (i < vl_write))
                                 write_enable[(i*4)+:4] <= 4'b1111;
                             else
                                 write_enable[(i*4)+:4] <= 4'b0000;
