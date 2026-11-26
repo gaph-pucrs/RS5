@@ -235,134 +235,56 @@ module vectorReductions
     //  LOGIC
     // *********************************
     if (VRedLogicEnable) begin : v_redlogic_gen_on
-        /////////////////////////////////////////////////
-        // 8 Bits
-        /////////////////////////////////////////////////
-        logic [ 7:0] result_redand_8b;
-        logic [ 7:0] result_redor_8b;
-        logic [ 7:0] result_redxor_8b;
+        /* AND, OR and XOR are bitwise, so the 8 and 16 bit reductions run on */
+        /* the 32 bit trees: each inactive element takes the identity of its  */
+        /* operation, the accumulator goes in the low SEW bits of word 0 with */
+        /* the identity above, and the 32 bit result is folded to SEW at the  */
+        /* end. OR runs on the AND tree with inputs and result inverted       */
+        /* (De Morgan: or(x) = ~and(~x)).                                     */
+        logic [VLENB-1:0] active_byte;
+        logic [VLEN-1:0]  active_bits;
+        logic [VLEN-1:0]  inverted_operand;
+        logic [31:0]      sew_bits;
+        logic             invert;
 
-        vectorReductionTree #(
-            .SEW                   (8),
-            .VLEN                  (VLEN),
-            .ELEMENTS_PER_REG      (VLEN/8),
-            .RED_OP                (RED_AND),
-            .VMultiCycleReductions (VMultiCycleReductions)
-        )   reduction_tree_and_8b (
-            .clk           (clk),
-            .reset_n       (reset_n),
-            .first_operand (first_operand_8b),
-            .second_operand(second_operand[7:0]),
-            .vl            (vl),
-            .vm            (vm),
-            .mask          (mask_8b),
-            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
-            .result_o      (result_redand_8b)
-        );
+        always_comb begin
+            for (int i = 0; i < VLENB; i++) begin
+                unique case (vsew)
+                    EW8:     active_byte[i] = (vm || mask_8b [i  ]) && (i   < vl);
+                    EW16:    active_byte[i] = (vm || mask_16b[i/2]) && (i/2 < vl);
+                    default: active_byte[i] = (vm || mask_32b[i/4]) && (i/4 < vl);
+                endcase
+                active_bits[(8*i)+:8] = {8{active_byte[i]}};
+            end
+        end
 
-        vectorReductionTree #(
-            .SEW                   (8),
-            .VLEN                  (VLEN),
-            .ELEMENTS_PER_REG      (VLEN/8),
-            .RED_OP                (RED_OR),
-            .VMultiCycleReductions (VMultiCycleReductions)
-        )   reduction_tree_or_8b (
-            .clk           (clk),
-            .reset_n       (reset_n),
-            .first_operand (first_operand_8b),
-            .second_operand(second_operand[7:0]),
-            .vl            (vl),
-            .vm            (vm),
-            .mask          (mask_8b),
-            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
-            .result_o      (result_redor_8b)
-        );
+        always_comb begin
+            unique case (vsew)
+                EW8:     sew_bits = 32'h0000_00FF;
+                EW16:    sew_bits = 32'h0000_FFFF;
+                default: sew_bits = 32'hFFFF_FFFF;
+            endcase
+        end
 
-        vectorReductionTree #(
-            .SEW                   (8),
-            .VLEN                  (VLEN),
-            .ELEMENTS_PER_REG      (VLEN/8),
-            .RED_OP                (RED_XOR),
-            .VMultiCycleReductions (VMultiCycleReductions)
-        )   reduction_tree_xor_8b (
-            .clk           (clk),
-            .reset_n       (reset_n),
-            .first_operand (first_operand_8b),
-            .second_operand(second_operand[7:0]),
-            .vl            (vl),
-            .vm            (vm),
-            .mask          (mask_8b),
-            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
-            .result_o      (result_redxor_8b)
-        );
+        assign invert           = (vector_operation_i == VREDOR);
+        assign inverted_operand = first_operand ^ {VLEN{invert}};
 
-        /////////////////////////////////////////////////
-        // 16 Bits
-        /////////////////////////////////////////////////
-        logic [15:0] result_redand_16b;
-        logic [15:0] result_redor_16b;
-        logic [15:0] result_redxor_16b;
+        logic [(VLENB/4)-1:0][31:0] and_operand;
+        logic [(VLENB/4)-1:0][31:0] xor_operand;
+        logic [31:0]                and_accumulator;
+        logic [31:0]                xor_accumulator;
+        logic [31:0]                result_and_32b;
+        logic [31:0]                result_xor_32b;
 
-        vectorReductionTree #(
-            .SEW                   (16),
-            .VLEN                  (VLEN),
-            .ELEMENTS_PER_REG      (VLEN/16),
-            .RED_OP                (RED_AND),
-            .VMultiCycleReductions (VMultiCycleReductions)
-        )   reduction_tree_and_16b (
-            .clk           (clk),
-            .reset_n       (reset_n),
-            .first_operand (first_operand_16b),
-            .second_operand(second_operand[15:0]),
-            .vl            (vl),
-            .vm            (vm),
-            .mask          (mask_16b),
-            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
-            .result_o      (result_redand_16b)
-        );
+        always_comb begin
+            for (int i = 0; i < VLENB/4; i++) begin
+                and_operand[i] = inverted_operand[(32*i)+:32] | ~active_bits[(32*i)+:32];
+                xor_operand[i] = first_operand   [(32*i)+:32] &  active_bits[(32*i)+:32];
+            end
+        end
 
-        vectorReductionTree #(
-            .SEW                   (16),
-            .VLEN                  (VLEN),
-            .ELEMENTS_PER_REG      (VLEN/16),
-            .RED_OP                (RED_OR),
-            .VMultiCycleReductions (VMultiCycleReductions)
-        )   reduction_tree_or_16b (
-            .clk           (clk),
-            .reset_n       (reset_n),
-            .first_operand (first_operand_16b),
-            .second_operand(second_operand[15:0]),
-            .vl            (vl),
-            .vm            (vm),
-            .mask          (mask_16b),
-            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
-            .result_o      (result_redor_16b)
-        );
-
-        vectorReductionTree #(
-            .SEW                   (16),
-            .VLEN                  (VLEN),
-            .ELEMENTS_PER_REG      (VLEN/16),
-            .RED_OP                (RED_XOR),
-            .VMultiCycleReductions (VMultiCycleReductions)
-        )   reduction_tree_xor_16b (
-            .clk           (clk),
-            .reset_n       (reset_n),
-            .first_operand (first_operand_16b),
-            .second_operand(second_operand[15:0]),
-            .vl            (vl),
-            .vm            (vm),
-            .mask          (mask_16b),
-            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
-            .result_o      (result_redxor_16b)
-        );
-
-        /////////////////////////////////////////////////
-        // 32 Bits
-        /////////////////////////////////////////////////
-        logic [31:0] result_redand_32b;
-        logic [31:0] result_redor_32b;
-        logic [31:0] result_redxor_32b;
+        assign and_accumulator = ((second_operand ^ {32{invert}}) & sew_bits) | ~sew_bits;
+        assign xor_accumulator =   second_operand                 & sew_bits;
 
         vectorReductionTree #(
             .SEW                   (32),
@@ -370,34 +292,16 @@ module vectorReductions
             .ELEMENTS_PER_REG      (VLEN/32),
             .RED_OP                (RED_AND),
             .VMultiCycleReductions (VMultiCycleReductions)
-        )   reduction_tree_and_32b (
+        )   reduction_tree_and (
             .clk           (clk),
             .reset_n       (reset_n),
-            .first_operand (first_operand_32b),
-            .second_operand(second_operand[31:0]),
-            .vl            (vl),
-            .vm            (vm),
-            .mask          (mask_32b),
+            .first_operand (and_operand),
+            .second_operand(and_accumulator),
+            .vl            (VLEN/32),
+            .vm            (1'b1),
+            .mask          ('1),
             .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
-            .result_o      (result_redand_32b)
-        );
-
-        vectorReductionTree #(
-            .SEW                   (32),
-            .VLEN                  (VLEN),
-            .ELEMENTS_PER_REG      (VLEN/32),
-            .RED_OP                (RED_OR),
-            .VMultiCycleReductions (VMultiCycleReductions)
-        )   reduction_tree_or_32b (
-            .clk           (clk),
-            .reset_n       (reset_n),
-            .first_operand (first_operand_32b),
-            .second_operand(second_operand[31:0]),
-            .vl            (vl),
-            .vm            (vm),
-            .mask          (mask_32b),
-            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
-            .result_o      (result_redor_32b)
+            .result_o      (result_and_32b)
         );
 
         vectorReductionTree #(
@@ -406,40 +310,44 @@ module vectorReductions
             .ELEMENTS_PER_REG      (VLEN/32),
             .RED_OP                (RED_XOR),
             .VMultiCycleReductions (VMultiCycleReductions)
-        )   reduction_tree_xor_32b (
+        )   reduction_tree_xor (
             .clk           (clk),
             .reset_n       (reset_n),
-            .first_operand (first_operand_32b),
-            .second_operand(second_operand[31:0]),
-            .vl            (vl),
-            .vm            (vm),
-            .mask          (mask_32b),
+            .first_operand (xor_operand),
+            .second_operand(xor_accumulator),
+            .vl            (VLEN/32),
+            .vm            (1'b1),
+            .mask          ('1),
             .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
-            .result_o      (result_redxor_32b)
+            .result_o      (result_xor_32b)
         );
 
         // *********************************
-        //  Sew Demux
+        //  Fold to SEW
         // *********************************
+        logic [31:0] result_and_folded;
+
         always_comb begin
             unique case (vsew)
                 EW8: begin
-                    result_redand  = {'0, result_redand_8b};
-                    result_redor   = {'0, result_redor_8b };
-                    result_redxor  = {'0, result_redxor_8b};
+                    result_and_folded = {24'b0, result_and_32b[7:0]   & result_and_32b[15:8]
+                                              & result_and_32b[23:16] & result_and_32b[31:24]};
+                    result_redxor     = {24'b0, result_xor_32b[7:0]   ^ result_xor_32b[15:8]
+                                              ^ result_xor_32b[23:16] ^ result_xor_32b[31:24]};
                 end
                 EW16: begin
-                    result_redand  = {'0, result_redand_16b};
-                    result_redor   = {'0, result_redor_16b };
-                    result_redxor  = {'0, result_redxor_16b};
+                    result_and_folded = {16'b0, result_and_32b[15:0] & result_and_32b[31:16]};
+                    result_redxor     = {16'b0, result_xor_32b[15:0] ^ result_xor_32b[31:16]};
                 end
                 default: begin
-                    result_redand  = result_redand_32b;
-                    result_redor   = result_redor_32b;
-                    result_redxor  = result_redxor_32b;
+                    result_and_folded = result_and_32b;
+                    result_redxor     = result_xor_32b;
                 end
             endcase
         end
+
+        assign result_redand = result_and_folded;
+        assign result_redor  = result_and_folded ^ sew_bits;
     end
     else begin : v_redlogic_gen_off
         always_comb begin

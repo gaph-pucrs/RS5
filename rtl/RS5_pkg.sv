@@ -539,7 +539,6 @@ package RS5_pkg;
         RED_MIN,
         RED_MINU,
         RED_AND,
-        RED_OR,
         RED_XOR,
         RED_SUM
     } red_op_e;

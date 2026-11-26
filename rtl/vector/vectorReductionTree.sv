@@ -80,9 +80,6 @@ module vectorReductionTree
                         else if (RED_OP == RED_AND) begin
                             result[0][i] = first_operand[0] & second_operand;
                         end
-                        else if (RED_OP == RED_OR) begin
-                            result[0][i] = first_operand[0] | second_operand;
-                        end
                         else if (RED_OP == RED_XOR) begin
                             result[0][i] = first_operand[0] ^ second_operand;
                         end
@@ -143,9 +140,6 @@ module vectorReductionTree
                     else if (RED_OP == RED_AND) begin
                         result[i+1][j] = result[i][2*j] & result[i][2*j+1];
                     end
-                    else if (RED_OP == RED_OR) begin
-                        result[i+1][j] = result[i][2*j] | result[i][2*j+1];
-                    end
                     else if (RED_OP == RED_XOR) begin
                         result[i+1][j] = result[i][2*j] ^ result[i][2*j+1];
                     end
@@ -191,9 +185,6 @@ module vectorReductionTree
                 else if (RED_OP == RED_AND) begin
                     result[k] = operand[j] & operand[j+1];
                 end
-                else if (RED_OP == RED_OR) begin
-                    result[k] = operand[j] | operand[j+1];
-                end
                 else if (RED_OP == RED_XOR) begin
                     result[k] = operand[j] ^ operand[j+1];
                 end
@@ -233,9 +224,6 @@ module vectorReductionTree
                             end
                             else if (RED_OP == RED_AND) begin
                                operand[i] <= first_operand[0] & second_operand;
-                            end
-                            else if (RED_OP == RED_OR) begin
-                               operand[i] <= first_operand[0] | second_operand;
                             end
                             else if (RED_OP == RED_XOR) begin
                                operand[i] <= first_operand[0] ^ second_operand;
