@@ -56,47 +56,53 @@ module vectorReductions
     logic [31:0] result_redxor;
     logic [31:0] result_redminmax;
 
-    // *********************************
-    //  HOLD CONTROL
-    // *********************************
-    localparam TREE_LEVELS_8b  = $clog2(VLENB);
-    localparam TREE_LEVELS_16b = $clog2(VLENB/2);
-    localparam TREE_LEVELS_32b = $clog2(VLENB/4);
+    /* Element by element add of two 32 bit slices: a separator bit between */
+    /* bytes stops the carry at an element boundary (a = b = 0) or lets it  */
+    /* through inside an element (a = 1, b = 0)                             */
+    function automatic logic [31:0] simd_add(input logic [31:0] a, input logic [31:0] b,
+                                             input logic [2:0] bnd);
+        /* verilator lint_off UNUSEDSIGNAL */
+        logic [34:0] s;     /* the separator bits are dropped */
+        /* verilator lint_on UNUSEDSIGNAL */
+        s = {a[31:24], ~bnd[2], a[23:16], ~bnd[1], a[15:8], ~bnd[0], a[7:0]}
+          + {b[31:24],    1'b0, b[23:16],    1'b0, b[15:8],    1'b0, b[7:0]};
+        return {s[34:27], s[25:18], s[16:9], s[7:0]};
+    endfunction
 
-    logic [$clog2(TREE_LEVELS_8b):0] cycle_counter;
-
-    if (VMultiCycleReductions) begin  : multi_cycle_reduction_on
-        logic                            last_cycle;
-
-        always_ff @(posedge clk or negedge reset_n) begin
-            if (!reset_n)
-                cycle_counter <= '0;
-            else if (enable_i && !last_cycle)
-                cycle_counter <= cycle_counter + 1;
-            else
-                cycle_counter <= '0;
-        end
-
-        always_comb begin
-            unique case (vsew)
-                EW8:    last_cycle = (cycle_counter == TREE_LEVELS_8b+1);
-                EW16:   last_cycle = (cycle_counter == TREE_LEVELS_16b+1);
-                default:last_cycle = (cycle_counter == TREE_LEVELS_32b+1);
-            endcase
-        end
-
-        assign hold_o = enable_i && !last_cycle;
-    end
-    else begin : multi_cycle_reduction_off
-        assign hold_o = 1'b0;
-        assign cycle_counter = '0;
-    end
+    /* Element by element unsigned minimum: a - b with the same separators, */
+    /* which at a boundary (a = b = 1) also add the +1 of the next element; */
+    /* the sum bit of a boundary separator is the carry out of the element  */
+    /* below it, which is 1 when a >= b                                     */
+    function automatic logic [31:0] simd_minu(input logic [31:0] a, input logic [31:0] b,
+                                              input logic [2:0] bnd, input vew_e sew);
+        /* verilator lint_off UNUSEDSIGNAL */
+        logic [35:0] d;     /* only the carries are used */
+        /* verilator lint_on UNUSEDSIGNAL */
+        logic [3:0]  carry, a_ge_b;
+        logic [31:0] nb, r;
+        nb = ~b;
+        d = {1'b0, a[31:24],   1'b1, a[23:16],   1'b1, a[15:8],   1'b1, a[7:0]}
+          + {1'b0, nb[31:24], bnd[2], nb[23:16], bnd[1], nb[15:8], bnd[0], nb[7:0]}
+          + 36'd1;
+        carry = {d[35], d[26], d[17], d[8]};
+        unique case (sew)
+            EW8:     a_ge_b = carry;
+            EW16:    a_ge_b = {{2{carry[3]}}, {2{carry[1]}}};
+            default: a_ge_b = {4{carry[3]}};
+        endcase
+        for (int k = 0; k < 4; k++)
+            r[(8*k)+:8] = a_ge_b[k] ? b[(8*k)+:8] : a[(8*k)+:8];
+        return r;
+    endfunction
 
     // *********************************
     // Operands Control
     // *********************************
+    /* verilator lint_off UNUSEDSIGNAL */
+    /* The 8 and 16 bit views are not used with VMultiCycleReductions = 1 */
     logic [(VLENB)  -1:0][ 7:0] first_operand_8b;
     logic [(VLENB/2)-1:0][15:0] first_operand_16b;
+    /* verilator lint_on UNUSEDSIGNAL */
     logic [(VLENB/4)-1:0][31:0] first_operand_32b;
 
     always_comb begin
@@ -148,7 +154,7 @@ module vectorReductions
     // *********************************
     //  SUM
     // *********************************
-    if (VRedSumEnable) begin : v_redsum_gen_on
+    if (VRedSumEnable && !VMultiCycleReductions) begin : v_redsum_gen_on
         logic [ 7:0] result_redsum_8b;
         logic [15:0] result_redsum_16b;
         logic [31:0] result_redsum_32b;
@@ -157,17 +163,13 @@ module vectorReductions
             .SEW                   (8),
             .VLEN                  (VLEN),
             .ELEMENTS_PER_REG      (VLEN/8),
-            .RED_OP                (RED_SUM),
-            .VMultiCycleReductions (VMultiCycleReductions)
+            .RED_OP                (RED_SUM)
         )   reduction_tree_sum_8b (
-            .clk           (clk),
-            .reset_n       (reset_n),
             .first_operand (first_operand_8b),
             .second_operand(second_operand[7:0]),
             .vl            (vl),
             .vm            (vm),
             .mask          (mask_8b),
-            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redsum_8b)
         );
 
@@ -175,17 +177,13 @@ module vectorReductions
             .SEW                   (16),
             .VLEN                  (VLEN),
             .ELEMENTS_PER_REG      (VLEN/16),
-            .RED_OP                (RED_SUM),
-            .VMultiCycleReductions (VMultiCycleReductions)
+            .RED_OP                (RED_SUM)
         )   reduction_tree_sum_16b (
-            .clk           (clk),
-            .reset_n       (reset_n),
             .first_operand (first_operand_16b),
             .second_operand(second_operand[15:0]),
             .vl            (vl),
             .vm            (vm),
             .mask          (mask_16b),
-            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redsum_16b)
         );
 
@@ -193,17 +191,13 @@ module vectorReductions
             .SEW                   (32),
             .VLEN                  (VLEN),
             .ELEMENTS_PER_REG      (VLEN/32),
-            .RED_OP                (RED_SUM),
-            .VMultiCycleReductions (VMultiCycleReductions)
+            .RED_OP                (RED_SUM)
         )   reduction_tree_sum_32b (
-            .clk           (clk),
-            .reset_n       (reset_n),
             .first_operand (first_operand_32b),
             .second_operand(second_operand[31:0]),
             .vl            (vl),
             .vm            (vm),
             .mask          (mask_32b),
-            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_redsum_32b)
         );
 
@@ -231,7 +225,7 @@ module vectorReductions
     // *********************************
     //  LOGIC
     // *********************************
-    if (VRedLogicEnable) begin : v_redlogic_gen_on
+    if (VRedLogicEnable && !VMultiCycleReductions) begin : v_redlogic_gen_on
         /* AND, OR and XOR are bitwise, so the 8 and 16 bit reductions run on */
         /* the 32 bit trees: each inactive element takes the identity of its  */
         /* operation, the accumulator goes in the low SEW bits of word 0 with */
@@ -287,17 +281,13 @@ module vectorReductions
             .SEW                   (32),
             .VLEN                  (VLEN),
             .ELEMENTS_PER_REG      (VLEN/32),
-            .RED_OP                (RED_AND),
-            .VMultiCycleReductions (VMultiCycleReductions)
+            .RED_OP                (RED_AND)
         )   reduction_tree_and (
-            .clk           (clk),
-            .reset_n       (reset_n),
             .first_operand (and_operand),
             .second_operand(and_accumulator),
             .vl            (VLEN/32),
             .vm            (1'b1),
             .mask          ('1),
-            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_and_32b)
         );
 
@@ -305,17 +295,13 @@ module vectorReductions
             .SEW                   (32),
             .VLEN                  (VLEN),
             .ELEMENTS_PER_REG      (VLEN/32),
-            .RED_OP                (RED_XOR),
-            .VMultiCycleReductions (VMultiCycleReductions)
+            .RED_OP                (RED_XOR)
         )   reduction_tree_xor (
-            .clk           (clk),
-            .reset_n       (reset_n),
             .first_operand (xor_operand),
             .second_operand(xor_accumulator),
             .vl            (VLEN/32),
             .vm            (1'b1),
             .mask          ('1),
-            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_xor_32b)
         );
 
@@ -357,7 +343,7 @@ module vectorReductions
     // *********************************
     //  MIN-MAX
     // *********************************
-    if (VRedMinMaxEnable) begin : v_redminmax_gen_on
+    if (VRedMinMaxEnable && !VMultiCycleReductions) begin : v_redminmax_gen_on
         /* One minu tree per width covers the four operations: flipping the */
         /* MSB of each element turns the signed order into the unsigned     */
         /* one, and inverting every bit turns max into min                  */
@@ -410,17 +396,13 @@ module vectorReductions
             .SEW                   (8),
             .VLEN                  (VLEN),
             .ELEMENTS_PER_REG      (VLEN/8),
-            .RED_OP                (RED_MINU),
-            .VMultiCycleReductions (VMultiCycleReductions)
+            .RED_OP                (RED_MINU)
         )   reduction_tree_minu_8b (
-            .clk           (clk),
-            .reset_n       (reset_n),
             .first_operand (minmax_operand_8b),
             .second_operand(minmax_accumulator[7:0]),
             .vl            (vl),
             .vm            (vm),
             .mask          (mask_8b),
-            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_minu_8b)
         );
 
@@ -428,17 +410,13 @@ module vectorReductions
             .SEW                   (16),
             .VLEN                  (VLEN),
             .ELEMENTS_PER_REG      (VLEN/16),
-            .RED_OP                (RED_MINU),
-            .VMultiCycleReductions (VMultiCycleReductions)
+            .RED_OP                (RED_MINU)
         )   reduction_tree_minu_16b (
-            .clk           (clk),
-            .reset_n       (reset_n),
             .first_operand (minmax_operand_16b),
             .second_operand(minmax_accumulator[15:0]),
             .vl            (vl),
             .vm            (vm),
             .mask          (mask_16b),
-            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_minu_16b)
         );
 
@@ -446,17 +424,13 @@ module vectorReductions
             .SEW                   (32),
             .VLEN                  (VLEN),
             .ELEMENTS_PER_REG      (VLEN/32),
-            .RED_OP                (RED_MINU),
-            .VMultiCycleReductions (VMultiCycleReductions)
+            .RED_OP                (RED_MINU)
         )   reduction_tree_minu_32b (
-            .clk           (clk),
-            .reset_n       (reset_n),
             .first_operand (minmax_operand_32b),
             .second_operand(minmax_accumulator),
             .vl            (vl),
             .vm            (vm),
             .mask          (mask_32b),
-            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
             .result_o      (result_minu_32b)
         );
 
@@ -476,23 +450,167 @@ module vectorReductions
     end
 
     // *********************************
+    //  MULTI-CYCLE
+    // *********************************
+    /* The source register is reduced 32 bits per cycle: each step combines */
+    /* one 32 bit chunk of first_operand, element by element, into a 32 bit */
+    /* accumulator, and after the last chunk the accumulator is folded to   */
+    /* one element (2 steps with SEW = 8, 1 with SEW = 16). The accumulator */
+    /* starts with the scalar operand in element 0 and the identity of the  */
+    /* operation elsewhere, as do the inactive elements. OR runs as AND     */
+    /* with inputs and result inverted, and min/max as minu with the        */
+    /* pattern of the single-cycle trees. The last step is combinational,   */
+    /* in the cycle hold_o falls.                                           */
+    logic [31:0] result_multi_cycle;
+
+    if (VMultiCycleReductions) begin : multi_cycle_reduction_on
+        localparam CHUNKS    = VLEN/32;
+        localparam STEP_BITS = $clog2(CHUNKS+2);
+
+        logic [STEP_BITS-1:0] step;
+        logic [STEP_BITS-1:0] last_step;
+        logic                 last_cycle;
+
+        always_comb begin
+            unique case (vsew)
+                EW8:     last_step = STEP_BITS'(CHUNKS + 1);
+                EW16:    last_step = STEP_BITS'(CHUNKS);
+                default: last_step = STEP_BITS'(CHUNKS - 1);
+            endcase
+        end
+
+        assign last_cycle = (step == last_step);
+        assign hold_o     = enable_i && !last_cycle;
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                step <= '0;
+            else if (enable_i && !last_cycle)
+                step <= step + 1'b1;
+            else
+                step <= '0;
+        end
+
+        /* Operation */
+        logic       op_sum, op_minu, op_and;
+        logic       minmax_signed, minmax_max, invert;
+        logic [2:0] boundary;
+        logic [7:0] pattern_8b;
+        logic [15:0] pattern_16b;
+        logic [31:0] pattern, identity, sew_bits;
+
+        assign op_sum        = (vector_operation_i inside {VREDSUM, VWREDSUMU, VWREDSUM});
+        assign op_minu       = (vector_operation_i inside {VREDMIN, VREDMINU, VREDMAX, VREDMAXU});
+        assign op_and        = (vector_operation_i inside {VREDAND, VREDOR});
+        assign minmax_signed = (vector_operation_i inside {VREDMIN, VREDMAX});
+        assign minmax_max    = (vector_operation_i inside {VREDMAX, VREDMAXU});
+        assign invert        = (vector_operation_i == VREDOR);
+        assign identity      = {32{op_and || op_minu}};
+
+        assign pattern_8b  = {8{minmax_max  || invert}} ^ {minmax_signed, 7'b0};
+        assign pattern_16b = {16{minmax_max || invert}} ^ {minmax_signed, 15'b0};
+
+        always_comb begin
+            unique case (vsew)
+                EW8: begin
+                    boundary = 3'b111;
+                    pattern  = {4{pattern_8b}};
+                    sew_bits = 32'h0000_00FF;
+                end
+                EW16: begin
+                    boundary = 3'b010;
+                    pattern  = {2{pattern_16b}};
+                    sew_bits = 32'h0000_FFFF;
+                end
+                default: begin
+                    boundary = 3'b000;
+                    pattern  = {32{minmax_max || invert}} ^ {minmax_signed, 31'b0};
+                    sew_bits = 32'hFFFF_FFFF;
+                end
+            endcase
+        end
+
+        /* Active elements of the chunk of this step, one bit per byte */
+        logic [3:0]  active_byte;
+        logic [31:0] active_bits;
+
+        always_comb begin
+            for (int j = 0; j < 4; j++) begin
+                unique case (vsew)
+                    EW8:     active_byte[j] = (vm || mask_8b [(4*step) + j    ]) && (((4*step) + j    ) < vl);
+                    EW16:    active_byte[j] = (vm || mask_16b[(2*step) + (j/2)]) && (((2*step) + (j/2)) < vl);
+                    default: active_byte[j] = (vm || mask_32b[step           ]) && (step < vl);
+                endcase
+                active_bits[(8*j)+:8] = {8{active_byte[j]}};
+            end
+        end
+
+        /* Operands of the step */
+        logic [31:0] accumulator, initial_value, chunk, chunk_operand, fold_operand;
+        logic [31:0] operand_a, operand_b, step_result;
+
+        assign chunk         = (step < CHUNKS) ? first_operand_32b[step[STEP_BITS-1:0]] : '0;
+        assign chunk_operand = ((chunk ^ pattern) & active_bits) | (identity & ~active_bits);
+        assign initial_value = ((second_operand ^ pattern) & sew_bits) | (identity & ~sew_bits);
+        assign fold_operand  = (step == STEP_BITS'(CHUNKS)) ? (accumulator >> 16) : (accumulator >> 8);
+
+        assign operand_a = (step == '0)     ? initial_value : accumulator;
+        assign operand_b = (step < CHUNKS)  ? chunk_operand : fold_operand;
+
+        /* Element by element operation on the 32 bits */
+        logic [31:0] sum, smaller;
+
+        assign sum     = (VRedSumEnable)    ? simd_add(operand_a, operand_b, boundary)     : '0;
+        assign smaller = (VRedMinMaxEnable) ? simd_minu(operand_a, operand_b, boundary, vsew) : '0;
+
+        always_comb begin
+            if (op_sum)
+                step_result = sum;
+            else if (op_minu)
+                step_result = smaller;
+            else if (op_and)
+                step_result = (VRedLogicEnable) ? (operand_a & operand_b) : '0;
+            else
+                step_result = (VRedLogicEnable) ? (operand_a ^ operand_b) : '0;
+        end
+
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n)
+                accumulator <= '0;
+            else if (enable_i)
+                accumulator <= step_result;
+        end
+
+        assign result_multi_cycle = (step_result ^ pattern) & sew_bits;
+    end
+    else begin : multi_cycle_reduction_off
+        assign hold_o             = 1'b0;
+        assign result_multi_cycle = '0;
+    end
+
+    // *********************************
     //  Result Demux
     // *********************************
 
     always @(posedge clk) begin
         if (!stall) begin
-            unique case(vector_operation_i)
-                VREDOR:   result_o <= result_redor;
-                VREDXOR:  result_o <= result_redxor;
-                VREDSUM,
-                VWREDSUMU,
-                VWREDSUM: result_o <= result_redsum;
-                VREDMIN,
-                VREDMINU,
-                VREDMAX,
-                VREDMAXU: result_o <= result_redminmax;
-                default:  result_o <= result_redand;
-            endcase
+            if (VMultiCycleReductions) begin
+                result_o <= result_multi_cycle;
+            end
+            else begin
+                unique case(vector_operation_i)
+                    VREDOR:   result_o <= result_redor;
+                    VREDXOR:  result_o <= result_redxor;
+                    VREDSUM,
+                    VWREDSUMU,
+                    VWREDSUM: result_o <= result_redsum;
+                    VREDMIN,
+                    VREDMINU,
+                    VREDMAX,
+                    VREDMAXU: result_o <= result_redminmax;
+                    default:  result_o <= result_redand;
+                endcase
+            end
         end
     end
 

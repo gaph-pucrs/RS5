@@ -29,8 +29,11 @@ The regression runs in two steps, both spread over -j/--jobs parallel jobs
      test.bin and test.lst; at the same time every configuration is elaborated once
      into its own Xcelium library, xcelium_vlen<V>_llen<L>_bus<B>.d, and
      xcelium_vlen<V>_llen<L>_bus<B>_classoff.d for the tests in class_disabled/,
-     which run with every vector class parameter set to 0 (with --sail, a
-     Sail configuration with that VLEN is written instead);
+     which run with every vector class parameter set to 0, and
+     xcelium_vlen<V>_llen<L>_bus<B>_multicycle.d, where the reduction tests
+     (MULTICYCLE_TESTS) run a second time with VMultiCycleReductions = 1 and
+     their results are filed as <test>@multicycle (with --sail, a Sail
+     configuration with that VLEN is written instead);
   2. every (test, configuration) pair is simulated from that snapshot
      (xrun -R), with the program given as +BIN_FILE=<path> (with --sail, by
      sail_riscv_sim on the test's test.axf).
@@ -90,6 +93,16 @@ CLASS_PARAMETERS = [
 ]
 CLASS_OFF = [arg for name in CLASS_PARAMETERS for arg in ("-defparam", f"testbench.{name}=0")]
 
+# Snapshot variants: "" is the default configuration, "classoff" has every vector
+# class parameter set to 0, and "multicycle" has the multi-cycle reductions
+VARIANT_PARAMS = {
+    "": [],
+    "classoff": CLASS_OFF,
+    "multicycle": ["-defparam", "testbench.VMultiCycleReductions=1"],
+}
+# Tests of SOURCE_FOLDERS that also run on the multicycle snapshot
+MULTICYCLE_TESTS = ["vred*.c", "vwred*.c"]
+
 # Process groups of the running builds and simulations, killed on Ctrl-C
 running = set()
 running_lock = threading.Lock()
@@ -97,7 +110,12 @@ running_lock = threading.Lock()
 
 class Test(NamedTuple):
     file: Path
-    classoff: bool  # runs with every vector class parameter set to 0
+    variant: str  # snapshot variant, a key of VARIANT_PARAMS
+
+    @property
+    def name(self):
+        """Name of the test in the results: the multicycle run gets a suffix."""
+        return self.file.stem + ("@multicycle" if self.variant == "multicycle" else "")
 
 
 class Config(NamedTuple):
@@ -177,9 +195,9 @@ def write_sail_config(config, vlen):
     return ""
 
 
-def library(config, classoff):
+def library(config, variant):
     """Xcelium library of the snapshot of a configuration."""
-    return f"xcelium_{config.name}{'_classoff' if classoff else ''}.d"
+    return f"xcelium_{config.name}{'_' + variant if variant else ''}.d"
 
 
 def kill(process, sig):
@@ -232,13 +250,13 @@ def build(test, model):
     return returncode == 0, log.read_text(errors="replace")
 
 
-def elaborate(config, classoff):
+def elaborate(config, variant):
     """Elaborate the snapshot of a configuration; return "" or the elaboration error."""
-    lib = library(config, classoff)
+    lib = library(config, variant)
     log = f"xrun.{lib.removeprefix('xcelium_').removesuffix('.d')}.log"
     command = ["xrun", "-f", "sim.xrun", "-elaborate", "-xmlibdirname", lib, "-l", log,
                "-defparam", "testbench.VEnable=1", *config.params,
-               *(CLASS_OFF if classoff else [])]
+               *VARIANT_PARAMS[variant]]
     _, returncode = run(command, subprocess.DEVNULL)
     if returncode == 0:
         return ""
@@ -247,12 +265,12 @@ def elaborate(config, classoff):
 
 def simulate(test, config, sim_timeout, sail_sim):
     """Simulate a built test on one configuration, file the log, return its Result."""
-    output_file = RESULTS_FOLDER / config.name / f"{test.file.stem}.txt"
+    output_file = RESULTS_FOLDER / config.name / f"{test.name}.txt"
     folder = BUILD_FOLDER / config.model / test.file.stem
     if config.model == "sail":
         command = [sail_sim, "--config", config.params[0], str(folder / "test.axf")]
     else:
-        command = ["xrun", "-R", "-xmlibdirname", library(config, test.classoff), "-l", "/dev/null",
+        command = ["xrun", "-R", "-xmlibdirname", library(config, test.variant), "-l", "/dev/null",
                    f"+BIN_FILE={folder / 'test.bin'}"]
     with open(output_file, "w") as output:
         timed_out, _ = run(command, output, sim_timeout)
@@ -261,50 +279,54 @@ def simulate(test, config, sim_timeout, sail_sim):
     reason, detail = failure_reason(log, test.file.name, timed_out, sim_timeout)
     verdict = "failed" if reason else "passed"
     shutil.move(output_file, RESULTS_FOLDER / config.name / verdict / output_file.name)
-    return Result(config.name, test.file.name, reason, detail)
+    return Result(config.name, test.name, reason, detail)
 
 
 def run_regression(pool, tests, configs, sim_timeout, sail_sim, vlens):
     """Build, elaborate (or write the Sail configurations) and simulate; return the Results."""
     model = configs[0].model
-    builds = {test: pool.submit(build, test, model) for test in tests}
+    # One build per file: the multicycle run of a test uses the build of its default run
+    builds = {}
+    for test in tests:
+        if test.file not in builds:
+            builds[test.file] = pool.submit(build, test, model)
     if model == "sail":
-        snapshots = {(config, False): pool.submit(write_sail_config, config, vlen)
+        snapshots = {(config, ""): pool.submit(write_sail_config, config, vlen)
                      for config, vlen in zip(configs, vlens)}
     else:
-        snapshots = {(config, classoff): pool.submit(elaborate, config, classoff)
-                     for config in configs for classoff in sorted({test.classoff for test in tests})}
+        snapshots = {(config, variant): pool.submit(elaborate, config, variant)
+                     for config in configs for variant in sorted({test.variant for test in tests})}
 
-    for (config, classoff), snapshot in snapshots.items():
+    for (config, variant), snapshot in snapshots.items():
         error = snapshot.result()
         if error:
-            target = library(config, classoff) if config.model == "rs5" else config.params[0]
+            target = library(config, variant) if config.model == "rs5" else config.params[0]
             print(f"{target}: setup failed: {error}", flush=True)
 
     results = []
     simulations = {}
-    for test, job in builds.items():
-        built, output = job.result()
+    for test in tests:
+        built, output = builds[test.file].result()
         if not built:
             for config in configs:
-                (RESULTS_FOLDER / config.name / "failed" / f"{test.file.stem}.txt").write_text(output)
-            print(f"{test.file.name} build failed", flush=True)
+                (RESULTS_FOLDER / config.name / "failed" / f"{test.name}.txt").write_text(output)
+            print(f"{test.name} build failed", flush=True)
             error = first_line(output, "error") or "make failed"
-            results += [Result(config.name, test.file.name, "BUILD", error) for config in configs]
+            results += [Result(config.name, test.name, "BUILD", error) for config in configs]
             continue
         simulations[test] = []
         for config in configs:
-            error = snapshots[(config, test.classoff)].result()
+            error = snapshots[(config, test.variant)].result()
             if error:
-                log = RESULTS_FOLDER / config.name / "failed" / f"{test.file.stem}.txt"
+                log = RESULTS_FOLDER / config.name / "failed" / f"{test.name}.txt"
                 log.write_text(f"Setup of {config.name} failed: {error}\n")
-                results.append(Result(config.name, test.file.name, "SIM", f"setup: {error}"))
+                results.append(Result(config.name, test.name, "SIM", f"setup: {error}"))
             else:
                 simulations[test].append(pool.submit(simulate, test, config, sim_timeout, sail_sim))
 
     for test, jobs in simulations.items():
         results += [job.result() for job in jobs]
-        print(f"{test.file.name} done", flush=True)
+        print(f"{test.name} done", flush=True)
     return results
 
 
@@ -353,9 +375,12 @@ def main():
         vlens = []
         configs = [make_config(*triple) for triple in triples]
 
-    tests = [Test(file, False) for folder in SOURCE_FOLDERS for file in sorted(folder.glob("*.c"))]
+    tests = [Test(file, "") for folder in SOURCE_FOLDERS for file in sorted(folder.glob("*.c"))]
     if not args.sail:
-        tests += [Test(file, True) for file in sorted((TESTS_FOLDER / "class_disabled").glob("*.c"))]
+        tests += [Test(file, "classoff") for file in sorted((TESTS_FOLDER / "class_disabled").glob("*.c"))]
+        tests += [Test(test.file, "multicycle") for test in list(tests)
+                  if test.variant == "" and any(fnmatch.fnmatch(test.file.name, pattern)
+                                                for pattern in MULTICYCLE_TESTS)]
     tests = [test for test in tests if selected(test.file, args.patterns)]
     if not tests:
         parser.error(f"no test matches {' '.join(args.patterns)}")
@@ -365,7 +390,7 @@ def main():
             # Keep the logs of the tests that do not run now
             for test in tests:
                 for verdict in ("passed", "failed"):
-                    (RESULTS_FOLDER / config.name / verdict / f"{test.file.stem}.txt").unlink(missing_ok=True)
+                    (RESULTS_FOLDER / config.name / verdict / f"{test.name}.txt").unlink(missing_ok=True)
         else:
             shutil.rmtree(RESULTS_FOLDER / config.name, ignore_errors=True)
         (RESULTS_FOLDER / config.name / "passed").mkdir(parents=True, exist_ok=True)
