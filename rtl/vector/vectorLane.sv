@@ -47,7 +47,9 @@ module vectorLane
     input  logic               mult_enable,
     input  logic               hold_widening,
     input  logic [ 1:0]        mult_signed_mode,
-    input  logic               div_enable,
+    /* verilator lint_off UNUSEDSIGNAL */
+    input  logic               div_enable,    /* unused with VDivEnable = 0 */
+    /* verilator lint_on UNUSEDSIGNAL */
 
     output logic               hold_o,
     output logic [LLEN/8-1:0]  result_mask_o,
@@ -512,156 +514,30 @@ module vectorLane
     end
 
 //////////////////////////////////////////////////////////////////////////////
-// Division Common
+// Division
 //////////////////////////////////////////////////////////////////////////////
 
-    logic [3:0] hold_div_8b;
-    logic [1:0] hold_div_16b;
-    logic       hold_div_32b;
-
-    logic        div_signed;
     logic [31:0] result_div;
     logic [31:0] result_rem;
 
-    logic  div_enable_8b;
-    logic  div_enable_16b;
-    logic  div_enable_32b;
-
-    if (VDivEnable) begin : v_div_common_gen_on
-        assign div_enable_8b  = (div_enable && vsew == EW8);
-        assign div_enable_16b = (div_enable && vsew == EW16);
-        assign div_enable_32b = (div_enable && vsew == EW32);
-        assign div_signed     = (vector_operation_i inside {VDIV, VREM});
-        assign hold_div       = (|hold_div_8b) | (|hold_div_16b) | (|hold_div_32b);
-    end
-    else begin : v_div_common_gen_off
-        assign div_enable_8b  = 1'b0;
-        assign div_enable_16b = 1'b0;
-        assign div_enable_32b = 1'b0;
-        assign div_signed     = 1'b0;
-        assign hold_div       = 1'b0;
-    end
-
-//////////////////////////////////////////////////////////////////////////////
-// Division 8 bits
-//////////////////////////////////////////////////////////////////////////////
-
-    logic [3:0][7:0] div_result_8b;
-    logic [3:0][7:0] rem_result_8b;
-
-    generate
-        for (genvar i_div8b = 0; i_div8b < 4; i_div8b++) begin : DIV8B_LOOP
-            if (VDivEnable) begin : v_div_8b_gen_on
-                div #(
-                    .N(8)
-                ) div8b (
-                    .clk              (clk),
-                    .reset_n          (reset_n),
-                    .first_operand_i  (first_operand [(8*i_div8b)+:8]),
-                    .second_operand_i (second_operand[(8*i_div8b)+:8]),
-                    .enable_i         (div_enable_8b),
-                    .signed_i         (div_signed),
-                    .hold_o           (hold_div_8b  [i_div8b]),
-                    .div_result_o     (div_result_8b[i_div8b]),
-                    .rem_result_o     (rem_result_8b[i_div8b])
-                );
-            end
-            else begin : v_div_8b_gen_off
-                assign div_result_8b[i_div8b] = '0;
-                assign rem_result_8b[i_div8b] = '0;
-                assign hold_div_8b  [i_div8b] = '0;
-            end
-        end
-    endgenerate
-
-//////////////////////////////////////////////////////////////////////////////
-// Division 16 bits
-//////////////////////////////////////////////////////////////////////////////
-
-    logic [1:0][15:0] div_result_16b;
-    logic [1:0][15:0] rem_result_16b;
-
-    generate
-        for (genvar i_div16b = 0; i_div16b < 2; i_div16b++) begin : DIV16B_LOOP
-            if (VDivEnable) begin : v_div_16b_gen_on
-                div #(
-                    .N(16)
-                ) div16b (
-                    .clk              (clk),
-                    .reset_n          (reset_n),
-                    .first_operand_i  (first_operand [(16*i_div16b)+:16]),
-                    .second_operand_i (second_operand[(16*i_div16b)+:16]),
-                    .enable_i         (div_enable_16b),
-                    .signed_i         (div_signed),
-                    .hold_o           (hold_div_16b  [i_div16b]),
-                    .div_result_o     (div_result_16b[i_div16b]),
-                    .rem_result_o     (rem_result_16b[i_div16b])
-                );
-            end
-            else begin : v_div_16b_gen_off
-                assign div_result_16b[i_div16b] = '0;
-                assign rem_result_16b[i_div16b] = '0;
-                assign hold_div_16b  [i_div16b] = '0;
-            end
-        end
-    endgenerate
-
-//////////////////////////////////////////////////////////////////////////////
-// Division 32 bits
-//////////////////////////////////////////////////////////////////////////////
-
-    logic [31:0] div_result_32b;
-    logic [31:0] rem_result_32b;
-
-    if (VDivEnable) begin : v_div_32b_gen_on
-        div #(
-            .N(32)
-        ) div32b (
-            .clk              (clk),
-            .reset_n          (reset_n),
-            .first_operand_i  (first_operand),
-            .second_operand_i (second_operand),
-            .enable_i         (div_enable_32b),
-            .signed_i         (div_signed),
-            .hold_o           (hold_div_32b),
-            .div_result_o     (div_result_32b),
-            .rem_result_o     (rem_result_32b)
+    if (VDivEnable) begin : v_div_gen_on
+        vectorDiv u_vector_div (
+            .clk             (clk),
+            .reset_n         (reset_n),
+            .first_operand_i (first_operand),
+            .second_operand_i(second_operand),
+            .vsew_i          (vsew),
+            .enable_i        (div_enable),
+            .signed_i        (vector_operation_i inside {VDIV, VREM}),
+            .hold_o          (hold_div),
+            .div_result_o    (result_div),
+            .rem_result_o    (result_rem)
         );
     end
-    else begin : v_div_32b_gen_off
-        assign div_result_32b = '0;
-        assign rem_result_32b = '0;
-        assign hold_div_32b   = '0;
-    end
-
-//////////////////////////////////////////////////////////////////////////////
-// Division Demux
-//////////////////////////////////////////////////////////////////////////////
-
-    if (VDivEnable) begin : v_div_mux_gen_on
-        always_comb begin
-            unique case (vsew)
-                EW8: begin
-                    for (int i = 0; i < 4; i++) begin
-                        result_div[(8*i)+:8] = div_result_8b[i];
-                        result_rem[(8*i)+:8] = rem_result_8b[i];
-                    end
-                end
-                EW16: begin
-                    for (int i = 0; i < 2; i++) begin
-                        result_div[(16*i)+:16] = div_result_16b[i];
-                        result_rem[(16*i)+:16] = rem_result_16b[i];
-                    end
-                end
-                default: begin
-                    result_div = div_result_32b;
-                    result_rem = rem_result_32b;
-                end
-            endcase
-        end
-    end else begin : v_div_mux_gen_off
+    else begin : v_div_gen_off
         assign result_div = '0;
         assign result_rem = '0;
+        assign hold_div   = 1'b0;
     end
 
 //////////////////////////////////////////////////////////////////////////////

@@ -12,6 +12,7 @@
 ./vector/vectorReductions.sv
 ./vector/vectorSlide.sv
 ./vector/vectorExtend.sv
+./vector/vectorDiv.sv
 ./vector/vectorLane.sv
 ./vector/vectorCSRs.sv
 ./vector/vectorALU.sv
