@@ -58,7 +58,7 @@ module div
 
     assign divide_by_zero   = (second_operand_i == '0);
     assign divide_by_one    = (second_operand_i ==  1);
-    assign overflow         = (second_operand_i == '1 && first_operand_i == (1 << 31) && signed_i == 1'b1);
+    assign overflow         = (second_operand_i == '1 && first_operand_i == {1'b1, {(N-1){1'b0}}} && signed_i == 1'b1);
 
     assign start            = (enable_i == 1'b1 && busy == 1'b0 && valid_result == 1'b0);
 
