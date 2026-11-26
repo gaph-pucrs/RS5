@@ -57,22 +57,7 @@ module vectorReductionTree
             for (int i = 0; i < ELEMENTS_PER_REG; i++) begin
                 if (i == 0) begin
                     if ((vm || mask[0]) && i < vl) begin
-                        if (RED_OP == RED_MAX) begin
-                            result[0][i] = ($signed(first_operand[0]) > $signed(second_operand))
-                                            ? first_operand[0]
-                                            : second_operand;
-                        end
-                        else if (RED_OP == RED_MAXU) begin
-                            result[0][i] = (first_operand[0] > second_operand)
-                                            ? first_operand[0]
-                                            : second_operand;
-                        end
-                        else if (RED_OP == RED_MIN) begin
-                            result[0][i] = ($signed(first_operand[0]) > $signed(second_operand))
-                                            ? second_operand
-                                            : first_operand[0];
-                        end
-                        else if (RED_OP == RED_MINU) begin
+                        if (RED_OP == RED_MINU) begin
                             result[0][i] = (first_operand[0] > second_operand)
                                             ? second_operand
                                             : first_operand[0];
@@ -96,15 +81,7 @@ module vectorReductionTree
                         result[0][i] = first_operand[i];
                     end
                     else begin
-                        if (RED_OP == RED_MIN) begin
-                            result[0][i][SEW-2:0] =  '1;
-                            result[0][i][SEW-1]   = 1'b0;
-                        end
-                        else if (RED_OP == RED_MAX) begin
-                            result[0][i][SEW-2:0] =  '0;
-                            result[0][i][SEW-1]   = 1'b1;
-                        end
-                        else if (RED_OP inside {RED_AND, RED_MINU}) begin
+                        if (RED_OP inside {RED_AND, RED_MINU}) begin
                             result[0][i] = '1;
                         end
                         else begin
@@ -117,22 +94,7 @@ module vectorReductionTree
             // Other Levels
             for (int i = 0; i < STAGES; i++) begin
                 for (int j = 0; j < ELEMENTS_PER_REG/(2**(i+1)); j++) begin
-                    if (RED_OP == RED_MAX) begin
-                        result[i+1][j] = ($signed(result[i][2*j]) > $signed(result[i][2*j+1]))
-                                            ? result[i][2*j]
-                                            : result[i][2*j+1];
-                    end
-                    else if (RED_OP == RED_MAXU) begin
-                        result[i+1][j] = (result[i][2*j] > result[i][2*j+1])
-                                            ? result[i][2*j]
-                                            : result[i][2*j+1];
-                    end
-                    else if (RED_OP == RED_MIN) begin
-                        result[i+1][j] = ($signed(result[i][2*j]) > $signed(result[i][2*j+1]))
-                                            ? result[i][2*j+1]
-                                            : result[i][2*j];
-                    end
-                    else if (RED_OP == RED_MINU) begin
+                    if (RED_OP == RED_MINU) begin
                         result[i+1][j] = (result[i][2*j] > result[i][2*j+1])
                                             ? result[i][2*j+1]
                                             : result[i][2*j];
@@ -162,22 +124,7 @@ module vectorReductionTree
 
         always_comb begin
             for (int j = 0, int k = 0; k < (ELEMENTS_PER_REG/2); j+=2, k++) begin
-                if (RED_OP == RED_MAX) begin
-                    result[k] = ($signed(operand[j]) > $signed(operand[j+1]))
-                                        ? operand[j]
-                                        : operand[j+1];
-                end
-                else if (RED_OP == RED_MAXU) begin
-                    result[k] = (operand[j] > operand[j+1])
-                                        ? operand[j]
-                                        : operand[j+1];
-                end
-                else if (RED_OP == RED_MIN) begin
-                    result[k] = ($signed(operand[j]) > $signed(operand[j+1]))
-                                        ? operand[j+1]
-                                        : operand[j];
-                end
-                else if (RED_OP == RED_MINU) begin
+                if (RED_OP == RED_MINU) begin
                     result[k] = (operand[j] > operand[j+1])
                                         ? operand[j+1]
                                         : operand[j];
@@ -202,22 +149,7 @@ module vectorReductionTree
                 for (int i = 0; i < ELEMENTS_PER_REG; i++) begin
                     if (i == 0) begin
                         if ((vm || mask[0]) && i < vl) begin
-                            if (RED_OP == RED_MAX) begin
-                               operand[i] <= ($signed(first_operand[0]) > $signed(second_operand))
-                                                ? first_operand[0]
-                                                : second_operand;
-                            end
-                            else if (RED_OP == RED_MAXU) begin
-                               operand[i] <= (first_operand[0] > second_operand)
-                                                ? first_operand[0]
-                                                : second_operand;
-                            end
-                            else if (RED_OP == RED_MIN) begin
-                               operand[i] <= ($signed(first_operand[0]) > $signed(second_operand))
-                                                ? second_operand
-                                                : first_operand[0];
-                            end
-                            else if (RED_OP == RED_MINU) begin
+                            if (RED_OP == RED_MINU) begin
                                operand[i] <= (first_operand[0] > second_operand)
                                                 ? second_operand
                                                 : first_operand[0];
@@ -241,15 +173,7 @@ module vectorReductionTree
                            operand[i] <= first_operand[i];
                         end
                         else begin
-                            if (RED_OP == RED_MIN) begin
-                               operand[i][SEW-2:0] <=  '1;
-                               operand[i][SEW-1]   <= 1'b0;
-                            end
-                            else if (RED_OP == RED_MAX) begin
-                               operand[i][SEW-2:0] <=  '0;
-                               operand[i][SEW-1]   <= 1'b1;
-                            end
-                            else if (RED_OP inside {RED_AND, RED_MINU}) begin
+                            if (RED_OP inside {RED_AND, RED_MINU}) begin
                                operand[i] <= '1;
                             end
                             else begin
@@ -265,15 +189,7 @@ module vectorReductionTree
                         operand[i] <= result[i];
                     end
                     else begin
-                        if (RED_OP == RED_MIN) begin
-                            operand[i][SEW-2:0] <=  '1;
-                            operand[i][SEW-1]   <= 1'b0;
-                        end
-                        else if (RED_OP == RED_MAX) begin
-                            operand[i][SEW-2:0] <=  '0;
-                            operand[i][SEW-1]   <= 1'b1;
-                        end
-                        else if (RED_OP inside {RED_AND, RED_MINU}) begin
+                        if (RED_OP inside {RED_AND, RED_MINU}) begin
                             operand[i] <= '1;
                         end
                         else begin

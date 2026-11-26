@@ -54,10 +54,7 @@ module vectorReductions
     logic [31:0] result_redand;
     logic [31:0] result_redor;
     logic [31:0] result_redxor;
-    logic [31:0] result_redmin;
-    logic [31:0] result_redminu;
-    logic [31:0] result_redmax;
-    logic [31:0] result_redmaxu;
+    logic [31:0] result_redminmax;
 
     // *********************************
     //  HOLD CONTROL
@@ -361,31 +358,53 @@ module vectorReductions
     //  MIN-MAX
     // *********************************
     if (VRedMinMaxEnable) begin : v_redminmax_gen_on
-        /////////////////////////////////////////////////
-        // 8 Bits
-        /////////////////////////////////////////////////
-        logic [ 7:0] result_redmin_8b;
-        logic [ 7:0] result_redminu_8b;
-        logic [ 7:0] result_redmax_8b;
-        logic [ 7:0] result_redmaxu_8b;
+        /* One minu tree per width covers the four operations: flipping the */
+        /* MSB of each element turns the signed order into the unsigned     */
+        /* one, and inverting every bit turns max into min                  */
+        /* (max(a,b) = ~min(~a,~b)). The same XOR pattern goes into the     */
+        /* elements and the accumulator and comes out of the result; the    */
+        /* identity of the inactive elements ('1 for minu) is the right one */
+        /* after the transform.                                             */
+        logic        minmax_signed;
+        logic        minmax_max;
+        logic [31:0] minmax_pattern;
 
-        vectorReductionTree #(
-            .SEW                   (8),
-            .VLEN                  (VLEN),
-            .ELEMENTS_PER_REG      (VLEN/8),
-            .RED_OP                (RED_MIN),
-            .VMultiCycleReductions (VMultiCycleReductions)
-        )   reduction_tree_min_8b (
-            .clk           (clk),
-            .reset_n       (reset_n),
-            .first_operand (first_operand_8b),
-            .second_operand(second_operand[7:0]),
-            .vl            (vl),
-            .vm            (vm),
-            .mask          (mask_8b),
-            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
-            .result_o      (result_redmin_8b)
-        );
+        assign minmax_signed = (vector_operation_i inside {VREDMIN, VREDMAX});
+        assign minmax_max    = (vector_operation_i inside {VREDMAX, VREDMAXU});
+
+        always_comb begin
+            unique case (vsew)
+                EW8:     minmax_pattern = {4{{8{minmax_max}}  ^ {minmax_signed, 7'b0}}};
+                EW16:    minmax_pattern = {2{{16{minmax_max}} ^ {minmax_signed, 15'b0}}};
+                default: minmax_pattern =     {32{minmax_max}} ^ {minmax_signed, 31'b0};
+            endcase
+        end
+
+        logic [VLEN-1:0] minmax_operand;
+        logic [31:0]     minmax_accumulator;
+
+        assign minmax_operand     = first_operand  ^ {(VLEN/32){minmax_pattern}};
+        assign minmax_accumulator = second_operand ^ minmax_pattern;
+
+        logic [(VLENB)  -1:0][ 7:0] minmax_operand_8b;
+        logic [(VLENB/2)-1:0][15:0] minmax_operand_16b;
+        logic [(VLENB/4)-1:0][31:0] minmax_operand_32b;
+
+        always_comb begin
+            for (int i = 0; i < VLENB; i++) begin
+                minmax_operand_8b [i] = minmax_operand[(8*i)+:8];
+            end
+            for (int i = 0; i < VLENB/2; i++) begin
+                minmax_operand_16b[i] = minmax_operand[(16*i)+:16];
+            end
+            for (int i = 0; i < VLENB/4; i++) begin
+                minmax_operand_32b[i] = minmax_operand[(32*i)+:32];
+            end
+        end
+
+        logic [ 7:0] result_minu_8b;
+        logic [15:0] result_minu_16b;
+        logic [31:0] result_minu_32b;
 
         vectorReductionTree #(
             .SEW                   (8),
@@ -396,75 +415,13 @@ module vectorReductions
         )   reduction_tree_minu_8b (
             .clk           (clk),
             .reset_n       (reset_n),
-            .first_operand (first_operand_8b),
-            .second_operand(second_operand[7:0]),
+            .first_operand (minmax_operand_8b),
+            .second_operand(minmax_accumulator[7:0]),
             .vl            (vl),
             .vm            (vm),
             .mask          (mask_8b),
             .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
-            .result_o      (result_redminu_8b)
-        );
-
-        vectorReductionTree #(
-            .SEW                   (8),
-            .VLEN                  (VLEN),
-            .ELEMENTS_PER_REG      (VLEN/8),
-            .RED_OP                (RED_MAX),
-            .VMultiCycleReductions (VMultiCycleReductions)
-        )   reduction_tree_max_8b (
-            .clk           (clk),
-            .reset_n       (reset_n),
-            .first_operand (first_operand_8b),
-            .second_operand(second_operand[7:0]),
-            .vl            (vl),
-            .vm            (vm),
-            .mask          (mask_8b),
-            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
-            .result_o      (result_redmax_8b)
-        );
-
-        vectorReductionTree #(
-            .SEW                   (8),
-            .VLEN                  (VLEN),
-            .ELEMENTS_PER_REG      (VLEN/8),
-            .RED_OP                (RED_MAXU),
-            .VMultiCycleReductions (VMultiCycleReductions)
-        )   reduction_tree_maxu_8b (
-            .clk           (clk),
-            .reset_n       (reset_n),
-            .first_operand (first_operand_8b),
-            .second_operand(second_operand[7:0]),
-            .vl            (vl),
-            .vm            (vm),
-            .mask          (mask_8b),
-            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
-            .result_o      (result_redmaxu_8b)
-        );
-
-        /////////////////////////////////////////////////
-        // 16 Bits
-        /////////////////////////////////////////////////
-        logic [15:0] result_redmin_16b;
-        logic [15:0] result_redminu_16b;
-        logic [15:0] result_redmax_16b;
-        logic [15:0] result_redmaxu_16b;
-
-        vectorReductionTree #(
-            .SEW                   (16),
-            .VLEN                  (VLEN),
-            .ELEMENTS_PER_REG      (VLEN/16),
-            .RED_OP                (RED_MIN),
-            .VMultiCycleReductions (VMultiCycleReductions)
-        )   reduction_tree_min_16b (
-            .clk           (clk),
-            .reset_n       (reset_n),
-            .first_operand (first_operand_16b),
-            .second_operand(second_operand[15:0]),
-            .vl            (vl),
-            .vm            (vm),
-            .mask          (mask_16b),
-            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
-            .result_o      (result_redmin_16b)
+            .result_o      (result_minu_8b)
         );
 
         vectorReductionTree #(
@@ -476,75 +433,13 @@ module vectorReductions
         )   reduction_tree_minu_16b (
             .clk           (clk),
             .reset_n       (reset_n),
-            .first_operand (first_operand_16b),
-            .second_operand(second_operand[15:0]),
+            .first_operand (minmax_operand_16b),
+            .second_operand(minmax_accumulator[15:0]),
             .vl            (vl),
             .vm            (vm),
             .mask          (mask_16b),
             .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
-            .result_o      (result_redminu_16b)
-        );
-
-        vectorReductionTree #(
-            .SEW                   (16),
-            .VLEN                  (VLEN),
-            .ELEMENTS_PER_REG      (VLEN/16),
-            .RED_OP                (RED_MAX),
-            .VMultiCycleReductions (VMultiCycleReductions)
-        )   reduction_tree_max_16b (
-            .clk           (clk),
-            .reset_n       (reset_n),
-            .first_operand (first_operand_16b),
-            .second_operand(second_operand[15:0]),
-            .vl            (vl),
-            .vm            (vm),
-            .mask          (mask_16b),
-            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
-            .result_o      (result_redmax_16b)
-        );
-
-        vectorReductionTree #(
-            .SEW                   (16),
-            .VLEN                  (VLEN),
-            .ELEMENTS_PER_REG      (VLEN/16),
-            .RED_OP                (RED_MAXU),
-            .VMultiCycleReductions (VMultiCycleReductions)
-        )   reduction_tree_maxu_16b (
-            .clk           (clk),
-            .reset_n       (reset_n),
-            .first_operand (first_operand_16b),
-            .second_operand(second_operand[15:0]),
-            .vl            (vl),
-            .vm            (vm),
-            .mask          (mask_16b),
-            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
-            .result_o      (result_redmaxu_16b)
-        );
-
-        /////////////////////////////////////////////////
-        // 32 Bits
-        /////////////////////////////////////////////////
-        logic [31:0] result_redmin_32b;
-        logic [31:0] result_redminu_32b;
-        logic [31:0] result_redmax_32b;
-        logic [31:0] result_redmaxu_32b;
-
-        vectorReductionTree #(
-            .SEW                   (32),
-            .VLEN                  (VLEN),
-            .ELEMENTS_PER_REG      (VLEN/32),
-            .RED_OP                (RED_MIN),
-            .VMultiCycleReductions (VMultiCycleReductions)
-        )   reduction_tree_min_32b (
-            .clk           (clk),
-            .reset_n       (reset_n),
-            .first_operand (first_operand_32b),
-            .second_operand(second_operand[31:0]),
-            .vl            (vl),
-            .vm            (vm),
-            .mask          (mask_32b),
-            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
-            .result_o      (result_redmin_32b)
+            .result_o      (result_minu_16b)
         );
 
         vectorReductionTree #(
@@ -556,84 +451,28 @@ module vectorReductions
         )   reduction_tree_minu_32b (
             .clk           (clk),
             .reset_n       (reset_n),
-            .first_operand (first_operand_32b),
-            .second_operand(second_operand[31:0]),
+            .first_operand (minmax_operand_32b),
+            .second_operand(minmax_accumulator),
             .vl            (vl),
             .vm            (vm),
             .mask          (mask_32b),
             .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
-            .result_o      (result_redminu_32b)
-        );
-
-        vectorReductionTree #(
-            .SEW                   (32),
-            .VLEN                  (VLEN),
-            .ELEMENTS_PER_REG      (VLEN/32),
-            .RED_OP                (RED_MAX),
-            .VMultiCycleReductions (VMultiCycleReductions)
-        )   reduction_tree_max_32b (
-            .clk           (clk),
-            .reset_n       (reset_n),
-            .first_operand (first_operand_32b),
-            .second_operand(second_operand[31:0]),
-            .vl            (vl),
-            .vm            (vm),
-            .mask          (mask_32b),
-            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
-            .result_o      (result_redmax_32b)
-        );
-
-        vectorReductionTree #(
-            .SEW                   (32),
-            .VLEN                  (VLEN),
-            .ELEMENTS_PER_REG      (VLEN/32),
-            .RED_OP                (RED_MAXU),
-            .VMultiCycleReductions (VMultiCycleReductions)
-        )   reduction_tree_maxu_32b (
-            .clk           (clk),
-            .reset_n       (reset_n),
-            .first_operand (first_operand_32b),
-            .second_operand(second_operand[31:0]),
-            .vl            (vl),
-            .vm            (vm),
-            .mask          (mask_32b),
-            .cycle         ({ {(10-$bits(cycle_counter)){1'b0}}, cycle_counter}),
-            .result_o      (result_redmaxu_32b)
+            .result_o      (result_minu_32b)
         );
 
         // *********************************
-        //  Sew Demux
+        //  Sew Demux and inverse transform
         // *********************************
         always_comb begin
             unique case (vsew)
-                EW8: begin
-                    result_redmin  = {'0, result_redmin_8b };
-                    result_redminu = {'0, result_redminu_8b};
-                    result_redmax  = {'0, result_redmax_8b };
-                    result_redmaxu = {'0, result_redmaxu_8b};
-                end
-                EW16: begin
-                    result_redmin  = {'0, result_redmin_16b };
-                    result_redminu = {'0, result_redminu_16b};
-                    result_redmax  = {'0, result_redmax_16b };
-                    result_redmaxu = {'0, result_redmaxu_16b};
-                end
-                default: begin
-                    result_redmin  = result_redmin_32b;
-                    result_redminu = result_redminu_32b;
-                    result_redmax  = result_redmax_32b;
-                    result_redmaxu = result_redmaxu_32b;
-                end
+                EW8:     result_redminmax = {24'b0, result_minu_8b  ^ minmax_pattern[7:0]};
+                EW16:    result_redminmax = {16'b0, result_minu_16b ^ minmax_pattern[15:0]};
+                default: result_redminmax =         result_minu_32b ^ minmax_pattern;
             endcase
         end
     end
     else begin : v_redminmax_gen_off
-        always_comb begin
-            result_redmin  = '0;
-            result_redminu = '0;
-            result_redmax  = '0;
-            result_redmaxu = '0;
-        end
+        assign result_redminmax = '0;
     end
 
     // *********************************
@@ -648,10 +487,10 @@ module vectorReductions
                 VREDSUM,
                 VWREDSUMU,
                 VWREDSUM: result_o <= result_redsum;
-                VREDMIN:  result_o <= result_redmin;
-                VREDMINU: result_o <= result_redminu;
-                VREDMAX:  result_o <= result_redmax;
-                VREDMAXU: result_o <= result_redmaxu;
+                VREDMIN,
+                VREDMINU,
+                VREDMAX,
+                VREDMAXU: result_o <= result_redminmax;
                 default:  result_o <= result_redand;
             endcase
         end

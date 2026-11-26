@@ -534,9 +534,6 @@ package RS5_pkg;
     } addrModes_e;
 
     typedef enum integer {
-        RED_MAX,
-        RED_MAXU,
-        RED_MIN,
         RED_MINU,
         RED_AND,
         RED_XOR,
